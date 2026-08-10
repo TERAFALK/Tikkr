@@ -187,11 +187,8 @@ describe("skrivning hamnar alltid i rätt företag", () => {
 });
 
 describe("kringgående vägar är stängda", () => {
-  it("rå SQL är blockerad på en företagslåst klient", () => {
-    const db = forCompany(companyA);
-    expect(() => db.$queryRawUnsafe("SELECT * FROM employees")).toThrow(
-      TenantIsolationError
-    );
+  it("klienten vet vilket företag den är låst till", () => {
+    expect(forCompany(companyA).$companyId).toBe(companyA);
   });
 
   it("forCompany utan companyId vägrar skapa en klient", () => {

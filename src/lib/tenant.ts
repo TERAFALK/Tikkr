@@ -88,28 +88,15 @@ export function forCompany(companyId: string) {
     client: {
       /** Företaget den här klienten är låst till. Bra vid felsökning. */
       $companyId: companyId,
-
-      // Råa SQL-frågor kan vi inte filtrera automatiskt — de är fri text.
-      // Därför blockeras de helt på den här klienten.
-      $queryRaw() {
-        throw new TenantIsolationError(
-          "Rå SQL är blockerad på en företagslåst klient, eftersom filtreringen " +
-            "på company_id inte kan garanteras. Använd Prismas vanliga metoder."
-        );
-      },
-      $executeRaw() {
-        throw new TenantIsolationError(
-          "Rå SQL är blockerad på en företagslåst klient, eftersom filtreringen " +
-            "på company_id inte kan garanteras. Använd Prismas vanliga metoder."
-        );
-      },
-      $queryRawUnsafe() {
-        throw new TenantIsolationError("Rå SQL är blockerad på en företagslåst klient.");
-      },
-      $executeRawUnsafe() {
-        throw new TenantIsolationError("Rå SQL är blockerad på en företagslåst klient.");
-      },
     },
+
+    // OBS: Prisma tillåter inte att inbyggda metoder skrivs över i en
+    // extension, så $queryRaw och $executeRaw går INTE att blockera här.
+    // Rå SQL kringgår därmed företagsfiltreringen helt.
+    //
+    // Regel: skriv aldrig rå SQL mot kunddata. Behövs det ändå — t.ex. för en
+    // tung rapportfråga i Fas 2 — måste "WHERE company_id = ..." skrivas ut
+    // för hand och granskas extra noga.
 
     query: {
       $allModels: {
@@ -120,18 +107,42 @@ export function forCompany(companyId: string) {
           }
 
           const a = (args ?? {}) as AnyArgs;
+          // Prismas typ för query() är snävare än de argument vi bygger om
+          // dynamiskt. Omvägen via unknown gör att TypeScript släpper igenom
+          // det utan att vi tappar kontrollen — vi vet vad vi skickar in.
+          const run = query as unknown as (args: unknown) => Promise<unknown>;
 
           switch (operation) {
-            // findUnique letar bara på unika kolumner och accepterar inte ett
-            // extra company_id-filter. Vi skriver om anropet till findFirst,
-            // som gör samma sak men tillåter filtret. Anroparen märker inget.
+            // findUnique letar bara på unika kolumner (som id) och accepterar
+            // inget extra company_id-filter i frågan. Därför kontrollerar vi
+            // efteråt istället: hämta raden, och lämna bara ut den om den
+            // tillhör rätt företag. Raden lämnar aldrig det här lagret annars,
+            // så ingen data kan läcka.
             case "findUnique":
-              return query(mergeWhere(a, companyId), { operation: "findFirst" } as never);
+            case "findUniqueOrThrow": {
+              // Om anroparen bett om utvalda kolumner måste vi se till att
+              // companyId följer med, annars går den inte att kontrollera.
+              // Den plockas bort igen innan svaret lämnas tillbaka, så
+              // anroparen får exakt det den bad om.
+              const select = a.select as Record<string, unknown> | undefined;
+              const addedCompanyId = Boolean(select) && !select!.companyId;
 
-            case "findUniqueOrThrow":
-              return query(mergeWhere(a, companyId), {
-                operation: "findFirstOrThrow",
-              } as never);
+              const row = (await run(
+                addedCompanyId ? { ...a, select: { ...select, companyId: true } } : a
+              )) as Record<string, unknown> | null;
+
+              if (!row || row.companyId !== companyId) {
+                if (operation === "findUniqueOrThrow") {
+                  throw new TenantIsolationError(
+                    `Ingen rad i ${model} med de angivna villkoren för det här företaget.`
+                  );
+                }
+                return null;
+              }
+
+              if (addedCompanyId) delete row.companyId;
+              return row;
+            }
 
             case "findFirst":
             case "findFirstOrThrow":
@@ -143,17 +154,15 @@ export function forCompany(companyId: string) {
             case "deleteMany":
             case "update":
             case "delete":
-              return query(mergeWhere(a, companyId));
+              return run(mergeWhere(a, companyId));
 
             case "create":
-              return query({ ...a, data: stampCompanyOnData(a.data, companyId) });
-
             case "createMany":
             case "createManyAndReturn":
-              return query({ ...a, data: stampCompanyOnData(a.data, companyId) });
+              return run({ ...a, data: stampCompanyOnData(a.data, companyId) });
 
             case "upsert":
-              return query({
+              return run({
                 ...mergeWhere(a, companyId),
                 create: stampCompanyOnData(a.create, companyId),
               });
