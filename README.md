@@ -121,7 +121,7 @@ Databasmigrationer körs automatiskt när appen startar — inget extra steg.
 | Starta om appen | `docker compose restart app` |
 | Stoppa allt | `docker compose down` |
 | Öppna databasen | `docker compose exec db psql -U tikkr -d tikkr` |
-| Köra testerna | `docker compose run --rm migrate npm test` |
+| Köra testerna | `./scripts/test.sh` |
 | Lägga in testdata | `docker compose run --rm migrate node prisma/seed.mjs` |
 
 ---
@@ -135,6 +135,20 @@ och checka in den en gång:
 ```bash
 docker compose exec app cat package-lock.json > package-lock.json && git add package-lock.json && git commit -m "Lås beroendeversioner"
 ```
+
+---
+
+## Bra att veta: koden i containern är en ögonblicksbild
+
+När imagen byggs kopieras koden in i den. Ändrar du en fil efteråt kör
+containern fortfarande den gamla kopian tills du bygger om:
+
+```bash
+docker compose up -d --build
+```
+
+`./scripts/test.sh` går runt detta genom att montera in mapparna direkt, så
+testerna alltid ser den senaste koden utan ombyggnad.
 
 ---
 
