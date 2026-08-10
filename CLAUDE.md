@@ -47,7 +47,7 @@ via `company_id`-filtrering i koden.
 | Styling | Tailwind CSS | Snabbt, snyggt, konsekvent |
 | Databas | Vanlig Postgres-container (bara databasen) | Enklast möjliga — ingen plattform ovanpå att sköta |
 | Databaskoppling | Prisma (ORM) | Enkelt och säkert sätt att prata med databasen |
-| Reverse proxy / HTTPS | **Nginx Proxy Manager** (fanns redan på servern) — ersätter Caddy | Gör samma jobb och äger redan port 80/443. Två proxyer kan inte dela dem. |
+| Reverse proxy / HTTPS | **Labb:** Nginx Proxy Manager (fanns redan). **Produktion:** Caddy. | NPM äger redan port 80/443 i labbet — rör det inte. I produktion väljs Caddy för att konfigurationen då ligger som textfil i git och servern kan återskapas identiskt, vilket NPM:s webbgränssnitt inte tillåter. |
 | Server | Egen VPS (t.ex. Hetzner) | Enda löpande kostnaden |
 | Betalning | Stripe (Billing/Subscriptions) | Ingen fast avgift, styr åtkomst automatiskt, självbetjäning |
 | Bokföring | Fortnox, matas med Stripes intäktsdata | Vanlig bokföring/moms, slipper manuella fakturor |
@@ -182,9 +182,12 @@ Windows 11 Pro, projektrot `C:\Projekt\Tikkr`, PowerShell.
 Konsekvens: Claude kan **inte köra tester, bygga eller typkolla lokalt**. All
 verifiering sker på servern. Påstå aldrig att något fungerar innan det körts där.
 
-### Testserver
+### Testserver (labbmiljö — INTE produktion)
 
 `tf-docker01-test`, Ubuntu/Debian, Docker + Compose finns.
+
+All utveckling sker här. Ingen riktig kunddata får läggas in. Produktion är en
+separat server som sätts upp senare, mot tikkr.se.
 
 | Sak | Status |
 |---|---|
