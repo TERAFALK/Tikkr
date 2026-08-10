@@ -52,6 +52,13 @@ services:
       #   127.0.0.1 — bara servern själv, all trafik måste gå via NPM och HTTPS.
       #               Detta är rätt värde i produktion.
       - "${APP_BIND:-0.0.0.0}:${APP_PORT:-3000}:3000"
+    networks:
+      # default = det interna nätet där appen når databasen.
+      # npm_proxy = Nginx Proxy Managers nät, så att NPM kan nå appen på
+      # namnet "tikkr-app". Databasen ligger AVSIKTLIGT inte här — den ska
+      # inte vara nåbar från proxyns nät.
+      - default
+      - npm_proxy
     # Sätter upp databasen innan appen startar, så en deploy med en ny tabell
     # fungerar av sig själv — inget manuellt steg som kan glömmas.
     #
@@ -73,13 +80,9 @@ services:
 volumes:
   tikkr_db_data:
 
-# När Tikkr ska nås via domän genom Nginx Proxy Manager: avkommentera nedan och
-# lägg till "networks: [default, npm]" på app-tjänsten. Då kan NPM peka på
-# "tikkr-app" port 3000 utan att porten behöver publiceras utåt alls.
-# Ersätt namnet med NPM:s faktiska nätverk — hitta det med:
-#   docker inspect <npm-container> -f '{{range $k,$v := .NetworkSettings.Networks}}{{$k}}{{end}}'
-#
-# networks:
-#   npm:
-#     external: true
-#     name: BYT-UT-MOT-NPM-NATVERKET
+networks:
+  # Nginx Proxy Managers befintliga nätverk. "external" betyder att det redan
+  # finns och skapas av NPM — Tikkr ansluter bara till det och rör det inte.
+  npm_proxy:
+    external: true
+    name: npm_proxy

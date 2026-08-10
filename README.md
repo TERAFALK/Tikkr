@@ -76,6 +76,10 @@ docker compose exec app npx tsx prisma/seed.ts
 
 När Tikkr ska nås på en riktig adress med HTTPS istället för `IP:3000`:
 
+Tikkr ansluter till NPM:s Docker-nätverk `npm_proxy`, så proxyn når appen på
+containernamnet `tikkr-app`. Databasen ligger inte på det nätet och är därmed
+onåbar därifrån.
+
 1. Peka domänens DNS (A-post) mot serverns IP-adress
 2. Öppna Nginx Proxy Manager → **Hosts → Proxy Hosts → Add Proxy Host**
 3. **Domain Names:** din adress · **Scheme:** `http` · **Forward Hostname:**
@@ -83,12 +87,16 @@ När Tikkr ska nås på en riktig adress med HTTPS istället för `IP:3000`:
 4. Slå på **Block Common Exploits** och **Websockets Support**
 5. Fliken **SSL** → *Request a new SSL Certificate*, kryssa i **Force SSL**
 
-Punkt 3 kräver att NPM och Tikkr ligger på samma Docker-nätverk — se den
-utkommenterade `networks`-delen längst ner i `docker-compose.yml`. Alternativt
-kan du ange serverns IP och port `3000` istället för `tikkr-app`.
+Heter NPM:s nätverk något annat hos dig, ändra `npm_proxy` längst ner i
+`docker-compose.yml`. Hitta namnet med:
 
-Sätt sedan `APP_BIND=127.0.0.1` i `.env` och kör `docker compose up -d`. Då går
-all trafik via HTTPS och appen kan inte längre nås okrypterad utifrån.
+```bash
+docker inspect <npm-container> -f '{{range $k,$v := .NetworkSettings.Networks}}{{$k}} {{end}}'
+```
+
+När domänen fungerar: sätt `APP_BIND=127.0.0.1` i `.env` och kör
+`docker compose up -d`. Då måste all trafik gå via HTTPS och appen kan inte
+längre nås okrypterad på `IP:3000`.
 
 ---
 
