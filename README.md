@@ -10,8 +10,11 @@ Teknisk projektkontext finns i [CLAUDE.md](CLAUDE.md).
 
 ## Så körs det
 
-Hela systemet är tre containrar: **appen**, **databasen** och **Caddy** (HTTPS).
-Caddy tillkommer när domänen är på plats — just nu är det två.
+Två containrar: **appen** och **databasen**.
+
+HTTPS sköts av den **Nginx Proxy Manager** som redan kör på servern. Ingen egen
+Caddy alltså — NPM gör samma jobb och äger redan port 80/443. Två program kan
+inte dela de portarna.
 
 ```
 Din laptop  →  GitHub  →  Servern: git pull + docker compose up -d
@@ -66,6 +69,26 @@ docker compose exec app npx tsx prisma/seed.ts
 ```
 
 Öppna sedan `http://<serverns-ip>:3000` i webbläsaren.
+
+---
+
+## Koppla in en domän via Nginx Proxy Manager
+
+När Tikkr ska nås på en riktig adress med HTTPS istället för `IP:3000`:
+
+1. Peka domänens DNS (A-post) mot serverns IP-adress
+2. Öppna Nginx Proxy Manager → **Hosts → Proxy Hosts → Add Proxy Host**
+3. **Domain Names:** din adress · **Scheme:** `http` · **Forward Hostname:**
+   `tikkr-app` · **Forward Port:** `3000`
+4. Slå på **Block Common Exploits** och **Websockets Support**
+5. Fliken **SSL** → *Request a new SSL Certificate*, kryssa i **Force SSL**
+
+Punkt 3 kräver att NPM och Tikkr ligger på samma Docker-nätverk — se den
+utkommenterade `networks`-delen längst ner i `docker-compose.yml`. Alternativt
+kan du ange serverns IP och port `3000` istället för `tikkr-app`.
+
+Sätt sedan `APP_BIND=127.0.0.1` i `.env` och kör `docker compose up -d`. Då går
+all trafik via HTTPS och appen kan inte längre nås okrypterad utifrån.
 
 ---
 

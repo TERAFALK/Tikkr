@@ -47,7 +47,7 @@ via `company_id`-filtrering i koden.
 | Styling | Tailwind CSS | Snabbt, snyggt, konsekvent |
 | Databas | Vanlig Postgres-container (bara databasen) | Enklast möjliga — ingen plattform ovanpå att sköta |
 | Databaskoppling | Prisma (ORM) | Enkelt och säkert sätt att prata med databasen |
-| Reverse proxy / HTTPS | Caddy (Docker) | Automatiska SSL-certifikat mot tikkr.se |
+| Reverse proxy / HTTPS | **Nginx Proxy Manager** (fanns redan på servern) — ersätter Caddy | Gör samma jobb och äger redan port 80/443. Två proxyer kan inte dela dem. |
 | Server | Egen VPS (t.ex. Hetzner) | Enda löpande kostnaden |
 | Betalning | Stripe (Billing/Subscriptions) | Ingen fast avgift, styr åtkomst automatiskt, självbetjäning |
 | Bokföring | Fortnox, matas med Stripes intäktsdata | Vanlig bokföring/moms, slipper manuella fakturor |
@@ -55,8 +55,9 @@ via `company_id`-filtrering i koden.
 | Auth (admin) | Auth.js, i samma Next.js-app | Ingen separat auth-server |
 | Auth (kiosk) | Device-token, kontrolleras i appens egen API-kod | Några rader kod, ingen extra tjänst |
 
-**Designprincip: hela systemet ska vara TRE containrar totalt** — app, databas,
-Caddy. `docker compose up -d` startar allt.
+**Designprincip: så få containrar som möjligt.** I praktiken **två** — app och
+databas — eftersom servern redan har en reverse proxy. `docker compose up -d`
+startar allt.
 
 **Varför inte självhostad Supabase eller liknande plattform:** sådana lösningar
 är i praktiken 10+ separata containrar (databas, auth-server, API-lager, realtid,
@@ -158,13 +159,45 @@ Användaren kan **inte koda särskilt mycket själv**. Claude driver det teknisk
 
 ## 9. Miljöstatus (uppdatera vid ändring)
 
-Utvecklingsdator: Windows 11 Pro, projektrot `C:\Projekt\Tikkr`.
+### Arbetssätt
+
+Koden skrivs på laptopen, körs på servern. Användaren kör själv kommandon på
+servern — Claude har **ingen** SSH-åtkomst och ska alltid leverera kommandon i
+färdiga kodblock, ett i taget, med förklaring av vad de gör.
+
+```
+Laptop (skriva kod)  →  GitHub  →  Server: git pull + docker compose up -d
+```
+
+### Utvecklingsdator
+
+Windows 11 Pro, projektrot `C:\Projekt\Tikkr`, PowerShell.
 
 | Verktyg | Status per 2026-08-10 |
 |---|---|
 | git | ✅ 2.50.1 |
-| Node.js | ❌ ej installerat |
+| Node.js | ❌ ej installerat — appen körs på servern istället |
 | Docker Desktop | ❌ ej installerat |
-| VPS | ❓ ej bekräftad |
-| Domän tikkr.se | ❓ ej bekräftad |
-| GitHub-repo | ❓ ej bekräftat |
+
+Konsekvens: Claude kan **inte köra tester, bygga eller typkolla lokalt**. All
+verifiering sker på servern. Påstå aldrig att något fungerar innan det körts där.
+
+### Testserver
+
+`tf-docker01-test`, Ubuntu/Debian, Docker + Compose finns.
+
+| Sak | Status |
+|---|---|
+| Port 80/443 | 🔴 upptagna av **Nginx Proxy Manager** — rör dem inte |
+| Port 3000 | ✅ ledig, Tikkr använder den |
+| Övrigt på servern | kör andra tjänster — kontrollera alltid innan portar tas |
+
+### Ej på plats än
+
+| Sak | Status |
+|---|---|
+| GitHub-repo | ⏸ ska skapas av användaren (privat, namn `tikkr`) |
+| Produktionsserver | ⏸ separat från testservern, senare |
+| Domän tikkr.se | ⏸ ej köpt |
+| Offsite-backup (rclone-mål) | ⏸ ej valt — `BACKUP_REMOTE` i `.env` |
+| Uptime-övervakning | ⏸ kräver publik URL först |
