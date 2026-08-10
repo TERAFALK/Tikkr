@@ -138,17 +138,33 @@ docker compose exec app cat package-lock.json > package-lock.json && git add pac
 
 ---
 
-## Bra att veta: koden i containern är en ögonblicksbild
+## När behöver jag bygga om?
 
-När imagen byggs kopieras koden in i den. Ändrar du en fil efteråt kör
-containern fortfarande den gamla kopian tills du bygger om:
+Koden kopieras in i imagen när den byggs. Ändrar du en fil efteråt kör
+containern den gamla kopian tills du bygger om.
+
+| Vad du ändrat | Bygga om? |
+|---|---|
+| `src/` eller `tests/`, och kör `./scripts/test.sh` | Nej — mapparna monteras in |
+| `src/`, och vill se det i webbläsaren | Ja |
+| `prisma/schema.prisma` | Ja — **och skapa migration först** |
+| `package.json` | Ja |
 
 ```bash
 docker compose up -d --build
 ```
 
-`./scripts/test.sh` går runt detta genom att montera in mapparna direkt, så
-testerna alltid ser den senaste koden utan ombyggnad.
+**Vid ändrad datamodell** måste stegen tas i den här ordningen. Migrationen
+lägger till kolumnerna i databasen; ombyggnaden bakar in migrationsfilen och
+den Prisma-kod som genereras ur schemat.
+
+```bash
+./scripts/create-migration.sh <kort-namn-på-ändringen>
+```
+
+```bash
+docker compose up -d --build
+```
 
 ---
 
