@@ -3,11 +3,15 @@
 #
 # En migration är en fil som beskriver exakt hur databasen ska ändras — t.ex.
 # "lägg till kolumnen foto på employees". Filerna checkas in i git och körs
-# automatiskt i tur och ordning när appen startar. Det är så databasen på
+# automatiskt i tur och ordning när systemet startar. Det är så databasen på
 # servern hålls i takt med koden utan att någon behöver komma ihåg något.
 #
-# Kör från projektmappen på servern:  ./scripts/create-migration.sh init
+# Kör från projektmappen på servern:
+#   ./scripts/create-migration.sh init
+#   ./scripts/create-migration.sh lagg-till-foto-pa-anstalld
 set -euo pipefail
+
+cd "$(dirname "$0")/.."
 
 NAME="${1:-}"
 if [ -z "$NAME" ]; then
@@ -16,33 +20,38 @@ if [ -z "$NAME" ]; then
   exit 1
 fi
 
-cd "$(dirname "$0")/.."
-
 if [ ! -f .env ]; then
-  echo "Hittar ingen .env. Kör 'cp .env.example .env' och fyll i lösenordet först."
+  echo "Hittar ingen .env. Kör 'cp .env.example .env' först."
   exit 1
 fi
 
-# shellcheck disable=SC1091
-set -a; . ./.env; set +a
+# Projektmappen monteras in i containern så att den nya filen hamnar i din
+# riktiga mapp och kan checkas in i git.
+MOUNT=(-v "$PWD/prisma:/app/prisma")
 
-NETWORK="$(docker compose ps --format '{{.Name}}' db | head -1)"
-if [ -z "$NETWORK" ]; then
-  echo "Databasen verkar inte köra. Kör 'docker compose up -d db' först."
-  exit 1
+if [ ! -d prisma/migrations ]; then
+  # Första gången. Databasen har redan tabeller (skapade direkt ur schemat vid
+  # första starten), så vi kan inte låta Prisma köra migrationen — den finns
+  # ju i praktiken redan. Istället skrivs den ut som fil och markeras som
+  # "redan körd". Det kallas att baslinjera, och ger en ren historik framåt.
+  echo "==> Skapar första migrationen (baslinje)..."
+  mkdir -p "prisma/migrations/0_$NAME"
+
+  docker compose run --rm --no-deps "${MOUNT[@]}" migrate \
+    npx prisma migrate diff \
+      --from-empty \
+      --to-schema-datamodel prisma/schema.prisma \
+      --script > "prisma/migrations/0_$NAME/migration.sql"
+
+  echo "==> Markerar den som redan körd..."
+  docker compose run --rm "${MOUNT[@]}" migrate \
+    npx prisma migrate resolve --applied "0_$NAME"
+else
+  echo "==> Skapar migration '$NAME'..."
+  docker compose run --rm "${MOUNT[@]}" migrate \
+    npx prisma migrate dev --name "$NAME"
 fi
-
-echo "Skapar migration '$NAME'..."
-
-# En engångscontainer med projektmappen inmonterad, så att migrationsfilen
-# hamnar i din riktiga projektmapp och kan checkas in i git.
-docker run --rm -it \
-  -v "$PWD:/work" -w /work \
-  --network "container:$NETWORK" \
-  -e DATABASE_URL="postgresql://${POSTGRES_USER:-tikkr}:${POSTGRES_PASSWORD}@127.0.0.1:5432/${POSTGRES_DB:-tikkr}?schema=public" \
-  node:22-alpine \
-  sh -c "apk add --no-cache openssl >/dev/null && npm install --silent && npx prisma migrate dev --name '$NAME'"
 
 echo
-echo "Klart. Checka in migrationen:"
+echo "Klart. Checka in den:"
 echo "  git add prisma/migrations && git commit -m 'Migration: $NAME' && git push"
