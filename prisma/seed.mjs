@@ -10,6 +10,7 @@
 
 import { createHash } from "node:crypto";
 import { PrismaClient } from "@prisma/client";
+import bcrypt from "bcryptjs";
 
 const prisma = new PrismaClient();
 
@@ -82,6 +83,20 @@ async function main() {
     },
   });
 
+  // Adminkonto för labbet. Byt lösenord innan systemet används på riktigt —
+  // det står i klartext här och repot är läsbart.
+  const adminEmail = "admin@demo.se";
+  await prisma.adminUser.upsert({
+    where: { email: adminEmail },
+    update: {},
+    create: {
+      companyId: demo.id,
+      email: adminEmail,
+      passwordHash: await bcrypt.hash("tikkr123", 12),
+      role: "OWNER",
+    },
+  });
+
   const counts = {
     anstallda: await prisma.employee.count(),
     ordrar: await prisma.order.count(),
@@ -97,6 +112,9 @@ async function main() {
   console.log("");
   console.log("Koppla testskärmen genom att öppna denna adress EN gång:");
   console.log(`  /kiosk/koppla/${DEMO_KIOSK_TOKEN}`);
+  console.log("");
+  console.log("Logga in i adminpanelen på /admin/login:");
+  console.log(`  ${adminEmail} / tikkr123`);
 }
 
 main()

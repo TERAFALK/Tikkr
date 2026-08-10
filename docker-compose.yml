@@ -63,6 +63,8 @@ services:
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER:-tikkr}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-tikkr}?schema=public
       NODE_ENV: production
+      AUTH_SECRET: ${AUTH_SECRET:?AUTH_SECRET saknas i .env}
+      AUTH_TRUST_HOST: ${AUTH_TRUST_HOST:-true}
     ports:
       # Vänsterledet är porten på servern och går att ändra i .env om något
       # annat redan använder 3000.
