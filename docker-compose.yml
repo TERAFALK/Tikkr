@@ -65,6 +65,7 @@ services:
       NODE_ENV: production
       AUTH_SECRET: ${AUTH_SECRET:?AUTH_SECRET saknas i .env}
       AUTH_TRUST_HOST: ${AUTH_TRUST_HOST:-true}
+      CRON_SECRET: ${CRON_SECRET:-}
     ports:
       # Vänsterledet är porten på servern och går att ändra i .env om något
       # annat redan använder 3000.

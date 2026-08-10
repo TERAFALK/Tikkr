@@ -7,15 +7,17 @@ import { logout } from "@/app/admin/actions";
 // Navigeringen. Ordnad efter hur ofta man faktiskt använder sakerna: rapporter
 // och granskning dagligen, inställningar sällan.
 
-// Rapporter och Inställningar byggs i nästa omgång och saknas därför här —
-// hellre en kortare meny än länkar som leder till ingenting.
+// Ordnad efter hur ofta man faktiskt använder sakerna: rapporter och granskning
+// dagligen, inställningar sällan.
 const links = [
   { href: "/admin", label: "Översikt", exact: true },
+  { href: "/admin/rapporter", label: "Rapporter" },
   { href: "/admin/granskning", label: "Granskning" },
   { href: "/admin/ordrar", label: "Ordrar" },
   { href: "/admin/anstallda", label: "Anställda" },
   { href: "/admin/moment", label: "Arbetsmoment" },
   { href: "/admin/skarmar", label: "Skärmar" },
+  { href: "/admin/installningar", label: "Inställningar" },
 ];
 
 export default function AdminNav({
