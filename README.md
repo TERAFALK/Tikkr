@@ -65,7 +65,7 @@ inte databasen — kolla `docker compose logs db`.
 **6. Lägg in testdata**
 
 ```bash
-docker compose exec app npx tsx prisma/seed.ts
+docker compose exec app node prisma/seed.mjs
 ```
 
 Öppna sedan `http://<serverns-ip>:3000` i webbläsaren.

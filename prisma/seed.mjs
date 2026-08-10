@@ -1,13 +1,14 @@
-import { PrismaClient } from "@prisma/client";
+// Testdata så att det finns något att titta på direkt.
+//
+// Två företag med avsiktligt likartad data — det gör att man med blotta ögat
+// kan se att multi-tenant-isoleringen fungerar när kiosken byggs i Fas 1.
+//
+// Skriven i vanlig JavaScript, inte TypeScript, så att den kan köras direkt i
+// appcontainern. Den färdiga imagen innehåller medvetet inga byggverktyg.
+//
+// Kör: docker compose exec app node prisma/seed.mjs
 
-/**
- * Testdata så att det finns något att titta på direkt.
- *
- * Två företag med avsiktligt likartad data — det gör att man med blotta ögat
- * kan se att multi-tenant-isoleringen fungerar när kiosken byggs i Fas 1.
- *
- * Kör: npm run db:seed
- */
+import { PrismaClient } from "@prisma/client";
 
 const prisma = new PrismaClient();
 
@@ -61,9 +62,18 @@ async function main() {
     },
   });
 
-  console.log(`Seed klar:`);
+  const counts = {
+    anstallda: await prisma.employee.count(),
+    ordrar: await prisma.order.count(),
+    moment: await prisma.workMoment.count(),
+  };
+
+  console.log("Seed klar:");
   console.log(`  ${demo.name} (id: ${demo.id})`);
   console.log(`  ${other.name} (id: ${other.id})`);
+  console.log(
+    `  Totalt: ${counts.anstallda} anställda, ${counts.ordrar} ordrar, ${counts.moment} moment`
+  );
 }
 
 main()
