@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import { enqueue, flush, pending, type QueuedPunch } from "@/lib/offline-queue";
 
 /**
  * KIOSKSKÄRMEN.
@@ -115,32 +116,78 @@ export default function KioskScreen({
     return () => clearTimeout(timer);
   }, [receipt]);
 
-  const send = useCallback(
-    async (body: Record<string, unknown>) => {
-      try {
-        const response = await fetch("/api/kiosk/punch", {
-          method: "POST",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify({
-            ...body,
-            // Gör att en omsändning känns igen och inte blir en dubblett.
-            clientPunchId: newPunchId(),
-          }),
-        });
+  const [waiting, setWaiting] = useState(0);
 
-        if (!response.ok) {
-          const data = await response.json().catch(() => ({}));
-          setError(data.error ?? "Stämplingen gick inte igenom.");
-        }
-      } catch {
-        setError("Ingen kontakt med servern. Stämplingen kan ha missats.");
-      } finally {
-        // Hämtar serverns bild, så att optimistiska gissningar rättas.
-        router.refresh();
-      }
+  /**
+   * Tömmer kön och rapporterar läget.
+   *
+   * Anropas efter varje tryck, när nätet kommer tillbaka, och med jämna
+   * mellanrum — en skärm som stått offline en natt ska hämta ikapp av sig själv
+   * på morgonen utan att någon rör den.
+   */
+  const drain = useCallback(async () => {
+    const result = await flush();
+    setWaiting(result.waiting);
+
+    if (result.rejected.length > 0) {
+      const first = result.rejected[0];
+      setError(
+        `${first.punch.label}: ${first.reason}` +
+          (result.rejected.length > 1
+            ? ` (och ${result.rejected.length - 1} till)`
+            : "")
+      );
+    }
+
+    // Hämtar serverns bild, så att optimistiska gissningar rättas.
+    if (result.sent > 0) router.refresh();
+  }, [router]);
+
+  /**
+   * Registrerar ett tryck.
+   *
+   * Trycket sparas alltid i kön först och skickas sedan. Skulle skärmen dö
+   * mitt i anropet ligger det kvar och skickas nästa gång.
+   */
+  const send = useCallback(
+    async (punch: Omit<QueuedPunch, "clientPunchId" | "at">) => {
+      await enqueue({
+        ...punch,
+        clientPunchId: newPunchId(),
+        at: new Date().toISOString(),
+      });
+
+      setWaiting((count) => count + 1);
+      await drain();
     },
-    [router]
+    [drain]
   );
+
+  // Låter skärmen laddas om utan nät. Kräver HTTPS — över vanlig http händer
+  // ingenting här, och kön fungerar ändå så länge sidan inte laddas om.
+  useEffect(() => {
+    if ("serviceWorker" in navigator) {
+      void navigator.serviceWorker.register("/sw.js").catch(() => {
+        // Ingen åtgärd: utan service worker fungerar allt utom omladdning
+        // under nätavbrott.
+      });
+    }
+  }, []);
+
+  // Töm kön när nätet kommer tillbaka, och regelbundet som skyddsnät.
+  useEffect(() => {
+    void pending().then((queue) => setWaiting(queue.length));
+    void drain();
+
+    const onOnline = () => void drain();
+    window.addEventListener("online", onOnline);
+    const timer = setInterval(() => void drain(), 30_000);
+
+    return () => {
+      window.removeEventListener("online", onOnline);
+      clearInterval(timer);
+    };
+  }, [drain]);
 
   const punchIn = useCallback(
     (employee: Employee, order: Order, moment: Moment) => {
@@ -159,6 +206,7 @@ export default function KioskScreen({
         employeeId: employee.id,
         orderId: order.id,
         momentId: moment.id,
+        label: `${employee.name}, order ${order.orderNumber}`,
       });
     },
     [goHome, send]
@@ -173,7 +221,11 @@ export default function KioskScreen({
       });
       setReceipt(`${employee.name} — utstämplad`);
       goHome();
-      void send({ action: "out", employeeId: employee.id });
+      void send({
+        action: "out",
+        employeeId: employee.id,
+        label: `${employee.name}, utstämpling`,
+      });
     },
     [goHome, send]
   );
@@ -184,6 +236,7 @@ export default function KioskScreen({
         companyName={companyName}
         deviceName={deviceName}
         view={view}
+        waiting={waiting}
         onBack={goHome}
       />
 
@@ -252,11 +305,13 @@ function Header({
   companyName,
   deviceName,
   view,
+  waiting,
   onBack,
 }: {
   companyName: string;
   deviceName: string;
   view: View;
+  waiting: number;
   onBack: () => void;
 }) {
   return (
@@ -265,6 +320,15 @@ function Header({
         <p className="truncate text-lg font-semibold">{companyName}</p>
         <p className="truncate text-sm text-slate-500">{deviceName}</p>
       </div>
+
+      {/* Syns bara när något faktiskt väntar. En ständig statusikon skulle
+          bara bli tapet som ingen läser. */}
+      {waiting > 0 && (
+        <span className="shrink-0 rounded-xl bg-amber-100 px-4 py-3 text-center text-sm font-semibold text-amber-800">
+          {waiting} stämpling{waiting === 1 ? "" : "ar"} väntar
+          <span className="block font-normal">skickas när nätet är tillbaka</span>
+        </span>
+      )}
 
       {view.name !== "employees" && (
         <button

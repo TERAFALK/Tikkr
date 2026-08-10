@@ -1,0 +1,19 @@
+{
+  "name": "Tikkr Stämpling",
+  "short_name": "Tikkr",
+  "description": "Stämpla in och ut på order och arbetsmoment",
+  "start_url": "/kiosk",
+  "scope": "/",
+  "display": "fullscreen",
+  "orientation": "any",
+  "background_color": "#f1f5f9",
+  "theme_color": "#0f172a",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
