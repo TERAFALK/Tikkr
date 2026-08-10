@@ -9,6 +9,20 @@ Ett molnbaserat **stämplingssystem för touchskärm** som svenska verkstads- oc
 tillverkningsföretag använder för att registrera arbetstid per **order** och
 **arbetsmoment**. Domän: **tikkr.se**.
 
+### Avgränsning — läs denna först
+
+**Tikkr är underlag för FAKTURERING. Inte för lön.** All tid som registreras
+hör till en kundorder som ska faktureras. Systemet ska aldrig utökas med
+lönearter, övertidsregler, frånvaro, semester eller interna ordrar för
+städning och möten — den tiden hör inte hemma här överhuvudtaget.
+
+Konsekvenser att hålla fast vid:
+- Order är alltid obligatorisk. Inget "Ingen order"-val, inga interna ordrar.
+- Rapporterna svarar på "hur mycket ska kunden faktureras", inte "hur mycket
+  har personen jobbat".
+- En felaktig stämpling är ett fakturafel, inte ett lönefel. Allvarligt, men
+  hanteras genom att admin rättar posten i efterhand.
+
 ### Kärnflöde (kiosk)
 
 En anställd går fram till en touchskärm, trycker på sitt namn, stämplar in/ut,
@@ -79,10 +93,11 @@ kiosk_devices  — id, company_id, name, device_token, active, last_seen_at
 
 ### Beslutade regler för stämpling (bestämt 2026-08-10)
 
-1. **Order och moment är obligatoriska.** All registrerad tid hör till ett jobb.
-   Inget "Ingen order"-val. Konsekvens: `time_entries.order_id` och `moment_id`
-   är NOT NULL, och ordrar/moment med registrerad tid går inte att radera
-   (`onDelete: Restrict`) — de stängs istället.
+1. **Order och moment är obligatoriska.** All registrerad tid hör till en
+   kundorder som ska faktureras — se avgränsningen överst. Inget "Ingen
+   order"-val, inga interna ordrar. Konsekvens: `time_entries.order_id` och
+   `moment_id` är NOT NULL, och ordrar/moment med registrerad tid går inte att
+   radera (`onDelete: Restrict`) — de stängs istället.
 2. **Glömd utstämpling stängs vid ett fast klockslag OCH flaggas.**
    `companies.auto_close_at` (standard "18:00", per företag) styr när. Posten
    får `source = AUTO_CLOSE`, `needs_review = true` och en `review_note` i
