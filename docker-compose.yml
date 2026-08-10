@@ -1,5 +1,8 @@
 # Tikkr — två containrar: appen och databasen.
-# Caddy (HTTPS) läggs till som tredje container när domänen är på plats.
+#
+# HTTPS sköts av den Nginx Proxy Manager som redan kör på servern. Därför ingen
+# egen Caddy här: två program kan inte dela port 443, och NPM har redan den.
+# Se README för hur Tikkr kopplas in i NPM.
 #
 # Starta:  docker compose up -d --build
 # Stoppa:  docker compose down
@@ -8,6 +11,7 @@
 services:
   db:
     image: postgres:17-alpine
+    container_name: tikkr-db
     restart: unless-stopped
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-tikkr}
@@ -28,6 +32,9 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+    # Fast namn så att Nginx Proxy Manager kan peka på "tikkr-app" istället för
+    # en IP-adress som ändrar sig varje gång containern startas om.
+    container_name: tikkr-app
     restart: unless-stopped
     depends_on:
       db:
@@ -38,7 +45,13 @@ services:
     ports:
       # Vänsterledet är porten på servern och går att ändra i .env om något
       # annat redan använder 3000.
-      - "${APP_PORT:-3000}:3000"
+      #
+      # APP_BIND styr vem som når porten direkt:
+      #   0.0.0.0   — alla, även från internet. Bra på en testserver: du kan
+      #               öppna http://serverns-ip:3000 direkt från touchskärmen.
+      #   127.0.0.1 — bara servern själv, all trafik måste gå via NPM och HTTPS.
+      #               Detta är rätt värde i produktion.
+      - "${APP_BIND:-0.0.0.0}:${APP_PORT:-3000}:3000"
     # Sätter upp databasen innan appen startar, så en deploy med en ny tabell
     # fungerar av sig själv — inget manuellt steg som kan glömmas.
     #
@@ -59,3 +72,14 @@ services:
 
 volumes:
   tikkr_db_data:
+
+# När Tikkr ska nås via domän genom Nginx Proxy Manager: avkommentera nedan och
+# lägg till "networks: [default, npm]" på app-tjänsten. Då kan NPM peka på
+# "tikkr-app" port 3000 utan att porten behöver publiceras utåt alls.
+# Ersätt namnet med NPM:s faktiska nätverk — hitta det med:
+#   docker inspect <npm-container> -f '{{range $k,$v := .NetworkSettings.Networks}}{{$k}}{{end}}'
+#
+# networks:
+#   npm:
+#     external: true
+#     name: BYT-UT-MOT-NPM-NATVERKET
