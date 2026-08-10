@@ -5,47 +5,41 @@
  * i en rapport gör att man börjar tvivla på siffrorna.
  */
 
-const SWEDISH_DATE = new Intl.DateTimeFormat("sv-SE", {
+const DEFAULT_TIME_ZONE = "Europe/Stockholm";
+
+const DATE_OPTIONS: Intl.DateTimeFormatOptions = {
   year: "numeric",
   month: "2-digit",
   day: "2-digit",
-});
+};
 
-const SWEDISH_DATETIME = new Intl.DateTimeFormat("sv-SE", {
-  year: "numeric",
-  month: "2-digit",
-  day: "2-digit",
+const TIME_OPTIONS: Intl.DateTimeFormatOptions = {
   hour: "2-digit",
   minute: "2-digit",
-});
+  hourCycle: "h23",
+};
 
-const SWEDISH_TIME = new Intl.DateTimeFormat("sv-SE", {
-  hour: "2-digit",
-  minute: "2-digit",
-});
-
-export function formatDate(value: Date, timeZone = "Europe/Stockholm"): string {
-  return new Intl.DateTimeFormat("sv-SE", {
-    ...SWEDISH_DATE.resolvedOptions(),
-    timeZone,
-  }).format(value);
+export function formatDate(value: Date, timeZone = DEFAULT_TIME_ZONE): string {
+  return new Intl.DateTimeFormat("sv-SE", { ...DATE_OPTIONS, timeZone }).format(
+    value
+  );
 }
 
 export function formatDateTime(
   value: Date,
-  timeZone = "Europe/Stockholm"
+  timeZone = DEFAULT_TIME_ZONE
 ): string {
   return new Intl.DateTimeFormat("sv-SE", {
-    ...SWEDISH_DATETIME.resolvedOptions(),
+    ...DATE_OPTIONS,
+    ...TIME_OPTIONS,
     timeZone,
   }).format(value);
 }
 
-export function formatTime(value: Date, timeZone = "Europe/Stockholm"): string {
-  return new Intl.DateTimeFormat("sv-SE", {
-    ...SWEDISH_TIME.resolvedOptions(),
-    timeZone,
-  }).format(value);
+export function formatTime(value: Date, timeZone = DEFAULT_TIME_ZONE): string {
+  return new Intl.DateTimeFormat("sv-SE", { ...TIME_OPTIONS, timeZone }).format(
+    value
+  );
 }
 
 /**
