@@ -99,14 +99,21 @@ describe("läsning kan inte nå ett annat företag", () => {
     expect(stolen).toBeNull();
   });
 
-  it("findFirst med explicit fel companyId går inte att överlista", async () => {
+  it("att uttryckligen fråga efter ett annat företag ger ett fel", async () => {
     const db = forCompany(companyA);
-    const stolen = await db.employee.findFirst({
-      // Ett försök att kringgå filtret genom att skicka in det själv.
-      where: { companyId: companyB },
-    });
 
-    expect(stolen).toBeNull();
+    // Systemet skulle kunna byta ut företags-id:t tyst och returnera kund A:s
+    // data istället. Det vore säkert men dolde buggen. Vi vill höra av oss.
+    await expect(
+      db.employee.findFirst({ where: { companyId: companyB } })
+    ).rejects.toThrow(TenantIsolationError);
+  });
+
+  it("att ange sitt EGET företag är tillåtet — det ändrar ingenting", async () => {
+    const db = forCompany(companyA);
+    const found = await db.employee.findFirst({ where: { companyId: companyA } });
+
+    expect(found?.id).toBe(employeeA);
   });
 
   it("count räknar bara det egna företaget", async () => {
@@ -135,13 +142,17 @@ describe("skrivning hamnar alltid i rätt företag", () => {
   });
 
   it("create kan inte tvinga in data hos ett annat företag", async () => {
-    const created = await forCompany(companyA).workMoment.create({
+    await expect(
       // Försök att smuggla in raden hos kund B.
-      data: { name: "Målning", companyId: companyB },
-    });
+      forCompany(companyA).workMoment.create({
+        data: { name: "Målning", companyId: companyB },
+      })
+    ).rejects.toThrow(TenantIsolationError);
 
-    expect(created.companyId).toBe(companyA);
-    await forCompany(companyA).workMoment.delete({ where: { id: created.id } });
+    const leaked = await unsafeGlobalPrisma.workMoment.count({
+      where: { companyId: companyB, name: "Målning" },
+    });
+    expect(leaked).toBe(0);
   });
 
   it("update når inte ett annat företags rad", async () => {

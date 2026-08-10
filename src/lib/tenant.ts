@@ -49,21 +49,50 @@ export class TenantIsolationError extends Error {
 
 type AnyArgs = Record<string, unknown>;
 
+/**
+ * Vägrar om koden uttryckligen pekar ut ett annat företag.
+ *
+ * Att göra det är alltid ett fel — antingen en bugg eller ett angreppsförsök.
+ * Vi skulle kunna byta ut värdet tyst och returnera det egna företagets data,
+ * men då göms buggen. Bättre att säga ifrån direkt.
+ */
+function rejectForeignCompanyId(value: unknown, companyId: string, where: string) {
+  if (value !== undefined && value !== companyId) {
+    throw new TenantIsolationError(
+      `Försök att ${where} med companyId "${String(value)}" från en klient låst ` +
+        `till "${companyId}". Ta bort companyId ur anropet — filtreringen sköts ` +
+        `automatiskt av forCompany().`
+    );
+  }
+}
+
 function mergeWhere(args: AnyArgs | undefined, companyId: string): AnyArgs {
   const next = { ...(args ?? {}) };
   const existing = (next.where ?? {}) as Record<string, unknown>;
 
-  // companyId läggs sist och skriver över allt anropande kod råkat skicka in.
-  // Det är avsiktligt: ingen ska kunna be om ett annat företags data.
+  rejectForeignCompanyId(existing.companyId, companyId, "söka");
+
   next.where = { ...existing, companyId };
   return next;
 }
 
 function stampCompanyOnData(data: unknown, companyId: string): unknown {
   if (Array.isArray(data)) {
-    return data.map((row) => ({ ...(row as object), companyId }));
+    return data.map((row) => {
+      rejectForeignCompanyId(
+        (row as Record<string, unknown>)?.companyId,
+        companyId,
+        "skriva"
+      );
+      return { ...(row as object), companyId };
+    });
   }
   if (data && typeof data === "object") {
+    rejectForeignCompanyId(
+      (data as Record<string, unknown>).companyId,
+      companyId,
+      "skriva"
+    );
     return { ...(data as object), companyId };
   }
   return data;
