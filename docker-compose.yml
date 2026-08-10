@@ -1,0 +1,54 @@
+# Tikkr — två containrar: appen och databasen.
+# Caddy (HTTPS) läggs till som tredje container när domänen är på plats.
+#
+# Starta:  docker compose up -d --build
+# Stoppa:  docker compose down
+# Loggar:  docker compose logs -f app
+
+services:
+  db:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-tikkr}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD saknas i .env}
+      POSTGRES_DB: ${POSTGRES_DB:-tikkr}
+    volumes:
+      - tikkr_db_data:/var/lib/postgresql/data
+    # Databasporten publiceras AVSIKTLIGT inte utåt. Bara appcontainern når
+    # databasen, via det interna nätverket. Det undviker krock med en annan
+    # Postgres på servern och gör databasen onåbar från internet.
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-tikkr} -d ${POSTGRES_DB:-tikkr}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-tikkr}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-tikkr}?schema=public
+      NODE_ENV: production
+    ports:
+      # Vänsterledet är porten på servern och går att ändra i .env om något
+      # annat redan använder 3000.
+      - "${APP_PORT:-3000}:3000"
+    # Kör databasmigrationer innan appen startar. Gör att en deploy med en ny
+    # tabell fungerar av sig själv — inget manuellt steg som kan glömmas.
+    command: >
+      sh -c "npx prisma migrate deploy && node server.js"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O- http://127.0.0.1:3000/api/health || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+
+volumes:
+  tikkr_db_data:

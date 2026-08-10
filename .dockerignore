@@ -1,0 +1,12 @@
+node_modules
+.next
+.git
+.github
+.env
+.env.local
+*.md
+!README.md
+coverage
+backups
+caddy_data
+caddy_config

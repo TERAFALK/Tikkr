@@ -1,0 +1,19 @@
+@import "tailwindcss";
+
+:root {
+  color-scheme: light dark;
+}
+
+html,
+body {
+  height: 100%;
+}
+
+/* Kioskskärmar: ingen textmarkering vid tryck, ingen dubbeltryck-zoom.
+   Utan detta känns knapparna som en webbsida istället för som en app. */
+body {
+  -webkit-tap-highlight-color: transparent;
+  -webkit-user-select: none;
+  user-select: none;
+  overscroll-behavior: none;
+}

@@ -1,0 +1,173 @@
+// Tikkr — datamodell
+//
+// Regel för hela schemat: varje tabell utom `companies` har en `company_id`.
+// Det är den kolumnen hela multi-tenant-isoleringen vilar på. Lägg ALDRIG till
+// en ny kundnära tabell utan company_id — se src/lib/tenant.ts.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum SubscriptionStatus {
+  TRIALING
+  ACTIVE
+  PAST_DUE
+  CANCELED
+}
+
+enum OrderStatus {
+  OPEN
+  CLOSED
+}
+
+enum AdminRole {
+  OWNER
+  ADMIN
+}
+
+/// Hur en stämpling kom in i systemet. Viktigt för audit-loggen:
+/// en manuellt korrigerad post ska aldrig gå att förväxla med en riktig.
+enum TimeEntrySource {
+  KIOSK
+  KIOSK_OFFLINE_SYNC
+  ADMIN_MANUAL
+  AUTO_CLOSE
+}
+
+/// Ett kundföretag. Detta är den enda tabellen utan company_id — den ÄR tenanten.
+model Company {
+  id                 String             @id @default(cuid())
+  name               String
+  subscriptionStatus SubscriptionStatus @default(TRIALING) @map("subscription_status")
+  createdAt          DateTime           @default(now()) @map("created_at")
+  updatedAt          DateTime           @updatedAt @map("updated_at")
+
+  employees    Employee[]
+  orders       Order[]
+  workMoments  WorkMoment[]
+  timeEntries  TimeEntry[]
+  adminUsers   AdminUser[]
+  kioskDevices KioskDevice[]
+
+  @@map("companies")
+}
+
+model Employee {
+  id        String   @id @default(cuid())
+  companyId String   @map("company_id")
+  name      String
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  company     Company     @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  timeEntries TimeEntry[]
+
+  @@index([companyId, active])
+  @@map("employees")
+}
+
+model Order {
+  id           String      @id @default(cuid())
+  companyId    String      @map("company_id")
+  orderNumber  String      @map("order_number")
+  customerName String?     @map("customer_name")
+  status       OrderStatus @default(OPEN)
+  createdAt    DateTime    @default(now()) @map("created_at")
+  updatedAt    DateTime    @updatedAt @map("updated_at")
+
+  company     Company     @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  timeEntries TimeEntry[]
+
+  // Ordernummer är unikt per företag — inte globalt. Två olika kunder ska
+  // kunna ha varsin order "1001" utan att krocka.
+  @@unique([companyId, orderNumber])
+  @@index([companyId, status])
+  @@map("orders")
+}
+
+model WorkMoment {
+  id        String   @id @default(cuid())
+  companyId String   @map("company_id")
+  name      String
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  company     Company     @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  timeEntries TimeEntry[]
+
+  @@unique([companyId, name])
+  @@index([companyId, active])
+  @@map("work_moments")
+}
+
+/// En stämpling. clockOutAt = null betyder "pågår just nu".
+model TimeEntry {
+  id         String    @id @default(cuid())
+  companyId  String    @map("company_id")
+  employeeId String    @map("employee_id")
+  orderId    String?   @map("order_id")
+  momentId   String?   @map("moment_id")
+  clockInAt  DateTime  @map("clock_in_at")
+  clockOutAt DateTime? @map("clock_out_at")
+
+  source TimeEntrySource @default(KIOSK)
+
+  // Audit-logg: vem/var/när, så en felaktig stämpling går att reda ut i efterhand.
+  kioskDeviceId String?  @map("kiosk_device_id")
+  sourceIp      String?  @map("source_ip")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  company     Company      @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  employee    Employee     @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  order       Order?       @relation(fields: [orderId], references: [id], onDelete: SetNull)
+  moment      WorkMoment?  @relation(fields: [momentId], references: [id], onDelete: SetNull)
+  kioskDevice KioskDevice? @relation(fields: [kioskDeviceId], references: [id], onDelete: SetNull)
+
+  // Snabbar upp den vanligaste frågan: "har den här personen en öppen stämpling?"
+  @@index([companyId, employeeId, clockOutAt])
+  @@index([companyId, clockInAt])
+  @@index([companyId, orderId])
+  @@map("time_entries")
+}
+
+model AdminUser {
+  id           String    @id @default(cuid())
+  companyId    String    @map("company_id")
+  email        String    @unique
+  passwordHash String    @map("password_hash")
+  role         AdminRole @default(ADMIN)
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@index([companyId])
+  @@map("admin_users")
+}
+
+/// En fysisk touchskärm. Identifieras med en lång slumpad token istället för
+/// inloggning — se säkerhetskraven i CLAUDE.md.
+model KioskDevice {
+  id          String    @id @default(cuid())
+  companyId   String    @map("company_id")
+  name        String
+  tokenHash   String    @unique @map("token_hash")
+  active      Boolean   @default(true)
+  lastSeenAt  DateTime? @map("last_seen_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  company     Company     @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  timeEntries TimeEntry[]
+
+  @@index([companyId, active])
+  @@map("kiosk_devices")
+}
