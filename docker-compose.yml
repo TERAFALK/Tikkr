@@ -39,10 +39,17 @@ services:
       # Vänsterledet är porten på servern och går att ändra i .env om något
       # annat redan använder 3000.
       - "${APP_PORT:-3000}:3000"
-    # Kör databasmigrationer innan appen startar. Gör att en deploy med en ny
-    # tabell fungerar av sig själv — inget manuellt steg som kan glömmas.
+    # Sätter upp databasen innan appen startar, så en deploy med en ny tabell
+    # fungerar av sig själv — inget manuellt steg som kan glömmas.
+    #
+    # Finns migrationsfiler körs de i tur och ordning (rätt sätt i produktion).
+    # Allra första gången finns inga än — då skapas tabellerna direkt ur
+    # schemat så att systemet går att starta. Kör scripts/create-migration.sh
+    # när du vill skapa den riktiga första migrationen.
     command: >
-      sh -c "npx prisma migrate deploy && node server.js"
+      sh -c "if [ -d prisma/migrations ]; then npx prisma migrate deploy;
+             else npx prisma db push --skip-generate --accept-data-loss; fi
+             && node server.js"
     healthcheck:
       test: ["CMD-SHELL", "wget -q -O- http://127.0.0.1:3000/api/health || exit 1"]
       interval: 30s

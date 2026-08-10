@@ -1,0 +1,14 @@
+# Koden skrivs på Windows men körs på Linux. Utan detta får skalskript och
+# Dockerfile Windows-radbrytningar, och Linux vägrar köra dem med det
+# svårbegripliga felet "no such file or directory".
+* text=auto eol=lf
+
+*.sh      text eol=lf
+Dockerfile text eol=lf
+*.yml     text eol=lf
+*.yaml    text eol=lf
+
+*.png binary
+*.jpg binary
+*.ico binary
+*.woff2 binary
