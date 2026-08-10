@@ -30,8 +30,13 @@ enum AdminRole {
   ADMIN
 }
 
-/// Hur en stämpling kom in i systemet. Viktigt för audit-loggen:
-/// en manuellt korrigerad post ska aldrig gå att förväxla med en riktig.
+/// Hur en stämpling kom in i systemet. Viktigt för audit-loggen: en manuellt
+/// korrigerad post ska aldrig gå att förväxla med en riktig.
+///
+/// Beskriver hur posten SKAPADES — utom AUTO_CLOSE, som sätts när systemet
+/// själv fått stänga en glömd stämpling vid företagets klockslag. Att en
+/// anställd byter jobb räknas INTE som automatisk stängning; då stängde
+/// personen posten genom sitt eget tryck.
 enum TimeEntrySource {
   KIOSK
   KIOSK_OFFLINE_SYNC
@@ -140,6 +145,12 @@ model TimeEntry {
   /// Exempel: "Automatiskt utstämplad 18:00 — ingen utstämpling registrerad".
   reviewNote String? @map("review_note")
 
+  /// Sätts av kioskskärmen vid varje tryck. Ligger nätet nere sparas
+  /// stämplingen lokalt och skickas senare — ibland flera gånger, om skärmen
+  /// inte hann få kvittensen. Det här id:t gör att en omsändning känns igen
+  /// och inte blir en dubblett. Se @@unique längre ner.
+  clientPunchId String? @map("client_punch_id")
+
   // Audit-logg: vem/var/när, så en felaktig stämpling går att reda ut i efterhand.
   kioskDeviceId String?  @map("kiosk_device_id")
   sourceIp      String?  @map("source_ip")
@@ -163,6 +174,8 @@ model TimeEntry {
   @@index([companyId, orderId])
   // Adminlistan över poster som behöver granskas.
   @@index([companyId, needsReview])
+  // Skyddet mot dubbletter från offline-kön. Unikt per företag, inte globalt.
+  @@unique([companyId, clientPunchId])
   @@map("time_entries")
 }
 
