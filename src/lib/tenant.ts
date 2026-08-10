@@ -13,10 +13,13 @@ import { unsafeGlobalPrisma } from "./db";
  * automatiskt bara det inloggade företagets anställda — även om hen inte tänkte
  * på det. Filtret går inte att glömma, eftersom det inte är något man skriver.
  *
- * Konkret sker tre saker automatiskt:
- *   1. Läsningar får `WHERE company_id = ...` påtvingat
- *   2. Nya rader får rätt company_id påstämplat
- *   3. Råa SQL-frågor blockeras helt (de går inte att filtrera automatiskt)
+ * Konkret sker två saker automatiskt:
+ *   1. Läsningar och ändringar får `WHERE company_id = ...` påtvingat
+ *   2. Anrop som pekar ut ett ANNAT företag avvisas med ett fel
+ *
+ * Vid `create` måste companyId anges uttryckligen — Prismas typer kräver det,
+ * och det är bra: TypeScript ser till att du inte glömmer, och det här lagret
+ * ser till att du inte anger fel. Kompilatorn och säkerheten drar åt samma håll.
  *
  * Bevisas av tests/tenant-isolation.test.ts.
  */

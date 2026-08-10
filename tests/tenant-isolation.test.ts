@@ -153,9 +153,9 @@ describe("läsning kan inte nå ett annat företag", () => {
 });
 
 describe("skrivning hamnar alltid i rätt företag", () => {
-  it("create stämplar på rätt companyId automatiskt", async () => {
+  it("create med eget företags id går igenom", async () => {
     const created = await forCompany(companyA).workMoment.create({
-      data: { name: "Kantpressning" },
+      data: { name: "Kantpressning", companyId: companyA },
     });
 
     expect(created.companyId).toBe(companyA);

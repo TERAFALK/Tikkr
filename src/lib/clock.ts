@@ -122,6 +122,10 @@ export async function clockIn(
 
     const started = await tx.timeEntry.create({
       data: {
+        // companyId anges uttryckligen eftersom Prismas typer kräver det.
+        // Filtreringslagret kontrollerar att det stämmer med klienten och
+        // vägrar annars — se src/lib/tenant.ts.
+        companyId,
         employeeId: input.employeeId,
         orderId: input.orderId,
         momentId: input.momentId,
