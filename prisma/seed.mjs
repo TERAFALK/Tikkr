@@ -8,9 +8,17 @@
 //
 // Kör: docker compose exec app node prisma/seed.mjs
 
+import { createHash } from "node:crypto";
 import { PrismaClient } from "@prisma/client";
 
 const prisma = new PrismaClient();
+
+/**
+ * Fast token för testskärmen, så att kopplingslänken är densamma varje gång
+ * du kör seed. ENDAST FÖR LABB — i skarp drift skapas varje skärm med en
+ * slumpad token via adminpanelen (Fas 2).
+ */
+const DEMO_KIOSK_TOKEN = "demo-labb-token-anvand-aldrig-i-skarp-drift";
 
 async function main() {
   const demo = await prisma.company.upsert({
@@ -62,6 +70,18 @@ async function main() {
     },
   });
 
+  // Testskärm för demoföretaget. Token sparas som fingeravtryck, precis som
+  // en riktig skärm — bara att den här är förutsägbar så du kan testa.
+  await prisma.kioskDevice.upsert({
+    where: { tokenHash: createHash("sha256").update(DEMO_KIOSK_TOKEN).digest("hex") },
+    update: { active: true },
+    create: {
+      companyId: demo.id,
+      name: "Verkstaden (testskärm)",
+      tokenHash: createHash("sha256").update(DEMO_KIOSK_TOKEN).digest("hex"),
+    },
+  });
+
   const counts = {
     anstallda: await prisma.employee.count(),
     ordrar: await prisma.order.count(),
@@ -74,6 +94,9 @@ async function main() {
   console.log(
     `  Totalt: ${counts.anstallda} anställda, ${counts.ordrar} ordrar, ${counts.moment} moment`
   );
+  console.log("");
+  console.log("Koppla testskärmen genom att öppna denna adress EN gång:");
+  console.log(`  /kiosk/koppla/${DEMO_KIOSK_TOKEN}`);
 }
 
 main()
