@@ -65,8 +65,11 @@ inte databasen — kolla `docker compose logs db`.
 **6. Lägg in testdata**
 
 ```bash
-docker compose exec app node prisma/seed.mjs
+docker compose run --rm migrate node prisma/seed.mjs
 ```
+
+`migrate`-containern innehåller alla utvecklingsverktyg och används för
+engångskommandon. Appcontainern är medvetet avskalad och har dem inte.
 
 Öppna sedan `http://<serverns-ip>:3000` i webbläsaren.
 
@@ -118,7 +121,8 @@ Databasmigrationer körs automatiskt när appen startar — inget extra steg.
 | Starta om appen | `docker compose restart app` |
 | Stoppa allt | `docker compose down` |
 | Öppna databasen | `docker compose exec db psql -U tikkr -d tikkr` |
-| Köra testerna | `docker compose exec app npm test` |
+| Köra testerna | `docker compose run --rm migrate npm test` |
+| Lägga in testdata | `docker compose run --rm migrate node prisma/seed.mjs` |
 
 ---
 

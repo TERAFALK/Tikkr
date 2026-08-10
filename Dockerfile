@@ -36,19 +36,16 @@ COPY --from=builder /app/public ./public
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 
-# Prisma behövs i produktion för att köra migrationer vid uppstart.
-COPY --from=builder /app/prisma ./prisma
+# Prisma-klienten som appen använder för att prata med databasen. Prismas
+# KOMMANDOVERKTYG (migrationer) finns medvetet inte här — det drar med sig
+# många beroenden. Migrationerna körs av "migrate"-containern istället, som
+# använder builder-steget ovan där allt redan finns.
 COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
 COPY --from=builder /app/node_modules/@prisma ./node_modules/@prisma
-COPY --from=builder /app/node_modules/prisma ./node_modules/prisma
-
-# Startskriptet: sätter upp databasen och startar sedan appen.
-COPY docker-entrypoint.sh ./docker-entrypoint.sh
-RUN chmod +x ./docker-entrypoint.sh
 
 USER nextjs
 EXPOSE 3000
 ENV PORT=3000
 ENV HOSTNAME=0.0.0.0
 
-CMD ["./docker-entrypoint.sh"]
+CMD ["node", "server.js"]

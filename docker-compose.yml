@@ -28,6 +28,24 @@ services:
       timeout: 5s
       retries: 10
 
+  # Engångscontainer som sätter upp databasen och sedan avslutar. Appen väntar
+  # på att den blir klar. Använder builder-steget ur Dockerfile, där Prismas
+  # kommandoverktyg och alla beroenden finns — appimagen slipper dem och
+  # förblir liten.
+  migrate:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: builder
+    container_name: tikkr-migrate
+    restart: "no"
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-tikkr}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-tikkr}?schema=public
+    command: ["sh", "./scripts/migrate.sh"]
+
   app:
     build:
       context: .
@@ -39,6 +57,9 @@ services:
     depends_on:
       db:
         condition: service_healthy
+      # Appen startar först när databasen har rätt tabeller.
+      migrate:
+        condition: service_completed_successfully
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER:-tikkr}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-tikkr}?schema=public
       NODE_ENV: production
@@ -59,9 +80,6 @@ services:
       # inte vara nåbar från proxyns nät.
       - default
       - npm_proxy
-    # Startlogiken (migrationer, sedan appen) ligger i docker-entrypoint.sh.
-    # Skalkod inklämd i YAML blir lätt fel — radbrytningar tolkas annorlunda
-    # än man tror, vilket gav "syntax error: unexpected &&" här tidigare.
     healthcheck:
       test: ["CMD-SHELL", "wget -q -O- http://127.0.0.1:3000/api/health || exit 1"]
       interval: 30s
