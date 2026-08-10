@@ -44,8 +44,18 @@ model Company {
   id                 String             @id @default(cuid())
   name               String
   subscriptionStatus SubscriptionStatus @default(TRIALING) @map("subscription_status")
-  createdAt          DateTime           @default(now()) @map("created_at")
-  updatedAt          DateTime           @updatedAt @map("updated_at")
+
+  /// Klockslag då glömda stämplingar stängs automatiskt, "HH:MM".
+  /// Posten stängs men flaggas för granskning — systemet gissar aldrig tyst.
+  autoCloseAt String @default("18:00") @map("auto_close_at")
+
+  /// Behövs för att veta när "18:00" inträffar. Sommartid hanteras av
+  /// tidszonen — hade vi räknat i UTC hade utstämplingen glidit en timme
+  /// mellan sommar och vinter.
+  timezone String @default("Europe/Stockholm")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
   employees    Employee[]
   orders       Order[]
@@ -109,15 +119,26 @@ model WorkMoment {
 
 /// En stämpling. clockOutAt = null betyder "pågår just nu".
 model TimeEntry {
-  id         String    @id @default(cuid())
-  companyId  String    @map("company_id")
-  employeeId String    @map("employee_id")
-  orderId    String?   @map("order_id")
-  momentId   String?   @map("moment_id")
+  id         String @id @default(cuid())
+  companyId  String @map("company_id")
+  employeeId String @map("employee_id")
+
+  // Order och moment är obligatoriska: all tid ska höra till ett jobb.
+  orderId  String @map("order_id")
+  momentId String @map("moment_id")
+
   clockInAt  DateTime  @map("clock_in_at")
   clockOutAt DateTime? @map("clock_out_at")
 
   source TimeEntrySource @default(KIOSK)
+
+  /// Sätts när systemet gissat sig till en utstämpling, t.ex. vid det
+  /// automatiska klockslaget. Admin får en lista att gå igenom och rätta.
+  needsReview Boolean @default(false) @map("needs_review")
+
+  /// Varför posten flaggades, i klartext för admin.
+  /// Exempel: "Automatiskt utstämplad 18:00 — ingen utstämpling registrerad".
+  reviewNote String? @map("review_note")
 
   // Audit-logg: vem/var/när, så en felaktig stämpling går att reda ut i efterhand.
   kioskDeviceId String?  @map("kiosk_device_id")
@@ -125,16 +146,23 @@ model TimeEntry {
   createdAt     DateTime @default(now()) @map("created_at")
   updatedAt     DateTime @updatedAt @map("updated_at")
 
-  company     Company      @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  employee    Employee     @relation(fields: [employeeId], references: [id], onDelete: Cascade)
-  order       Order?       @relation(fields: [orderId], references: [id], onDelete: SetNull)
-  moment      WorkMoment?  @relation(fields: [momentId], references: [id], onDelete: SetNull)
+  company  Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  employee Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  // Restrict: en order eller ett moment går inte att radera så länge det finns
+  // registrerad tid på den. Tidsdatan är fakturaunderlag och får inte tappa
+  // sin koppling. Admin stänger ordern istället för att radera den.
+  order  Order      @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  moment WorkMoment @relation(fields: [momentId], references: [id], onDelete: Restrict)
+
   kioskDevice KioskDevice? @relation(fields: [kioskDeviceId], references: [id], onDelete: SetNull)
 
   // Snabbar upp den vanligaste frågan: "har den här personen en öppen stämpling?"
   @@index([companyId, employeeId, clockOutAt])
   @@index([companyId, clockInAt])
   @@index([companyId, orderId])
+  // Adminlistan över poster som behöver granskas.
+  @@index([companyId, needsReview])
   @@map("time_entries")
 }
 

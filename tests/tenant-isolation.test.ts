@@ -19,6 +19,8 @@ let employeeA: string;
 let employeeB: string;
 let orderA: string;
 let orderB: string;
+let momentA: string;
+let momentB: string;
 
 beforeAll(async () => {
   const a = await unsafeGlobalPrisma.company.create({
@@ -54,11 +56,29 @@ beforeAll(async () => {
     })
   ).id;
 
+  momentA = (
+    await unsafeGlobalPrisma.workMoment.create({
+      data: { companyId: companyA, name: "Svetsning" },
+    })
+  ).id;
+  momentB = (
+    await unsafeGlobalPrisma.workMoment.create({
+      data: { companyId: companyB, name: "Svetsning" },
+    })
+  ).id;
+
+  // Bara företag B får en kioskskärm. Används för att bevisa att A:s
+  // raderingar inte når den.
+  await unsafeGlobalPrisma.kioskDevice.create({
+    data: { companyId: companyB, name: "Verkstaden", tokenHash: "hash-for-b" },
+  });
+
   await unsafeGlobalPrisma.timeEntry.create({
     data: {
       companyId: companyA,
       employeeId: employeeA,
       orderId: orderA,
+      momentId: momentA,
       clockInAt: new Date(),
     },
   });
@@ -67,6 +87,7 @@ beforeAll(async () => {
       companyId: companyB,
       employeeId: employeeB,
       orderId: orderB,
+      momentId: momentB,
       clockInAt: new Date(),
     },
   });
@@ -134,7 +155,7 @@ describe("läsning kan inte nå ett annat företag", () => {
 describe("skrivning hamnar alltid i rätt företag", () => {
   it("create stämplar på rätt companyId automatiskt", async () => {
     const created = await forCompany(companyA).workMoment.create({
-      data: { name: "Svetsning" },
+      data: { name: "Kantpressning" },
     });
 
     expect(created.companyId).toBe(companyA);
@@ -187,10 +208,12 @@ describe("skrivning hamnar alltid i rätt företag", () => {
   });
 
   it("deleteMany kan inte radera ett annat företags data", async () => {
-    const result = await forCompany(companyA).workMoment.deleteMany();
+    // Bara företag B har en kioskskärm. Företag A försöker radera "alla"
+    // kioskskärmar — vilket för A:s del är noll stycken.
+    const result = await forCompany(companyA).kioskDevice.deleteMany();
     expect(result.count).toBe(0);
 
-    const bStillThere = await unsafeGlobalPrisma.employee.count({
+    const bStillThere = await unsafeGlobalPrisma.kioskDevice.count({
       where: { companyId: companyB },
     });
     expect(bStillThere).toBe(1);

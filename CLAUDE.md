@@ -71,10 +71,23 @@ employees      — id, company_id, name, active
 orders         — id, company_id, order_number, customer_name, status
 work_moments   — id, company_id, name
 time_entries   — id, company_id, employee_id, order_id, moment_id,
-                 clock_in_at, clock_out_at, source
+                 clock_in_at, clock_out_at, source,
+                 needs_review, review_note, kiosk_device_id, source_ip
 admin_users    — id, company_id, email, password_hash, role
 kiosk_devices  — id, company_id, name, device_token, active, last_seen_at
 ```
+
+### Beslutade regler för stämpling (bestämt 2026-08-10)
+
+1. **Order och moment är obligatoriska.** All registrerad tid hör till ett jobb.
+   Inget "Ingen order"-val. Konsekvens: `time_entries.order_id` och `moment_id`
+   är NOT NULL, och ordrar/moment med registrerad tid går inte att radera
+   (`onDelete: Restrict`) — de stängs istället.
+2. **Glömd utstämpling stängs vid ett fast klockslag OCH flaggas.**
+   `companies.auto_close_at` (standard "18:00", per företag) styr när. Posten
+   får `source = AUTO_CLOSE`, `needs_review = true` och en `review_note` i
+   klartext. Systemet gissar aldrig tyst — admin får en lista att rätta.
+   Tidszon per företag, annars glider klockslaget mellan sommar- och vintertid.
 
 Multi-tenant-isolering byggs i appens kod: **varje databasfråga går via ett
 gemensamt lager** i Prisma som alltid filtrerar på inloggad användares
