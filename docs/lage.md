@@ -109,13 +109,19 @@ plattformskontot, som ser alla kunders driftuppgifter.
 
 ## Löst sedan förra genomgången
 
-**HTTPS** (2026-08-11). Via Nginx Proxy Manager mot `tikkr.terafalk.com`. Stängde
-säkerhetskrav 6 och gjorde offline-funktionen komplett — service workern
-registreras inte över vanlig http, så kiosken klarade tidigare inte en
-omladdning under nätavbrott.
+**HTTPS** (2026-08-11). Via Nginx Proxy Manager mot `tikkr.terafalk.com`, med
+**Force SSL** — okrypterade anrop besvaras med `301` till HTTPS istället för att
+serveras. Stängde säkerhetskrav 6 och gjorde offline-funktionen komplett:
+service workern registreras inte över vanlig http, så kiosken klarade tidigare
+inte en omladdning under nätavbrott.
 
-Appen nås inte längre okrypterat: `APP_BIND=127.0.0.1` gör att porten bara är
-öppen inifrån servern, och all trafik måste gå via proxyn.
+Appen nås inte längre okrypterat på något sätt: `APP_BIND=127.0.0.1` gör att
+porten bara är öppen inifrån servern, och proxyn omdirigerar http till https.
+
+Att omdirigeringen behövdes var inte kosmetik. Cookies är märkta `Secure` i
+produktionsläge, och webbläsaren vägrar spara dem över okrypterad anslutning —
+en kioskskärm som öppnat kopplingslänken på `http://` hade fått "inte kopplad"
+hur många gånger den än försökte, utan att något felmeddelande förklarade varför.
 
 **Kort request-timeout** på stämplingar, åtta sekunder. En långsam server kan
 inte längre få skärmen att hänga sig — trycket hamnar i kön istället.
