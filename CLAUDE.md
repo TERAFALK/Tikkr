@@ -181,9 +181,38 @@ Användaren kan **inte koda särskilt mycket själv**. Claude driver det teknisk
 
 ## 8. Affärsmodell (kontext, inte kod)
 
-- **Prissättning:** per skärm/kiosk + ev. per aktiv anställd, månadsvis via Stripe.
-- **Betalning vs bokföring:** Stripe sköter prenumerationen och styr åtkomst
-  automatiskt. Fortnox används parallellt för bokföring/momsredovisning.
+### Pris (beslutat 2026-08-11)
+
+**399 kr per aktiv stämplingsskärm och månad, exkl. moms.** Ingen grundavgift,
+inget tak på anställda, ordrar eller stämplingar. Bara månadsbetalning till att
+börja med — årsbetalning (tio månaders pris för tolv månader) läggs till först
+när en kund efterfrågar det.
+
+Motiv: ett pris är en siffra att förklara, två är en prislista. Antalet skärmar
+följer kundens storlek av sig självt, eftersom folk annars köar vid den enda
+skärmen. Jämförelse: System Andersson ligger på 25 000–50 000 kr/år, men är ett
+helt affärssystem — Tikkr ska ligga tydligt under.
+
+Höj inte priset för befintliga kunder i onödan; rabatt är lätt att ge, höjning
+är det svåraste som finns. Saknas en nivå för stora kunder (femtio anställda,
+två skärmar) läggs den till när den kunden dyker upp.
+
+### Provperiod och utebliven betalning (beslutat 2026-08-11)
+
+30 dagars provperiod, inget kort krävs. Varning sista veckan.
+
+**Stämplingen slutar aldrig fungera** — se `src/lib/subscription.ts`. Istället
+låses adminpanelen (rapporter och export) och en stor varning visas på
+stämplingsskärmarna. Utebliven betalning ger tio dagars respit innan låsning.
+
+Skälet: stämplar ingen går arbetstid förlorad och går inte att rekonstruera.
+Den tiden är kundens fakturaunderlag mot sin kund, alltså pengar som försvinner
+för någon som inte rår över att fakturan till oss är obetald.
+
+### Betalning vs bokföring
+
+Stripe sköter prenumerationen och styr åtkomst automatiskt. Fortnox används
+parallellt för bokföring och momsredovisning.
 
 ## 9. Miljöstatus (uppdatera vid ändring)
 
