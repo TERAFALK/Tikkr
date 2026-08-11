@@ -180,6 +180,18 @@ migrationer, se [docs/drift.md](docs/drift.md).
 
 ---
 
+## Tester rör aldrig appens databas
+
+Testerna skapar och raderar företag. De körs därför mot en egen databas som
+heter `<databasnamn>_test` och skapas automatiskt av `./scripts/test.sh`.
+
+Spärren sitter i `tests/setup.ts`: testerna vägrar starta om databasens namn
+inte slutar på `_test`, oavsett hur de startats. Att bara peka om databasen i
+skriptet vore inte tillräckligt — kör någon testerna på något annat sätt är
+det skyddet borta.
+
+---
+
 ## Säkerhet
 
 Två saker är kritiska och ska aldrig ändras utan eftertanke:
