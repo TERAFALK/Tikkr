@@ -1,7 +1,7 @@
 @import "tailwindcss";
 
 :root {
-  color-scheme: light dark;
+  color-scheme: light;
 }
 
 html,
@@ -9,11 +9,95 @@ body {
   height: 100%;
 }
 
-/* Kioskskärmar: ingen textmarkering vid tryck, ingen dubbeltryck-zoom.
-   Utan detta känns knapparna som en webbsida istället för som en app. */
-body {
+/*
+  Kioskytan. Låg tidigare på body och gällde därmed hela produkten — inklusive
+  säljsidan, där man inte kunde markera text för att kopiera den. Nu gäller det
+  bara skärmen den är till för.
+*/
+.kiosk-surface {
   -webkit-tap-highlight-color: transparent;
   -webkit-user-select: none;
   user-select: none;
   overscroll-behavior: none;
+}
+
+/* --------------------------------------------------------------------------
+   Animationer för säljsidan.
+
+   Bara vid inladdning, inget som triggas av att man skrollar. Rörelse som
+   följer skrollningen kräver JavaScript eller webbläsarstöd som inte alla har,
+   och en sida som hoppar till hälften är sämre än en som står still.
+
+   Allt respekterar systeminställningen för minskad rörelse längst ner.
+   -------------------------------------------------------------------------- */
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes rise-soft {
+  from {
+    opacity: 0;
+    transform: translateY(28px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes breathe {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
+  }
+}
+
+@keyframes drift {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-8px);
+  }
+}
+
+.animate-rise {
+  animation: rise 0.7s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.animate-rise-soft {
+  animation: rise-soft 0.9s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* Pulserande punkt som visar att något pågår just nu. */
+.animate-breathe {
+  animation: breathe 2.4s ease-in-out infinite;
+}
+
+/* Långsam vertikal rörelse, så produktbilden inte känns som en död bild. */
+.animate-drift {
+  animation: drift 7s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-rise,
+  .animate-rise-soft,
+  .animate-breathe,
+  .animate-drift {
+    animation: none;
+    opacity: 1;
+    transform: none;
+  }
 }

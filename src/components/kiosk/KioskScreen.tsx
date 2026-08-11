@@ -234,7 +234,7 @@ export default function KioskScreen({
   );
 
   return (
-    <main className="flex min-h-screen flex-col bg-neutral-50">
+    <main className="kiosk-surface flex min-h-screen flex-col bg-neutral-50">
       <Header
         companyName={companyName}
         deviceName={deviceName}
