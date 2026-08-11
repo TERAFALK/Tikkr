@@ -10,6 +10,20 @@ body {
 }
 
 /*
+  Dialogrutor centreras av webbläsaren genom "margin: auto". Tailwinds
+  återställning nollar marginaler på alla element, så centreringen försvann
+  och rutorna hamnade uppe till vänster. Här får de tillbaka den.
+
+  Maxhöjden gör att en lång ruta scrollar istället för att växa utanför
+  skärmen, vilket annars gör spara-knappen onåbar på en liten skärm.
+*/
+dialog {
+  margin: auto;
+  max-height: calc(100vh - 3rem);
+  max-height: calc(100dvh - 3rem);
+}
+
+/*
   Kioskytan. Låg tidigare på body och gällde därmed hela produkten — inklusive
   säljsidan, där man inte kunde markera text för att kopiera den. Nu gäller det
   bara skärmen den är till för.
