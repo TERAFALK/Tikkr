@@ -423,28 +423,35 @@ function EmployeeGrid({
           <button
             key={employee.id}
             onClick={() => onPick(employee)}
-            // Samma kort som i panelen — vit yta, tunn linje — bara betydligt
-            // större. Instämplad markeras med en kraftig kant i kanten och en
-            // grön etikett istället för heltäckande färg. Kantremsan syns på
-            // avstånd utan att skärmen blir en vägg av grönt när halva
-            // verkstaden är instämplad.
-            className={`flex min-h-36 flex-col justify-between rounded-xl border border-l-4 bg-white p-5 text-left transition-colors active:bg-neutral-50 ${
+            // Exakt samma kort som i panelen — samma form, mått, rundning och
+            // typografi. Det enda som skiljer är fyllningen.
+            //
+            // Instämplad fylls helt med systemets gröna. Frågan skärmen finns
+            // för att besvara är "är jag inne eller ute?", och det svaret ska
+            // gå att läsa tvärs över en verkstad utan att leta efter en
+            // detalj. En dämpad markering är snyggare på nära håll och sämre
+            // på det avstånd skärmen faktiskt används.
+            className={`flex min-h-36 flex-col justify-between rounded-xl border p-5 text-left transition-colors ${
               job
-                ? "border-neutral-200 border-l-emerald-500"
-                : "border-neutral-200 border-l-neutral-200"
+                ? "border-emerald-600 bg-emerald-600 active:bg-emerald-700"
+                : "border-neutral-200 bg-white active:bg-neutral-50"
             }`}
           >
-            <span className="text-xl font-semibold leading-tight text-neutral-900 sm:text-2xl">
+            <span
+              className={`text-xl font-semibold leading-tight sm:text-2xl ${
+                job ? "text-white" : "text-neutral-900"
+              }`}
+            >
               {employee.name}
             </span>
 
             {job ? (
               <span className="mt-3 block">
-                <span className="inline-flex items-center gap-2 rounded-md bg-emerald-50 px-2.5 py-1 text-sm font-semibold text-emerald-700 ring-1 ring-inset ring-emerald-200">
-                  <span className="h-2 w-2 rounded-full bg-emerald-500" />
+                <span className="inline-flex items-center gap-2 rounded-md bg-white/15 px-2.5 py-1 text-sm font-semibold text-white ring-1 ring-inset ring-white/25">
+                  <span className="h-2 w-2 rounded-full bg-white" />
                   <Elapsed since={job.since} />
                 </span>
-                <span className="mt-1.5 block truncate text-sm text-neutral-500">
+                <span className="mt-1.5 block truncate text-sm text-white/80">
                   {job.orderNumber} · {job.momentName}
                 </span>
               </span>
@@ -478,8 +485,8 @@ function ActionChoice({
 
         {job && (
           <div className="mt-3 flex flex-wrap items-center gap-2 text-[15px] text-neutral-600">
-            <span className="inline-flex items-center gap-2 rounded-lg bg-emerald-50 px-3 py-1.5 font-medium text-emerald-700 ring-1 ring-inset ring-emerald-200">
-              <span className="h-2 w-2 rounded-full bg-emerald-500" />
+            <span className="inline-flex items-center gap-2 rounded-md bg-emerald-600 px-3 py-1.5 font-semibold text-white">
+              <span className="h-2 w-2 rounded-full bg-white" />
               Pågår sedan <Elapsed since={job.since} />
             </span>
             <span>
