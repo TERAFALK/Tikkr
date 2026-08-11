@@ -37,6 +37,7 @@ export const TENANT_SCOPED_MODELS = [
   "WorkMoment",
   "TimeEntry",
   "AdminUser",
+  "AdminInvite",
   "KioskDevice",
 ] as const;
 

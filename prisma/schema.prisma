@@ -67,6 +67,7 @@ model Company {
   workMoments  WorkMoment[]
   timeEntries  TimeEntry[]
   adminUsers   AdminUser[]
+  adminInvites AdminInvite[]
   kioskDevices KioskDevice[]
 
   @@map("companies")
@@ -192,6 +193,35 @@ model AdminUser {
 
   @@index([companyId])
   @@map("admin_users")
+}
+
+/// En inbjudan att bli administratör.
+///
+/// Den inbjudne sätter sitt eget lösenord via en engångslänk. Alternativet —
+/// att någon hittar på ett lösenord åt en annan person och skickar det — gör
+/// att lösenordet passerar genom chatt eller mejl och blir känt av två personer
+/// från start.
+model AdminInvite {
+  id        String    @id @default(cuid())
+  companyId String    @map("company_id")
+  email     String
+  role      AdminRole @default(ADMIN)
+
+  /// Bara fingeravtrycket sparas, precis som för kioskskärmarnas tokens.
+  tokenHash String @unique @map("token_hash")
+
+  expiresAt      DateTime  @map("expires_at")
+  acceptedAt     DateTime? @map("accepted_at")
+  invitedByEmail String    @map("invited_by_email")
+  createdAt      DateTime  @default(now()) @map("created_at")
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  // En väntande inbjudan per adress och företag. Bjuder man in samma person
+  // igen ska den gamla länken ersättas, inte ligga kvar parallellt.
+  @@unique([companyId, email])
+  @@index([companyId, acceptedAt])
+  @@map("admin_invites")
 }
 
 /// En fysisk touchskärm. Identifieras med en lång slumpad token istället för

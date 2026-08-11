@@ -2,7 +2,12 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { IconBuilding, IconClock, IconShield } from "@/components/ui/icons";
+import {
+  IconBuilding,
+  IconClock,
+  IconPeople,
+  IconShield,
+} from "@/components/ui/icons";
 
 /**
  * Undernavigering för inställningarna.
@@ -33,6 +38,12 @@ const pages: SettingsPage[] = [
     label: "Tid och automatik",
     description: "Klockslag och tidszon",
     icon: IconClock,
+  },
+  {
+    href: "/admin/installningar/anvandare",
+    label: "Användare",
+    description: "Vilka som kan logga in",
+    icon: IconPeople,
   },
   {
     href: "/admin/installningar/dataskydd",
