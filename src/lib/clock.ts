@@ -233,12 +233,158 @@ export async function autoCloseForgottenEntries(
   return closed;
 }
 
+export interface ManualEntryInput {
+  employeeId: string;
+  orderId: string;
+  momentId: string;
+  clockInAt: Date;
+  clockOutAt: Date;
+  /** Vem som skrev in den. Hamnar i review_note så det syns i efterhand. */
+  byEmail: string;
+}
+
+/**
+ * Lägger in en stämpling för hand.
+ *
+ * Behövs när någon glömt stämpla IN. Då finns ingen post alls att rätta, och
+ * timmarna går annars inte att fakturera — vilket i praktiken händer oftare än
+ * glömd utstämpling, eftersom man är stressad när man börjar.
+ *
+ * Posten märks som ADMIN_MANUAL. En tid någon skrivit in ska aldrig gå att
+ * förväxla med en riktig stämpling, varken i rapporter eller i en framtida
+ * diskussion om en faktura.
+ */
+export async function createManualEntry(
+  companyId: string,
+  input: ManualEntryInput
+): Promise<TimeEntry> {
+  const db = forCompany(companyId);
+
+  await assertBelongsToCompany(db, input, { historical: true });
+  assertSaneInterval(input.clockInAt, input.clockOutAt);
+  await assertNoOverlap(db, input.employeeId, input.clockInAt, input.clockOutAt);
+
+  return db.timeEntry.create({
+    data: {
+      companyId,
+      employeeId: input.employeeId,
+      orderId: input.orderId,
+      momentId: input.momentId,
+      clockInAt: input.clockInAt,
+      clockOutAt: input.clockOutAt,
+      source: "ADMIN_MANUAL",
+      needsReview: false,
+      reviewNote: `Inlagd för hand av ${input.byEmail}.`,
+    },
+  });
+}
+
+/** Ändrar en befintlig stämpling. Samma kontroller som vid nyinlägg. */
+export async function updateEntryManually(
+  companyId: string,
+  entryId: string,
+  input: ManualEntryInput
+): Promise<TimeEntry> {
+  const db = forCompany(companyId);
+
+  await assertBelongsToCompany(db, input, { historical: true });
+  assertSaneInterval(input.clockInAt, input.clockOutAt);
+  await assertNoOverlap(
+    db,
+    input.employeeId,
+    input.clockInAt,
+    input.clockOutAt,
+    entryId
+  );
+
+  return db.timeEntry.update({
+    where: { id: entryId },
+    data: {
+      employeeId: input.employeeId,
+      orderId: input.orderId,
+      momentId: input.momentId,
+      clockInAt: input.clockInAt,
+      clockOutAt: input.clockOutAt,
+      source: "ADMIN_MANUAL",
+      needsReview: false,
+      reviewNote: `Ändrad för hand av ${input.byEmail}.`,
+    },
+  });
+}
+
+/** Rimlighetskontroll av ett tidsintervall. */
+function assertSaneInterval(from: Date, to: Date) {
+  if (Number.isNaN(from.getTime()) || Number.isNaN(to.getTime())) {
+    throw new ClockError("Ogiltigt datum eller klockslag.");
+  }
+
+  if (to <= from) {
+    throw new ClockError("Sluttiden måste ligga efter starttiden.");
+  }
+
+  const hours = (to.getTime() - from.getTime()) / 3_600_000;
+  if (hours > 24) {
+    throw new ClockError(
+      "Stämplingen är längre än ett dygn. Dela upp den på flera poster."
+    );
+  }
+}
+
+/**
+ * Vägrar om tiden krockar med en annan stämpling för samma person.
+ *
+ * Detta är den regel som skyddar fakturaunderlaget: ingen kan vara på två
+ * ordrar samtidigt, och överlappande poster skulle fakturera samma timme till
+ * två kunder. Kioskflödet kan inte skapa överlapp — men en admin som skriver
+ * in tider för hand kan, och gör det lätt när hen minns fel.
+ */
+async function assertNoOverlap(
+  db: CompanyDb,
+  employeeId: string,
+  from: Date,
+  to: Date,
+  ignoreEntryId?: string
+) {
+  const clash = await db.timeEntry.findFirst({
+    where: {
+      employeeId,
+      id: ignoreEntryId ? { not: ignoreEntryId } : undefined,
+      // Två intervall överlappar om det ena börjar innan det andra slutar,
+      // och slutar efter att det andra börjat.
+      clockInAt: { lt: to },
+      OR: [{ clockOutAt: null }, { clockOutAt: { gt: from } }],
+    },
+    select: {
+      clockInAt: true,
+      clockOutAt: true,
+      order: { select: { orderNumber: true } },
+    },
+  });
+
+  if (clash) {
+    throw new ClockError(
+      `Tiden krockar med en annan stämpling på order ${clash.order.orderNumber}` +
+        (clash.clockOutAt ? "" : " som fortfarande pågår") +
+        ". Samma timme kan inte faktureras till två kunder."
+    );
+  }
+}
+
 /**
  * Kontrollerar att anställd, order och moment finns hos företaget och går att
  * stämpla på. Utan detta skulle ett trasigt eller manipulerat anrop kunna
  * skapa en stämpling som pekar på ingenting.
+ *
+ * `historical` används när admin rättar historik i efterhand. Då tillåts
+ * stängda ordrar och avaktiverade anställda — tiden lades ju ner när de
+ * fortfarande var öppna respektive anställda, och den ska gå att registrera
+ * även om det upptäcks först efteråt.
  */
-async function assertBelongsToCompany(db: CompanyDb, input: ClockInInput) {
+async function assertBelongsToCompany(
+  db: CompanyDb,
+  input: { employeeId: string; orderId: string; momentId: string },
+  options: { historical?: boolean } = {}
+) {
   const [employee, order, moment] = await Promise.all([
     db.employee.findFirst({ where: { id: input.employeeId } }),
     db.order.findFirst({ where: { id: input.orderId } }),
@@ -246,10 +392,13 @@ async function assertBelongsToCompany(db: CompanyDb, input: ClockInInput) {
   ]);
 
   if (!employee) throw new ClockError("Okänd anställd.");
-  if (!employee.active) throw new ClockError("Den anställde är inte aktiv.");
   if (!order) throw new ClockError("Okänd order.");
-  if (order.status === "CLOSED") throw new ClockError("Ordern är stängd.");
   if (!moment) throw new ClockError("Okänt arbetsmoment.");
+
+  if (options.historical) return;
+
+  if (!employee.active) throw new ClockError("Den anställde är inte aktiv.");
+  if (order.status === "CLOSED") throw new ClockError("Ordern är stängd.");
   if (!moment.active) throw new ClockError("Arbetsmomentet är inte aktivt.");
 }
 

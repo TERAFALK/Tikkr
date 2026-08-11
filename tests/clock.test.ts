@@ -6,6 +6,8 @@ import {
   clockOut,
   getOpenEntry,
   autoCloseForgottenEntries,
+  createManualEntry,
+  updateEntryManually,
   ClockError,
 } from "@/lib/clock";
 
@@ -318,6 +320,178 @@ describe("ogiltiga stämplingar avvisas", () => {
         momentId: "finns-inte",
       })
     ).rejects.toThrow(ClockError);
+  });
+});
+
+describe("admin lägger in en stämpling för hand", () => {
+  const manual = (from: string, to: string, overrides = {}) => ({
+    employeeId: anna,
+    orderId: orderA,
+    momentId: svetsning,
+    clockInAt: new Date(from),
+    clockOutAt: new Date(to),
+    byEmail: "admin@demo.se",
+    ...overrides,
+  });
+
+  it("skapar posten och märker den som manuell", async () => {
+    const entry = await createManualEntry(
+      companyId,
+      manual("2026-08-05T06:00:00Z", "2026-08-05T14:00:00Z")
+    );
+
+    expect(entry.source).toBe("ADMIN_MANUAL");
+    expect(entry.needsReview).toBe(false);
+    expect(entry.reviewNote).toContain("admin@demo.se");
+    expect(entry.clockOutAt?.toISOString()).toBe("2026-08-05T14:00:00.000Z");
+  });
+
+  it("vägrar sluttid före starttid", async () => {
+    await expect(
+      createManualEntry(
+        companyId,
+        manual("2026-08-05T14:00:00Z", "2026-08-05T06:00:00Z")
+      )
+    ).rejects.toThrow(ClockError);
+  });
+
+  it("vägrar stämplingar längre än ett dygn", async () => {
+    await expect(
+      createManualEntry(
+        companyId,
+        manual("2026-08-05T06:00:00Z", "2026-08-07T06:00:00Z")
+      )
+    ).rejects.toThrow(ClockError);
+  });
+
+  it("tillåter stängd order — tiden lades ner innan den stängdes", async () => {
+    const entry = await createManualEntry(
+      companyId,
+      manual("2026-08-05T06:00:00Z", "2026-08-05T08:00:00Z", {
+        orderId: stangdOrder,
+      })
+    );
+
+    expect(entry.orderId).toBe(stangdOrder);
+  });
+
+  it("tillåter avaktiverad anställd — personen kan ha slutat sedan dess", async () => {
+    const entry = await createManualEntry(
+      companyId,
+      manual("2026-08-05T06:00:00Z", "2026-08-05T08:00:00Z", {
+        employeeId: inaktivPelle,
+      })
+    );
+
+    expect(entry.employeeId).toBe(inaktivPelle);
+  });
+});
+
+describe("överlappande tider avvisas", () => {
+  const manual = (from: string, to: string) => ({
+    employeeId: anna,
+    orderId: orderA,
+    momentId: svetsning,
+    clockInAt: new Date(from),
+    clockOutAt: new Date(to),
+    byEmail: "admin@demo.se",
+  });
+
+  beforeEach(async () => {
+    // Ett befintligt pass 08–12 svensk tid att krocka med.
+    await createManualEntry(
+      companyId,
+      manual("2026-08-05T06:00:00Z", "2026-08-05T10:00:00Z")
+    );
+  });
+
+  it("helt inuti det befintliga passet", async () => {
+    await expect(
+      createManualEntry(
+        companyId,
+        manual("2026-08-05T07:00:00Z", "2026-08-05T09:00:00Z")
+      )
+    ).rejects.toThrow(ClockError);
+  });
+
+  it("överlappar i början", async () => {
+    await expect(
+      createManualEntry(
+        companyId,
+        manual("2026-08-05T05:00:00Z", "2026-08-05T07:00:00Z")
+      )
+    ).rejects.toThrow(ClockError);
+  });
+
+  it("överlappar i slutet", async () => {
+    await expect(
+      createManualEntry(
+        companyId,
+        manual("2026-08-05T09:00:00Z", "2026-08-05T11:00:00Z")
+      )
+    ).rejects.toThrow(ClockError);
+  });
+
+  it("omsluter det befintliga passet helt", async () => {
+    await expect(
+      createManualEntry(
+        companyId,
+        manual("2026-08-05T05:00:00Z", "2026-08-05T12:00:00Z")
+      )
+    ).rejects.toThrow(ClockError);
+  });
+
+  it("kant i kant är TILLÅTET — ett pass slutar när nästa börjar", async () => {
+    const entry = await createManualEntry(
+      companyId,
+      manual("2026-08-05T10:00:00Z", "2026-08-05T12:00:00Z")
+    );
+
+    expect(entry.id).toBeTruthy();
+  });
+
+  it("krock med ett pågående jobb avvisas", async () => {
+    await unsafeGlobalPrisma.timeEntry.deleteMany({ where: { companyId } });
+    await clockIn(companyId, {
+      employeeId: anna,
+      orderId: orderA,
+      momentId: svetsning,
+      at: new Date("2026-08-05T06:00:00Z"),
+    });
+
+    await expect(
+      createManualEntry(
+        companyId,
+        manual("2026-08-05T07:00:00Z", "2026-08-05T09:00:00Z")
+      )
+    ).rejects.toThrow(ClockError);
+  });
+
+  it("en annan anställd på samma tid går bra", async () => {
+    const bosse = await unsafeGlobalPrisma.employee.create({
+      data: { companyId, name: "Bosse Bok" },
+    });
+
+    const entry = await createManualEntry(companyId, {
+      ...manual("2026-08-05T07:00:00Z", "2026-08-05T09:00:00Z"),
+      employeeId: bosse.id,
+    });
+
+    expect(entry.employeeId).toBe(bosse.id);
+    await unsafeGlobalPrisma.employee.delete({ where: { id: bosse.id } });
+  });
+
+  it("ändring av en post krockar inte med sig själv", async () => {
+    const existing = await unsafeGlobalPrisma.timeEntry.findFirstOrThrow({
+      where: { companyId },
+    });
+
+    const updated = await updateEntryManually(companyId, existing.id, {
+      ...manual("2026-08-05T06:00:00Z", "2026-08-05T11:00:00Z"),
+    });
+
+    expect(updated.clockOutAt?.toISOString()).toBe("2026-08-05T11:00:00.000Z");
+    expect(updated.source).toBe("ADMIN_MANUAL");
   });
 });
 

@@ -263,13 +263,16 @@ export function Td({
   children,
   numeric,
   muted,
+  colSpan,
 }: {
-  children: ReactNode;
+  children?: ReactNode;
   numeric?: boolean;
   muted?: boolean;
+  colSpan?: number;
 }) {
   return (
     <td
+      colSpan={colSpan}
       className={`px-4 py-2.5 align-middle ${
         numeric ? "text-right tabular-nums" : "text-left"
       } ${muted ? "text-neutral-500" : "text-neutral-900"}`}

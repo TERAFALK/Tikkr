@@ -80,6 +80,41 @@ export function instantFromWallTime(wall: WallTime, timeZone: string): Date {
   return instant;
 }
 
+/**
+ * Tolkar värdet från ett datum/tid-fält som en tidpunkt i angiven tidszon.
+ *
+ * Fältet ger klockslag som det står på väggen ("2026-08-05T14:30"), helt utan
+ * tidszon. Tolkade vi det rakt av skulle en tid inskriven i juli hamna en timme
+ * fel mot en inskriven i januari.
+ *
+ * Returnerar null om värdet inte går att tolka.
+ */
+export function parseLocalDateTime(
+  value: string,
+  timeZone: string
+): Date | null {
+  const match = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/.exec(value.trim());
+  if (!match) return null;
+
+  return instantFromWallTime(
+    {
+      year: Number(match[1]),
+      month: Number(match[2]),
+      day: Number(match[3]),
+      hour: Number(match[4]),
+      minute: Number(match[5]),
+    },
+    timeZone
+  );
+}
+
+/** Formaterar en tidpunkt så ett datum/tid-fält visar rätt lokal tid. */
+export function toLocalDateTimeInput(value: Date, timeZone: string): string {
+  const wall = wallTimeIn(value, timeZone);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${wall.year}-${pad(wall.month)}-${pad(wall.day)}T${pad(wall.hour)}:${pad(wall.minute)}`;
+}
+
 /** Tolkar "18:00" till timme och minut. Kastar vid felaktigt format. */
 export function parseTimeOfDay(value: string): { hour: number; minute: number } {
   const match = /^(\d{1,2}):(\d{2})$/.exec(value.trim());

@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { useState } from "react";
 import { logout } from "@/app/admin/actions";
 import {
+  IconClock,
   IconDevice,
   IconLogout,
   IconMoment,
@@ -46,6 +47,7 @@ const sections: { label: string; links: NavLink[] }[] = [
       { href: "/admin", label: "Översikt", icon: IconOverview, exact: true },
       { href: "/admin/rapporter", label: "Rapporter", icon: IconReport },
       { href: "/admin/granskning", label: "Granskning", icon: IconReview, badge: true },
+      { href: "/admin/stamplingar", label: "Stämplingar", icon: IconClock },
     ],
   },
   {
