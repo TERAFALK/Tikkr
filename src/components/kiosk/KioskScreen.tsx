@@ -268,7 +268,9 @@ export default function KioskScreen({
         </Banner>
       )}
 
-      <div className="flex-1 p-4 sm:p-6 lg:p-8">
+      {/* Nyckeln byter när vyn byter, vilket startar om övergången. Utan den
+          skulle innehållet bytas ut utan att något syntes hända. */}
+      <div key={view.name} className="animate-view flex-1 p-4 sm:p-6 lg:p-8">
         {view.name === "employees" && (
           <EmployeeGrid
             employees={employees}
@@ -347,7 +349,10 @@ function Header({
         : null;
 
   return (
-    <header className="flex items-center gap-4 border-b border-neutral-200 bg-white px-4 py-3 sm:px-6">
+    // Fast höjd. Avbryt-knappen är högre än resten av innehållet, och utan en
+    // reserverad höjd växte rubriken när knappen dök upp — hela skärmen hoppade
+    // nedåt mitt i ett val.
+    <header className="flex min-h-[88px] items-center gap-4 border-b border-neutral-200 bg-white px-4 py-3 sm:px-6">
       <CompanyBadge companyName={companyName} hasLogo={hasLogo} size={40} />
 
       <div className="min-w-0">
@@ -366,7 +371,7 @@ function Header({
         </span>
       )}
 
-      <div className="ml-auto flex items-center gap-3">
+      <div className="relative ml-auto flex items-center gap-3">
         {/* Syns bara när något faktiskt väntar. En ständig statusikon skulle
             bara bli tapet som ingen läser. */}
         {waiting > 0 && (
@@ -376,21 +381,26 @@ function Header({
           </span>
         )}
 
-        {view.name !== "employees" && (
-          <button
-            onClick={onBack}
-            className="shrink-0 rounded-xl border border-neutral-200 bg-white px-6 py-4 text-lg font-semibold text-neutral-600 transition-colors active:bg-neutral-50"
-          >
-            Avbryt
-          </button>
-        )}
+        {/* Knappen finns alltid, men är osynlig när den inte behövs. Att ta
+            bort den ur layouten skulle ändra rubrikens höjd varje gång man
+            väljer ett namn. */}
+        <button
+          onClick={onBack}
+          tabIndex={view.name === "employees" ? -1 : 0}
+          aria-hidden={view.name === "employees"}
+          className={`kiosk-press shrink-0 rounded-xl border border-neutral-200 bg-white px-6 py-4 text-lg font-semibold text-neutral-600 ${
+            view.name === "employees" ? "invisible" : ""
+          }`}
+        >
+          Avbryt
+        </button>
 
-        {/* Tikkr-märket nedtonat. Skärmen hänger på kundens vägg och är deras,
-            inte vår. */}
+        {/* Tikkr-märket, nedtonat. Skärmen hänger på kundens vägg och är
+            deras — men märket ska gå att se från andra sidan verkstaden. */}
         {view.name === "employees" && (
-          <span className="hidden items-center gap-1.5 opacity-40 sm:flex">
-            <LogoMark size={16} />
-            <span className="text-[11px] font-medium text-neutral-500">
+          <span className="absolute right-4 hidden items-center gap-2 opacity-55 sm:right-6 sm:flex">
+            <LogoMark size={24} />
+            <span className="text-[13px] font-semibold text-neutral-500">
               Tikkr
             </span>
           </span>
@@ -461,7 +471,7 @@ function EmployeeGrid({
             // gå att läsa tvärs över en verkstad utan att leta efter en
             // detalj. En dämpad markering är snyggare på nära håll och sämre
             // på det avstånd skärmen faktiskt används.
-            className={`flex min-h-36 flex-col justify-between rounded-xl border p-5 text-left transition-colors ${
+            className={`kiosk-press flex min-h-36 flex-col justify-between rounded-xl border p-5 text-left ${
               job
                 ? "border-emerald-600 bg-emerald-600 active:bg-emerald-700"
                 : "border-neutral-200 bg-white active:bg-neutral-50"
@@ -531,13 +541,13 @@ function ActionChoice({
       <div className="mt-3 grid gap-3 sm:grid-cols-2">
         <button
           onClick={onClockOut}
-          className="min-h-32 rounded-xl bg-blue-600 p-6 text-2xl font-semibold text-white transition-colors active:bg-blue-700"
+          className="kiosk-press min-h-32 rounded-xl bg-blue-600 p-6 text-2xl font-semibold text-white active:bg-blue-700"
         >
           Stämpla ut
         </button>
         <button
           onClick={onSwitch}
-          className="min-h-32 rounded-xl border border-neutral-200 bg-white p-6 text-2xl font-semibold text-neutral-900 transition-colors active:bg-neutral-50"
+          className="kiosk-press min-h-32 rounded-xl border border-neutral-200 bg-white p-6 text-2xl font-semibold text-neutral-900 active:bg-neutral-50"
         >
           Byt jobb
           <span className="mt-1.5 block text-base font-normal text-neutral-500">
@@ -577,7 +587,7 @@ function Chooser({
             <button
               key={item.key}
               onClick={item.onPick}
-              className="flex min-h-32 flex-col justify-center rounded-xl border border-neutral-200 bg-white p-5 text-left transition-colors active:bg-neutral-50"
+              className="kiosk-press flex min-h-32 flex-col justify-center rounded-xl border border-neutral-200 bg-white p-5 text-left active:bg-neutral-50"
             >
               <span className="text-2xl font-semibold text-neutral-900">
                 {item.primary}

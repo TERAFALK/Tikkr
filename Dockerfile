@@ -43,6 +43,12 @@ COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
 COPY --from=builder /app/node_modules/@prisma ./node_modules/@prisma
 
+# PDF-biblioteket i sin helhet, med teckensnittsfilerna det läser vid körning.
+# Next spårar inte filer som öppnas dynamiskt, och en saknad .afm-fil gör att
+# varje PDF-export misslyckas.
+COPY --from=builder /app/node_modules/pdfkit ./node_modules/pdfkit
+COPY --from=builder /app/node_modules/fontkit ./node_modules/fontkit
+
 USER nextjs
 EXPOSE 3000
 ENV PORT=3000

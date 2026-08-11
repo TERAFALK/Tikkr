@@ -38,7 +38,7 @@ export default async function KioskPage() {
       subscriptionStatus: true,
       trialEndsAt: true,
       pastDueSince: true,
-      logoMimeType: true,
+      logoSquareMimeType: true,
     },
   });
 
@@ -100,7 +100,7 @@ export default async function KioskPage() {
       subscriptionWarning={
         access.level === "full" ? null : access.headline
       }
-      hasLogo={Boolean(company?.logoMimeType)}
+      hasLogo={Boolean(company?.logoSquareMimeType)}
     />
   );
 }

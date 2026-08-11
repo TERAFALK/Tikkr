@@ -67,15 +67,19 @@ model Company {
   /// mellan sommar och vinter.
   timezone String @default("Europe/Stockholm")
 
-  /// Kundens egen logotyp. Visas på stämplingsskärmen, i adminpanelen och
-  /// överst på underlag som skickas vidare till deras kund.
+  /// Kundens logotyper. Två stycken, för att en logotyp sällan fungerar på
+  /// båda ställena: märket i ett hörn vill vara fyrkantigt och fylla sin ruta,
+  /// medan det på ett dokument vill vara brett med namnet utskrivet.
   ///
-  /// Ligger i databasen och inte som fil på servern. Bilden följer då med i
-  /// säkerhetskopian av sig själv, och det finns ingen mapp som måste
-  /// monteras in och hållas i takt mellan miljöer. Filerna är små — vi
-  /// tillåter högst några hundra kilobyte.
-  logoData      Bytes?    @map("logo_data")
-  logoMimeType  String?   @map("logo_mime_type")
+  /// Kvadratisk — märket i panelen och på stämplingsskärmen.
+  logoSquareData     Bytes?  @map("logo_square_data")
+  logoSquareMimeType String? @map("logo_square_mime_type")
+  /// Bred — överst på underlag som skickas vidare till kundens kund.
+  logoWideData     Bytes?  @map("logo_wide_data")
+  logoWideMimeType String? @map("logo_wide_mime_type")
+
+  /// När någon av dem senast ändrades. Används för att webbläsaren ska sluta
+  /// visa den gamla bilden efter en uppladdning.
   logoUpdatedAt DateTime? @map("logo_updated_at")
 
   createdAt DateTime @default(now()) @map("created_at")

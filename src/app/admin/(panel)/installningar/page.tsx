@@ -17,7 +17,8 @@ export default async function CompanySettingsPage() {
         name: true,
         createdAt: true,
         subscriptionStatus: true,
-        logoMimeType: true,
+        logoSquareMimeType: true,
+        logoWideMimeType: true,
         logoUpdatedAt: true,
       },
     }),
@@ -45,11 +46,24 @@ export default async function CompanySettingsPage() {
 
       <Card>
         <CardHeader
-          title="Logotyp"
-          description="Visas på stämplingsskärmen, här i panelen och överst på de underlag ni skickar till era kunder."
+          title="Märke"
+          description="Fyrkantig bild som visas i hörnet här i panelen och på stämplingsskärmen. Fyller rutan helt."
         />
         <LogoUpload
-          hasLogo={Boolean(company.logoMimeType)}
+          variant="square"
+          hasLogo={Boolean(company.logoSquareMimeType)}
+          updatedAt={company.logoUpdatedAt?.getTime().toString() ?? null}
+        />
+      </Card>
+
+      <Card>
+        <CardHeader
+          title="Logotyp för utskrifter"
+          description="Ligger överst på de underlag ni skickar till era kunder. Får gärna vara bred, med namnet utskrivet."
+        />
+        <LogoUpload
+          variant="wide"
+          hasLogo={Boolean(company.logoWideMimeType)}
           updatedAt={company.logoUpdatedAt?.getTime().toString() ?? null}
         />
       </Card>

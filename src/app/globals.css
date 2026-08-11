@@ -105,6 +105,56 @@ dialog {
   animation: drift 7s ease-in-out infinite;
 }
 
+/*
+  Övergång mellan kioskens vyer. Kort med flit — 140 ms räcker för att ögat
+  ska förstå att något bytts ut, men är för snabbt för att kännas som väntan.
+  Längre än så och skärmen upplevs som trög, vilket är det värsta en
+  stämplingsskärm kan vara.
+*/
+@keyframes view-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-view {
+  animation: view-in 0.14s ease-out both;
+}
+
+/*
+  Kvittens på tryck. Knappen sjunker ihop en aning och får en ring omkring
+  sig så länge fingret ligger kvar — man ska veta att man träffade rätt även
+  innan skärmen hunnit byta vy.
+*/
+.kiosk-press {
+  transition:
+    transform 0.12s ease-out,
+    background-color 0.12s ease-out,
+    box-shadow 0.12s ease-out;
+}
+
+.kiosk-press:active {
+  transform: scale(0.975);
+  box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.25);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-view,
+  .kiosk-press {
+    animation: none;
+    transition: none;
+  }
+
+  .kiosk-press:active {
+    transform: none;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .animate-rise,
   .animate-rise-soft,

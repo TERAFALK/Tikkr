@@ -26,27 +26,32 @@ export async function GET(request: NextRequest) {
   const params = request.nextUrl.searchParams;
 
   const format = params.get("format") === "excel" ? "excel" : "pdf";
-  let orderIds = params.getAll("order").filter(Boolean);
+  const orderIds = params.getAll("order").filter(Boolean);
 
-  // Inga markerade — ta alla öppna. Att svara med ett felmeddelande när någon
-  // trycker på exportknappen utan att ha kryssat i något vore korrekt men
-  // ovänligt; det de vill ha är nästan alltid allt.
   if (orderIds.length === 0) {
-    const open = await db.order.findMany({
-      where: { status: "OPEN" },
-      select: { id: true },
-    });
-    orderIds = open.map((order) => order.id);
+    return NextResponse.json(
+      { error: "Ingen order vald." },
+      { status: 400 }
+    );
   }
 
+  // Både öppna och stängda ordrar går att exportera. En färdig order är ofta
+  // den man vill titta på — "hur lång tid tog ett liknande jobb förra gången"
+  // är hela poängen med att spara tiden.
   const orders = await getOrderExports(db, orderIds);
+
+  if (orders.length === 0) {
+    return NextResponse.json({ error: "Hittade ingen order." }, { status: 404 });
+  }
 
   const company = await unsafeGlobalPrisma.company.findUnique({
     where: { id: companyId },
     select: {
       timezone: true,
-      logoData: true,
-      logoMimeType: true,
+      // Bara den breda används på utskrifter. Märket i panelen är fyrkantigt
+      // och skulle bli en klump i ett brevhuvud.
+      logoWideData: true,
+      logoWideMimeType: true,
     },
   });
 
@@ -75,23 +80,37 @@ export async function GET(request: NextRequest) {
     name: companyName,
     timezone: timeZone,
     logo:
-      company?.logoData && company.logoMimeType
+      company?.logoWideData && company.logoWideMimeType
         ? {
-            data: Buffer.from(company.logoData),
-            mimeType: company.logoMimeType,
+            data: Buffer.from(company.logoWideData),
+            mimeType: company.logoWideMimeType,
           }
         : null,
   };
 
-  const pdf = await buildOrderPdf(pdfCompany, orders);
+  try {
+    const pdf = await buildOrderPdf(pdfCompany, orders);
 
-  return new NextResponse(new Uint8Array(pdf), {
-    headers: {
-      "content-type": "application/pdf",
-      "content-disposition": `attachment; filename="${fileBase}.pdf"`,
-      "cache-control": "no-store",
-    },
-  });
+    return new NextResponse(new Uint8Array(pdf), {
+      headers: {
+        "content-type": "application/pdf",
+        "content-disposition": `attachment; filename="${fileBase}.pdf"`,
+        "cache-control": "no-store",
+      },
+    });
+  } catch (error) {
+    // Ett tyst fel här ser ut som att knappen inte gör något. Skriv ut det som
+    // faktiskt hände i loggen och svara med något begripligt.
+    console.error("PDF kunde inte skapas", error);
+
+    return NextResponse.json(
+      {
+        error:
+          "PDF:en kunde inte skapas. Felet står i serverloggen. Excel-exporten fungerar under tiden.",
+      },
+      { status: 500 }
+    );
+  }
 }
 
 async function buildWorkbook(

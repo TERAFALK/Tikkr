@@ -38,7 +38,12 @@ export interface LogoState {
 }
 
 /**
- * Laddar upp kundens logotyp.
+ * Laddar upp en av kundens två logotyper.
+ *
+ * Två stycken eftersom en sällan fungerar på båda ställena: märket i ett hörn
+ * vill vara fyrkantigt och fylla sin ruta, medan det på ett dokument vill vara
+ * brett med namnet utskrivet. Att skala om den ena till den andra ger antingen
+ * en tunn remsa med luft omkring eller ett beskuret namn.
  *
  * Bara PNG och JPEG. SVG hade varit snyggast på skärm men fungerar inte i
  * PDF-biblioteket, och en logotyp som syns i panelen men saknas på underlaget
@@ -50,7 +55,9 @@ export async function uploadLogo(
 ): Promise<LogoState> {
   const { companyId } = await requireAdmin();
 
+  const wide = String(formData.get("variant")) === "wide";
   const file = formData.get("logo");
+
   if (!(file instanceof File) || file.size === 0) {
     return { error: "Välj en bildfil." };
   }
@@ -69,23 +76,36 @@ export async function uploadLogo(
 
   await unsafeGlobalPrisma.company.update({
     where: { id: companyId },
-    data: {
-      logoData: bytes,
-      logoMimeType: file.type,
-      logoUpdatedAt: new Date(),
-    },
+    data: wide
+      ? {
+          logoWideData: bytes,
+          logoWideMimeType: file.type,
+          logoUpdatedAt: new Date(),
+        }
+      : {
+          logoSquareData: bytes,
+          logoSquareMimeType: file.type,
+          logoUpdatedAt: new Date(),
+        },
   });
 
   revalidatePath("/admin", "layout");
-  return { ok: "Logotypen är uppdaterad." };
+  return {
+    ok: wide
+      ? "Logotypen för utskrifter är uppdaterad."
+      : "Märket är uppdaterat.",
+  };
 }
 
-export async function removeLogo() {
+export async function removeLogo(formData: FormData) {
   const { companyId } = await requireAdmin();
+  const wide = String(formData.get("variant")) === "wide";
 
   await unsafeGlobalPrisma.company.update({
     where: { id: companyId },
-    data: { logoData: null, logoMimeType: null, logoUpdatedAt: null },
+    data: wide
+      ? { logoWideData: null, logoWideMimeType: null }
+      : { logoSquareData: null, logoSquareMimeType: null },
   });
 
   revalidatePath("/admin", "layout");

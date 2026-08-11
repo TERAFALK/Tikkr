@@ -1,10 +1,13 @@
-import { NextResponse } from "next/server";
+import { NextResponse, type NextRequest } from "next/server";
 import { auth } from "@/lib/auth";
 import { getKioskSession } from "@/lib/kiosk-auth";
 import { unsafeGlobalPrisma } from "@/lib/db";
 
 /**
  * Serverar kundens logotyp.
+ *
+ * `?variant=square` ger märket som visas i panelen och på stämplingsskärmen.
+ * `?variant=wide` ger den breda som ligger överst på utskrifter.
  *
  * Nås både av adminpanelen och av stämplingsskärmen, som identifierar sig på
  * helt olika sätt — den ena med inloggning, den andra med sin skärmtoken.
@@ -18,7 +21,7 @@ import { unsafeGlobalPrisma } from "@/lib/db";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   const session = await auth();
   const companyId =
     session?.user?.companyId ?? (await getKioskSession())?.companyId;
@@ -27,22 +30,35 @@ export async function GET() {
     return new NextResponse(null, { status: 401 });
   }
 
+  const wide = request.nextUrl.searchParams.get("variant") === "wide";
+
   const company = await unsafeGlobalPrisma.company.findUnique({
     where: { id: companyId },
-    select: { logoData: true, logoMimeType: true, logoUpdatedAt: true },
+    select: {
+      logoSquareData: true,
+      logoSquareMimeType: true,
+      logoWideData: true,
+      logoWideMimeType: true,
+      logoUpdatedAt: true,
+    },
   });
 
-  if (!company?.logoData || !company.logoMimeType) {
+  const data = wide ? company?.logoWideData : company?.logoSquareData;
+  const mimeType = wide
+    ? company?.logoWideMimeType
+    : company?.logoSquareMimeType;
+
+  if (!data || !mimeType) {
     return new NextResponse(null, { status: 404 });
   }
 
-  return new NextResponse(new Uint8Array(company.logoData), {
+  return new NextResponse(new Uint8Array(data), {
     headers: {
-      "content-type": company.logoMimeType,
+      "content-type": mimeType,
       // Privat: får sparas i besökarens webbläsare men aldrig i en delad
       // mellanlagring, där en annan kunds skärm skulle kunna få fel bild.
       "cache-control": "private, max-age=300",
-      etag: `"${company.logoUpdatedAt?.getTime() ?? 0}"`,
+      etag: `"${wide ? "w" : "s"}-${company?.logoUpdatedAt?.getTime() ?? 0}"`,
     },
   });
 }

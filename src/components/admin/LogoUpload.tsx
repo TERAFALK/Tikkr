@@ -10,21 +10,26 @@ import {
 import { Alert, Button, Field } from "@/components/ui";
 
 /**
- * Uppladdning av kundens logotyp.
+ * Uppladdning av en logotyp.
  *
- * Visar bilden som redan finns, så man ser vad man byter ut. Nyckeln på
- * förhandsvisningen innehåller tidpunkten för senaste ändring — utan den
- * skulle webbläsaren visa den gamla bilden kvar från sin egen mellanlagring
- * och det skulle se ut som att uppladdningen inte tagit.
+ * Används två gånger: en gång för det fyrkantiga märket och en gång för den
+ * breda som ligger på utskrifter.
+ *
+ * Förhandsvisningen har tidpunkten för senaste ändring i sin adress. Utan den
+ * visar webbläsaren kvar den gamla bilden ur sin mellanlagring, och det ser ut
+ * som att uppladdningen inte tagit.
  */
 export default function LogoUpload({
+  variant,
   hasLogo,
   updatedAt,
 }: {
+  variant: "square" | "wide";
   hasLogo: boolean;
   updatedAt: string | null;
 }) {
   const [state, action] = useActionState<LogoState, FormData>(uploadLogo, {});
+  const wide = variant === "wide";
 
   return (
     <div className="space-y-4 p-5">
@@ -33,17 +38,26 @@ export default function LogoUpload({
 
       {hasLogo && (
         <div className="flex items-center gap-4">
-          <span className="flex h-16 w-32 items-center justify-center overflow-hidden rounded-lg border border-neutral-200 bg-white p-2">
+          <span
+            className={`flex items-center justify-center overflow-hidden rounded-lg border border-neutral-200 bg-white ${
+              wide ? "h-16 w-40 p-2" : "h-16 w-16"
+            }`}
+          >
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
-              key={updatedAt ?? "logo"}
-              src={`/api/company/logo?v=${updatedAt ?? ""}`}
-              alt="Nuvarande logotyp"
-              className="max-h-full max-w-full object-contain"
+              key={updatedAt ?? variant}
+              src={`/api/company/logo?variant=${variant}&v=${updatedAt ?? ""}`}
+              alt=""
+              className={
+                wide
+                  ? "max-h-full max-w-full object-contain"
+                  : "h-full w-full object-cover"
+              }
             />
           </span>
 
           <form action={removeLogo}>
+            <input type="hidden" name="variant" value={variant} />
             <Button type="submit" tone="danger">
               Ta bort
             </Button>
@@ -52,9 +66,15 @@ export default function LogoUpload({
       )}
 
       <form action={action} className="space-y-4">
+        <input type="hidden" name="variant" value={variant} />
+
         <Field
-          label={hasLogo ? "Byt logotyp" : "Ladda upp logotyp"}
-          hint="PNG eller JPEG, högst 512 kB. En PNG med genomskinlig bakgrund ser bäst ut på stämplingsskärmen."
+          label={hasLogo ? "Byt bild" : "Ladda upp bild"}
+          hint={
+            wide
+              ? "PNG eller JPEG, högst 512 kB. Bred bild med namnet utskrivet fungerar bäst — den läggs överst på underlaget som en brevhuvud."
+              : "PNG eller JPEG, högst 512 kB. Bilden fyller rutan helt, så en kvadratisk bild blir bäst. En PNG med genomskinlig bakgrund ser snyggast ut på stämplingsskärmen."
+          }
         >
           <input
             type="file"
@@ -76,7 +96,7 @@ function SubmitButton() {
 
   return (
     <Button type="submit" disabled={pending}>
-      {pending ? "Laddar upp…" : "Spara logotyp"}
+      {pending ? "Laddar upp…" : "Spara"}
     </Button>
   );
 }

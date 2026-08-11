@@ -178,9 +178,11 @@ export default function AdminSidebar({
 
         {/* Tikkr-märket nedtonat. Panelen tillhör kunden — deras logotyp står
             överst, vår står i marginalen. */}
-        <div className="flex items-center gap-1.5 px-2 pt-2 opacity-50">
-          <LogoMark size={14} />
-          <span className="text-[10px] font-medium text-neutral-500">Tikkr</span>
+        <div className="flex items-center gap-2 px-2 pt-2.5">
+          <LogoMark size={22} />
+          <span className="text-[13px] font-semibold text-neutral-400">
+            Tikkr
+          </span>
         </div>
       </div>
     </nav>
