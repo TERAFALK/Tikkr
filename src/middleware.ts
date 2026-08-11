@@ -39,11 +39,19 @@ function isAppPath(pathname: string): boolean {
 }
 
 export function middleware(request: NextRequest) {
-  const marketingHost = process.env.MARKETING_HOST?.toLowerCase();
+  // Flera säljadresser tillåts, kommaseparerat. Praktiskt när både tikkr.se
+  // och www.tikkr.se ska fungera: även om proxyn skickar den ena till den
+  // andra ska omdirigeringen till portalen fungera oavsett vilken som råkar
+  // träffa appen först.
+  const marketingHosts = (process.env.MARKETING_HOST ?? "")
+    .split(",")
+    .map((host) => host.trim().toLowerCase())
+    .filter(Boolean);
+
   const portalHost = process.env.PORTAL_HOST?.toLowerCase();
 
   // Inte konfigurerat — allt ligger på samma adress, som i labbet.
-  if (!marketingHost || !portalHost) return NextResponse.next();
+  if (marketingHosts.length === 0 || !portalHost) return NextResponse.next();
 
   // Bakom en reverse proxy står den riktiga adressen i x-forwarded-host.
   const host = (
@@ -57,7 +65,7 @@ export function middleware(request: NextRequest) {
   const path = request.nextUrl.pathname;
 
   // Systemets sidor på säljadressen → skicka till portalen.
-  if (host === marketingHost && isAppPath(path)) {
+  if (marketingHosts.includes(host) && isAppPath(path)) {
     return NextResponse.redirect(
       new URL(`${request.nextUrl.pathname}${request.nextUrl.search}`, `https://${portalHost}`)
     );
