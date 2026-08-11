@@ -185,10 +185,20 @@ migrationer, se [docs/drift.md](docs/drift.md).
 Testerna skapar och raderar företag. De körs därför mot en egen databas som
 heter `<databasnamn>_test` och skapas automatiskt av `./scripts/test.sh`.
 
-Spärren sitter i `tests/setup.ts`: testerna vägrar starta om databasens namn
-inte slutar på `_test`, oavsett hur de startats. Att bara peka om databasen i
-skriptet vore inte tillräckligt — kör någon testerna på något annat sätt är
-det skyddet borta.
+Två spärrar, oberoende av varandra:
+
+1. `npm test` kör inga tester alls, utan skriver ut vilket kommando som gäller.
+   Det är kommandot man skriver av vana, och det hade kört mot appens databas.
+2. `tests/setup.ts` vägrar starta om databasens namn inte slutar på `_test`,
+   oavsett hur testerna startats — via skript, direkt med vitest eller från
+   en editor.
+
+Att bara peka om databasen i skriptet vore inte tillräckligt: kör någon
+testerna på något annat sätt är det skyddet borta.
+
+> **Båda spärrarna ligger i koden, och koden bakas in i imagen vid bygget.**
+> En container som inte byggts om kör alltså fortfarande utan dem. Efter
+> `git pull` gäller `docker compose up -d --build` innan något är verifierat.
 
 ---
 
