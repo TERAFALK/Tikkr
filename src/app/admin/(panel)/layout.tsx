@@ -1,5 +1,6 @@
 import { requireAdmin } from "@/lib/admin-session";
 import { getOnboardingState } from "@/lib/onboarding";
+import { isPlatformAdmin } from "@/lib/platform-admin";
 import AdminSidebar from "@/components/admin/AdminSidebar";
 
 /**
@@ -38,6 +39,7 @@ export default async function PanelLayout({
         // En permanent "kom igång"-länk är bara skräp för den som redan kommit
         // igång; sidan finns kvar på sin adress för den som vill tillbaka.
         showOnboarding={!onboarding.ready}
+        isPlatformAdmin={isPlatformAdmin(session.email)}
       />
 
       <div className="min-w-0 flex-1">
