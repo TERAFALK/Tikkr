@@ -1,6 +1,7 @@
 import Link from "next/link";
 import {
   listCompanies,
+  recentPlatformActivity,
   requirePlatformAdmin,
 } from "@/lib/platform-admin";
 import { emailIsConfigured } from "@/lib/email";
@@ -24,7 +25,10 @@ export const metadata = { title: "Plattform — Tikkr" };
 
 export default async function PlatformPage() {
   const { email } = await requirePlatformAdmin();
-  const companies = await listCompanies();
+  const [companies, activity] = await Promise.all([
+    listCompanies(),
+    recentPlatformActivity(10),
+  ]);
 
   const active = companies.filter(
     (company) => company.subscriptionStatus === "ACTIVE"
@@ -116,7 +120,12 @@ export default async function PlatformPage() {
                   {companies.map((company) => (
                     <Tr key={company.id}>
                       <Td>
-                        <span className="font-medium">{company.name}</span>
+                        <Link
+                          href={`/plattform/${company.id}`}
+                          className="font-medium text-blue-600"
+                        >
+                          {company.name}
+                        </Link>
                       </Td>
                       <Td>
                         <SubscriptionBadge status={company.subscriptionStatus} />
@@ -153,6 +162,40 @@ export default async function PlatformPage() {
             </Card>
           )}
         </div>
+
+        {activity.length > 0 && (
+          <Card className="mt-6">
+            <CardHeader
+              title="Senaste åtgärderna"
+              description="Allt som ändrats från den här panelen, oavsett kund."
+            />
+            <Table>
+              <thead>
+                <tr>
+                  <Th>När</Th>
+                  <Th>Vem</Th>
+                  <Th>Vad</Th>
+                </tr>
+              </thead>
+              <tbody>
+                {activity.map((row) => (
+                  <Tr key={row.id}>
+                    <Td muted>{formatDateTime(row.createdAt)}</Td>
+                    <Td muted>{row.actorEmail}</Td>
+                    <Td>
+                      {row.action}
+                      {row.detail && (
+                        <span className="mt-0.5 block text-neutral-500">
+                          {row.detail}
+                        </span>
+                      )}
+                    </Td>
+                  </Tr>
+                ))}
+              </tbody>
+            </Table>
+          </Card>
+        )}
 
         <Card className="mt-6">
           <CardHeader title="Driftläge" />

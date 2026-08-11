@@ -195,6 +195,40 @@ model AdminUser {
   @@map("admin_users")
 }
 
+/// Logg över vad plattformsadministratörer gjort.
+///
+/// Panelen där du ser alla kunder går utanför företagsfiltreringen. Allt som
+/// ÄNDRAR något där ska gå att härleda i efterhand — vem, vad, när och varför.
+/// Utan det är det din utsaga mot kundens den dag något ifrågasätts.
+///
+/// Fältet heter targetCompanyId och inte companyId med flit: raden tillhör
+/// plattformen, inte kunden, och ska aldrig omfattas av det filtrerande lagret.
+model PlatformAuditLog {
+  id              String   @id @default(cuid())
+  actorEmail      String   @map("actor_email")
+  action          String
+  targetCompanyId String?  @map("target_company_id")
+  detail          String?
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  @@index([targetCompanyId, createdAt])
+  @@index([createdAt])
+  @@map("platform_audit_log")
+}
+
+/// Intern anteckning om ett kundföretag. Syns bara i plattformspanelen.
+///
+/// Ligger i en egen tabell och inte på companies, så att den aldrig kan råka
+/// följa med i en fråga som kunden själv gör.
+model PlatformNote {
+  targetCompanyId String   @id @map("target_company_id")
+  body            String
+  updatedByEmail  String   @map("updated_by_email")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  @@map("platform_notes")
+}
+
 /// En inbjudan att bli administratör.
 ///
 /// Den inbjudne sätter sitt eget lösenord via en engångslänk. Alternativet —
