@@ -1,4 +1,5 @@
 import { requireAdmin } from "@/lib/admin-session";
+import { getOnboardingState } from "@/lib/onboarding";
 import AdminSidebar from "@/components/admin/AdminSidebar";
 
 /**
@@ -22,9 +23,10 @@ export default async function PanelLayout({
 
   // Hämtas här så att siffran i menyn stämmer på varje sida, inte bara på den
   // som råkar visa granskningslistan.
-  const reviewCount = await session.db.timeEntry.count({
-    where: { needsReview: true },
-  });
+  const [reviewCount, onboarding] = await Promise.all([
+    session.db.timeEntry.count({ where: { needsReview: true } }),
+    getOnboardingState(session.db),
+  ]);
 
   return (
     <div className="min-h-screen bg-neutral-50 lg:flex">
@@ -32,6 +34,10 @@ export default async function PanelLayout({
         companyName={session.companyName}
         email={session.email}
         reviewCount={reviewCount}
+        // Guiden ligger i menyn tills den är klar, och försvinner sedan.
+        // En permanent "kom igång"-länk är bara skräp för den som redan kommit
+        // igång; sidan finns kvar på sin adress för den som vill tillbaka.
+        showOnboarding={!onboarding.ready}
       />
 
       <div className="min-w-0 flex-1">

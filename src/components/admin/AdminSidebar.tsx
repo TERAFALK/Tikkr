@@ -65,20 +65,39 @@ export default function AdminSidebar({
   companyName,
   email,
   reviewCount,
+  showOnboarding,
 }: {
   companyName: string;
   email: string;
   reviewCount: number;
+  showOnboarding: boolean;
 }) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
+
+  const visibleSections = showOnboarding
+    ? [
+        {
+          label: "Uppsättning",
+          links: [
+            {
+              href: "/admin/kom-igang",
+              label: "Kom igång",
+              icon: IconOverview,
+              exact: true,
+            },
+          ],
+        },
+        ...sections,
+      ]
+    : sections;
 
   const nav = (
     <nav className="flex h-full flex-col gap-6 p-3">
       <CompanyBadge companyName={companyName} />
 
       <div className="flex-1 space-y-6">
-        {sections.map((section) => (
+        {visibleSections.map((section) => (
           <div key={section.label}>
             <p className="mb-1 px-2 text-[11px] font-semibold uppercase tracking-wider text-neutral-400">
               {section.label}

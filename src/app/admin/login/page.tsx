@@ -1,4 +1,5 @@
 import LoginForm from "@/components/admin/LoginForm";
+import Link from "next/link";
 import { Card } from "@/components/ui";
 
 // Ligger utanför admin-mappens layout, eftersom den layouten kräver inloggning.
@@ -18,7 +19,14 @@ export default function LoginPage() {
           <LoginForm />
         </Card>
 
-        <p className="mt-6 text-center text-xs text-neutral-400">
+        <p className="mt-6 text-center text-[13px] text-neutral-500">
+          Nytt företag?{" "}
+          <Link href="/registrera" className="font-medium text-blue-600">
+            Skapa en arbetsyta
+          </Link>
+        </p>
+
+        <p className="mt-3 text-center text-xs text-neutral-400">
           Stämplingsskärmar loggar inte in här — de kopplas med en egen länk.
         </p>
       </div>

@@ -1,6 +1,6 @@
 import { requireAdmin } from "@/lib/admin-session";
 import { unsafeGlobalPrisma } from "@/lib/db";
-import { Button, Card, CardHeader, Field, Input } from "@/components/ui";
+import { Button, ButtonLink, Card, CardHeader, Field, Input } from "@/components/ui";
 import { formatDate } from "@/lib/format";
 import { saveCompany } from "./actions";
 
@@ -37,7 +37,14 @@ export default async function CompanySettingsPage() {
       </Card>
 
       <Card>
-        <CardHeader title="Om arbetsytan" />
+        <CardHeader
+          title="Om arbetsytan"
+          action={
+            <ButtonLink href="/admin/kom-igang" tone="secondary">
+              Kom igång-guiden
+            </ButtonLink>
+          }
+        />
         <dl className="divide-y divide-neutral-100 text-[13px]">
           <Row label="Upplagt" value={formatDate(company.createdAt)} />
           <Row label="Aktiva anställda" value={String(employees)} />

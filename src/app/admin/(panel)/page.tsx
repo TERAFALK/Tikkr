@@ -19,11 +19,13 @@ import {
   IconReview,
 } from "@/components/ui/icons";
 import { formatDuration, formatTime, minutesBetween } from "@/lib/format";
+import { getOnboardingState } from "@/lib/onboarding";
 
 export const dynamic = "force-dynamic";
 
 export default async function OverviewPage() {
   const { db, companyName } = await requireAdmin();
+  const onboarding = await getOnboardingState(db);
 
   const startOfToday = new Date();
   startOfToday.setHours(0, 0, 0, 0);
@@ -59,6 +61,22 @@ export default async function OverviewPage() {
         title="Översikt"
         description={`Läget just nu hos ${companyName}.`}
       />
+
+      {!onboarding.ready && (
+        <Card className="mb-6 border-blue-200 bg-blue-50/60 p-4">
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <div>
+              <p className="text-sm font-medium text-blue-900">
+                {onboarding.completed} av {onboarding.total} steg klara
+              </p>
+              <p className="mt-0.5 text-[13px] text-blue-800">
+                Stämplingsskärmen fungerar först när uppsättningen är klar.
+              </p>
+            </div>
+            <ButtonLink href="/admin/kom-igang">Fortsätt uppsättningen</ButtonLink>
+          </div>
+        </Card>
+      )}
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <Stat
