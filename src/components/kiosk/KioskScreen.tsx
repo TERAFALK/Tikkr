@@ -360,7 +360,7 @@ function Header({
         {view.name !== "employees" && (
           <button
             onClick={onBack}
-            className="shrink-0 rounded-xl px-6 py-4 text-lg font-semibold text-neutral-600 ring-1 ring-inset ring-neutral-200 transition-colors active:bg-neutral-100"
+            className="shrink-0 rounded-xl border border-neutral-200 bg-white px-6 py-4 text-lg font-semibold text-neutral-600 transition-colors active:bg-neutral-50"
           >
             Avbryt
           </button>
@@ -423,32 +423,35 @@ function EmployeeGrid({
           <button
             key={employee.id}
             onClick={() => onPick(employee)}
-            // Instämplad behåller heltäckande grönt med flit. Panelen är stram
-            // och sval, men den här skärmen läses på flera meters avstånd av
-            // någon i skyddsglasögon — då måste läget synas direkt, inte
-            // upptäckas. Storlekarna är kioskens, färgerna är systemets.
-            className={`flex min-h-36 flex-col justify-between rounded-xl p-4 text-left transition-transform active:scale-[0.97] ${
+            // Samma kort som i panelen — vit yta, tunn linje — bara betydligt
+            // större. Instämplad markeras med en kraftig kant i kanten och en
+            // grön etikett istället för heltäckande färg. Kantremsan syns på
+            // avstånd utan att skärmen blir en vägg av grönt när halva
+            // verkstaden är instämplad.
+            className={`flex min-h-36 flex-col justify-between rounded-xl border border-l-4 bg-white p-5 text-left transition-colors active:bg-neutral-50 ${
               job
-                ? "bg-emerald-600 text-white"
-                : "border border-neutral-200 bg-white text-neutral-900"
+                ? "border-neutral-200 border-l-emerald-500"
+                : "border-neutral-200 border-l-neutral-200"
             }`}
           >
-            <span className="text-xl font-semibold leading-tight sm:text-2xl">
+            <span className="text-xl font-semibold leading-tight text-neutral-900 sm:text-2xl">
               {employee.name}
             </span>
 
             {job ? (
-              <span className="mt-2 text-sm font-medium">
-                <span className="block truncate opacity-90">
-                  {job.orderNumber} · {job.momentName}
-                </span>
-                <span className="mt-1 inline-flex items-center gap-1.5 rounded bg-white/20 px-2 py-0.5">
-                  <span className="h-1.5 w-1.5 rounded-full bg-white" />
+              <span className="mt-3 block">
+                <span className="inline-flex items-center gap-2 rounded-md bg-emerald-50 px-2.5 py-1 text-sm font-semibold text-emerald-700 ring-1 ring-inset ring-emerald-200">
+                  <span className="h-2 w-2 rounded-full bg-emerald-500" />
                   <Elapsed since={job.since} />
+                </span>
+                <span className="mt-1.5 block truncate text-sm text-neutral-500">
+                  {job.orderNumber} · {job.momentName}
                 </span>
               </span>
             ) : (
-              <span className="mt-2 text-sm text-neutral-400">Ej instämplad</span>
+              <span className="mt-3 block text-sm text-neutral-400">
+                Ej instämplad
+              </span>
             )}
           </button>
         );
@@ -486,19 +489,21 @@ function ActionChoice({
         )}
       </div>
 
+      {/* Samma två knapptyper som i panelen — blå för handlingen man oftast
+          är här för, vit med linje för alternativet — bara i kioskstorlek. */}
       <div className="mt-3 grid gap-3 sm:grid-cols-2">
         <button
           onClick={onClockOut}
-          className="min-h-32 rounded-xl bg-neutral-900 p-6 text-2xl font-semibold text-white transition-transform active:scale-[0.98]"
+          className="min-h-32 rounded-xl bg-blue-600 p-6 text-2xl font-semibold text-white transition-colors active:bg-blue-700"
         >
           Stämpla ut
         </button>
         <button
           onClick={onSwitch}
-          className="min-h-32 rounded-xl bg-blue-600 p-6 text-2xl font-semibold text-white transition-transform active:scale-[0.98]"
+          className="min-h-32 rounded-xl border border-neutral-200 bg-white p-6 text-2xl font-semibold text-neutral-900 transition-colors active:bg-neutral-50"
         >
           Byt jobb
-          <span className="mt-1.5 block text-base font-normal opacity-90">
+          <span className="mt-1.5 block text-base font-normal text-neutral-500">
             Stämplar ut från nuvarande automatiskt
           </span>
         </button>
@@ -535,7 +540,7 @@ function Chooser({
             <button
               key={item.key}
               onClick={item.onPick}
-              className="flex min-h-32 flex-col justify-center rounded-xl border border-neutral-200 bg-white p-4 text-left transition-transform active:scale-[0.97]"
+              className="flex min-h-32 flex-col justify-center rounded-xl border border-neutral-200 bg-white p-5 text-left transition-colors active:bg-neutral-50"
             >
               <span className="text-2xl font-semibold text-neutral-900">
                 {item.primary}
