@@ -15,9 +15,9 @@ vad som faktiskt finns byggt.
 | Multi-tenant-lagret med tester | ✅ |
 | `CLAUDE.md` + README | ✅ |
 | Backup-skript | ⚠️ skrivet, offsite-mål ej satt |
-| Caddy + HTTPS mot tikkr.se | ❌ NPM används i labbet, HTTPS saknas helt |
+| HTTPS | ✅ via NPM mot `tikkr.terafalk.com`. Caddy planerad först i produktion |
 | GitHub Actions → staging → SSH-deploy | ❌ ersatt av `git pull` + `docker compose up -d` |
-| Uptime-övervakning | ❌ kräver publik adress |
+| Uptime-övervakning | ❌ nu möjlig, publik adress finns |
 
 ## Fas 1 — Kiosk
 
@@ -27,6 +27,7 @@ vad som faktiskt finns byggt.
 | Namnrutnät, ett tryck, order, moment | ✅ |
 | Automatisk utstämpling vid jobbyte | ✅ med tester |
 | Offline-kö | ✅ **men utan automatiska tester** |
+| Service worker (omladdning utan nät) | ✅ fungerar sedan HTTPS finns |
 | Dokumenterat kiosk-läge | ✅ `docs/kiosk-lage.md` |
 
 ## Fas 2 — Adminpanel
@@ -82,24 +83,39 @@ kom ur ett upptäckt hål snarare än en idé:
 | 3. Fullständig audit-logg | ✅ tidpunkt, skärm, IP |
 | 4. Anomali-varningar | ⏸ markerat "senare fas" redan i originalet |
 | 5. Fysisk säkerhet dokumenterad | ✅ |
-| 6. HTTPS + kort request-timeout | ❌ ingendera |
+| 6. HTTPS + kort request-timeout | ✅ HTTPS via NPM, åtta sekunders timeout på stämplingar |
 | 7. GDPR export och radering | ✅ anonymisering plus export via rapport |
 
 ---
 
 ## Luckorna som spelar roll, i ordning
 
-**1. Ingen HTTPS.** Uttalat säkerhetskrav, och det blockerar offline-funktionen:
-service workern registreras inte över vanlig http, så kiosken klarar inte en
-omladdning under nätavbrott. Förutsättning för både övervakning och
-Stripe-webhookar.
+**1. Ingen staging, ingen deploy-pipeline.** Originalplanens motiv står kvar —
+en trasig deploy slår mot alla kunder samtidigt. Ofarligt idag med noll kunder,
+men det är den lucka som blir farligast snabbast när de första dyker upp.
 
-**2. Ingen staging, ingen deploy-pipeline.** Originalplanens motiv står kvar —
-en trasig deploy slår mot alla kunder samtidigt. Ofarligt idag med noll kunder.
+**2. Ingen offsite-backup, ingen övervakning.** Medvetet uppskjutet i labbmiljö.
+Övervakning är nu möjlig eftersom en publik adress finns. Båda måste vara lösta
+före första kunden.
 
-**3. Ingen offsite-backup, ingen övervakning.** Medvetet uppskjutet i labbmiljö.
-Måste vara löst före första kunden.
-
-**4. Offline-kön saknar automatiska tester.** Den enda kritiska logiken som bara
+**3. Offline-kön saknar automatiska tester.** Den enda kritiska logiken som bara
 testats för hand, och den hanterar just den situation där tid annars går
 förlorad.
+
+**4. Ingen tvåfaktorsautentisering.** Varken för kundadministratörer eller för
+plattformskontot, som ser alla kunders driftuppgifter.
+
+---
+
+## Löst sedan förra genomgången
+
+**HTTPS** (2026-08-11). Via Nginx Proxy Manager mot `tikkr.terafalk.com`. Stängde
+säkerhetskrav 6 och gjorde offline-funktionen komplett — service workern
+registreras inte över vanlig http, så kiosken klarade tidigare inte en
+omladdning under nätavbrott.
+
+Appen nås inte längre okrypterat: `APP_BIND=127.0.0.1` gör att porten bara är
+öppen inifrån servern, och all trafik måste gå via proxyn.
+
+**Kort request-timeout** på stämplingar, åtta sekunder. En långsam server kan
+inte längre få skärmen att hänga sig — trycket hamnar i kön istället.
