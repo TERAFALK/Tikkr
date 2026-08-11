@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { findInvite } from "@/lib/admin-users";
 import AcceptInviteForm from "@/components/admin/AcceptInviteForm";
-import { Card } from "@/components/ui";
+import AuthShell from "@/components/ui/AuthShell";
 
 // Ligger utanför den skyddade adminmappen — den som öppnar länken har per
 // definition inget konto än.
@@ -19,46 +19,42 @@ export default async function InvitePage({
 
   if (!invite) {
     return (
-      <main className="flex min-h-screen items-center justify-center bg-neutral-50 p-4">
-        <Card className="max-w-sm p-8 text-center">
-          <h1 className="text-xl font-semibold text-neutral-900">
-            Länken fungerar inte
-          </h1>
-          <p className="mt-2 text-[13px] leading-relaxed text-neutral-500">
-            Inbjudan har gått ut, redan använts eller återkallats. Be den som
-            bjöd in dig om en ny länk.
-          </p>
+      <AuthShell
+        title="Länken fungerar inte"
+        subtitle="Inbjudan har gått ut, redan använts eller återkallats."
+        footer={
           <Link
             href="/admin/login"
-            className="mt-5 inline-block text-[13px] font-medium text-blue-600"
+            className="font-medium text-blue-600 hover:underline"
           >
             Till inloggningen
           </Link>
-        </Card>
-      </main>
+        }
+      >
+        <p className="text-[13px] leading-relaxed text-neutral-600">
+          Be den som bjöd in dig att skapa en ny länk. En inbjudan gäller i sju
+          dagar och kan bara användas en gång — det är därför den slutat
+          fungera, inte för att något är trasigt.
+        </p>
+      </AuthShell>
     );
   }
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-neutral-50 p-4">
-      <div className="w-full max-w-sm">
-        <div className="mb-8 text-center">
-          <h1 className="text-3xl font-semibold tracking-tight">Tikkr</h1>
-          <p className="mt-1 text-sm text-neutral-500">
-            Du har bjudits in som{" "}
-            {invite.role === "OWNER" ? "ägare" : "administratör"} hos{" "}
-            <strong className="text-neutral-700">{invite.companyName}</strong>
-          </p>
-        </div>
-
-        <Card className="p-6">
-          <AcceptInviteForm token={token} email={invite.email} />
-        </Card>
-
-        <p className="mt-6 text-center text-xs text-neutral-400">
-          Länken kan bara användas en gång.
-        </p>
-      </div>
-    </main>
+    <AuthShell
+      title={`Välkommen till ${invite.companyName}`}
+      subtitle={
+        <>
+          Du har bjudits in som{" "}
+          <strong className="font-medium text-neutral-700">
+            {invite.role === "OWNER" ? "ägare" : "administratör"}
+          </strong>
+          . Välj ett lösenord så är du igång.
+        </>
+      }
+      note="Länken kan bara användas en gång."
+    >
+      <AcceptInviteForm token={token} email={invite.email} />
+    </AuthShell>
   );
 }

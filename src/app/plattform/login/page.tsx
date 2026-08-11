@@ -1,32 +1,28 @@
 import PlatformLoginForm from "@/components/admin/PlatformLoginForm";
-import { Card } from "@/components/ui";
+import AuthShell from "@/components/ui/AuthShell";
 
 // Egen inloggning, skild från kundernas. Ett plattformskonto tillhör inget
-// företag och ska aldrig kunna förväxlas med ett kundkonto.
+// företag och ska aldrig kunna förväxlas med ett kundkonto — därför den mörka
+// bakgrunden. Man ska se på skärmen vilken sida man står på.
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Plattform — Tikkr" };
 
 export default function PlatformLoginPage() {
   return (
-    <main className="flex min-h-screen items-center justify-center bg-neutral-100 p-4">
-      <div className="w-full max-w-sm">
-        <div className="mb-8 text-center">
-          <h1 className="text-3xl font-semibold tracking-tight">Tikkr</h1>
-          <p className="mt-1 text-sm text-neutral-500">Plattformsadministration</p>
-        </div>
-
-        <Card className="p-6">
-          <PlatformLoginForm />
-        </Card>
-
-        <p className="mt-6 text-center text-xs leading-relaxed text-neutral-400">
-          Konton skapas på servern med{" "}
-          <code className="text-neutral-500">scripts/platform-user.sh</code>.
+    <AuthShell
+      tone="platform"
+      title="Plattformsadministration"
+      subtitle="Översikt över alla kundföretag"
+      note={
+        <>
+          Konton skapas på servern med scripts/platform-user.sh.
           <br />
           Är du kund loggar du in på /admin/login.
-        </p>
-      </div>
-    </main>
+        </>
+      }
+    >
+      <PlatformLoginForm />
+    </AuthShell>
   );
 }
