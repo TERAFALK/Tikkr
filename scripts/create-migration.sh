@@ -27,7 +27,10 @@ fi
 
 # Projektmappen monteras in i containern så att den nya filen hamnar i din
 # riktiga mapp och kan checkas in i git.
-MOUNT=(-v "$PWD/prisma:/app/prisma")
+#
+# --user gör att filen ägs av dig och inte av root. Utan den skapar containern
+# root-ägda filer i din mapp, som du sedan inte kan radera utan sudo.
+MOUNT=(-v "$PWD/prisma:/app/prisma" --user "$(id -u):$(id -g)")
 
 if [ ! -d prisma/migrations ]; then
   # Första gången. Databasen har redan tabeller (skapade direkt ur schemat vid
@@ -47,9 +50,11 @@ if [ ! -d prisma/migrations ]; then
   docker compose run --rm "${MOUNT[@]}" migrate \
     npx prisma migrate resolve --applied "0_$NAME"
 else
+  # --skip-generate: Prisma-koden genereras ändå vid nästa bygge, och att
+  # skriva den här skulle kräva åtkomst till mappar containern äger.
   echo "==> Skapar migration '$NAME'..."
   docker compose run --rm "${MOUNT[@]}" migrate \
-    npx prisma migrate dev --name "$NAME"
+    npx prisma migrate dev --name "$NAME" --skip-generate
 fi
 
 echo
