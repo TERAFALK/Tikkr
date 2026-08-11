@@ -43,3 +43,26 @@ export async function toggleDevice(formData: FormData) {
   await db.kioskDevice.update({ where: { id }, data: { active: !active } });
   revalidatePath(PATH);
 }
+
+/**
+ * Raderar en återkallad skärm.
+ *
+ * Bara återkallade går att radera. En aktiv skärm står och används av någon —
+ * att den försvinner mitt i ett arbetspass vore ett fel, inte en städning.
+ *
+ * Stämplingar som gjorts på skärmen finns kvar med sin tid, men tappar
+ * noteringen om vilken skärm de kom från. Det är den enda förlusten, och den
+ * står i bekräftelsen så att ingen blir överraskad.
+ */
+export async function deleteDevice(formData: FormData) {
+  const { db } = await requireAdmin();
+
+  const id = String(formData.get("id") ?? "");
+  if (!id) return;
+
+  const device = await db.kioskDevice.findFirst({ where: { id } });
+  if (!device || device.active) return;
+
+  await db.kioskDevice.delete({ where: { id } });
+  revalidatePath(PATH);
+}

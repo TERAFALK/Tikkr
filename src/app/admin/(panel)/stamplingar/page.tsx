@@ -1,6 +1,7 @@
 import { requireAdmin } from "@/lib/admin-session";
 import { unsafeGlobalPrisma } from "@/lib/db";
-import NewEntryForm from "@/components/admin/NewEntryForm";
+import NewEntryDialog from "@/components/admin/NewEntryDialog";
+import FormDialog from "@/components/admin/FormDialog";
 import ConfirmButton from "@/components/admin/ConfirmButton";
 import {
   Badge,
@@ -18,7 +19,7 @@ import {
   Th,
   Tr,
 } from "@/components/ui";
-import { formatDuration, minutesBetween } from "@/lib/format";
+import { formatDateTime, formatDuration, minutesBetween } from "@/lib/format";
 import { toLocalDateTimeInput } from "@/lib/time-zone";
 import { deleteEntry, editEntry } from "./actions";
 
@@ -79,7 +80,8 @@ export default async function EntriesPage({
         orderId: true,
         momentId: true,
         employee: { select: { name: true } },
-        order: { select: { orderNumber: true } },
+        order: { select: { orderNumber: true, customerName: true } },
+        moment: { select: { name: true } },
       },
     }),
   ]);
@@ -104,12 +106,13 @@ export default async function EntriesPage({
       <PageHeader
         title="Stämplingar"
         description="Alla registrerade tider. Här läggs tid in som aldrig blev stämplad, och felaktiga poster rättas."
-      />
-
-      <NewEntryForm
-        employees={employeeOptions}
-        orders={orderOptions}
-        moments={momentOptions}
+        action={
+          <NewEntryDialog
+            employees={employeeOptions}
+            orders={orderOptions}
+            moments={momentOptions}
+          />
+        }
       />
 
       <Card className="mb-6">
@@ -119,9 +122,7 @@ export default async function EntriesPage({
             <Input
               type="date"
               name="from"
-              defaultValue={
-                params.from ?? defaultFrom.toISOString().slice(0, 10)
-              }
+              defaultValue={params.from ?? defaultFrom.toISOString().slice(0, 10)}
             />
           </Field>
 
@@ -148,20 +149,21 @@ export default async function EntriesPage({
       {entries.length === 0 ? (
         <EmptyState
           title="Inga stämplingar i perioden"
-          description="Vidga datumintervallet, eller lägg till en stämpling ovan om tid saknas."
+          description="Vidga datumintervallet, eller lägg till en stämpling om tid saknas."
         />
       ) : (
         <Card>
           <CardHeader
-            title="Registrerade tider"
-            description={`${entries.length} poster, senaste först. Ändringar märks som manuella.`}
+            title={`${entries.length} ${entries.length === 1 ? "post" : "poster"}`}
+            description="Senaste först. Ändringar märks som manuella."
           />
           <Table>
             <thead>
               <tr>
                 <Th>Anställd</Th>
                 <Th>Order och moment</Th>
-                <Th>Tider</Th>
+                <Th>Instämplad</Th>
+                <Th>Utstämplad</Th>
                 <Th numeric>Längd</Th>
                 <Th>
                   <span className="sr-only">Åtgärder</span>
@@ -188,109 +190,113 @@ export default async function EntriesPage({
                       )}
                     </Td>
 
-                    {/* Pågående poster ändras inte här. Att skriva in en
-                        sluttid på ett jobb som fortfarande pågår skulle stänga
-                        det bakom ryggen på den som står vid skärmen. */}
-                    {ongoing ? (
-                      <>
-                        <Td muted>{entry.order.orderNumber}</Td>
-                        <Td>
-                          <Badge tone="active">Pågår just nu</Badge>
-                        </Td>
-                        <Td numeric>
-                          {formatDuration(minutesBetween(entry.clockInAt, null))}
-                        </Td>
-                        <Td />
-                      </>
-                    ) : (
-                      <Td colSpan={4}>
-                        {/* Fälten får bryta rad på smal skärm istället för att
-                            klämmas ihop. En felskriven tid här blir ett
-                            fakturafel, så de ska vara läsbara. */}
-                        <form
-                          action={editEntry}
-                          className="flex flex-wrap items-center gap-2"
-                        >
-                          <input type="hidden" name="id" value={entry.id} />
-                          <input
-                            type="hidden"
-                            name="employeeId"
-                            value={entry.employeeId}
-                          />
+                    <Td muted>
+                      {entry.order.orderNumber} · {entry.moment.name}
+                      {entry.order.customerName && (
+                        <span className="mt-0.5 block text-xs text-neutral-400">
+                          {entry.order.customerName}
+                        </span>
+                      )}
+                    </Td>
 
-                          <Select
-                            name="orderId"
-                            defaultValue={entry.orderId}
-                            className="w-44"
-                            aria-label="Order"
+                    <Td muted>{formatDateTime(entry.clockInAt, timeZone)}</Td>
+
+                    <Td muted>
+                      {ongoing ? (
+                        <Badge tone="active">Pågår</Badge>
+                      ) : (
+                        formatDateTime(entry.clockOutAt!, timeZone)
+                      )}
+                    </Td>
+
+                    <Td numeric>
+                      {formatDuration(
+                        minutesBetween(entry.clockInAt, entry.clockOutAt)
+                      )}
+                    </Td>
+
+                    <Td>
+                      {/* Pågående poster ändras inte här. Att skriva in en
+                          sluttid på ett jobb som fortfarande pågår skulle
+                          stänga det bakom ryggen på den som står vid skärmen. */}
+                      {ongoing ? (
+                        <span className="block text-right text-xs text-neutral-400">
+                          Ändras när den avslutats
+                        </span>
+                      ) : (
+                        <div className="flex justify-end gap-2">
+                          <FormDialog
+                            trigger="Ändra"
+                            triggerTone="ghost"
+                            title={`Ändra stämpling — ${entry.employee.name}`}
+                            description="Ändringen märks som manuell, så den aldrig går att förväxla med en riktig stämpling."
+                            action={editEntry}
+                            submitLabel="Spara"
                           >
-                            {orderOptions.map((option) => (
-                              <option key={option.id} value={option.id}>
-                                {option.label}
-                              </option>
-                            ))}
-                          </Select>
+                            <input type="hidden" name="id" value={entry.id} />
+                            <input
+                              type="hidden"
+                              name="employeeId"
+                              value={entry.employeeId}
+                            />
 
-                          <Select
-                            name="momentId"
-                            defaultValue={entry.momentId}
-                            className="w-36"
-                            aria-label="Arbetsmoment"
-                          >
-                            {momentOptions.map((option) => (
-                              <option key={option.id} value={option.id}>
-                                {option.label}
-                              </option>
-                            ))}
-                          </Select>
+                            <Field label="Order">
+                              <Select name="orderId" defaultValue={entry.orderId}>
+                                {orderOptions.map((option) => (
+                                  <option key={option.id} value={option.id}>
+                                    {option.label}
+                                  </option>
+                                ))}
+                              </Select>
+                            </Field>
 
-                          <Input
-                            type="datetime-local"
-                            name="clockInAt"
-                            defaultValue={toLocalDateTimeInput(
-                              entry.clockInAt,
-                              timeZone
-                            )}
-                            className="w-48"
-                            aria-label="Instämplad"
-                          />
-                          <Input
-                            type="datetime-local"
-                            name="clockOutAt"
-                            defaultValue={toLocalDateTimeInput(
-                              entry.clockOutAt!,
-                              timeZone
-                            )}
-                            className="w-48"
-                            aria-label="Utstämplad"
-                          />
+                            <Field label="Arbetsmoment">
+                              <Select name="momentId" defaultValue={entry.momentId}>
+                                {momentOptions.map((option) => (
+                                  <option key={option.id} value={option.id}>
+                                    {option.label}
+                                  </option>
+                                ))}
+                              </Select>
+                            </Field>
 
-                          <Badge>
-                            {formatDuration(
-                              minutesBetween(entry.clockInAt, entry.clockOutAt)
-                            )}
-                          </Badge>
+                            <div className="grid gap-4 sm:grid-cols-2">
+                              <Field label="Instämplad">
+                                <Input
+                                  type="datetime-local"
+                                  name="clockInAt"
+                                  defaultValue={toLocalDateTimeInput(
+                                    entry.clockInAt,
+                                    timeZone
+                                  )}
+                                />
+                              </Field>
+                              <Field label="Utstämplad">
+                                <Input
+                                  type="datetime-local"
+                                  name="clockOutAt"
+                                  defaultValue={toLocalDateTimeInput(
+                                    entry.clockOutAt!,
+                                    timeZone
+                                  )}
+                                />
+                              </Field>
+                            </div>
+                          </FormDialog>
 
-                          <div className="ml-auto flex items-center gap-2">
-                            <Button type="submit" tone="secondary">
-                              Spara
-                            </Button>
-
-                            {/* formAction låter samma formulär skickas till en
-                                annan serveråtgärd, så raderingen får med sig
-                                posten utan ett eget formulär i raden. */}
+                          <form action={deleteEntry}>
+                            <input type="hidden" name="id" value={entry.id} />
                             <ConfirmButton
                               type="submit"
                               tone="danger"
-                              formAction={deleteEntry}
                               question={`Radera stämplingen för ${entry.employee.name}? Tiden går inte att få tillbaka.`}
                             >
                               Radera
                             </ConfirmButton>
-                          </div>
-                        </form>
-                      </Td>
-                    )}
+                          </form>
+                        </div>
+                      )}
+                    </Td>
                   </Tr>
                 );
               })}
@@ -298,7 +304,6 @@ export default async function EntriesPage({
           </Table>
         </Card>
       )}
-
     </>
   );
 }

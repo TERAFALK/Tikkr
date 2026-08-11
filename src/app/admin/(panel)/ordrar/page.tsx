@@ -1,4 +1,5 @@
 import { requireAdmin } from "@/lib/admin-session";
+import FormDialog from "@/components/admin/FormDialog";
 import {
   Badge,
   Button,
@@ -32,41 +33,48 @@ export default async function OrdersPage() {
     },
   });
 
+  const newOrder = (
+    <FormDialog
+      trigger="Ny order"
+      title="Lägg till order"
+      description="Öppna ordrar går att stämpla på. All registrerad tid hör till en order som ska faktureras."
+      action={createOrder}
+      submitLabel="Lägg till"
+    >
+      <Field label="Ordernummer">
+        <Input name="orderNumber" placeholder="2601" required autoFocus />
+      </Field>
+      <Field label="Kund" hint="Valfritt, men gör ordern lättare att känna igen på skärmen.">
+        <Input name="customerName" placeholder="Volvo Lastvagnar" />
+      </Field>
+    </FormDialog>
+  );
+
   return (
     <>
       <PageHeader
         title="Ordrar"
-        description="Öppna ordrar går att stämpla på. Stängda döljs på skärmen men behåller sin tid."
+        description="Stängda ordrar döljs på stämplingsskärmen men behåller sin tid."
+        action={newOrder}
       />
-
-      <Card className="mb-6">
-        <CardHeader title="Lägg till order" />
-        <form action={createOrder} className="flex flex-wrap items-end gap-3 p-5">
-          <div className="w-40">
-            <Field label="Ordernummer">
-              <Input name="orderNumber" placeholder="2601" required />
-            </Field>
-          </div>
-          <div className="min-w-64 flex-1">
-            <Field label="Kund" hint="Valfritt, men gör ordern lättare att känna igen">
-              <Input name="customerName" placeholder="Volvo Lastvagnar" />
-            </Field>
-          </div>
-          <Button type="submit">Lägg till</Button>
-        </form>
-      </Card>
 
       {orders.length === 0 ? (
         <EmptyState
           title="Inga ordrar upplagda"
           description="Utan minst en öppen order kan ingen stämpla in — all tid måste höra till en order som ska faktureras."
+          action={newOrder}
         />
       ) : (
         <Card>
+          <CardHeader
+            title={`${orders.length} ${orders.length === 1 ? "order" : "ordrar"}`}
+            description="Öppna först."
+          />
           <Table>
             <thead>
               <tr>
-                <Th>Order och kund</Th>
+                <Th>Order</Th>
+                <Th>Kund</Th>
                 <Th>Status</Th>
                 <Th numeric>Upparbetad tid</Th>
                 <Th>
@@ -86,29 +94,9 @@ export default async function OrdersPage() {
                 return (
                   <Tr key={order.id} dimmed={!isOpen}>
                     <Td>
-                      <form
-                        action={updateOrder}
-                        className="flex flex-wrap items-center gap-2"
-                      >
-                        <input type="hidden" name="id" value={order.id} />
-                        <Input
-                          name="orderNumber"
-                          defaultValue={order.orderNumber}
-                          className="w-28"
-                          aria-label="Ordernummer"
-                        />
-                        <Input
-                          name="customerName"
-                          defaultValue={order.customerName ?? ""}
-                          placeholder="Kund"
-                          className="w-52"
-                          aria-label="Kund"
-                        />
-                        <Button type="submit" tone="ghost">
-                          Spara
-                        </Button>
-                      </form>
+                      <span className="font-medium">{order.orderNumber}</span>
                     </Td>
+                    <Td muted>{order.customerName ?? "—"}</Td>
                     <Td>
                       {isOpen ? (
                         <Badge tone="active">Öppen</Badge>
@@ -118,13 +106,40 @@ export default async function OrdersPage() {
                     </Td>
                     <Td numeric>{formatDuration(minutes)}</Td>
                     <Td>
-                      <form action={toggleOrder}>
-                        <input type="hidden" name="id" value={order.id} />
-                        <input type="hidden" name="status" value={order.status} />
-                        <Button type="submit" tone="secondary">
-                          {isOpen ? "Stäng order" : "Öppna igen"}
-                        </Button>
-                      </form>
+                      <div className="flex justify-end gap-2">
+                        <FormDialog
+                          trigger="Ändra"
+                          triggerTone="ghost"
+                          title={`Ändra order ${order.orderNumber}`}
+                          action={updateOrder}
+                          submitLabel="Spara"
+                        >
+                          <input type="hidden" name="id" value={order.id} />
+                          <Field label="Ordernummer">
+                            <Input
+                              name="orderNumber"
+                              defaultValue={order.orderNumber}
+                              required
+                              autoFocus
+                            />
+                          </Field>
+                          <Field label="Kund">
+                            <Input
+                              name="customerName"
+                              defaultValue={order.customerName ?? ""}
+                              placeholder="Valfritt"
+                            />
+                          </Field>
+                        </FormDialog>
+
+                        <form action={toggleOrder}>
+                          <input type="hidden" name="id" value={order.id} />
+                          <input type="hidden" name="status" value={order.status} />
+                          <Button type="submit" tone="secondary">
+                            {isOpen ? "Stäng order" : "Öppna igen"}
+                          </Button>
+                        </form>
+                      </div>
                     </Td>
                   </Tr>
                 );
