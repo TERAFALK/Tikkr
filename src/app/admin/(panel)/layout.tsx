@@ -1,5 +1,5 @@
 import { requireAdmin } from "@/lib/admin-session";
-import AdminNav from "@/components/admin/AdminNav";
+import AdminSidebar from "@/components/admin/AdminSidebar";
 
 /**
  * Skalet runt de inloggade adminsidorna.
@@ -20,12 +20,25 @@ export default async function PanelLayout({
 }) {
   const session = await requireAdmin();
 
+  // Hämtas här så att siffran i menyn stämmer på varje sida, inte bara på den
+  // som råkar visa granskningslistan.
+  const reviewCount = await session.db.timeEntry.count({
+    where: { needsReview: true },
+  });
+
   return (
-    <div className="min-h-screen bg-slate-50">
-      <AdminNav companyName={session.companyName} email={session.email} />
-      <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-        {children}
-      </main>
+    <div className="min-h-screen bg-neutral-50 lg:flex">
+      <AdminSidebar
+        companyName={session.companyName}
+        email={session.email}
+        reviewCount={reviewCount}
+      />
+
+      <div className="min-w-0 flex-1">
+        <main className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
+          {children}
+        </main>
+      </div>
     </div>
   );
 }

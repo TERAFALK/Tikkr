@@ -4,14 +4,22 @@ import type { ComponentProps, ReactNode } from "react";
 /**
  * DESIGNSYSTEMET.
  *
- * Byggstenarna som alla adminvyer sätts ihop av. Anledningen att de ligger
- * samlade här och inte skrivs om per sida: det är skillnaden mellan en app som
- * ser sammanhållen ut och en som ser hopplockad ut. Ska en knapp ändras ändras
- * den på ett ställe.
+ * Byggstenarna som alla adminvyer sätts ihop av. Ska en knapp ändras ändras den
+ * på ett ställe — det är skillnaden mellan en app som ser sammanhållen ut och
+ * en som ser hopplockad ut.
  *
- * Riktning: ljust och stramt. Vit yta, gråskala, mörkblått för handling och
- * grönt för pågående arbete. Färg används sparsamt — när allt är färgglatt
- * betyder ingenting något.
+ * Formspråket är inspirerat av verktyg som Twenty CRM: stramt och kompakt,
+ * tunna ljusa linjer istället för skuggor, små rundningar, tät typografi och
+ * mycket sparsam färg. Idén är att gränssnittet ska försvinna och innehållet
+ * synas. En yta full av färg och skuggor konkurrerar med siffrorna, och det är
+ * siffrorna man är här för.
+ *
+ * Färgregler som gäller överallt:
+ *   blå   = något går att göra här
+ *   grön  = pågår just nu
+ *   gul   = kräver din uppmärksamhet
+ *   röd   = går inte att ångra
+ * Allt annat är gråskala.
  */
 
 /* -------------------------------------------------------------------------- */
@@ -29,15 +37,34 @@ export function PageHeader({
 }) {
   return (
     <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight text-slate-900">
+      <div className="min-w-0">
+        <h1 className="text-xl font-semibold tracking-tight text-neutral-900">
           {title}
         </h1>
         {description && (
-          <p className="mt-1 text-sm text-slate-500">{description}</p>
+          <p className="mt-1 max-w-2xl text-[13px] leading-relaxed text-neutral-500">
+            {description}
+          </p>
         )}
       </div>
-      {action}
+      {action && <div className="shrink-0">{action}</div>}
+    </div>
+  );
+}
+
+export function SectionTitle({
+  children,
+  hint,
+}: {
+  children: ReactNode;
+  hint?: string;
+}) {
+  return (
+    <div className="mb-3">
+      <h2 className="text-[13px] font-semibold uppercase tracking-wider text-neutral-400">
+        {children}
+      </h2>
+      {hint && <p className="mt-1 text-[13px] text-neutral-500">{hint}</p>}
     </div>
   );
 }
@@ -46,19 +73,22 @@ export function PageHeader({
 /* Knappar                                                                     */
 /* -------------------------------------------------------------------------- */
 
-type ButtonTone = "primary" | "secondary" | "danger";
+type ButtonTone = "primary" | "secondary" | "danger" | "ghost";
 
 const buttonStyles: Record<ButtonTone, string> = {
-  primary: "bg-slate-900 text-white hover:bg-slate-800",
-  secondary: "bg-white text-slate-700 ring-1 ring-inset ring-slate-300 hover:bg-slate-50",
-  danger: "bg-white text-red-700 ring-1 ring-inset ring-red-300 hover:bg-red-50",
+  primary: "bg-blue-600 text-white hover:bg-blue-700 shadow-xs",
+  secondary:
+    "bg-white text-neutral-700 ring-1 ring-inset ring-neutral-200 hover:bg-neutral-50",
+  danger:
+    "bg-white text-red-600 ring-1 ring-inset ring-red-200 hover:bg-red-50",
+  ghost: "text-neutral-600 hover:bg-neutral-100",
 };
 
 const buttonBase =
-  "inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm " +
-  "font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50 " +
-  "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 " +
-  "focus-visible:outline-slate-900";
+  "inline-flex items-center justify-center gap-1.5 rounded-md px-3 py-1.5 " +
+  "text-[13px] font-medium transition-colors disabled:cursor-not-allowed " +
+  "disabled:opacity-50 focus-visible:outline focus-visible:outline-2 " +
+  "focus-visible:outline-offset-1 focus-visible:outline-blue-600";
 
 export function Button({
   tone = "primary",
@@ -66,10 +96,7 @@ export function Button({
   ...props
 }: ComponentProps<"button"> & { tone?: ButtonTone }) {
   return (
-    <button
-      {...props}
-      className={`${buttonBase} ${buttonStyles[tone]} ${className}`}
-    />
+    <button {...props} className={`${buttonBase} ${buttonStyles[tone]} ${className}`} />
   );
 }
 
@@ -96,9 +123,31 @@ export function Card({
 }) {
   return (
     <div
-      className={`rounded-xl border border-slate-200 bg-white shadow-sm ${className}`}
+      className={`rounded-lg border border-neutral-200 bg-white ${className}`}
     >
       {children}
+    </div>
+  );
+}
+
+export function CardHeader({
+  title,
+  description,
+  action,
+}: {
+  title: string;
+  description?: string;
+  action?: ReactNode;
+}) {
+  return (
+    <div className="flex flex-wrap items-start justify-between gap-3 border-b border-neutral-200 px-5 py-3.5">
+      <div className="min-w-0">
+        <h2 className="text-sm font-semibold text-neutral-900">{title}</h2>
+        {description && (
+          <p className="mt-0.5 text-[13px] text-neutral-500">{description}</p>
+        )}
+      </div>
+      {action && <div className="shrink-0">{action}</div>}
     </div>
   );
 }
@@ -108,27 +157,32 @@ export function Stat({
   value,
   hint,
   tone = "neutral",
+  icon,
 }: {
   label: string;
   value: string | number;
   hint?: string;
   tone?: "neutral" | "active" | "warning";
+  icon?: ReactNode;
 }) {
   const valueTone = {
-    neutral: "text-slate-900",
-    active: "text-emerald-700",
-    warning: "text-amber-700",
+    neutral: "text-neutral-900",
+    active: "text-emerald-600",
+    warning: "text-amber-600",
   }[tone];
 
   return (
-    <Card className="p-5">
-      <p className="text-sm font-medium text-slate-500">{label}</p>
+    <Card className="px-5 py-4">
+      <div className="flex items-center gap-2 text-neutral-400">
+        {icon}
+        <p className="text-[13px] font-medium text-neutral-500">{label}</p>
+      </div>
       {/* tabular-nums ger alla siffror samma bredd, så tal går att jämföra
-          med blicken istället för att hoppa i sidled. */}
-      <p className={`mt-2 text-3xl font-semibold tabular-nums ${valueTone}`}>
+          med blicken istället för att hoppa i sidled mellan raderna. */}
+      <p className={`mt-1.5 text-2xl font-semibold tabular-nums ${valueTone}`}>
         {value}
       </p>
-      {hint && <p className="mt-1 text-sm text-slate-500">{hint}</p>}
+      {hint && <p className="mt-0.5 text-xs text-neutral-400">{hint}</p>}
     </Card>
   );
 }
@@ -138,9 +192,9 @@ export function Stat({
 /* -------------------------------------------------------------------------- */
 
 const fieldStyles =
-  "block w-full rounded-lg border-0 py-2 px-3 text-slate-900 shadow-sm " +
-  "ring-1 ring-inset ring-slate-300 placeholder:text-slate-400 " +
-  "focus:ring-2 focus:ring-inset focus:ring-slate-900 sm:text-sm";
+  "block w-full rounded-md border-0 bg-white px-2.5 py-1.5 text-[13px] " +
+  "text-neutral-900 ring-1 ring-inset ring-neutral-200 " +
+  "placeholder:text-neutral-400 focus:ring-2 focus:ring-inset focus:ring-blue-600";
 
 export function Field({
   label,
@@ -153,11 +207,15 @@ export function Field({
 }) {
   return (
     <label className="block">
-      <span className="mb-1.5 block text-sm font-medium text-slate-700">
+      <span className="mb-1 block text-[13px] font-medium text-neutral-700">
         {label}
       </span>
       {children}
-      {hint && <span className="mt-1 block text-xs text-slate-500">{hint}</span>}
+      {hint && (
+        <span className="mt-1 block text-xs leading-relaxed text-neutral-500">
+          {hint}
+        </span>
+      )}
     </label>
   );
 }
@@ -177,9 +235,7 @@ export function Select({ className = "", ...props }: ComponentProps<"select">) {
 export function Table({ children }: { children: ReactNode }) {
   return (
     <div className="overflow-x-auto">
-      <table className="min-w-full divide-y divide-slate-200 text-sm">
-        {children}
-      </table>
+      <table className="min-w-full text-[13px]">{children}</table>
     </div>
   );
 }
@@ -194,7 +250,7 @@ export function Th({
   return (
     <th
       scope="col"
-      className={`px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500 ${
+      className={`border-b border-neutral-200 bg-neutral-50/70 px-4 py-2 text-xs font-medium text-neutral-500 ${
         numeric ? "text-right" : "text-left"
       }`}
     >
@@ -214,12 +270,30 @@ export function Td({
 }) {
   return (
     <td
-      className={`px-4 py-3 ${numeric ? "text-right tabular-nums" : "text-left"} ${
-        muted ? "text-slate-500" : "text-slate-900"
-      }`}
+      className={`px-4 py-2.5 align-middle ${
+        numeric ? "text-right tabular-nums" : "text-left"
+      } ${muted ? "text-neutral-500" : "text-neutral-900"}`}
     >
       {children}
     </td>
+  );
+}
+
+export function Tr({
+  children,
+  dimmed,
+}: {
+  children: ReactNode;
+  dimmed?: boolean;
+}) {
+  return (
+    <tr
+      className={`border-b border-neutral-100 last:border-0 hover:bg-neutral-50/70 ${
+        dimmed ? "bg-neutral-50/50 text-neutral-400" : ""
+      }`}
+    >
+      {children}
+    </tr>
   );
 }
 
@@ -237,15 +311,15 @@ export function Badge({
   tone?: BadgeTone;
 }) {
   const tones: Record<BadgeTone, string> = {
-    neutral: "bg-slate-100 text-slate-700",
-    active: "bg-emerald-100 text-emerald-800",
-    warning: "bg-amber-100 text-amber-800",
-    muted: "bg-slate-100 text-slate-400",
+    neutral: "bg-neutral-100 text-neutral-600 ring-neutral-200",
+    active: "bg-emerald-50 text-emerald-700 ring-emerald-200",
+    warning: "bg-amber-50 text-amber-700 ring-amber-200",
+    muted: "bg-neutral-50 text-neutral-400 ring-neutral-200",
   };
 
   return (
     <span
-      className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium ${tones[tone]}`}
+      className={`inline-flex items-center rounded px-1.5 py-0.5 text-xs font-medium ring-1 ring-inset ${tones[tone]}`}
     >
       {children}
     </span>
@@ -268,9 +342,11 @@ export function EmptyState({
   action?: ReactNode;
 }) {
   return (
-    <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 px-6 py-12 text-center">
-      <p className="text-base font-medium text-slate-900">{title}</p>
-      <p className="mx-auto mt-1 max-w-md text-sm text-slate-500">{description}</p>
+    <div className="rounded-lg border border-dashed border-neutral-200 bg-neutral-50/50 px-6 py-14 text-center">
+      <p className="text-sm font-medium text-neutral-900">{title}</p>
+      <p className="mx-auto mt-1 max-w-md text-[13px] leading-relaxed text-neutral-500">
+        {description}
+      </p>
       {action && <div className="mt-5 flex justify-center">{action}</div>}
     </div>
   );
@@ -280,16 +356,19 @@ export function Alert({
   tone = "error",
   children,
 }: {
-  tone?: "error" | "info";
+  tone?: "error" | "info" | "warning";
   children: ReactNode;
 }) {
   const tones = {
     error: "border-red-200 bg-red-50 text-red-800",
-    info: "border-slate-200 bg-slate-50 text-slate-700",
+    info: "border-neutral-200 bg-neutral-50 text-neutral-600",
+    warning: "border-amber-200 bg-amber-50 text-amber-800",
   };
 
   return (
-    <div className={`rounded-lg border px-4 py-3 text-sm ${tones[tone]}`}>
+    <div
+      className={`rounded-md border px-3 py-2.5 text-[13px] leading-relaxed ${tones[tone]}`}
+    >
       {children}
     </div>
   );

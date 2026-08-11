@@ -3,13 +3,21 @@ import {
   Badge,
   ButtonLink,
   Card,
+  CardHeader,
   EmptyState,
   PageHeader,
   Stat,
   Table,
   Td,
   Th,
+  Tr,
 } from "@/components/ui";
+import {
+  IconClock,
+  IconOrder,
+  IconPeople,
+  IconReview,
+} from "@/components/ui/icons";
 import { formatDuration, formatTime, minutesBetween } from "@/lib/format";
 
 export const dynamic = "force-dynamic";
@@ -58,30 +66,33 @@ export default async function OverviewPage() {
           value={working.length}
           tone={working.length > 0 ? "active" : "neutral"}
           hint={working.length === 1 ? "person instämplad" : "personer instämplade"}
+          icon={<IconPeople />}
         />
         <Stat
           label="Registrerat idag"
           value={formatDuration(minutesToday)}
           hint="inklusive pågående jobb"
+          icon={<IconClock />}
         />
         <Stat
           label="Att granska"
           value={needsReview}
           tone={needsReview > 0 ? "warning" : "neutral"}
           hint="poster systemet stängt automatiskt"
+          icon={<IconReview />}
         />
-        <Stat label="Öppna ordrar" value={openOrders} />
+        <Stat label="Öppna ordrar" value={openOrders} icon={<IconOrder />} />
       </div>
 
       {needsReview > 0 && (
-        <Card className="mt-6 border-amber-200 bg-amber-50 p-5">
+        <Card className="mt-6 border-amber-200 bg-amber-50/60 p-4">
           <div className="flex flex-wrap items-center justify-between gap-4">
             <div>
-              <p className="font-medium text-amber-900">
+              <p className="text-sm font-medium text-amber-900">
                 {needsReview} {needsReview === 1 ? "post" : "poster"} behöver
                 granskas
               </p>
-              <p className="mt-1 text-sm text-amber-800">
+              <p className="mt-0.5 text-[13px] text-amber-800">
                 Någon glömde stämpla ut. Systemet har gissat sluttiden — rätta
                 den innan du fakturerar.
               </p>
@@ -91,16 +102,19 @@ export default async function OverviewPage() {
         </Card>
       )}
 
-      <h2 className="mt-8 mb-3 text-lg font-semibold">Pågående arbete</h2>
-
-      {working.length === 0 ? (
-        <EmptyState
-          title="Ingen är instämplad just nu"
-          description="När någon stämplar in på en order dyker det upp här direkt."
-        />
-      ) : (
-        <Card>
-          <Table>
+      <div className="mt-6">
+        {working.length === 0 ? (
+          <EmptyState
+            title="Ingen är instämplad just nu"
+            description="När någon stämplar in på en order dyker det upp här direkt."
+          />
+        ) : (
+          <Card>
+            <CardHeader
+              title="Pågående arbete"
+              description="Tiden räknas upp så länge posten är öppen."
+            />
+            <Table>
             <thead>
               <tr>
                 <Th>Anställd</Th>
@@ -110,16 +124,16 @@ export default async function OverviewPage() {
                 <Th numeric>Tid</Th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100">
+            <tbody>
               {working.map((entry) => (
-                <tr key={entry.id}>
+                <Tr key={entry.id}>
                   <Td>
                     <span className="font-medium">{entry.employee.name}</span>
                   </Td>
                   <Td>
                     {entry.order.orderNumber}
                     {entry.order.customerName && (
-                      <span className="ml-2 text-slate-500">
+                      <span className="ml-2 text-neutral-500">
                         {entry.order.customerName}
                       </span>
                     )}
@@ -131,12 +145,13 @@ export default async function OverviewPage() {
                       {formatDuration(minutesBetween(entry.clockInAt, null))}
                     </Badge>
                   </Td>
-                </tr>
+                </Tr>
               ))}
             </tbody>
-          </Table>
-        </Card>
-      )}
+            </Table>
+          </Card>
+        )}
+      </div>
     </>
   );
 }

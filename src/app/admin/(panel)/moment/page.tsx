@@ -3,12 +3,14 @@ import {
   Badge,
   Button,
   Card,
+  CardHeader,
   EmptyState,
   Input,
   PageHeader,
   Table,
   Td,
   Th,
+  Tr,
 } from "@/components/ui";
 import { createMoment, renameMoment, toggleMoment } from "./actions";
 
@@ -34,16 +36,11 @@ export default async function MomentsPage() {
         description="Vad tiden läggs på — svetsning, fräsning, montering. Väljs efter ordern på stämplingsskärmen."
       />
 
-      <Card className="mb-6 p-5">
-        <form action={createMoment} className="flex flex-wrap items-end gap-3">
+      <Card className="mb-6">
+        <CardHeader title="Lägg till arbetsmoment" />
+        <form action={createMoment} className="flex flex-wrap items-end gap-3 p-5">
           <div className="min-w-64 flex-1">
-            <label
-              htmlFor="new-moment"
-              className="mb-1.5 block text-sm font-medium text-slate-700"
-            >
-              Lägg till arbetsmoment
-            </label>
-            <Input id="new-moment" name="name" placeholder="Svetsning" required />
+            <Input name="name" placeholder="Svetsning" required />
           </div>
           <Button type="submit">Lägg till</Button>
         </form>
@@ -67,9 +64,9 @@ export default async function MomentsPage() {
                 </Th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100">
+            <tbody>
               {moments.map((moment) => (
-                <tr key={moment.id} className={moment.active ? "" : "bg-slate-50"}>
+                <Tr key={moment.id} dimmed={!moment.active}>
                   <Td>
                     <form action={renameMoment} className="flex gap-2">
                       <input type="hidden" name="id" value={moment.id} />
@@ -107,7 +104,7 @@ export default async function MomentsPage() {
                       </Button>
                     </form>
                   </Td>
-                </tr>
+                </Tr>
               ))}
             </tbody>
           </Table>

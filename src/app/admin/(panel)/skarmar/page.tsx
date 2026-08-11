@@ -10,6 +10,7 @@ import {
   Table,
   Td,
   Th,
+  Tr,
 } from "@/components/ui";
 import { formatDateTime } from "@/lib/format";
 import { toggleDevice } from "./actions";
@@ -65,9 +66,9 @@ export default async function DevicesPage() {
                 </Th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100">
+            <tbody>
               {devices.map((device) => (
-                <tr key={device.id} className={device.active ? "" : "bg-slate-50"}>
+                <Tr key={device.id} dimmed={!device.active}>
                   <Td>
                     <span className="font-medium">{device.name}</span>
                   </Td>
@@ -97,7 +98,7 @@ export default async function DevicesPage() {
                       </Button>
                     </form>
                   </Td>
-                </tr>
+                </Tr>
               ))}
             </tbody>
           </Table>

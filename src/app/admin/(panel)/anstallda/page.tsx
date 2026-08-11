@@ -3,12 +3,14 @@ import {
   Badge,
   Button,
   Card,
+  CardHeader,
   EmptyState,
   Input,
   PageHeader,
   Table,
   Td,
   Th,
+  Tr,
 } from "@/components/ui";
 import { createEmployee, renameEmployee, toggleEmployee } from "./actions";
 
@@ -34,21 +36,11 @@ export default async function EmployeesPage() {
         description="De som visas på stämplingsskärmen. Avaktiverade döljs där men behåller sin registrerade tid."
       />
 
-      <Card className="mb-6 p-5">
-        <form action={createEmployee} className="flex flex-wrap items-end gap-3">
+      <Card className="mb-6">
+        <CardHeader title="Lägg till anställd" />
+        <form action={createEmployee} className="flex flex-wrap items-end gap-3 p-5">
           <div className="min-w-64 flex-1">
-            <label
-              htmlFor="new-employee"
-              className="mb-1.5 block text-sm font-medium text-slate-700"
-            >
-              Lägg till anställd
-            </label>
-            <Input
-              id="new-employee"
-              name="name"
-              placeholder="För- och efternamn"
-              required
-            />
+            <Input name="name" placeholder="För- och efternamn" required />
           </div>
           <Button type="submit">Lägg till</Button>
         </form>
@@ -72,9 +64,9 @@ export default async function EmployeesPage() {
                 </Th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100">
+            <tbody>
               {employees.map((employee) => (
-                <tr key={employee.id} className={employee.active ? "" : "bg-slate-50"}>
+                <Tr key={employee.id} dimmed={!employee.active}>
                   <Td>
                     <form action={renameEmployee} className="flex gap-2">
                       <input type="hidden" name="id" value={employee.id} />
@@ -112,7 +104,7 @@ export default async function EmployeesPage() {
                       </Button>
                     </form>
                   </Td>
-                </tr>
+                </Tr>
               ))}
             </tbody>
           </Table>

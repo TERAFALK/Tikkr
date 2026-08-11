@@ -29,7 +29,7 @@ export default function NewDeviceForm({ baseUrl }: { baseUrl: string }) {
         <div className="min-w-64 flex-1">
           <label
             htmlFor="device-name"
-            className="mb-1.5 block text-sm font-medium text-slate-700"
+            className="mb-1.5 block text-sm font-medium text-neutral-700"
           >
             Lägg till skärm
           </label>
@@ -52,7 +52,7 @@ export default function NewDeviceForm({ baseUrl }: { baseUrl: string }) {
           </Alert>
 
           <div className="flex flex-wrap items-center gap-2">
-            <code className="min-w-0 flex-1 overflow-x-auto rounded-lg bg-slate-900 px-4 py-3 text-sm text-slate-100">
+            <code className="min-w-0 flex-1 overflow-x-auto rounded-lg bg-neutral-900 px-4 py-3 text-sm text-neutral-100">
               {link}
             </code>
             <Button

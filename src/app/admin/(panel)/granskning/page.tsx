@@ -9,6 +9,7 @@ import {
   Table,
   Td,
   Th,
+  Tr,
 } from "@/components/ui";
 import { formatDateTime, formatDuration, minutesBetween } from "@/lib/format";
 import { wallTimeIn } from "@/lib/time-zone";
@@ -62,12 +63,12 @@ export default async function ReviewPage() {
                 <Th>Rätta sluttid</Th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100">
+            <tbody>
               {entries.map((entry) => (
-                <tr key={entry.id}>
+                <Tr key={entry.id}>
                   <Td>
                     <span className="font-medium">{entry.employee.name}</span>
-                    <span className="mt-0.5 block text-sm text-slate-500">
+                    <span className="mt-0.5 block text-sm text-neutral-500">
                       {entry.order.orderNumber}
                       {entry.order.customerName && ` · ${entry.order.customerName}`}
                       {` · ${entry.moment.name}`}
@@ -111,7 +112,7 @@ export default async function ReviewPage() {
                       </form>
                     </div>
                   </Td>
-                </tr>
+                </Tr>
               ))}
             </tbody>
           </Table>

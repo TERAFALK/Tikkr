@@ -5,6 +5,7 @@ import {
   Button,
   ButtonLink,
   Card,
+  CardHeader,
   EmptyState,
   Field,
   PageHeader,
@@ -14,6 +15,7 @@ import {
   Table,
   Td,
   Th,
+  Tr,
 } from "@/components/ui";
 import { formatDateTime, formatDuration, toDecimalHours } from "@/lib/format";
 
@@ -73,10 +75,11 @@ export default async function ReportsPage({
         }
       />
 
-      <Card className="mb-6 p-5">
+      <Card className="mb-6">
+        <CardHeader title="Filter" />
         {/* Vanligt GET-formulär: filtren hamnar i adressen, så en rapport går
             att spara som bokmärke eller skicka vidare till någon annan. */}
-        <form className="grid gap-4 sm:grid-cols-2 lg:grid-cols-6">
+        <form className="grid gap-4 p-5 sm:grid-cols-2 lg:grid-cols-6">
           <Field label="Från">
             <Input type="date" name="from" defaultValue={params.from ?? ""} />
           </Field>
@@ -162,9 +165,11 @@ export default async function ReportsPage({
             <Summary title="Per arbetsmoment" groups={report.byMoment} />
           </div>
 
-          <h2 className="mb-3 text-lg font-semibold">Alla stämplingar</h2>
-
           <Card>
+            <CardHeader
+              title="Alla stämplingar"
+              description={`${report.rows.length} rader, senaste först.`}
+            />
             <Table>
               <thead>
                 <tr>
@@ -176,14 +181,14 @@ export default async function ReportsPage({
                   <Th numeric>Tid</Th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100">
+              <tbody>
                 {report.rows.map((row) => (
-                  <tr key={row.id}>
+                  <Tr key={row.id}>
                     <Td>{row.employeeName}</Td>
                     <Td>
                       {row.orderNumber}
                       {row.customerName && (
-                        <span className="ml-2 text-slate-500">
+                        <span className="ml-2 text-neutral-500">
                           {row.customerName}
                         </span>
                       )}
@@ -210,7 +215,7 @@ export default async function ReportsPage({
                         </span>
                       )}
                     </Td>
-                  </tr>
+                  </Tr>
                 ))}
               </tbody>
             </Table>
@@ -224,7 +229,7 @@ export default async function ReportsPage({
 function Summary({ title, groups }: { title: string; groups: ReportGroup[] }) {
   return (
     <Card className="p-5">
-      <h3 className="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-500">
+      <h3 className="mb-3 text-sm font-semibold uppercase tracking-wide text-neutral-500">
         {title}
       </h3>
       <ul className="space-y-2">
@@ -233,7 +238,7 @@ function Summary({ title, groups }: { title: string; groups: ReportGroup[] }) {
             <span className="min-w-0 truncate">
               {group.label}
               {group.sublabel && (
-                <span className="ml-2 text-sm text-slate-500">
+                <span className="ml-2 text-sm text-neutral-500">
                   {group.sublabel}
                 </span>
               )}
@@ -244,7 +249,7 @@ function Summary({ title, groups }: { title: string; groups: ReportGroup[] }) {
           </li>
         ))}
         {groups.length > 8 && (
-          <li className="pt-1 text-sm text-slate-500">
+          <li className="pt-1 text-sm text-neutral-500">
             och {groups.length - 8} till — finns med i Excel-exporten
           </li>
         )}

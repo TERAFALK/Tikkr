@@ -3,6 +3,7 @@ import {
   Badge,
   Button,
   Card,
+  CardHeader,
   EmptyState,
   Field,
   Input,
@@ -10,6 +11,7 @@ import {
   Table,
   Td,
   Th,
+  Tr,
 } from "@/components/ui";
 import { formatDuration, minutesBetween } from "@/lib/format";
 import { createOrder, toggleOrder, updateOrder } from "./actions";
@@ -37,8 +39,9 @@ export default async function OrdersPage() {
         description="Öppna ordrar går att stämpla på. Stängda döljs på skärmen men behåller sin tid."
       />
 
-      <Card className="mb-6 p-5">
-        <form action={createOrder} className="flex flex-wrap items-end gap-3">
+      <Card className="mb-6">
+        <CardHeader title="Lägg till order" />
+        <form action={createOrder} className="flex flex-wrap items-end gap-3 p-5">
           <div className="w-40">
             <Field label="Ordernummer">
               <Input name="orderNumber" placeholder="2601" required />
@@ -49,7 +52,7 @@ export default async function OrdersPage() {
               <Input name="customerName" placeholder="Volvo Lastvagnar" />
             </Field>
           </div>
-          <Button type="submit">Lägg till order</Button>
+          <Button type="submit">Lägg till</Button>
         </form>
       </Card>
 
@@ -71,7 +74,7 @@ export default async function OrdersPage() {
                 </Th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100">
+            <tbody>
               {orders.map((order) => {
                 const minutes = order.timeEntries.reduce(
                   (total, entry) =>
@@ -81,7 +84,7 @@ export default async function OrdersPage() {
                 const isOpen = order.status === "OPEN";
 
                 return (
-                  <tr key={order.id} className={isOpen ? "" : "bg-slate-50"}>
+                  <Tr key={order.id} dimmed={!isOpen}>
                     <Td>
                       <form
                         action={updateOrder}
@@ -123,7 +126,7 @@ export default async function OrdersPage() {
                         </Button>
                       </form>
                     </Td>
-                  </tr>
+                  </Tr>
                 );
               })}
             </tbody>
