@@ -65,6 +65,10 @@ export function SiteFooter() {
               Tidregistrering per order och arbetsmoment, byggd för svensk
               verkstads- och tillverkningsindustri.
             </p>
+            <p className="mt-3 text-[13px] text-neutral-500">
+              En del av{" "}
+              <span className="font-medium text-neutral-700">TERAFALK AB</span>
+            </p>
           </div>
 
           <div className="flex gap-12">
@@ -103,11 +107,27 @@ export function SiteFooter() {
                 </li>
               </ul>
             </div>
+
+            <div>
+              <p className="text-[11px] font-semibold uppercase tracking-wider text-neutral-400">
+                Kontakt
+              </p>
+              <ul className="mt-3 space-y-2 text-[13px]">
+                <li>
+                  <a
+                    href="mailto:support@tikkr.se"
+                    className="text-neutral-600 hover:text-neutral-900"
+                  >
+                    support@tikkr.se
+                  </a>
+                </li>
+              </ul>
+            </div>
           </div>
         </div>
 
         <p className="mt-10 border-t border-neutral-200 pt-6 text-xs text-neutral-400">
-          © {new Date().getFullYear()} Tikkr. Priser exklusive moms.
+          © {new Date().getFullYear()} TERAFALK AB. Priser exklusive moms.
         </p>
       </div>
     </footer>
