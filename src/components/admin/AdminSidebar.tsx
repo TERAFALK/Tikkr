@@ -75,21 +75,22 @@ export default function AdminSidebar({
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
 
+  // Typen skrivs ut, annars slår TypeScript ihop avsnitten till en union där
+  // fält som bara finns på vissa länkar (badge, exact) försvinner.
+  const setupSection: { label: string; links: NavLink[] } = {
+    label: "Uppsättning",
+    links: [
+      {
+        href: "/admin/kom-igang",
+        label: "Kom igång",
+        icon: IconOverview,
+        exact: true,
+      },
+    ],
+  };
+
   const visibleSections = showOnboarding
-    ? [
-        {
-          label: "Uppsättning",
-          links: [
-            {
-              href: "/admin/kom-igang",
-              label: "Kom igång",
-              icon: IconOverview,
-              exact: true,
-            },
-          ],
-        },
-        ...sections,
-      ]
+    ? [setupSection, ...sections]
     : sections;
 
   const nav = (
