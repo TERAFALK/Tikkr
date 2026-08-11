@@ -19,6 +19,7 @@ import {
   Tr,
 } from "@/components/ui";
 import { formatDate, formatDateTime } from "@/lib/format";
+import { platformLogout } from "./login/actions";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Plattform — Tikkr" };
@@ -53,12 +54,14 @@ export default async function PlatformPage() {
           </span>
           <span className="text-[13px] font-semibold">Tikkr · Plattform</span>
           <span className="ml-auto text-[13px] text-neutral-400">{email}</span>
-          <Link
-            href="/admin"
-            className="text-[13px] font-medium text-blue-600"
-          >
-            Till min arbetsyta
-          </Link>
+          <form action={platformLogout}>
+            <button
+              type="submit"
+              className="text-[13px] font-medium text-blue-600"
+            >
+              Logga ut
+            </button>
+          </form>
         </div>
       </header>
 
@@ -73,6 +76,11 @@ export default async function PlatformPage() {
           data, alltså namn på anställda, ordrar och registrerade tider, är
           medvetet inte åtkomligt härifrån. Behöver du hjälpa en kund med något
           konkret får de bjuda in dig som administratör hos sig.
+          <span className="mt-1.5 block">
+            Det här kontot tillhör inget kundföretag. Vill du använda Tikkr för
+            egen tidregistrering behöver du en vanlig arbetsyta, skild från
+            det här.
+          </span>
         </Alert>
 
         <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">

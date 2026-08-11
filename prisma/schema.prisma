@@ -195,6 +195,29 @@ model AdminUser {
   @@map("admin_users")
 }
 
+/// Ett konto för den som driver hela Tikkr — inte en kund.
+///
+/// Skilt från admin_users med flit. En plattformsadministratör tillhör inget
+/// företag, och ska inte behöva ett kundkonto för att komma åt sin egen
+/// driftpanel.
+///
+/// Två oberoende villkor måste vara uppfyllda för att komma in:
+///   1. Adressen står i PLATFORM_ADMIN_EMAILS på servern (behörighet)
+///   2. Det finns en rad här med rätt lösenord (identitet)
+///
+/// Att de är åtskilda är poängen. Den som kommer åt databasen kan lägga till
+/// en rad här men inte ge sig själv behörighet; den som kommer åt .env kan ge
+/// behörighet men inte skapa ett lösenord. Båda krävs.
+model PlatformUser {
+  email        String    @id
+  passwordHash String    @map("password_hash")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+  lastLoginAt  DateTime? @map("last_login_at")
+
+  @@map("platform_users")
+}
+
 /// Logg över vad plattformsadministratörer gjort.
 ///
 /// Panelen där du ser alla kunder går utanför företagsfiltreringen. Allt som

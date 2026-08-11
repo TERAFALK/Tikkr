@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
-import { auth } from "./auth";
 import { unsafeGlobalPrisma } from "./db";
 import { isPlatformAdmin } from "./platform-access";
+import { readPlatformSession } from "./platform-session";
 
 /**
  * PLATTFORMSADMINISTRATION.
@@ -27,21 +27,22 @@ import { isPlatformAdmin } from "./platform-access";
 // så att den går att testa utan att starta en app.
 export { isPlatformAdmin, platformAdminEmails } from "./platform-access";
 
-/** Grinden till plattformspanelen. */
+/**
+ * Grinden till plattformspanelen.
+ *
+ * Kontrollerar BÅDA villkoren vid varje sidladdning, inte bara vid inloggning.
+ * Tas en adress bort ur PLATFORM_ADMIN_EMAILS ska den som redan är inloggad
+ * kastas ut vid nästa klick — annars vore en återkallad behörighet giltig i
+ * åtta timmar till.
+ */
 export async function requirePlatformAdmin() {
-  const session = await auth();
+  const email = await readPlatformSession();
 
-  if (!session?.user?.email) {
-    redirect("/admin/login");
+  if (!email || !isPlatformAdmin(email)) {
+    redirect("/plattform/login");
   }
 
-  if (!isPlatformAdmin(session.user.email)) {
-    // Samma svar som för en adress som inte finns — vi bekräftar inte ens att
-    // panelen existerar för den som inte ska se den.
-    redirect("/admin");
-  }
-
-  return { email: session.user.email };
+  return { email };
 }
 
 export interface CompanyOverview {

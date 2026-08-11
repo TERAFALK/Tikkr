@@ -5,7 +5,6 @@ import { usePathname } from "next/navigation";
 import { useState } from "react";
 import { logout } from "@/app/admin/actions";
 import {
-  IconBuilding,
   IconClock,
   IconDevice,
   IconLogout,
@@ -67,13 +66,11 @@ export default function AdminSidebar({
   email,
   reviewCount,
   showOnboarding,
-  isPlatformAdmin,
 }: {
   companyName: string;
   email: string;
   reviewCount: number;
   showOnboarding: boolean;
-  isPlatformAdmin: boolean;
 }) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
@@ -172,18 +169,6 @@ export default function AdminSidebar({
             Logga ut
           </button>
         </form>
-
-        {/* Syns bara för den som driver hela installationen. */}
-        {isPlatformAdmin && (
-          <Link
-            href="/plattform"
-            onClick={() => setOpen(false)}
-            className="flex items-center gap-2.5 rounded-md px-2 py-1.5 text-[13px] font-medium text-neutral-500 transition-colors hover:bg-neutral-50"
-          >
-            <IconBuilding className="text-neutral-400" />
-            Plattform
-          </Link>
-        )}
 
         <p className="truncate px-2 pt-2 text-[11px] text-neutral-400">{email}</p>
       </div>
