@@ -113,6 +113,19 @@ Databasmigrationer körs automatiskt när appen startar — inget extra steg.
 
 ---
 
+## Drift
+
+Vad som måste vara på plats — migrationer i git, schemalagd autoutstämpling,
+offsite-backup, HTTPS och övervakning — står i [docs/drift.md](docs/drift.md).
+
+Se läget just nu:
+
+```bash
+./scripts/status.sh
+```
+
+---
+
 ## Vanliga kommandon
 
 | Vad | Kommando |
