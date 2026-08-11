@@ -1,5 +1,6 @@
 import bcrypt from "bcryptjs";
 import { unsafeGlobalPrisma } from "./db";
+import { trialEndDate } from "./subscription";
 
 /**
  * REGISTRERING AV NYTT FÖRETAG.
@@ -83,6 +84,7 @@ export async function createCompanyWithOwner(input: SignupInput) {
       data: {
         name: input.companyName.trim(),
         subscriptionStatus: "TRIALING",
+        trialEndsAt: trialEndDate(),
       },
     });
 

@@ -50,6 +50,14 @@ model Company {
   name               String
   subscriptionStatus SubscriptionStatus @default(TRIALING) @map("subscription_status")
 
+  /// När provperioden tar slut. Sätts vid registrering.
+  trialEndsAt DateTime? @map("trial_ends_at")
+
+  /// När betalningen började utebli. Nollställs när den går igenom.
+  /// Behövs för att kunna ge några dagars respit istället för att låsa
+  /// panelen i samma sekund som ett kort råkar gå ut.
+  pastDueSince DateTime? @map("past_due_since")
+
   /// Klockslag då glömda stämplingar stängs automatiskt, "HH:MM".
   /// Posten stängs men flaggas för granskning — systemet gissar aldrig tyst.
   autoCloseAt String @default("18:00") @map("auto_close_at")

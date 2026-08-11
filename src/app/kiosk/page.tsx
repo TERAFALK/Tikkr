@@ -1,5 +1,7 @@
 import { getKioskSession } from "@/lib/kiosk-auth";
+import { unsafeGlobalPrisma } from "@/lib/db";
 import { forCompany } from "@/lib/tenant";
+import { evaluateAccess } from "@/lib/subscription";
 import KioskScreen from "@/components/kiosk/KioskScreen";
 
 // Kioskvyn. Hämtar allt skärmen behöver i ett svep och lämnar över till
@@ -29,6 +31,21 @@ export default async function KioskPage() {
   }
 
   const db = forCompany(session.companyId);
+
+  const company = await unsafeGlobalPrisma.company.findUnique({
+    where: { id: session.companyId },
+    select: {
+      subscriptionStatus: true,
+      trialEndsAt: true,
+      pastDueSince: true,
+    },
+  });
+
+  const access = evaluateAccess({
+    status: company?.subscriptionStatus ?? "TRIALING",
+    trialEndsAt: company?.trialEndsAt ?? null,
+    pastDueSince: company?.pastDueSince ?? null,
+  });
 
   const [employees, orders, moments, openEntries] = await Promise.all([
     db.employee.findMany({
@@ -76,6 +93,12 @@ export default async function KioskPage() {
       orders={orders}
       moments={moments}
       activeByEmployee={activeByEmployee}
+      // Stämplingen fungerar oavsett. Varningen finns för att någon i
+      // verkstaden ska se den och fråga chefen — den som kan betala står
+      // sällan vid skärmen.
+      subscriptionWarning={
+        access.level === "full" ? null : access.headline
+      }
     />
   );
 }

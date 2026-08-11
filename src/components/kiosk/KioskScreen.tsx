@@ -51,6 +51,8 @@ interface Props {
   orders: Order[];
   moments: Moment[];
   activeByEmployee: Record<string, ActiveJob>;
+  /** Text om prenumerationen, eller null. Stoppar aldrig stämplingen. */
+  subscriptionWarning: string | null;
 }
 
 type View =
@@ -87,6 +89,7 @@ export default function KioskScreen({
   orders,
   moments,
   activeByEmployee,
+  subscriptionWarning,
 }: Props) {
   const router = useRouter();
   const [view, setView] = useState<View>({ name: "employees" });
@@ -239,6 +242,18 @@ export default function KioskScreen({
         waiting={waiting}
         onBack={goHome}
       />
+
+      {/* Ligger överst och går inte att stänga. Den ska ses av någon som
+          nämner den för chefen — meningen är inte att störa den som stämplar,
+          därför tar den ingen plats från knapparna. */}
+      {subscriptionWarning && (
+        <div className="flex items-center gap-3 bg-amber-500 px-6 py-3 text-white">
+          <span className="text-lg font-semibold">{subscriptionWarning}</span>
+          <span className="text-sm opacity-90">
+            Stämplingen fungerar som vanligt — visa det här för din chef.
+          </span>
+        </div>
+      )}
 
       {receipt && <Banner tone="ok">{receipt}</Banner>}
       {error && (

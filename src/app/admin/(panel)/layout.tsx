@@ -1,12 +1,15 @@
 import { requireAdmin } from "@/lib/admin-session";
+import { unsafeGlobalPrisma } from "@/lib/db";
 import { getOnboardingState } from "@/lib/onboarding";
+import { evaluateAccess } from "@/lib/subscription";
 import AdminSidebar from "@/components/admin/AdminSidebar";
+import SubscriptionLocked from "@/components/admin/SubscriptionLocked";
 
 /**
  * Skalet runt de inloggade adminsidorna.
  *
- * Kontrollen ligger här, alltså på ETT ställe — varje undersida ärver den och
- * kan inte råka glömmas bort.
+ * Två kontroller ligger här, alltså på ETT ställe, och ärvs av varje undersida:
+ * att man är inloggad, och att prenumerationen är i ordning.
  *
  * Mappnamnet inom parentes bildar ingen del av adressen. Det finns bara för att
  * kunna lägga inloggningssidan UTANFÖR det här skalet: låg den innanför skulle
@@ -21,12 +24,24 @@ export default async function PanelLayout({
 }) {
   const session = await requireAdmin();
 
-  // Hämtas här så att siffran i menyn stämmer på varje sida, inte bara på den
-  // som råkar visa granskningslistan.
-  const [reviewCount, onboarding] = await Promise.all([
+  const [reviewCount, onboarding, company] = await Promise.all([
     session.db.timeEntry.count({ where: { needsReview: true } }),
     getOnboardingState(session.db),
+    unsafeGlobalPrisma.company.findUnique({
+      where: { id: session.companyId },
+      select: {
+        subscriptionStatus: true,
+        trialEndsAt: true,
+        pastDueSince: true,
+      },
+    }),
   ]);
+
+  const access = evaluateAccess({
+    status: company?.subscriptionStatus ?? "TRIALING",
+    trialEndsAt: company?.trialEndsAt ?? null,
+    pastDueSince: company?.pastDueSince ?? null,
+  });
 
   return (
     <div className="min-h-screen bg-neutral-50 lg:flex">
@@ -41,8 +56,26 @@ export default async function PanelLayout({
       />
 
       <div className="min-w-0 flex-1">
+        {access.level === "warning" && (
+          <div className="border-b border-amber-200 bg-amber-50 px-4 py-2.5 sm:px-6 lg:px-8">
+            <p className="mx-auto max-w-7xl text-[13px] text-amber-900">
+              <strong>{access.headline}.</strong> {access.detail}
+            </p>
+          </div>
+        )}
+
         <main className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
-          {children}
+          {/* Vid låst prenumeration visas ingen adminsida alls. Inget kan
+              då råka nås via en direktlänk, vilket hade varit fallet om vi
+              istället gömt menyn och litat på att ingen gissar adresser. */}
+          {access.level === "locked" ? (
+            <SubscriptionLocked
+              state={access}
+              companyName={session.companyName}
+            />
+          ) : (
+            children
+          )}
         </main>
       </div>
     </div>
