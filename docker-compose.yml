@@ -72,6 +72,8 @@ services:
       GRAPH_CLIENT_SECRET: ${GRAPH_CLIENT_SECRET:-}
       GRAPH_SENDER: ${GRAPH_SENDER:-}
       PLATFORM_ADMIN_EMAILS: ${PLATFORM_ADMIN_EMAILS:-}
+      MARKETING_HOST: ${MARKETING_HOST:-}
+      PORTAL_HOST: ${PORTAL_HOST:-}
     ports:
       # Vänsterledet är porten på servern och går att ändra i .env om något
       # annat redan använder 3000.

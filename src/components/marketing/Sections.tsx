@@ -7,7 +7,9 @@ import {
   IconReport,
   IconShield,
 } from "@/components/ui/icons";
-import { AdminMockup, ExportMockup, KioskMockup } from "./Mockups";
+import { AdminMockup, ExportMockup } from "./Mockups";
+import LiveKiosk from "./LiveKiosk";
+import Reveal from "./Reveal";
 
 /* -------------------------------------------------------------------------- */
 /* Hero                                                                        */
@@ -16,11 +18,16 @@ import { AdminMockup, ExportMockup, KioskMockup } from "./Mockups";
 export function Hero() {
   return (
     <section className="relative overflow-hidden border-b border-neutral-200 bg-white">
-      {/* Mjuk ljusgång bakom rubriken. Ren dekoration, därför dold för
-          skärmläsare. */}
+      {/* Mjukt ljus bakom rubriken.
+          En gradient i en låda med bestämd höjd får en synlig kant där lådan
+          tar slut. En suddad fläck har ingen kant att se. */}
       <div
         aria-hidden="true"
-        className="pointer-events-none absolute inset-x-0 -top-40 h-80 bg-[radial-gradient(60%_100%_at_50%_100%,rgba(37,99,235,0.10),transparent)]"
+        className="pointer-events-none absolute left-1/2 top-[-280px] h-[560px] w-[1100px] -translate-x-1/2 rounded-full bg-blue-500/[0.09] blur-[130px]"
+      />
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute left-[15%] top-[-120px] h-[380px] w-[520px] rounded-full bg-emerald-400/[0.07] blur-[120px]"
       />
 
       <div className="relative mx-auto max-w-6xl px-6 pb-20 pt-16 sm:pt-24">
@@ -88,7 +95,7 @@ export function Hero() {
             style={{ animationDelay: "480ms" }}
           >
             <div className="animate-drift">
-              <KioskMockup />
+              <LiveKiosk />
             </div>
           </div>
         </div>
@@ -130,18 +137,19 @@ export function Problem() {
         </div>
 
         <div className="mt-10 grid gap-5 sm:grid-cols-3">
-          {points.map((point) => (
-            <div
-              key={point.title}
-              className="rounded-xl border border-neutral-200 bg-white p-5"
-            >
-              <h3 className="text-sm font-semibold text-neutral-900">
-                {point.title}
-              </h3>
-              <p className="mt-2 text-[13px] leading-relaxed text-neutral-600">
-                {point.body}
-              </p>
-            </div>
+          {points.map((point, index) => (
+            // Korten tonas in efter varandra istället för samtidigt. Ögat
+            // hinner då läsa i den ordning de är tänkta att läsas.
+            <Reveal key={point.title} delay={index * 90}>
+              <div className="h-full rounded-xl border border-neutral-200 bg-white p-5">
+                <h3 className="text-sm font-semibold text-neutral-900">
+                  {point.title}
+                </h3>
+                <p className="mt-2 text-[13px] leading-relaxed text-neutral-600">
+                  {point.body}
+                </p>
+              </div>
+            </Reveal>
           ))}
         </div>
       </div>
@@ -187,7 +195,7 @@ export function HowItWorks() {
           </div>
 
           <div className="order-1 space-y-6 lg:order-2">
-            <KioskMockup />
+            <LiveKiosk />
             <ExportMockup className="ml-6" />
           </div>
         </div>
@@ -280,21 +288,20 @@ export function Features() {
         </div>
 
         <div className="mt-10 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-          {features.map((feature) => (
-            <div
-              key={feature.title}
-              className="rounded-xl border border-neutral-200 bg-white p-5"
-            >
-              <span className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-neutral-200 text-neutral-500">
-                {feature.icon}
-              </span>
-              <h3 className="mt-3.5 text-sm font-semibold text-neutral-900">
-                {feature.title}
-              </h3>
-              <p className="mt-1.5 text-[13px] leading-relaxed text-neutral-600">
-                {feature.body}
-              </p>
-            </div>
+          {features.map((feature, index) => (
+            <Reveal key={feature.title} delay={index * 70}>
+              <div className="group h-full rounded-xl border border-neutral-200 bg-white p-5 transition-shadow hover:shadow-md">
+                <span className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-neutral-200 text-neutral-500 transition-colors group-hover:border-blue-200 group-hover:bg-blue-50 group-hover:text-blue-600">
+                  {feature.icon}
+                </span>
+                <h3 className="mt-3.5 text-sm font-semibold text-neutral-900">
+                  {feature.title}
+                </h3>
+                <p className="mt-1.5 text-[13px] leading-relaxed text-neutral-600">
+                  {feature.body}
+                </p>
+              </div>
+            </Reveal>
           ))}
         </div>
       </div>

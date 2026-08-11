@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Reveal from "@/components/marketing/Reveal";
 import { SiteFooter, SiteHeader } from "@/components/marketing/SiteChrome";
 import {
   AdminSection,
@@ -21,14 +22,33 @@ export default function Home() {
   return (
     <div className="bg-white">
       <SiteHeader />
+
+      {/* Hero animeras vid inladdning — den syns direkt och har inget att
+          vänta på. Resten tonas in när man skrollar dit. */}
       <Hero />
-      <Problem />
-      <HowItWorks />
-      <Features />
-      <AdminSection />
-      <Pricing />
-      <Faq />
-      <FinalCta />
+
+      <Reveal>
+        <Problem />
+      </Reveal>
+      <Reveal>
+        <HowItWorks />
+      </Reveal>
+      <Reveal>
+        <Features />
+      </Reveal>
+      <Reveal>
+        <AdminSection />
+      </Reveal>
+      <Reveal>
+        <Pricing />
+      </Reveal>
+      <Reveal>
+        <Faq />
+      </Reveal>
+      <Reveal>
+        <FinalCta />
+      </Reveal>
+
       <SiteFooter />
     </div>
   );
