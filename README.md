@@ -135,6 +135,7 @@ Se läget just nu:
 | Stoppa allt | `docker compose down` |
 | Öppna databasen | `docker compose exec db psql -U tikkr -d tikkr` |
 | Köra testerna | `./scripts/test.sh` |
+| Driftkontroll | `./scripts/status.sh` |
 | Lägga in testdata | `docker compose run --rm migrate node prisma/seed.mjs` |
 
 ---

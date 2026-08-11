@@ -97,10 +97,13 @@ async function main() {
     },
   });
 
+  // Räknar bara demoföretagens rader. En global räkning hade tagit med allt
+  // annat som råkat hamna i databasen och gett en missvisande siffra.
+  const ids = [demo.id, other.id];
   const counts = {
-    anstallda: await prisma.employee.count(),
-    ordrar: await prisma.order.count(),
-    moment: await prisma.workMoment.count(),
+    anstallda: await prisma.employee.count({ where: { companyId: { in: ids } } }),
+    ordrar: await prisma.order.count({ where: { companyId: { in: ids } } }),
+    moment: await prisma.workMoment.count({ where: { companyId: { in: ids } } }),
   };
 
   console.log("Seed klar:");
