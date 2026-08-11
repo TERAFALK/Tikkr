@@ -26,7 +26,7 @@ vad som faktiskt finns byggt.
 | Engångslänk med device-token | ✅ token hashas, flyttas till cookie |
 | Namnrutnät, ett tryck, order, moment | ✅ |
 | Automatisk utstämpling vid jobbyte | ✅ med tester |
-| Offline-kö | ✅ **men utan automatiska tester** |
+| Offline-kö | ✅ med tester |
 | Service worker (omladdning utan nät) | ✅ fungerar sedan HTTPS finns |
 | Dokumenterat kiosk-läge | ✅ `docs/kiosk-lage.md` |
 
@@ -98,11 +98,7 @@ men det är den lucka som blir farligast snabbast när de första dyker upp.
 Övervakning är nu möjlig eftersom en publik adress finns. Båda måste vara lösta
 före första kunden.
 
-**3. Offline-kön saknar automatiska tester.** Den enda kritiska logiken som bara
-testats för hand, och den hanterar just den situation där tid annars går
-förlorad.
-
-**4. Ingen tvåfaktorsautentisering.** Varken för kundadministratörer eller för
+**3. Ingen tvåfaktorsautentisering.** Varken för kundadministratörer eller för
 plattformskontot, som ser alla kunders driftuppgifter.
 
 ---
@@ -125,3 +121,9 @@ hur många gånger den än försökte, utan att något felmeddelande förklarade
 
 **Kort request-timeout** på stämplingar, åtta sekunder. En långsam server kan
 inte längre få skärmen att hänga sig — trycket hamnar i kön istället.
+
+**Tester för offline-kön** (2026-08-11). Kön lever i webbläsarens egen databas
+och gick tidigare inte att testa utanför en webbläsare. Med `fake-indexeddb`
+täcks nu det som måste hålla: ett tryck försvinner aldrig när servern inte
+svarar, det skickas aldrig två gånger, tryck levereras i den ordning de gjordes,
+och ett permanent avvisat tryck fastnar inte och blockerar resten av kön.
