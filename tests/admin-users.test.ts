@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterAll } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, afterAll } from "vitest";
 import bcrypt from "bcryptjs";
 import { unsafeGlobalPrisma } from "@/lib/db";
 import { forCompany } from "@/lib/tenant";
@@ -22,16 +22,28 @@ import {
 let companyId: string;
 let ownerId: string;
 let ownerEmail: string;
+let unique: string;
+
+/**
+ * Egen adress per test.
+ *
+ * E-postadresser är unika i HELA systemet, inte per företag. Använde alla
+ * tester samma adress skulle det första testet lägga beslag på den och resten
+ * falla — vilket är precis vad som hände första gången.
+ */
+function addr(prefix: string): string {
+  return `${prefix}-${unique}@example.com`;
+}
 
 beforeEach(async () => {
-  const unique = Math.random().toString(36).slice(2, 10);
+  unique = Math.random().toString(36).slice(2, 10);
 
   const company = await unsafeGlobalPrisma.company.create({
     data: { name: `Anvandartest ${unique}` },
   });
   companyId = company.id;
 
-  ownerEmail = `agare-${unique}@example.com`;
+  ownerEmail = addr("agare");
   const owner = await unsafeGlobalPrisma.adminUser.create({
     data: {
       companyId,
@@ -43,10 +55,15 @@ beforeEach(async () => {
   ownerId = owner.id;
 });
 
-afterAll(async () => {
+// Varje test städar efter sig. Cascade tar med administratörer och
+// inbjudningar, så adresserna frigörs direkt istället för vid körningens slut.
+afterEach(async () => {
   await unsafeGlobalPrisma.company.deleteMany({
     where: { name: { startsWith: "Anvandartest " } },
   });
+});
+
+afterAll(async () => {
   await unsafeGlobalPrisma.$disconnect();
 });
 
@@ -62,12 +79,12 @@ function invite(email: string, asRole: "OWNER" | "ADMIN" = "ADMIN") {
 
 describe("bjuda in", () => {
   it("ger en länk och en väntande inbjudan", async () => {
-    const { token } = await invite("ny@example.com");
+    const { token } = await invite(addr("ny"));
 
     expect(token.length).toBeGreaterThan(30);
 
     const pending = await findInvite(token);
-    expect(pending?.email).toBe("ny@example.com");
+    expect(pending?.email).toBe(addr("ny"));
     expect(pending?.role).toBe("ADMIN");
   });
 
@@ -76,8 +93,8 @@ describe("bjuda in", () => {
       inviteAdmin({
         companyId,
         role: "ADMIN",
-        invitedByEmail: "vanlig@example.com",
-        email: "ny@example.com",
+        invitedByEmail: addr("vanlig"),
+        email: addr("ny"),
         asRole: "ADMIN",
       })
     ).rejects.toThrow(AdminUserError);
@@ -92,8 +109,8 @@ describe("bjuda in", () => {
   });
 
   it("ny inbjudan till samma adress ersätter den gamla", async () => {
-    const first = await invite("ny@example.com");
-    const second = await invite("ny@example.com");
+    const first = await invite(addr("ny"));
+    const second = await invite(addr("ny"));
 
     expect(await findInvite(first.token)).toBeNull();
     expect(await findInvite(second.token)).not.toBeNull();
@@ -105,10 +122,10 @@ describe("bjuda in", () => {
 
 describe("lösa in en inbjudan", () => {
   it("skapar kontot med personens eget lösenord", async () => {
-    const { token } = await invite("ny@example.com");
+    const { token } = await invite(addr("ny"));
     const user = await acceptInvite(token, "mitt-eget-losenord");
 
-    expect(user.email).toBe("ny@example.com");
+    expect(user.email).toBe(addr("ny"));
     expect(user.companyId).toBe(companyId);
     expect(user.role).toBe("ADMIN");
     expect(await bcrypt.compare("mitt-eget-losenord", user.passwordHash)).toBe(
@@ -117,7 +134,7 @@ describe("lösa in en inbjudan", () => {
   });
 
   it("länken fungerar bara en gång", async () => {
-    const { token } = await invite("ny@example.com");
+    const { token } = await invite(addr("ny"));
     await acceptInvite(token, "mitt-eget-losenord");
 
     await expect(acceptInvite(token, "ett-annat-losenord")).rejects.toThrow(
@@ -126,7 +143,7 @@ describe("lösa in en inbjudan", () => {
   });
 
   it("vägrar för kort lösenord", async () => {
-    const { token } = await invite("ny@example.com");
+    const { token } = await invite(addr("ny"));
 
     await expect(acceptInvite(token, "kort")).rejects.toThrow(AdminUserError);
     // Inbjudan ska fortfarande gå att använda med ett bättre lösenord.
@@ -134,7 +151,7 @@ describe("lösa in en inbjudan", () => {
   });
 
   it("vägrar en utgången inbjudan", async () => {
-    const { token } = await invite("ny@example.com");
+    const { token } = await invite(addr("ny"));
 
     await unsafeGlobalPrisma.adminInvite.updateMany({
       where: { companyId },
@@ -152,7 +169,7 @@ describe("lösa in en inbjudan", () => {
   });
 
   it("återkallad inbjudan går inte att lösa in", async () => {
-    const { token } = await invite("ny@example.com");
+    const { token } = await invite(addr("ny"));
     const { invites } = await listAdmins(forCompany(companyId));
 
     await revokeInvite({
@@ -169,7 +186,7 @@ describe("lösa in en inbjudan", () => {
 
 describe("ta bort administratörer", () => {
   it("ägaren kan ta bort en vanlig administratör", async () => {
-    const { token } = await invite("ny@example.com");
+    const { token } = await invite(addr("ny"));
     const user = await acceptInvite(token, "mitt-eget-losenord");
 
     await removeAdmin({
@@ -195,7 +212,7 @@ describe("ta bort administratörer", () => {
   });
 
   it("sista ägaren kan inte tas bort", async () => {
-    const { token } = await invite("andra@example.com", "OWNER");
+    const { token } = await invite(addr("andra"), "OWNER");
     const andraAgaren = await acceptInvite(token, "mitt-eget-losenord");
 
     // Två ägare: nu går det.
@@ -210,8 +227,8 @@ describe("ta bort administratörer", () => {
     const { token: tredje } = await inviteAdmin({
       companyId,
       role: "OWNER",
-      invitedByEmail: "andra@example.com",
-      email: "tredje@example.com",
+      invitedByEmail: addr("andra"),
+      email: addr("tredje"),
       asRole: "ADMIN",
     });
     const vanlig = await acceptInvite(tredje, "mitt-eget-losenord");

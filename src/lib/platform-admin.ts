@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { auth } from "./auth";
 import { unsafeGlobalPrisma } from "./db";
+import { isPlatformAdmin } from "./platform-access";
 
 /**
  * PLATTFORMSADMINISTRATION.
@@ -22,17 +23,9 @@ import { unsafeGlobalPrisma } from "./db";
  * kund som frågar vem som ser deras siffror.
  */
 
-export function platformAdminEmails(): string[] {
-  return (process.env.PLATFORM_ADMIN_EMAILS ?? "")
-    .split(",")
-    .map((email) => email.trim().toLowerCase())
-    .filter(Boolean);
-}
-
-export function isPlatformAdmin(email: string | null | undefined): boolean {
-  if (!email) return false;
-  return platformAdminEmails().includes(email.trim().toLowerCase());
-}
+// Själva behörighetsregeln ligger i platform-access.ts, fri från webbramverk
+// så att den går att testa utan att starta en app.
+export { isPlatformAdmin, platformAdminEmails } from "./platform-access";
 
 /** Grinden till plattformspanelen. */
 export async function requirePlatformAdmin() {

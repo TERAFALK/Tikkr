@@ -1,5 +1,5 @@
 import { describe, it, expect, afterEach } from "vitest";
-import { isPlatformAdmin, platformAdminEmails } from "@/lib/platform-admin";
+import { isPlatformAdmin, platformAdminEmails } from "@/lib/platform-access";
 
 /**
  * Behörigheten till plattformspanelen.

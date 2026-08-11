@@ -1,6 +1,6 @@
 import { requireAdmin } from "@/lib/admin-session";
 import { getOnboardingState } from "@/lib/onboarding";
-import { isPlatformAdmin } from "@/lib/platform-admin";
+import { isPlatformAdmin } from "@/lib/platform-access";
 import AdminSidebar from "@/components/admin/AdminSidebar";
 
 /**
