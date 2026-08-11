@@ -90,6 +90,16 @@ export interface FlushResult {
   rejected: { punch: QueuedPunch; reason: string }[];
 }
 
+/**
+ * Hur länge vi väntar på servern innan trycket får ligga kvar i kön.
+ *
+ * En långsam server ska inte kunna få skärmen att hänga sig. Går anropet över
+ * tiden behandlas det som om nätet vore borta: trycket ligger kvar och skickas
+ * om. Det är alltid rätt utfall, eftersom id:t på trycket gör att en dubblett
+ * inte kan uppstå även om servern faktiskt hann ta emot det.
+ */
+const REQUEST_TIMEOUT_MS = 8000;
+
 // Bara en tömning åt gången. Två samtidiga skulle kunna skicka samma tryck två
 // gånger och rota till ordningen.
 let flushing: Promise<FlushResult> | null = null;
@@ -118,9 +128,11 @@ export function flush(): Promise<FlushResult> {
           method: "POST",
           headers: { "content-type": "application/json" },
           body: JSON.stringify({ ...punch, queued: true }),
+          signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
         });
       } catch {
-        // Ingen kontakt. Avbryt — resten ligger kvar orörd.
+        // Ingen kontakt, eller för långsamt svar. Avbryt — resten ligger kvar
+        // orörd och skickas om vid nästa försök.
         return { sent, waiting: queue.length - sent, rejected };
       }
 
