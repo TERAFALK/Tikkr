@@ -26,6 +26,71 @@ export async function saveCompany(formData: FormData) {
   revalidatePath("/admin");
 }
 
+/** Bildformat som fungerar både på skärm och i PDF. */
+const LOGO_TYPES = ["image/png", "image/jpeg"];
+
+/** 512 kB räcker gott för en logotyp och håller databasen liten. */
+const LOGO_MAX_BYTES = 512 * 1024;
+
+export interface LogoState {
+  error?: string;
+  ok?: string;
+}
+
+/**
+ * Laddar upp kundens logotyp.
+ *
+ * Bara PNG och JPEG. SVG hade varit snyggast på skärm men fungerar inte i
+ * PDF-biblioteket, och en logotyp som syns i panelen men saknas på underlaget
+ * till kundens kund är värre än ingen logotyp alls.
+ */
+export async function uploadLogo(
+  _previous: LogoState,
+  formData: FormData
+): Promise<LogoState> {
+  const { companyId } = await requireAdmin();
+
+  const file = formData.get("logo");
+  if (!(file instanceof File) || file.size === 0) {
+    return { error: "Välj en bildfil." };
+  }
+
+  if (!LOGO_TYPES.includes(file.type)) {
+    return { error: "Bilden måste vara PNG eller JPEG." };
+  }
+
+  if (file.size > LOGO_MAX_BYTES) {
+    return {
+      error: `Bilden är ${Math.round(file.size / 1024)} kB. Högsta storlek är 512 kB.`,
+    };
+  }
+
+  const bytes = Buffer.from(await file.arrayBuffer());
+
+  await unsafeGlobalPrisma.company.update({
+    where: { id: companyId },
+    data: {
+      logoData: bytes,
+      logoMimeType: file.type,
+      logoUpdatedAt: new Date(),
+    },
+  });
+
+  revalidatePath("/admin", "layout");
+  return { ok: "Logotypen är uppdaterad." };
+}
+
+export async function removeLogo() {
+  const { companyId } = await requireAdmin();
+
+  await unsafeGlobalPrisma.company.update({
+    where: { id: companyId },
+    data: { logoData: null, logoMimeType: null, logoUpdatedAt: null },
+  });
+
+  revalidatePath("/admin", "layout");
+}
+
 export async function saveTimeSettings(formData: FormData) {
   const { companyId } = await requireAdmin();
 

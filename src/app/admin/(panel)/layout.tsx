@@ -33,6 +33,7 @@ export default async function PanelLayout({
         subscriptionStatus: true,
         trialEndsAt: true,
         pastDueSince: true,
+        logoMimeType: true,
       },
     }),
   ]);
@@ -53,6 +54,7 @@ export default async function PanelLayout({
         // En permanent "kom igång"-länk är bara skräp för den som redan kommit
         // igång; sidan finns kvar på sin adress för den som vill tillbaka.
         showOnboarding={!onboarding.ready}
+        hasLogo={Boolean(company?.logoMimeType)}
       />
 
       <div className="min-w-0 flex-1">

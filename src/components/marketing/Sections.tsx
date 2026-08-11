@@ -189,7 +189,7 @@ export function HowItWorks() {
             <Step
               number={3}
               title="Du tar ut underlaget"
-              body="Tid per order, person och moment. Glömde någon stämpla ut stänger systemet posten och flaggar den, så du ser exakt vilka tider som är gissade."
+              body="Klicka på en order och ladda ner en färdig PDF att bifoga fakturan — med er logotyp, alla stämplingar och en summa. Glömde någon stämpla ut står det utskrivet vilka tider som är gissade, så ingen faktureras för en gissning i smyg."
               last
             />
           </div>
@@ -252,8 +252,8 @@ export function Features() {
     },
     {
       icon: <IconReport />,
-      title: "Underlag att fakturera på",
-      body: "Tid per order, person och moment. Excel-export med decimaltimmar i egna celler och färdiga summor, så siffrorna går att räkna vidare på.",
+      title: "Underlag per order, med er logotyp",
+      body: "Ladda ner en färdig PDF att bifoga fakturan: ordernummer och kund som rubrik, alla stämplingar och en summa längst ner. Eller Excel om siffrorna ska räknas vidare på.",
     },
     {
       icon: <IconOrder />,
@@ -316,10 +316,11 @@ export function Features() {
 export function AdminSection() {
   const points = [
     "Se vem som arbetar just nu och på vilken order",
-    "Filtrera på order, person, moment och datum",
+    "Ladda ner underlag per order som PDF eller Excel",
+    "Markera flera ordrar och få ut dem samlat",
     "Rätta glömda utstämplingar innan du fakturerar",
     "Lägg in tid som aldrig hann stämplas",
-    "Exportera till Excel med färdiga summor",
+    "Er egen logotyp på skärmen och på underlagen",
   ];
 
   return (
@@ -477,6 +478,10 @@ export function Faq() {
     {
       q: "Kan Tikkr användas för löner?",
       a: "Nej, och det är ett medvetet val. Tikkr registrerar tid som ska faktureras en kund. Ingen frånvaro, ingen övertid, inga lönearter. Det håller systemet enkelt nog att faktiskt användas.",
+    },
+    {
+      q: "Kan vi skicka underlaget vidare till vår kund?",
+      a: "Ja, det är vad PDF:en är till för. Ordernummer och kundnamn står som rubrik, alla stämplingar listas och summan finns längst ner. Laddar ni upp er logotyp hamnar den överst, och Tikkr nämns bara diskret i foten. Poster där sluttiden är gissad märks ut — mottagaren ska aldrig faktureras för en gissning utan att veta om det.",
     },
     {
       q: "Vem kan se vår data?",

@@ -1,5 +1,6 @@
 import { requireAdmin } from "@/lib/admin-session";
 import FormDialog from "@/components/admin/FormDialog";
+import OrderActions from "@/components/admin/OrderActions";
 import {
   Badge,
   Button,
@@ -44,7 +45,10 @@ export default async function OrdersPage() {
       <Field label="Ordernummer">
         <Input name="orderNumber" placeholder="2601" required autoFocus />
       </Field>
-      <Field label="Kund" hint="Valfritt, men gör ordern lättare att känna igen på skärmen.">
+      <Field
+        label="Kund"
+        hint="Valfritt, men syns som rubrik på underlaget ni skickar vidare."
+      >
         <Input name="customerName" placeholder="Volvo Lastvagnar" />
       </Field>
     </FormDialog>
@@ -54,7 +58,7 @@ export default async function OrdersPage() {
     <>
       <PageHeader
         title="Ordrar"
-        description="Stängda ordrar döljs på stämplingsskärmen men behåller sin tid."
+        description="Klicka på ett ordernummer för att ladda ner underlag eller ändra ordern."
         action={newOrder}
       />
 
@@ -65,88 +69,99 @@ export default async function OrdersPage() {
           action={newOrder}
         />
       ) : (
-        <Card>
-          <CardHeader
-            title={`${orders.length} ${orders.length === 1 ? "order" : "ordrar"}`}
-            description="Öppna först."
-          />
-          <Table>
-            <thead>
-              <tr>
-                <Th>Order</Th>
-                <Th>Kund</Th>
-                <Th>Status</Th>
-                <Th numeric>Upparbetad tid</Th>
-                <Th>
-                  <span className="sr-only">Åtgärder</span>
-                </Th>
-              </tr>
-            </thead>
-            <tbody>
-              {orders.map((order) => {
-                const minutes = order.timeEntries.reduce(
-                  (total, entry) =>
-                    total + minutesBetween(entry.clockInAt, entry.clockOutAt),
-                  0
-                );
-                const isOpen = order.status === "OPEN";
+        // Vanligt GET-formulär. Kryssrutorna hamnar i adressen och skickas
+        // till exportadressen, utan en rad JavaScript för markeringen.
+        <form action="/api/admin/export/orders" method="GET">
+          <Card>
+            <CardHeader
+              title={`${orders.length} ${orders.length === 1 ? "order" : "ordrar"}`}
+              description="Markera flera för att få ut dem samlat — en PDF med en order per sida, eller en Excel med en flik per order."
+              action={
+                <div className="flex gap-2">
+                  <Button type="submit" name="format" value="pdf">
+                    PDF
+                  </Button>
+                  <Button
+                    type="submit"
+                    name="format"
+                    value="excel"
+                    tone="secondary"
+                  >
+                    Excel
+                  </Button>
+                </div>
+              }
+            />
 
-                return (
-                  <Tr key={order.id} dimmed={!isOpen}>
-                    <Td>
-                      <span className="font-medium">{order.orderNumber}</span>
-                    </Td>
-                    <Td muted>{order.customerName ?? "—"}</Td>
-                    <Td>
-                      {isOpen ? (
-                        <Badge tone="active">Öppen</Badge>
-                      ) : (
-                        <Badge tone="muted">Stängd</Badge>
-                      )}
-                    </Td>
-                    <Td numeric>{formatDuration(minutes)}</Td>
-                    <Td>
-                      <div className="flex justify-end gap-2">
-                        <FormDialog
-                          trigger="Ändra"
-                          triggerTone="ghost"
-                          title={`Ändra order ${order.orderNumber}`}
-                          action={updateOrder}
-                          submitLabel="Spara"
-                        >
-                          <input type="hidden" name="id" value={order.id} />
-                          <Field label="Ordernummer">
-                            <Input
-                              name="orderNumber"
-                              defaultValue={order.orderNumber}
-                              required
-                              autoFocus
-                            />
-                          </Field>
-                          <Field label="Kund">
-                            <Input
-                              name="customerName"
-                              defaultValue={order.customerName ?? ""}
-                              placeholder="Valfritt"
-                            />
-                          </Field>
-                        </FormDialog>
+            <Table>
+              <thead>
+                <tr>
+                  <Th>
+                    <span className="sr-only">Markera</span>
+                  </Th>
+                  <Th>Order</Th>
+                  <Th>Kund</Th>
+                  <Th>Status</Th>
+                  <Th numeric>Stämplingar</Th>
+                  <Th numeric>Upparbetad tid</Th>
+                </tr>
+              </thead>
+              <tbody>
+                {orders.map((order) => {
+                  const minutes = order.timeEntries.reduce(
+                    (total, entry) =>
+                      total + minutesBetween(entry.clockInAt, entry.clockOutAt),
+                    0
+                  );
+                  const isOpen = order.status === "OPEN";
 
-                        <form action={toggleOrder}>
-                          <input type="hidden" name="id" value={order.id} />
-                          <input type="hidden" name="status" value={order.status} />
-                          <Button type="submit" tone="secondary">
-                            {isOpen ? "Stäng order" : "Öppna igen"}
-                          </Button>
-                        </form>
-                      </div>
-                    </Td>
-                  </Tr>
-                );
-              })}
-            </tbody>
-          </Table>
-        </Card>
+                  return (
+                    <Tr key={order.id} dimmed={!isOpen}>
+                      <Td>
+                        <input
+                          type="checkbox"
+                          name="order"
+                          value={order.id}
+                          aria-label={`Markera order ${order.orderNumber}`}
+                          className="h-4 w-4 rounded border-neutral-300 text-blue-600 focus:ring-blue-600"
+                        />
+                      </Td>
+                      <Td>
+                        <OrderActions
+                          order={{
+                            id: order.id,
+                            orderNumber: order.orderNumber,
+                            customerName: order.customerName,
+                            status: order.status,
+                            entries: order.timeEntries.length,
+                          }}
+                          updateAction={updateOrder}
+                          toggleAction={toggleOrder}
+                        />
+                      </Td>
+                      <Td muted>{order.customerName ?? "—"}</Td>
+                      <Td>
+                        {isOpen ? (
+                          <Badge tone="active">Öppen</Badge>
+                        ) : (
+                          <Badge tone="muted">Stängd</Badge>
+                        )}
+                      </Td>
+                      <Td numeric muted>
+                        {order.timeEntries.length}
+                      </Td>
+                      <Td numeric>{formatDuration(minutes)}</Td>
+                    </Tr>
+                  );
+                })}
+              </tbody>
+            </Table>
+
+            <p className="border-t border-neutral-200 px-4 py-3 text-xs text-neutral-500">
+              Markerar du ingen order tas alla öppna med.
+            </p>
+          </Card>
+        </form>
       )}
     </>
   );

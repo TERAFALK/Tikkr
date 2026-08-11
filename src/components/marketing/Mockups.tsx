@@ -221,52 +221,70 @@ function Stat({
 /* Excel-exporten                                                              */
 /* -------------------------------------------------------------------------- */
 
+/**
+ * Underlaget som skickas vidare till kundens kund.
+ *
+ * Visar avsiktligt en tänkt logotypruta överst — det är den detalj som gör
+ * skillnaden mellan "en systemutskrift" och "ett dokument från leverantören",
+ * och den är svår att förklara i text.
+ */
 export function ExportMockup({ className = "" }: { className?: string }) {
   const rows = [
-    ["Anna Andersson", "2601", "Svetsning", "7,50"],
-    ["Erik Ek", "2601", "Fräsning", "8,00"],
-    ["Carina Cederlund", "2603", "Montering", "4,25"],
-    ["Anna Andersson", "2603", "Montering", "3,00"],
+    ["Anna Andersson", "Svetsning", "7,50"],
+    ["Erik Ek", "Fräsning", "8,00"],
+    ["Carina Cederlund", "Montering", "4,25"],
+    ["Anna Andersson", "Kvalitetskontroll", "3,00"],
   ];
 
   return (
-    <Frame label="tikkr-demo-mekaniska-2026-08.xlsx" className={className}>
-      <table className="w-full text-[10px]">
-        <thead>
-          <tr className="bg-neutral-900 text-white">
-            <th className="px-3 py-1.5 text-left font-medium">Anställd</th>
-            <th className="px-3 py-1.5 text-left font-medium">Order</th>
-            <th className="px-3 py-1.5 text-left font-medium">Moment</th>
-            <th className="px-3 py-1.5 text-right font-medium">Timmar</th>
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((row) => (
-            <tr key={row.join()} className="border-b border-neutral-100">
-              {row.map((cell, index) => (
-                <td
-                  key={index}
-                  className={`px-3 py-1.5 ${
-                    index === 3
-                      ? "text-right tabular-nums text-neutral-900"
-                      : "text-neutral-600"
-                  }`}
-                >
-                  {cell}
-                </td>
-              ))}
+    <Frame label="order-2601.pdf" className={className}>
+      <div className="px-4 py-4">
+        <div className="flex h-7 w-20 items-center justify-center rounded border border-dashed border-neutral-300 text-[8px] text-neutral-400">
+          er logotyp
+        </div>
+
+        <p className="mt-3 text-[13px] font-semibold text-neutral-900">
+          Order 2601
+        </p>
+        <p className="text-[10px] text-neutral-500">Volvo Lastvagnar</p>
+
+        <table className="mt-3 w-full text-[10px]">
+          <thead>
+            <tr className="bg-neutral-900 text-white">
+              <th className="px-2 py-1 text-left font-medium">Anställd</th>
+              <th className="px-2 py-1 text-left font-medium">Moment</th>
+              <th className="px-2 py-1 text-right font-medium">Timmar</th>
             </tr>
-          ))}
-          <tr className="font-semibold">
-            <td className="px-3 py-1.5 text-neutral-900" colSpan={3}>
-              TOTALT
-            </td>
-            <td className="px-3 py-1.5 text-right tabular-nums text-neutral-900">
-              22,75
-            </td>
-          </tr>
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {rows.map((row) => (
+              <tr key={row.join()} className="border-b border-neutral-100">
+                {row.map((cell, index) => (
+                  <td
+                    key={index}
+                    className={`px-2 py-1 ${
+                      index === 2
+                        ? "text-right tabular-nums text-neutral-900"
+                        : "text-neutral-600"
+                    }`}
+                  >
+                    {cell}
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+
+        <div className="mt-1 flex items-center justify-between rounded bg-neutral-100 px-2 py-1.5">
+          <span className="text-[10px] font-semibold text-neutral-900">
+            TOTALT
+          </span>
+          <span className="text-[10px] font-semibold tabular-nums text-neutral-900">
+            22,75 timmar
+          </span>
+        </div>
+      </div>
     </Frame>
   );
 }

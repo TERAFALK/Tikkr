@@ -1,5 +1,6 @@
 import { requireAdmin } from "@/lib/admin-session";
 import { unsafeGlobalPrisma } from "@/lib/db";
+import LogoUpload from "@/components/admin/LogoUpload";
 import { Button, ButtonLink, Card, CardHeader, Field, Input } from "@/components/ui";
 import { formatDate } from "@/lib/format";
 import { saveCompany } from "./actions";
@@ -12,7 +13,13 @@ export default async function CompanySettingsPage() {
   const [company, employees, orders, devices] = await Promise.all([
     unsafeGlobalPrisma.company.findUnique({
       where: { id: companyId },
-      select: { name: true, createdAt: true, subscriptionStatus: true },
+      select: {
+        name: true,
+        createdAt: true,
+        subscriptionStatus: true,
+        logoMimeType: true,
+        logoUpdatedAt: true,
+      },
     }),
     db.employee.count({ where: { active: true } }),
     db.order.count({ where: { status: "OPEN" } }),
@@ -34,6 +41,17 @@ export default async function CompanySettingsPage() {
           </Field>
           <Button type="submit">Spara</Button>
         </form>
+      </Card>
+
+      <Card>
+        <CardHeader
+          title="Logotyp"
+          description="Visas på stämplingsskärmen, här i panelen och överst på de underlag ni skickar till era kunder."
+        />
+        <LogoUpload
+          hasLogo={Boolean(company.logoMimeType)}
+          updatedAt={company.logoUpdatedAt?.getTime().toString() ?? null}
+        />
       </Card>
 
       <Card>

@@ -16,6 +16,8 @@ import {
   IconReview,
   IconSettings,
 } from "@/components/ui/icons";
+import CompanyBadge from "@/components/ui/CompanyBadge";
+import { LogoMark } from "@/components/ui/Logo";
 
 /**
  * Vänsternavigeringen.
@@ -66,11 +68,13 @@ export default function AdminSidebar({
   email,
   reviewCount,
   showOnboarding,
+  hasLogo,
 }: {
   companyName: string;
   email: string;
   reviewCount: number;
   showOnboarding: boolean;
+  hasLogo: boolean;
 }) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
@@ -95,7 +99,7 @@ export default function AdminSidebar({
 
   const nav = (
     <nav className="flex h-full flex-col gap-6 p-3">
-      <CompanyBadge companyName={companyName} />
+      <CompanyHeader companyName={companyName} hasLogo={hasLogo} />
 
       <div className="flex-1 space-y-6">
         {visibleSections.map((section) => (
@@ -171,6 +175,13 @@ export default function AdminSidebar({
         </form>
 
         <p className="truncate px-2 pt-2 text-[11px] text-neutral-400">{email}</p>
+
+        {/* Tikkr-märket nedtonat. Panelen tillhör kunden — deras logotyp står
+            överst, vår står i marginalen. */}
+        <div className="flex items-center gap-1.5 px-2 pt-2 opacity-50">
+          <LogoMark size={14} />
+          <span className="text-[10px] font-medium text-neutral-500">Tikkr</span>
+        </div>
       </div>
     </nav>
   );
@@ -208,22 +219,22 @@ export default function AdminSidebar({
   );
 }
 
-function CompanyBadge({ companyName }: { companyName: string }) {
-  // Initialen fungerar som igenkänningstecken när man växlar mellan flera
-  // kunder — samma idé som en arbetsyteväljare i andra verktyg.
-  const initial = companyName.trim().charAt(0).toUpperCase() || "T";
-
+function CompanyHeader({
+  companyName,
+  hasLogo,
+}: {
+  companyName: string;
+  hasLogo: boolean;
+}) {
   return (
     <div className="flex items-center gap-2.5 rounded-lg px-2 py-1.5">
-      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-neutral-900 text-sm font-semibold text-white">
-        {initial}
-      </span>
+      <CompanyBadge companyName={companyName} hasLogo={hasLogo} size={32} />
       <span className="min-w-0">
         <span className="block truncate text-[13px] font-semibold leading-tight text-neutral-900">
           {companyName}
         </span>
         <span className="block text-[11px] leading-tight text-neutral-400">
-          Tikkr
+          Arbetsyta
         </span>
       </span>
     </div>

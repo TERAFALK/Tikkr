@@ -3,6 +3,8 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { enqueue, flush, pending, type QueuedPunch } from "@/lib/offline-queue";
+import CompanyBadge from "@/components/ui/CompanyBadge";
+import { LogoMark } from "@/components/ui/Logo";
 
 /**
  * KIOSKSKÄRMEN.
@@ -53,6 +55,8 @@ interface Props {
   activeByEmployee: Record<string, ActiveJob>;
   /** Text om prenumerationen, eller null. Stoppar aldrig stämplingen. */
   subscriptionWarning: string | null;
+  /** true om företaget laddat upp en egen logotyp. */
+  hasLogo: boolean;
 }
 
 type View =
@@ -90,6 +94,7 @@ export default function KioskScreen({
   moments,
   activeByEmployee,
   subscriptionWarning,
+  hasLogo,
 }: Props) {
   const router = useRouter();
   const [view, setView] = useState<View>({ name: "employees" });
@@ -240,6 +245,7 @@ export default function KioskScreen({
         deviceName={deviceName}
         view={view}
         waiting={waiting}
+        hasLogo={hasLogo}
         onBack={goHome}
       />
 
@@ -321,18 +327,18 @@ function Header({
   deviceName,
   view,
   waiting,
+  hasLogo,
   onBack,
 }: {
   companyName: string;
   deviceName: string;
   view: View;
   waiting: number;
+  hasLogo: boolean;
   onBack: () => void;
 }) {
   // Samma företagsmärke som i adminpanelen, så att det syns att det hänger
   // ihop. Steget visas bara mitt i ett val — på startsidan finns inget steg.
-  const initial = companyName.trim().charAt(0).toUpperCase() || "T";
-
   const step =
     view.name === "order"
       ? { current: 2, label: "Välj order" }
@@ -342,9 +348,7 @@ function Header({
 
   return (
     <header className="flex items-center gap-4 border-b border-neutral-200 bg-white px-4 py-3 sm:px-6">
-      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-neutral-900 text-sm font-semibold text-white">
-        {initial}
-      </span>
+      <CompanyBadge companyName={companyName} hasLogo={hasLogo} size={40} />
 
       <div className="min-w-0">
         <p className="truncate text-[15px] font-semibold text-neutral-900">
@@ -379,6 +383,17 @@ function Header({
           >
             Avbryt
           </button>
+        )}
+
+        {/* Tikkr-märket nedtonat. Skärmen hänger på kundens vägg och är deras,
+            inte vår. */}
+        {view.name === "employees" && (
+          <span className="hidden items-center gap-1.5 opacity-40 sm:flex">
+            <LogoMark size={16} />
+            <span className="text-[11px] font-medium text-neutral-500">
+              Tikkr
+            </span>
+          </span>
         )}
       </div>
     </header>

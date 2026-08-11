@@ -1,0 +1,47 @@
+/**
+ * Företagsmärket — logotyp om kunden laddat upp en, annars initialen.
+ *
+ * Används i adminpanelens sidomeny och i stämplingsskärmens huvud, så att en
+ * kund som lagt in sin logotyp ser den på båda ställena.
+ *
+ * Bilden hämtas från en adress som svarar utifrån vem som frågar. Vanlig
+ * img-tagg och inte Next-komponenten för bilder: den senare vill optimera och
+ * mellanlagra, vilket kräver att bilden går att nå utan inloggning.
+ */
+export default function CompanyBadge({
+  companyName,
+  hasLogo,
+  size = 32,
+}: {
+  companyName: string;
+  hasLogo: boolean;
+  size?: number;
+}) {
+  const initial = companyName.trim().charAt(0).toUpperCase() || "T";
+
+  if (hasLogo) {
+    return (
+      <span
+        className="flex shrink-0 items-center justify-center overflow-hidden rounded-lg border border-neutral-200 bg-white"
+        style={{ width: size, height: size }}
+      >
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src="/api/company/logo"
+          alt=""
+          className="h-full w-full object-contain p-0.5"
+        />
+      </span>
+    );
+  }
+
+  return (
+    <span
+      className="flex shrink-0 items-center justify-center rounded-lg bg-neutral-900 font-semibold text-white"
+      style={{ width: size, height: size, fontSize: size * 0.4 }}
+      aria-hidden="true"
+    >
+      {initial}
+    </span>
+  );
+}

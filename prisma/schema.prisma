@@ -67,6 +67,17 @@ model Company {
   /// mellan sommar och vinter.
   timezone String @default("Europe/Stockholm")
 
+  /// Kundens egen logotyp. Visas på stämplingsskärmen, i adminpanelen och
+  /// överst på underlag som skickas vidare till deras kund.
+  ///
+  /// Ligger i databasen och inte som fil på servern. Bilden följer då med i
+  /// säkerhetskopian av sig själv, och det finns ingen mapp som måste
+  /// monteras in och hållas i takt mellan miljöer. Filerna är små — vi
+  /// tillåter högst några hundra kilobyte.
+  logoData      Bytes?    @map("logo_data")
+  logoMimeType  String?   @map("logo_mime_type")
+  logoUpdatedAt DateTime? @map("logo_updated_at")
+
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
