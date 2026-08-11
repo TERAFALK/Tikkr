@@ -14,10 +14,12 @@ export default async function KioskPage() {
 
   if (!session) {
     return (
-      <main className="flex min-h-screen items-center justify-center p-8">
-        <div className="max-w-md rounded-2xl border border-slate-200 bg-white p-8 text-center shadow-sm">
-          <h1 className="text-2xl font-bold">Skärmen är inte kopplad</h1>
-          <p className="mt-3 text-slate-600">
+      <main className="flex min-h-screen items-center justify-center bg-neutral-50 p-8">
+        <div className="max-w-md rounded-xl border border-neutral-200 bg-white p-8 text-center">
+          <h1 className="text-2xl font-semibold text-neutral-900">
+            Skärmen är inte kopplad
+          </h1>
+          <p className="mt-3 text-[15px] leading-relaxed text-neutral-500">
             Öppna kopplingslänken du fått av administratören en gång på den här
             skärmen. Sedan behöver du aldrig göra det igen.
           </p>

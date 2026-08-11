@@ -231,7 +231,7 @@ export default function KioskScreen({
   );
 
   return (
-    <main className="flex min-h-screen flex-col bg-slate-100">
+    <main className="flex min-h-screen flex-col bg-neutral-50">
       <Header
         companyName={companyName}
         deviceName={deviceName}
@@ -247,7 +247,7 @@ export default function KioskScreen({
         </Banner>
       )}
 
-      <div className="flex-1 p-4 sm:p-6">
+      <div className="flex-1 p-4 sm:p-6 lg:p-8">
         {view.name === "employees" && (
           <EmployeeGrid
             employees={employees}
@@ -314,30 +314,58 @@ function Header({
   waiting: number;
   onBack: () => void;
 }) {
+  // Samma företagsmärke som i adminpanelen, så att det syns att det hänger
+  // ihop. Steget visas bara mitt i ett val — på startsidan finns inget steg.
+  const initial = companyName.trim().charAt(0).toUpperCase() || "T";
+
+  const step =
+    view.name === "order"
+      ? { current: 2, label: "Välj order" }
+      : view.name === "moment"
+        ? { current: 3, label: "Välj arbetsmoment" }
+        : null;
+
   return (
-    <header className="flex items-center justify-between gap-4 border-b border-slate-200 bg-white px-4 py-3 sm:px-6">
+    <header className="flex items-center gap-4 border-b border-neutral-200 bg-white px-4 py-3 sm:px-6">
+      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-neutral-900 text-sm font-semibold text-white">
+        {initial}
+      </span>
+
       <div className="min-w-0">
-        <p className="truncate text-lg font-semibold">{companyName}</p>
-        <p className="truncate text-sm text-slate-500">{deviceName}</p>
+        <p className="truncate text-[15px] font-semibold text-neutral-900">
+          {companyName}
+        </p>
+        <p className="truncate text-[13px] text-neutral-400">{deviceName}</p>
       </div>
 
-      {/* Syns bara när något faktiskt väntar. En ständig statusikon skulle
-          bara bli tapet som ingen läser. */}
-      {waiting > 0 && (
-        <span className="shrink-0 rounded-xl bg-amber-100 px-4 py-3 text-center text-sm font-semibold text-amber-800">
-          {waiting} stämpling{waiting === 1 ? "" : "ar"} väntar
-          <span className="block font-normal">skickas när nätet är tillbaka</span>
+      {step && (
+        <span className="hidden items-center gap-2 text-[13px] font-medium text-neutral-500 sm:flex">
+          <span className="flex h-6 w-6 items-center justify-center rounded-full bg-blue-600 text-xs font-semibold text-white">
+            {step.current}
+          </span>
+          {step.label}
         </span>
       )}
 
-      {view.name !== "employees" && (
-        <button
-          onClick={onBack}
-          className="shrink-0 rounded-xl bg-slate-200 px-6 py-4 text-lg font-semibold text-slate-700 active:bg-slate-300"
-        >
-          Avbryt
-        </button>
-      )}
+      <div className="ml-auto flex items-center gap-3">
+        {/* Syns bara när något faktiskt väntar. En ständig statusikon skulle
+            bara bli tapet som ingen läser. */}
+        {waiting > 0 && (
+          <span className="rounded-lg bg-amber-50 px-3 py-2 text-center text-[13px] font-medium text-amber-700 ring-1 ring-inset ring-amber-200">
+            {waiting} väntar
+            <span className="block text-xs font-normal">skickas när nätet är tillbaka</span>
+          </span>
+        )}
+
+        {view.name !== "employees" && (
+          <button
+            onClick={onBack}
+            className="shrink-0 rounded-xl px-6 py-4 text-lg font-semibold text-neutral-600 ring-1 ring-inset ring-neutral-200 transition-colors active:bg-neutral-100"
+          >
+            Avbryt
+          </button>
+        )}
+      </div>
     </header>
   );
 }
@@ -358,13 +386,13 @@ function Banner({
 
   return (
     <div
-      className={`flex items-center justify-between gap-4 px-6 py-4 text-lg font-semibold ${styles}`}
+      className={`flex items-center justify-between gap-4 px-6 py-3.5 text-base font-semibold ${styles}`}
     >
       <span>{children}</span>
       {onDismiss && (
         <button
           onClick={onDismiss}
-          className="rounded-lg bg-black/20 px-4 py-2 text-base"
+          className="rounded-lg bg-black/15 px-5 py-2.5 text-base"
         >
           Stäng
         </button>
@@ -390,28 +418,37 @@ function EmployeeGrid({
     <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 lg:grid-cols-4">
       {employees.map((employee) => {
         const job = active[employee.id];
+
         return (
           <button
             key={employee.id}
             onClick={() => onPick(employee)}
-            className={`flex min-h-36 flex-col justify-between rounded-2xl p-4 text-left shadow-sm transition-transform active:scale-[0.97] ${
+            // Instämplad behåller heltäckande grönt med flit. Panelen är stram
+            // och sval, men den här skärmen läses på flera meters avstånd av
+            // någon i skyddsglasögon — då måste läget synas direkt, inte
+            // upptäckas. Storlekarna är kioskens, färgerna är systemets.
+            className={`flex min-h-36 flex-col justify-between rounded-xl p-4 text-left transition-transform active:scale-[0.97] ${
               job
                 ? "bg-emerald-600 text-white"
-                : "bg-white text-slate-900 hover:bg-slate-50"
+                : "border border-neutral-200 bg-white text-neutral-900"
             }`}
           >
-            <span className="text-xl font-bold leading-tight sm:text-2xl">
+            <span className="text-xl font-semibold leading-tight sm:text-2xl">
               {employee.name}
             </span>
 
             {job ? (
-              <span className="text-sm font-medium opacity-90">
-                {job.orderNumber} · {job.momentName}
-                <br />
-                <Elapsed since={job.since} />
+              <span className="mt-2 text-sm font-medium">
+                <span className="block truncate opacity-90">
+                  {job.orderNumber} · {job.momentName}
+                </span>
+                <span className="mt-1 inline-flex items-center gap-1.5 rounded bg-white/20 px-2 py-0.5">
+                  <span className="h-1.5 w-1.5 rounded-full bg-white" />
+                  <Elapsed since={job.since} />
+                </span>
               </span>
             ) : (
-              <span className="text-sm text-slate-400">Ej instämplad</span>
+              <span className="mt-2 text-sm text-neutral-400">Ej instämplad</span>
             )}
           </button>
         );
@@ -433,29 +470,35 @@ function ActionChoice({
 }) {
   return (
     <div className="mx-auto max-w-2xl">
-      <div className="rounded-2xl bg-white p-6 shadow-sm">
-        <h2 className="text-3xl font-bold">{employee.name}</h2>
+      <div className="rounded-xl border border-neutral-200 bg-white p-6">
+        <h2 className="text-2xl font-semibold sm:text-3xl">{employee.name}</h2>
+
         {job && (
-          <p className="mt-2 text-lg text-slate-600">
-            Arbetar på <strong>{job.orderNumber}</strong> · {job.momentName} sedan{" "}
-            <Elapsed since={job.since} />
-          </p>
+          <div className="mt-3 flex flex-wrap items-center gap-2 text-[15px] text-neutral-600">
+            <span className="inline-flex items-center gap-2 rounded-lg bg-emerald-50 px-3 py-1.5 font-medium text-emerald-700 ring-1 ring-inset ring-emerald-200">
+              <span className="h-2 w-2 rounded-full bg-emerald-500" />
+              Pågår sedan <Elapsed since={job.since} />
+            </span>
+            <span>
+              {job.orderNumber} · {job.momentName}
+            </span>
+          </div>
         )}
       </div>
 
-      <div className="mt-4 grid gap-3 sm:grid-cols-2">
+      <div className="mt-3 grid gap-3 sm:grid-cols-2">
         <button
           onClick={onClockOut}
-          className="min-h-32 rounded-2xl bg-slate-800 p-6 text-2xl font-bold text-white active:scale-[0.98]"
+          className="min-h-32 rounded-xl bg-neutral-900 p-6 text-2xl font-semibold text-white transition-transform active:scale-[0.98]"
         >
           Stämpla ut
         </button>
         <button
           onClick={onSwitch}
-          className="min-h-32 rounded-2xl bg-blue-600 p-6 text-2xl font-bold text-white active:scale-[0.98]"
+          className="min-h-32 rounded-xl bg-blue-600 p-6 text-2xl font-semibold text-white transition-transform active:scale-[0.98]"
         >
           Byt jobb
-          <span className="mt-1 block text-base font-normal opacity-90">
+          <span className="mt-1.5 block text-base font-normal opacity-90">
             Stämplar ut från nuvarande automatiskt
           </span>
         </button>
@@ -480,7 +523,9 @@ function Chooser({
 }) {
   return (
     <div>
-      <h2 className="mb-4 text-2xl font-bold">{title}</h2>
+      <h2 className="mb-4 text-xl font-semibold text-neutral-900 sm:text-2xl">
+        {title}
+      </h2>
 
       {items.length === 0 ? (
         <Empty>{empty}</Empty>
@@ -490,11 +535,13 @@ function Chooser({
             <button
               key={item.key}
               onClick={item.onPick}
-              className="flex min-h-32 flex-col justify-center rounded-2xl bg-white p-4 text-left shadow-sm transition-transform active:scale-[0.97]"
+              className="flex min-h-32 flex-col justify-center rounded-xl border border-neutral-200 bg-white p-4 text-left transition-transform active:scale-[0.97]"
             >
-              <span className="text-2xl font-bold">{item.primary}</span>
+              <span className="text-2xl font-semibold text-neutral-900">
+                {item.primary}
+              </span>
               {item.secondary && (
-                <span className="mt-1 text-sm text-slate-500">
+                <span className="mt-1 truncate text-sm text-neutral-500">
                   {item.secondary}
                 </span>
               )}
@@ -508,7 +555,7 @@ function Chooser({
 
 function Empty({ children }: { children: React.ReactNode }) {
   return (
-    <div className="rounded-2xl border border-dashed border-slate-300 p-10 text-center text-lg text-slate-500">
+    <div className="rounded-xl border border-dashed border-neutral-300 bg-white/50 p-12 text-center text-lg text-neutral-500">
       {children}
     </div>
   );
