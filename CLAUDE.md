@@ -230,5 +230,9 @@ separat server som sätts upp senare, mot tikkr.se.
 | GitHub-repo | ⏸ ska skapas av användaren (privat, namn `tikkr`) |
 | Produktionsserver | ⏸ separat från testservern, senare |
 | Domän tikkr.se | ⏸ ej köpt |
-| Offsite-backup (rclone-mål) | ⏸ ej valt — `BACKUP_REMOTE` i `.env` |
+| Offsite-backup (rclone-mål) | ⏸ **medvetet uppskjutet** — labbmiljö utan kunddata. Skripten finns; `BACKUP_REMOTE` sätts före lansering. |
 | Uptime-övervakning | ⏸ kräver publik URL först |
+
+**Spärrar innan skarp drift** (se `docs/drift.md` punkt 6): offsite-backup satt,
+repot privat, demolösenordet `tikkr123` borttaget, testskärmens fasta token
+återkallad, och `./scripts/status.sh` utan röda punkter.
