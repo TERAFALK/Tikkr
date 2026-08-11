@@ -76,7 +76,7 @@ export default async function MomentsPage() {
                         className="max-w-xs"
                         aria-label={`Namn för ${moment.name}`}
                       />
-                      <Button type="submit" tone="secondary">
+                      <Button type="submit" tone="ghost">
                         Spara
                       </Button>
                     </form>

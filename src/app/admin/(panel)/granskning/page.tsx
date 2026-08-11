@@ -1,8 +1,10 @@
 import { requireAdmin } from "@/lib/admin-session";
 import { unsafeGlobalPrisma } from "@/lib/db";
 import {
+  Badge,
   Button,
   Card,
+  CardHeader,
   EmptyState,
   Input,
   PageHeader,
@@ -54,6 +56,10 @@ export default async function ReviewPage() {
         />
       ) : (
         <Card>
+          <CardHeader
+            title={`${entries.length} ${entries.length === 1 ? "post" : "poster"} att gå igenom`}
+            description="Ändra sluttiden om du vet när personen slutade, annars godkänn systemets gissning. Båda märks som granskade."
+          />
           <Table>
             <thead>
               <tr>
@@ -78,11 +84,15 @@ export default async function ReviewPage() {
                   <Td muted>{formatDateTime(entry.clockInAt, timeZone)}</Td>
 
                   <Td numeric>
-                    {formatDuration(
-                      minutesBetween(entry.clockInAt, entry.clockOutAt)
-                    )}
-                    <span className="mt-0.5 block text-xs text-amber-700">
-                      till {entry.clockOutAt && formatDateTime(entry.clockOutAt, timeZone)}
+                    <Badge tone="warning">
+                      {formatDuration(
+                        minutesBetween(entry.clockInAt, entry.clockOutAt)
+                      )}
+                    </Badge>
+                    <span className="mt-1 block text-xs text-neutral-400">
+                      gissad till{" "}
+                      {entry.clockOutAt &&
+                        formatDateTime(entry.clockOutAt, timeZone)}
                     </span>
                   </Td>
 
@@ -101,13 +111,13 @@ export default async function ReviewPage() {
                           aria-label="Rätt sluttid"
                           className="w-52"
                         />
-                        <Button type="submit">Spara</Button>
+                        <Button type="submit">Spara tiden</Button>
                       </form>
 
                       <form action={approveEntry}>
                         <input type="hidden" name="id" value={entry.id} />
                         <Button type="submit" tone="secondary">
-                          Stämmer
+                          Gissningen stämmer
                         </Button>
                       </form>
                     </div>

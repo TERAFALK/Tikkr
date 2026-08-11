@@ -104,7 +104,7 @@ export default async function OrdersPage() {
                           className="w-52"
                           aria-label="Kund"
                         />
-                        <Button type="submit" tone="secondary">
+                        <Button type="submit" tone="ghost">
                           Spara
                         </Button>
                       </form>

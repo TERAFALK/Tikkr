@@ -60,6 +60,11 @@ export default async function OverviewPage() {
       <PageHeader
         title="Översikt"
         description={`Läget just nu hos ${companyName}.`}
+        action={
+          <ButtonLink href="/admin/rapporter" tone="secondary">
+            Till rapporter
+          </ButtonLink>
+        }
       />
 
       {!onboarding.ready && (

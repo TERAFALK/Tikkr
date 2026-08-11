@@ -1,5 +1,8 @@
+import Link from "next/link";
 import { requireAdmin } from "@/lib/admin-session";
+import { unsafeGlobalPrisma } from "@/lib/db";
 import { buildReport, type ReportGroup } from "@/lib/report";
+import { wallTimeIn } from "@/lib/time-zone";
 import {
   Badge,
   Button,
@@ -34,8 +37,14 @@ export default async function ReportsPage({
 }: {
   searchParams: Promise<SearchParams>;
 }) {
-  const { db } = await requireAdmin();
+  const { db, companyId } = await requireAdmin();
   const params = await searchParams;
+
+  const company = await unsafeGlobalPrisma.company.findUnique({
+    where: { id: companyId },
+    select: { timezone: true },
+  });
+  const presets = datePresets(company?.timezone ?? "Europe/Stockholm");
 
   const [employees, orders, moments] = await Promise.all([
     db.employee.findMany({ orderBy: { name: "asc" }, select: { id: true, name: true } }),
@@ -76,7 +85,33 @@ export default async function ReportsPage({
       />
 
       <Card className="mb-6">
-        <CardHeader title="Filter" />
+        <CardHeader
+          title="Filter"
+          action={
+            // Snabbval istället för att skriva datum för hand. Det är det man
+            // gör oftast, och två datumfält per gång blir många knapptryck.
+            <div className="flex flex-wrap gap-1">
+              {presets.map((preset) => {
+                const active =
+                  params.from === preset.from && params.to === preset.to;
+
+                return (
+                  <Link
+                    key={preset.label}
+                    href={`/admin/rapporter?from=${preset.from}&to=${preset.to}`}
+                    className={`rounded-md px-2.5 py-1 text-xs font-medium transition-colors ${
+                      active
+                        ? "bg-neutral-900 text-white"
+                        : "bg-neutral-100 text-neutral-600 hover:bg-neutral-200"
+                    }`}
+                  >
+                    {preset.label}
+                  </Link>
+                );
+              })}
+            </div>
+          }
+        />
         {/* Vanligt GET-formulär: filtren hamnar i adressen, så en rapport går
             att spara som bokmärke eller skicka vidare till någon annan. */}
         <form className="grid gap-4 p-5 sm:grid-cols-2 lg:grid-cols-6">
@@ -224,6 +259,46 @@ export default async function ReportsPage({
       )}
     </>
   );
+}
+
+/**
+ * Snabbval för datumintervall, räknade i företagets tidszon.
+ *
+ * "Idag" måste betyda idag på verkstaden. Räknade vi i serverns tid skulle
+ * intervallet hoppa fel timmarna runt midnatt.
+ */
+function datePresets(timeZone: string) {
+  const wall = wallTimeIn(new Date(), timeZone);
+  const iso = (year: number, month: number, day: number) =>
+    `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+
+  const today = iso(wall.year, wall.month, wall.day);
+
+  // Veckan börjar på måndag. UTC används bara för att räkna kalenderdagar —
+  // datumen kommer från väggklockan i företagets tidszon.
+  const asUtc = new Date(Date.UTC(wall.year, wall.month - 1, wall.day));
+  const weekday = (asUtc.getUTCDay() + 6) % 7;
+  const monday = new Date(asUtc);
+  monday.setUTCDate(asUtc.getUTCDate() - weekday);
+
+  const firstOfMonth = iso(wall.year, wall.month, 1);
+
+  const lastMonthEnd = new Date(Date.UTC(wall.year, wall.month - 1, 0));
+  const lastMonthStart = new Date(
+    Date.UTC(lastMonthEnd.getUTCFullYear(), lastMonthEnd.getUTCMonth(), 1)
+  );
+  const toIso = (date: Date) => date.toISOString().slice(0, 10);
+
+  return [
+    { label: "Idag", from: today, to: today },
+    { label: "Denna vecka", from: toIso(monday), to: today },
+    { label: "Denna månad", from: firstOfMonth, to: today },
+    {
+      label: "Förra månaden",
+      from: toIso(lastMonthStart),
+      to: toIso(lastMonthEnd),
+    },
+  ];
 }
 
 function Summary({ title, groups }: { title: string; groups: ReportGroup[] }) {

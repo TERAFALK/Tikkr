@@ -214,15 +214,17 @@ function CompanyBadge({ companyName }: { companyName: string }) {
   const initial = companyName.trim().charAt(0).toUpperCase() || "T";
 
   return (
-    <div className="flex items-center gap-2.5 px-2 py-1">
-      <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-neutral-900 text-[13px] font-semibold text-white">
+    <div className="flex items-center gap-2.5 rounded-lg px-2 py-1.5">
+      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-neutral-900 text-sm font-semibold text-white">
         {initial}
       </span>
       <span className="min-w-0">
-        <span className="block truncate text-[13px] font-semibold text-neutral-900">
+        <span className="block truncate text-[13px] font-semibold leading-tight text-neutral-900">
           {companyName}
         </span>
-        <span className="block text-[11px] text-neutral-400">Tikkr</span>
+        <span className="block text-[11px] leading-tight text-neutral-400">
+          Tikkr
+        </span>
       </span>
     </div>
   );

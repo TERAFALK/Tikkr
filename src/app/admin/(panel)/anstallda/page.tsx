@@ -76,7 +76,10 @@ export default async function EmployeesPage() {
                         className="max-w-xs"
                         aria-label={`Namn för ${employee.name}`}
                       />
-                      <Button type="submit" tone="secondary">
+                      {/* Dämpad med flit. Knappen finns på varje rad, och om
+                          den vore lika stark som de riktiga åtgärderna skulle
+                          listan se ut som en vägg av knappar. */}
+                      <Button type="submit" tone="ghost">
                         Spara
                       </Button>
                     </form>

@@ -204,6 +204,9 @@ export default async function EntriesPage({
                       </>
                     ) : (
                       <Td colSpan={4}>
+                        {/* Fälten får bryta rad på smal skärm istället för att
+                            klämmas ihop. En felskriven tid här blir ett
+                            fakturafel, så de ska vara läsbara. */}
                         <form
                           action={editEntry}
                           className="flex flex-wrap items-center gap-2"
@@ -262,27 +265,29 @@ export default async function EntriesPage({
                             aria-label="Utstämplad"
                           />
 
-                          <span className="w-20 text-right tabular-nums text-neutral-500">
+                          <Badge>
                             {formatDuration(
                               minutesBetween(entry.clockInAt, entry.clockOutAt)
                             )}
-                          </span>
+                          </Badge>
 
-                          <Button type="submit" tone="secondary">
-                            Spara
-                          </Button>
+                          <div className="ml-auto flex items-center gap-2">
+                            <Button type="submit" tone="secondary">
+                              Spara
+                            </Button>
 
-                          {/* formAction låter samma formulär skickas till en
-                              annan serveråtgärd, så raderingen får med sig
-                              posten utan ett eget formulär i raden. */}
-                          <ConfirmButton
-                            type="submit"
-                            tone="danger"
-                            formAction={deleteEntry}
-                            question={`Radera stämplingen för ${entry.employee.name}? Tiden går inte att få tillbaka.`}
-                          >
-                            Radera
-                          </ConfirmButton>
+                            {/* formAction låter samma formulär skickas till en
+                                annan serveråtgärd, så raderingen får med sig
+                                posten utan ett eget formulär i raden. */}
+                            <ConfirmButton
+                              type="submit"
+                              tone="danger"
+                              formAction={deleteEntry}
+                              question={`Radera stämplingen för ${entry.employee.name}? Tiden går inte att få tillbaka.`}
+                            >
+                              Radera
+                            </ConfirmButton>
+                          </div>
                         </form>
                       </Td>
                     )}
