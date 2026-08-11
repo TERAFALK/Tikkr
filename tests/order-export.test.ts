@@ -72,10 +72,10 @@ beforeAll(async () => {
     });
 
   // Order 7001: 2 + 3 timmar = 5
-  await entry(anna.id, orderA, svets, "2026-08-03T06:00:00Z", "2026-08-03T08:00:00Z");
-  await entry(bosse.id, orderA, montering, "2026-08-04T06:00:00Z", "2026-08-04T09:00:00Z");
+  await entry(anna.id, orderA, svets.id, "2026-08-03T06:00:00Z", "2026-08-03T08:00:00Z");
+  await entry(bosse.id, orderA, montering.id, "2026-08-04T06:00:00Z", "2026-08-04T09:00:00Z");
   // Order 7002: 4 timmar, varav en post flaggad
-  await entry(anna.id, orderB, svets, "2026-08-05T06:00:00Z", "2026-08-05T10:00:00Z", {
+  await entry(anna.id, orderB, svets.id, "2026-08-05T06:00:00Z", "2026-08-05T10:00:00Z", {
     source: "AUTO_CLOSE",
     needsReview: true,
   });
