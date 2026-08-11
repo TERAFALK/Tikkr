@@ -13,6 +13,11 @@ import { NextResponse, type NextRequest } from "next/server";
  * Utan dem gör den här filen ingenting alls, vilket är läget i labbet där
  * allting ligger på samma adress.
  *
+ * VIKTIGT: den här filen körs i en avskalad miljö där miljövariabler bakas in
+ * när appen byggs, inte läses när den startar. Ändrar du raderna i .env måste
+ * appen alltså byggas om — "docker compose up -d --build", inte bara
+ * "docker compose up -d". Det gäller inte resten av inställningarna.
+ *
  * Varför två adresser är värt besväret:
  *
  * - **Cookies.** Inloggningen sätts bara på portaladressen. En besökare på
