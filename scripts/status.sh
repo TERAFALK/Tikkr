@@ -46,23 +46,26 @@ else
   bad "hälsokollen svarar inte som väntat: ${HEALTH:-inget svar}"
 fi
 
-# --- Databasens historik ----------------------------------------------------
-head_ "Migrationer"
+# --- Hur databasen byggs ----------------------------------------------------
+head_ "Databasens uppbyggnad"
 
 if [ ! -d prisma/migrations ]; then
-  bad "inga migrationer finns — kör: ./scripts/create-migration.sh init"
+  ok "byggs direkt ur prisma/schema.prisma (utvecklingsläge)"
+  echo "      Rätt läge tills det finns data värd att behålla. Ändras schemat"
+  echo "      försvinner det som ändrats — kör seed igen efteråt."
+  echo "      Före produktion: ./scripts/create-migration.sh init"
 else
   COUNT="$(find prisma/migrations -mindepth 1 -maxdepth 1 -type d | wc -l)"
-  ok "$COUNT migration(er) på disk"
+  ok "$COUNT migration(er) styr databasen (produktionsläge)"
 
-  if [ -n "$(git status --porcelain prisma/migrations 2>/dev/null)" ]; then
-    bad "migrationer är INTE incheckade i git — databasen går inte att återskapa"
-    echo "      git add prisma/migrations && git commit -m 'Migrationer' && git push"
-  elif [ -n "$(git log origin/main..HEAD --oneline -- prisma/migrations 2>/dev/null)" ]; then
-    bad "migrationer är incheckade men INTE pushade till GitHub"
-    echo "      git push"
+  if git check-ignore -q prisma/migrations 2>/dev/null; then
+    bad "migrationerna ignoreras av git och finns alltså bara här"
+    echo "      Ta bort raden prisma/migrations/ ur .gitignore och checka in dem,"
+    echo "      annars går databasen inte att återskapa på en annan server."
+  elif [ -n "$(git status --porcelain prisma/migrations 2>/dev/null)" ]; then
+    bad "migrationer är INTE incheckade i git"
   else
-    ok "migrationer finns i git och på GitHub"
+    ok "migrationerna finns i git"
   fi
 fi
 

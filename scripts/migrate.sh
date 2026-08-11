@@ -9,13 +9,18 @@
 set -e
 
 if [ -d "prisma/migrations" ]; then
+  # Produktionsläget: kör migrationsfilerna i tur och ordning. Det är enda
+  # sättet att ändra en databas med riktig data utan att tappa något.
   echo "==> Kör databasmigrationer..."
   npx prisma migrate deploy
 else
-  # Allra första starten, innan någon migration skapats. Skapar tabellerna
-  # direkt ur schemat så att systemet går att starta och testa.
-  # Kör scripts/create-migration.sh för att skapa den riktiga migrationen.
-  echo "==> Inga migrationer hittades — skapar tabellerna ur schemat..."
+  # Utvecklingsläget: bygg tabellerna direkt ur schemat.
+  #
+  # Går bra så länge det inte finns data värd att behålla. Ändras schemat
+  # försvinner det som ändrats — i labbet är det bara att köra seed igen.
+  # Före produktion skapas en baslinjemigration med scripts/create-migration.sh,
+  # och då går systemet över till grenen ovan av sig självt.
+  echo "==> Bygger tabellerna ur schemat (inga migrationer)..."
   npx prisma db push --skip-generate --accept-data-loss
 fi
 

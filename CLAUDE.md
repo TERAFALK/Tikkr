@@ -233,6 +233,21 @@ separat server som sätts upp senare, mot tikkr.se.
 | Offsite-backup (rclone-mål) | ⏸ **medvetet uppskjutet** — labbmiljö utan kunddata. Skripten finns; `BACKUP_REMOTE` sätts före lansering. |
 | Uptime-övervakning | ⏸ kräver publik URL först |
 
-**Spärrar innan skarp drift** (se `docs/drift.md` punkt 6): offsite-backup satt,
-repot privat, demolösenordet `tikkr123` borttaget, testskärmens fasta token
-återkallad, och `./scripts/status.sh` utan röda punkter.
+### Databasen byggs ur schemat, inte ur migrationer (beslutat 2026-08-11)
+
+Under utvecklingen finns **inga migrationsfiler**. Databasen byggs direkt ur
+`prisma/schema.prisma` vid varje start (`prisma db push`). Skälet: servern
+behöver då aldrig skriva till GitHub — organisationen blockerar deploy keys,
+och flödet laptop → GitHub → server går bara åt ett håll.
+
+Konsekvens: ändras schemat töms det som ändrats. Kör seed igen efteråt.
+`prisma/migrations/` ligger i `.gitignore`.
+
+Före produktion skapas en baslinjemigration, raden tas bort ur `.gitignore`,
+och därefter krävs en migration vid varje schemaändring. `scripts/migrate.sh`
+byter gren automatiskt så fort mappen finns. Se `docs/drift.md` punkt 1.
+
+**Spärrar innan skarp drift** (se `docs/drift.md` punkt 6): baslinjemigration
+incheckad, offsite-backup satt, repot privat, demolösenordet `tikkr123`
+borttaget, testskärmens fasta token återkallad, och `./scripts/status.sh` utan
+röda punkter.

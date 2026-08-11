@@ -27,3 +27,11 @@ caddy_config/
 *.sql
 *.dump
 backups/
+
+# Migrationer används inte under utvecklingen — databasen byggs direkt ur
+# prisma/schema.prisma, som ligger i repot. Se docs/drift.md.
+#
+# TA BORT den här raden innan produktion. Då skapas en baslinjemigration som
+# SKA checkas in, och därefter krävs en migration vid varje schemaändring för
+# att inte tappa data.
+prisma/migrations/

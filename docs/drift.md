@@ -10,33 +10,44 @@ Nedan står hur varje punkt åtgärdas, i den ordning de spelar roll.
 
 ---
 
-## 1. Migrationerna i git
+## 1. Hur databasen byggs
 
-**Varför det spelar roll:** migrationsfilerna beskriver hur databasens tabeller
-byggs upp. Finns de bara på servern går databasen inte att återskapa någon
-annanstans — inte på en produktionsserver, inte om labbservern går förlorad.
-Det är den enda punkten som är obotlig om det går fel.
+Under utvecklingen byggs databasen **direkt ur `prisma/schema.prisma`**, som
+ligger i repot och skrivs på laptopen. Servern behöver därför aldrig skriva
+något till GitHub — flödet går bara åt ena hållet, och en komprometterad
+labbserver kan inte ändra i koden.
 
-Servern behöver kunna skriva till GitHub. Ge den en egen nyckel som bara gäller
-det här repot:
-
-```bash
-ssh-keygen -t ed25519 -C "tf-docker01-test" -f ~/.ssh/id_ed25519 -N "" && cat ~/.ssh/id_ed25519.pub
-```
-
-Kopiera raden som skrivs ut → GitHub → repots **Settings → Deploy keys → Add
-deploy key** → klistra in → kryssa i **Allow write access** → spara.
-
-> Klistra bara in `.pub`-raden. Den hemliga halvan ligger kvar på servern och
-> ska aldrig lämna den.
-
-Byt sedan till nyckeln och skicka upp migrationerna:
+Priset: ändras schemat försvinner det som ändrats i databasen. Det gör inget så
+länge datan är testdata — kör `seed` igen:
 
 ```bash
-git remote set-url origin git@github.com:TERAFALK/Tikkr.git
-git config user.name "Adrian Falk" && git config user.email "adrian@terafalk.com"
-git add prisma/migrations && git commit -m "Migrationer" && git push
+docker compose run --rm migrate node prisma/seed.mjs
 ```
+
+### Före produktion: lås fast med en migration
+
+`schema.prisma` beskriver hur databasen **ska** se ut. En migration beskriver
+**vägen dit**, och skillnaden får betydelse först när det finns data att
+förlora.
+
+Byter vi namn på en kolumn ser ett verktyg som bara jämför nuläge mot önskat
+läge att den gamla kolumnen är borta och en ny tillkommit. Slutsatsen blir:
+radera den ena, skapa den andra — och innehållet försvinner. En migration säger
+uttryckligen "döp om", och datan följer med.
+
+Så här går övergången till, en gång, innan första riktiga kunden:
+
+1. Ta bort raden `prisma/migrations/` ur `.gitignore`
+2. Skapa baslinjen: `./scripts/create-migration.sh init`
+3. Checka in `prisma/migrations/` — den måste ligga i repot härifrån och framåt
+4. Därefter: en migration vid varje schemaändring, annars tappas data
+
+Från och med då kör systemet migrationerna i tur och ordning vid varje start,
+helt av sig självt. Ingen inställning behöver ändras — `scripts/migrate.sh`
+byter gren så fort mappen finns.
+
+> Ligger migrationerna bara på servern går databasen inte att återskapa någon
+> annanstans. `./scripts/status.sh` säger ifrån om det blir så.
 
 ---
 
@@ -151,10 +162,12 @@ kundens synvinkel, och ska larma.
 
 ## 6. Innan riktig kunddata
 
+- [ ] Baslinjemigration skapad och incheckad (punkt 1)
+- [ ] Offsite-backup satt upp (punkt 3)
 - [ ] Repot satt till **privat** på GitHub
 - [ ] Adminlösenordet från testdatan (`tikkr123`) borttaget eller bytt
 - [ ] Testskärmens fasta token (`demo-labb-token-…`) återkallad under Skärmar
-- [ ] Punkt 1–5 ovan gröna i `./scripts/status.sh`
+- [ ] `./scripts/status.sh` utan röda punkter
 
 ---
 

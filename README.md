@@ -160,24 +160,22 @@ containern den gamla kopian tills du bygger om.
 |---|---|
 | `src/` eller `tests/`, och kör `./scripts/test.sh` | Nej — mapparna monteras in |
 | `src/`, och vill se det i webbläsaren | Ja |
-| `prisma/schema.prisma` | Ja — **och skapa migration först** |
+| `prisma/schema.prisma` | Ja |
 | `package.json` | Ja |
 
 ```bash
 docker compose up -d --build
 ```
 
-**Vid ändrad datamodell** måste stegen tas i den här ordningen. Migrationen
-lägger till kolumnerna i databasen; ombyggnaden bakar in migrationsfilen och
-den Prisma-kod som genereras ur schemat.
+**Vid ändrad datamodell** räcker samma kommando. Databasen byggs om ur schemat
+vid uppstart, och det som ändrats töms — lägg tillbaka testdatan efteråt:
 
 ```bash
-./scripts/create-migration.sh <kort-namn-på-ändringen>
+docker compose run --rm migrate node prisma/seed.mjs
 ```
 
-```bash
-docker compose up -d --build
-```
+Det gäller under utvecklingen. Före produktion låses databasen fast med
+migrationer, se [docs/drift.md](docs/drift.md).
 
 ---
 
