@@ -184,9 +184,16 @@ Användaren kan **inte koda särskilt mycket själv**. Claude driver det teknisk
 ### Pris (beslutat 2026-08-11)
 
 **399 kr per aktiv stämplingsskärm och månad, exkl. moms.** Ingen grundavgift,
-inget tak på anställda, ordrar eller stämplingar. Bara månadsbetalning till att
-börja med — årsbetalning (tio månaders pris för tolv månader) läggs till först
-när en kund efterfrågar det.
+inget tak på anställda, ordrar eller stämplingar. **Ingen bindningstid.**
+
+**Årsbetalning: 3 990 kr per skärm och år** — tio månaders pris för tolv
+månader. Frivilligt alternativ, inte bindning: kunden väljer själv och får
+rabatten för att de betalar i förskott.
+
+Per anställd övervägdes och valdes bort (2026-08-11). Skälet: kostar varje
+anställd pengar får kunden ett skäl att inte lägga upp alla, och just den
+tiden blir oregistrerad — vilket är precis problemet systemet ska lösa. Per
+skärm hänger kostnaden på något fysiskt som ändå måste köpas in.
 
 Motiv: ett pris är en siffra att förklara, två är en prislista. Antalet skärmar
 följer kundens storlek av sig självt, eftersom folk annars köar vid den enda

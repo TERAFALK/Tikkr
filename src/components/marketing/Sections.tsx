@@ -410,7 +410,10 @@ export function Pricing() {
                 <span className="text-sm text-neutral-500">kr / månad</span>
               </p>
               <p className="mt-1 text-xs text-neutral-400">
-                exklusive moms, månadsvis
+                exklusive moms · ingen bindningstid
+              </p>
+              <p className="mt-3 inline-block rounded-md bg-emerald-50 px-3 py-1.5 text-xs font-medium text-emerald-700 ring-1 ring-inset ring-emerald-200">
+                Eller 3 990 kr per år — tio månaders pris för tolv
               </p>
             </div>
 

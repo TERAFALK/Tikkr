@@ -15,8 +15,15 @@ import Stripe from "stripe";
 
 let client: Stripe | null = null;
 
+export type BillingInterval = "month" | "year";
+
 export function isStripeConfigured(): boolean {
   return Boolean(process.env.STRIPE_SECRET_KEY && process.env.STRIPE_PRICE_ID);
+}
+
+/** true när årsbetalning går att välja. Saknas priset erbjuds bara månad. */
+export function yearlyAvailable(): boolean {
+  return Boolean(process.env.STRIPE_PRICE_ID_YEARLY);
 }
 
 export function stripe(): Stripe {
@@ -34,17 +41,29 @@ export function stripe(): Stripe {
   return client;
 }
 
-export function priceId(): string {
-  const id = process.env.STRIPE_PRICE_ID;
+export function priceId(interval: BillingInterval = "month"): string {
+  const id =
+    interval === "year"
+      ? process.env.STRIPE_PRICE_ID_YEARLY
+      : process.env.STRIPE_PRICE_ID;
 
   if (!id) {
     throw new StripeNotConfiguredError(
-      "STRIPE_PRICE_ID saknas. Betalningar är inte påkopplade."
+      interval === "year"
+        ? "STRIPE_PRICE_ID_YEARLY saknas. Årsbetalning är inte påkopplad."
+        : "STRIPE_PRICE_ID saknas. Betalningar är inte påkopplade."
     );
   }
 
   return id;
 }
+
+/** Vad kunden betalar per skärm, för att kunna visa summan innan kassan. */
+export const PRICE_PER_SCREEN = {
+  month: 399,
+  /** Tio månaders pris för tolv månader. */
+  year: 3990,
+} as const;
 
 export class StripeNotConfiguredError extends Error {
   constructor(message: string) {

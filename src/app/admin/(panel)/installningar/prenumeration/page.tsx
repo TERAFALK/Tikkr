@@ -1,7 +1,7 @@
 import { requireAdmin } from "@/lib/admin-session";
 import { unsafeGlobalPrisma } from "@/lib/db";
 import { getBillingOverview } from "@/lib/billing";
-import { isStripeConfigured } from "@/lib/stripe";
+import { isStripeConfigured, yearlyAvailable } from "@/lib/stripe";
 import { evaluateAccess } from "@/lib/subscription";
 import { Alert, Button, Card, CardHeader } from "@/components/ui";
 import { formatDate } from "@/lib/format";
@@ -36,9 +36,20 @@ export default async function SubscriptionPage({
   });
 
   const configured = isStripeConfigured();
+  const yearly = yearlyAvailable();
+
   const overview = configured
     ? await getBillingOverview(companyId)
-    : { screens: 0, monthlyAmount: 0, hasSubscription: false, currentPeriodEnd: null, cancelAtPeriodEnd: false };
+    : {
+        screens: 0,
+        monthlyAmount: 0,
+        yearlyAmount: 0,
+        yearlySaving: 0,
+        hasSubscription: false,
+        currentPeriodEnd: null,
+        cancelAtPeriodEnd: false,
+        interval: null,
+      };
 
   return (
     <div className="space-y-6">
@@ -63,8 +74,15 @@ export default async function SubscriptionPage({
               value={String(overview.screens)}
             />
             <Row
-              label="Kostnad per månad"
-              value={`${overview.monthlyAmount.toLocaleString("sv-SE")} kr`}
+              label={
+                overview.interval === "year"
+                  ? "Kostnad per år"
+                  : "Kostnad per månad"
+              }
+              value={`${(overview.interval === "year"
+                ? overview.yearlyAmount
+                : overview.monthlyAmount
+              ).toLocaleString("sv-SE")} kr`}
             />
             {company.trialEndsAt && company.subscriptionStatus === "TRIALING" && (
               <Row
@@ -103,11 +121,35 @@ export default async function SubscriptionPage({
               </p>
             </form>
           ) : (
-            <form action={startCheckout}>
-              <Button type="submit">Starta prenumeration</Button>
-              <p className="mt-2 text-xs text-neutral-500">
+            <form action={startCheckout} className="space-y-3">
+              <div className="flex flex-wrap gap-2">
+                <Button type="submit" name="interval" value="month">
+                  Betala månadsvis · {overview.monthlyAmount.toLocaleString("sv-SE")} kr/mån
+                </Button>
+
+                {yearly && (
+                  <Button
+                    type="submit"
+                    name="interval"
+                    value="year"
+                    tone="secondary"
+                  >
+                    Betala årsvis · {overview.yearlyAmount.toLocaleString("sv-SE")} kr/år
+                  </Button>
+                )}
+              </div>
+
+              {yearly && overview.screens > 0 && (
+                <p className="text-xs text-emerald-700">
+                  Årsbetalning motsvarar tio månaders pris för tolv månader —
+                  ni sparar {overview.yearlySaving.toLocaleString("sv-SE")} kr.
+                </p>
+              )}
+
+              <p className="text-xs text-neutral-500">
                 Ni skickas till Stripe för att fylla i kortuppgifter.
-                Kortnumret passerar aldrig Tikkr.
+                Kortnumret passerar aldrig Tikkr. Ingen bindningstid — säg upp
+                när ni vill.
               </p>
             </form>
           )}

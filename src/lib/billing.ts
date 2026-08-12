@@ -1,6 +1,11 @@
 import { unsafeGlobalPrisma } from "./db";
 import { forCompany } from "./tenant";
-import { priceId, stripe } from "./stripe";
+import {
+  priceId,
+  stripe,
+  PRICE_PER_SCREEN,
+  type BillingInterval,
+} from "./stripe";
 
 /**
  * PRENUMERATIONEN.
@@ -29,6 +34,7 @@ export async function createCheckoutSession(params: {
   companyName: string;
   email: string;
   baseUrl: string;
+  interval: BillingInterval;
 }): Promise<string> {
   const screens = Math.max(1, await countBillableScreens(params.companyId));
 
@@ -39,7 +45,7 @@ export async function createCheckoutSession(params: {
 
   const session = await stripe().checkout.sessions.create({
     mode: "subscription",
-    line_items: [{ price: priceId(), quantity: screens }],
+    line_items: [{ price: priceId(params.interval), quantity: screens }],
 
     // Finns kunden redan hos Stripe återanvänder vi den, så att en kund som
     // avslutat och kommer tillbaka inte blir två kunder med varsin historik.
@@ -141,9 +147,13 @@ export async function syncSubscriptionQuantity(companyId: string): Promise<void>
 export interface BillingOverview {
   screens: number;
   monthlyAmount: number;
+  yearlyAmount: number;
+  /** Vad kunden sparar på att betala ett år i förskott. */
+  yearlySaving: number;
   hasSubscription: boolean;
   currentPeriodEnd: Date | null;
   cancelAtPeriodEnd: boolean;
+  interval: BillingInterval | null;
 }
 
 /** Vad kunden ser på prenumerationssidan. */
@@ -159,10 +169,14 @@ export async function getBillingOverview(
 
   const overview: BillingOverview = {
     screens,
-    monthlyAmount: screens * 399,
+    monthlyAmount: screens * PRICE_PER_SCREEN.month,
+    yearlyAmount: screens * PRICE_PER_SCREEN.year,
+    yearlySaving:
+      screens * (PRICE_PER_SCREEN.month * 12 - PRICE_PER_SCREEN.year),
     hasSubscription: Boolean(company?.stripeSubscriptionId),
     currentPeriodEnd: null,
     cancelAtPeriodEnd: false,
+    interval: null,
   };
 
   if (!company?.stripeSubscriptionId) return overview;
@@ -186,6 +200,10 @@ export async function getBillingOverview(
 
     overview.currentPeriodEnd = periodEnd ? new Date(periodEnd * 1000) : null;
     overview.cancelAtPeriodEnd = subscription.cancel_at_period_end;
+    overview.interval =
+      subscription.items.data[0]?.price?.recurring?.interval === "year"
+        ? "year"
+        : "month";
   } catch (error) {
     // Sidan ska gå att öppna även när Stripe inte svarar.
     console.error("Kunde inte hämta prenumerationen från Stripe", error);

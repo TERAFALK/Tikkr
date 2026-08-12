@@ -18,7 +18,7 @@ async function baseUrl(): Promise<string> {
   return `${proto}://${host}`;
 }
 
-export async function startCheckout() {
+export async function startCheckout(formData: FormData) {
   const session = await requireAdmin();
 
   const url = await createCheckoutSession({
@@ -26,6 +26,7 @@ export async function startCheckout() {
     companyName: session.companyName,
     email: session.email,
     baseUrl: await baseUrl(),
+    interval: String(formData.get("interval")) === "year" ? "year" : "month",
   });
 
   redirect(url);
