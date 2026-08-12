@@ -1,8 +1,10 @@
+import Link from "next/link";
 import { headers } from "next/headers";
 import { requireAdmin } from "@/lib/admin-session";
 import NewDeviceForm from "@/components/admin/NewDeviceForm";
 import ConfirmButton from "@/components/admin/ConfirmButton";
 import {
+  Alert,
   Badge,
   Button,
   Card,
@@ -15,12 +17,14 @@ import {
   Tr,
 } from "@/components/ui";
 import { formatDateTime } from "@/lib/format";
+import { getLicenseState } from "@/lib/licenses";
 import { deleteDevice, toggleDevice } from "./actions";
 
 export const dynamic = "force-dynamic";
 
 export default async function DevicesPage() {
-  const { db } = await requireAdmin();
+  const { db, companyId } = await requireAdmin();
+  const licenses = await getLicenseState(companyId);
 
   const devices = await db.kioskDevice.findMany({
     orderBy: [{ active: "desc" }, { name: "asc" }],
@@ -45,15 +49,33 @@ export default async function DevicesPage() {
     <>
       <PageHeader
         title="Stämplingsskärmar"
-        description="Varje fysisk skärm kopplas en gång med en egen länk. Ingen inloggning behövs sedan."
-        action={<NewDeviceForm baseUrl={baseUrl} />}
+        description={`${licenses.used} av ${licenses.total} licenser används. Varje skärm kopplas en gång med en egen länk och behöver ingen inloggning sedan.`}
+        action={
+          <NewDeviceForm baseUrl={baseUrl} available={licenses.available} />
+        }
       />
+
+      {licenses.available === 0 && (
+        <Alert tone="warning">
+          Alla {licenses.total} licenser används. Vill ni ha fler skärmar ökar
+          ni antalet under{" "}
+          <Link
+            href="/admin/installningar/prenumeration"
+            className="font-medium underline"
+          >
+            Inställningar → Prenumeration
+          </Link>
+          , eller återkallar en skärm ni inte längre använder.
+        </Alert>
+      )}
 
       {devices.length === 0 ? (
         <EmptyState
           title="Inga skärmar upplagda"
           description="Skapa en skärm och öppna dess kopplingslänk på surfplattan eller datorn som ska stå i verkstaden."
-          action={<NewDeviceForm baseUrl={baseUrl} />}
+          action={
+          <NewDeviceForm baseUrl={baseUrl} available={licenses.available} />
+        }
         />
       ) : (
         <Card>

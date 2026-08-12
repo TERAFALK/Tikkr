@@ -1,9 +1,15 @@
 import { requireAdmin } from "@/lib/admin-session";
 import { unsafeGlobalPrisma } from "@/lib/db";
 import { getBillingOverview } from "@/lib/billing";
-import { isStripeConfigured, yearlyAvailable } from "@/lib/stripe";
+import {
+  isStripeConfigured,
+  yearlyAvailable,
+  PRICE_PER_SCREEN,
+} from "@/lib/stripe";
 import { evaluateAccess } from "@/lib/subscription";
-import { Alert, Button, Card, CardHeader } from "@/components/ui";
+import { TRIAL_LICENSES } from "@/lib/licenses";
+import LicenseForm from "@/components/admin/LicenseForm";
+import { Alert, Button, Card, CardHeader, Field, Input } from "@/components/ui";
 import { formatDate } from "@/lib/format";
 import { openBillingPortal, startCheckout } from "./actions";
 
@@ -42,6 +48,7 @@ export default async function SubscriptionPage({
     ? await getBillingOverview(companyId)
     : {
         screens: 0,
+        used: 0,
         monthlyAmount: 0,
         yearlyAmount: 0,
         yearlySaving: 0,
@@ -70,8 +77,12 @@ export default async function SubscriptionPage({
           <dl className="divide-y divide-neutral-100 text-[13px]">
             <Row label="Status" value={statusText(company.subscriptionStatus)} />
             <Row
-              label="Aktiva skärmar"
-              value={String(overview.screens)}
+              label="Licenser"
+              value={`${overview.screens} skärmar`}
+            />
+            <Row
+              label="Använda just nu"
+              value={`${overview.used} av ${overview.screens}`}
             />
             <Row
               label={
@@ -114,17 +125,48 @@ export default async function SubscriptionPage({
               ordnar vi prenumerationen manuellt under tiden.
             </Alert>
           ) : overview.hasSubscription ? (
-            <form action={openBillingPortal}>
-              <Button type="submit">Hantera betalning och fakturor</Button>
-              <p className="mt-2 text-xs text-neutral-500">
-                Byt kort, se kvitton eller säg upp. Sköts hos Stripe.
-              </p>
-            </form>
+            <div className="space-y-6">
+              <LicenseForm
+                current={overview.screens}
+                used={overview.used}
+                pricePerScreen={
+                  overview.interval === "year"
+                    ? PRICE_PER_SCREEN.year
+                    : PRICE_PER_SCREEN.month
+                }
+                interval={overview.interval ?? "month"}
+              />
+
+              <form action={openBillingPortal} className="border-t border-neutral-100 pt-5">
+                <Button type="submit" tone="secondary">
+                  Hantera betalning och fakturor
+                </Button>
+                <p className="mt-2 text-xs text-neutral-500">
+                  Byt kort, se kvitton eller säg upp. Sköts hos Stripe.
+                </p>
+              </form>
+            </div>
           ) : (
-            <form action={startCheckout} className="space-y-3">
+            <form action={startCheckout} className="space-y-4">
+              <div className="w-40">
+                <Field
+                  label="Hur många skärmar?"
+                  hint="Så många kan ni koppla. Antalet går att ändra sedan."
+                >
+                  <Input
+                    type="number"
+                    name="screens"
+                    min={Math.max(1, overview.used)}
+                    max={100}
+                    defaultValue={Math.max(1, overview.used)}
+                    required
+                  />
+                </Field>
+              </div>
+
               <div className="flex flex-wrap gap-2">
                 <Button type="submit" name="interval" value="month">
-                  Betala månadsvis · {overview.monthlyAmount.toLocaleString("sv-SE")} kr/mån
+                  Betala månadsvis · {PRICE_PER_SCREEN.month} kr per skärm
                 </Button>
 
                 {yearly && (
@@ -134,15 +176,14 @@ export default async function SubscriptionPage({
                     value="year"
                     tone="secondary"
                   >
-                    Betala årsvis · {overview.yearlyAmount.toLocaleString("sv-SE")} kr/år
+                    Betala årsvis · {PRICE_PER_SCREEN.year.toLocaleString("sv-SE")} kr per skärm
                   </Button>
                 )}
               </div>
 
-              {yearly && overview.screens > 0 && (
+              {yearly && (
                 <p className="text-xs text-emerald-700">
-                  Årsbetalning motsvarar tio månaders pris för tolv månader —
-                  ni sparar {overview.yearlySaving.toLocaleString("sv-SE")} kr.
+                  Årsbetalning motsvarar tio månaders pris för tolv månader.
                 </p>
               )}
 
@@ -160,13 +201,18 @@ export default async function SubscriptionPage({
         <CardHeader title="Så räknas priset" />
         <div className="space-y-2 p-5 text-[13px] leading-relaxed text-neutral-600">
           <p>
-            Ni betalar per <strong>aktiv</strong> stämplingsskärm. Antalet
-            anställda, ordrar och stämplingar spelar ingen roll, och det finns
-            ingen grundavgift.
+            Ni betalar för ett antal <strong>licenser</strong>, och kan koppla
+            lika många stämplingsskärmar. Antalet anställda, ordrar och
+            stämplingar spelar ingen roll, och det finns ingen grundavgift.
           </p>
           <p>
-            Lägger ni till en skärm mitt i månaden betalar ni bara för de dagar
-            som återstår. Återkallar ni en skärm minskar beloppet på samma sätt.
+            Under provperioden ingår {TRIAL_LICENSES} licenser. Behöver ni
+            fler ökar ni antalet här — kostnaden växer aldrig av sig själv för
+            att någon lagt upp en skärm till.
+          </p>
+          <p>
+            Ökar ni mitt i perioden räknar Stripe av de dagar som återstår, så
+            ni betalar bara för den tid ni faktiskt har skärmen.
           </p>
           <p>
             <strong>Stämplingen slutar aldrig fungera</strong>, oavsett

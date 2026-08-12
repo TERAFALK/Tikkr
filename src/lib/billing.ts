@@ -1,5 +1,9 @@
 import { unsafeGlobalPrisma } from "./db";
-import { forCompany } from "./tenant";
+import {
+  assertLicenseCountAllowed,
+  getLicenseState,
+  setLicenseCount,
+} from "./licenses";
 import {
   priceId,
   stripe,
@@ -16,9 +20,16 @@ import {
  * missar att ta betalt för nya.
  */
 
-/** Vad kunden betalar för: skärmar som faktiskt går att stämpla på. */
-export async function countBillableScreens(companyId: string): Promise<number> {
-  return forCompany(companyId).kioskDevice.count({ where: { active: true } });
+/**
+ * Vad kunden betalar för: antalet licenser de valt.
+ *
+ * Inte antalet skapade skärmar. Kostnaden ska aldrig växa av sig själv för att
+ * någon lagt upp en skärm till — kunden bestämmer antalet, och skapar sedan
+ * skärmar inom det.
+ */
+export async function billedScreens(companyId: string): Promise<number> {
+  const state = await getLicenseState(companyId);
+  return state.total;
 }
 
 /**
@@ -35,8 +46,9 @@ export async function createCheckoutSession(params: {
   email: string;
   baseUrl: string;
   interval: BillingInterval;
+  screens: number;
 }): Promise<string> {
-  const screens = Math.max(1, await countBillableScreens(params.companyId));
+  const screens = Math.max(1, Math.min(100, Math.floor(params.screens)));
 
   const company = await unsafeGlobalPrisma.company.findUnique({
     where: { id: params.companyId },
@@ -45,7 +57,15 @@ export async function createCheckoutSession(params: {
 
   const session = await stripe().checkout.sessions.create({
     mode: "subscription",
-    line_items: [{ price: priceId(params.interval), quantity: screens }],
+    line_items: [
+      {
+        price: priceId(params.interval),
+        quantity: screens,
+        // Kunden kan justera antalet i kassan också. Den som ändrar sig i
+        // sista stund ska inte behöva backa ut och börja om.
+        adjustable_quantity: { enabled: true, minimum: 1, maximum: 100 },
+      },
+    ],
 
     // Finns kunden redan hos Stripe återanvänder vi den, så att en kund som
     // avslutat och kommer tillbaka inte blir två kunder med varsin historik.
@@ -105,47 +125,55 @@ export async function createPortalSession(params: {
 }
 
 /**
- * Håller antalet betalda skärmar i takt med antalet aktiva.
+ * Ändrar antalet licenser.
  *
- * Anropas när en skärm läggs till, återkallas eller raderas. Stripe räknar
- * själv av resterande dagar, så en skärm som läggs till den femtonde kostar
- * halva månaden — inte en hel, och inte noll.
+ * Finns en prenumeration ändras kvantiteten hos Stripe, som räknar av
+ * resterande dagar — en skärm som läggs till den femtonde kostar halva
+ * månaden, inte en hel och inte noll.
  *
- * Fel här får aldrig stoppa det kunden höll på med. Att inte kunna lägga till
- * en skärm för att Stripe har en dålig dag vore mycket värre än att
- * kvantiteten är fel i några minuter.
+ * Utan prenumeration går antalet inte att ändra. Under provperioden ingår två,
+ * och fler får man genom att börja betala.
  */
-export async function syncSubscriptionQuantity(companyId: string): Promise<void> {
+export async function changeLicenseCount(
+  companyId: string,
+  next: number
+): Promise<void> {
+  await assertLicenseCountAllowed(companyId, next);
+
   const company = await unsafeGlobalPrisma.company.findUnique({
     where: { id: companyId },
     select: { stripeSubscriptionId: true },
   });
 
-  if (!company?.stripeSubscriptionId) return;
-
-  try {
-    const screens = await countBillableScreens(companyId);
-    const subscription = await stripe().subscriptions.retrieve(
-      company.stripeSubscriptionId
-    );
-
-    const item = subscription.items.data[0];
-    if (!item || item.quantity === screens) return;
-
-    await stripe().subscriptions.update(company.stripeSubscriptionId, {
-      items: [{ id: item.id, quantity: Math.max(1, screens) }],
-      proration_behavior: "create_prorations",
-    });
-  } catch (error) {
-    console.error(
-      `Kunde inte uppdatera antalet skärmar hos Stripe för ${companyId}`,
-      error
+  if (!company?.stripeSubscriptionId) {
+    throw new Error(
+      "Antalet licenser går att ändra först när prenumerationen är igång."
     );
   }
+
+  const subscription = await stripe().subscriptions.retrieve(
+    company.stripeSubscriptionId
+  );
+
+  const item = subscription.items.data[0];
+  if (!item) throw new Error("Prenumerationen saknar rad hos Stripe.");
+
+  await stripe().subscriptions.update(company.stripeSubscriptionId, {
+    items: [{ id: item.id, quantity: next }],
+    proration_behavior: "create_prorations",
+  });
+
+  // Sätts direkt så att kunden kan skapa skärmen på en gång. Webhooken
+  // bekräftar samma värde strax efter — hade vi väntat på den skulle knappen
+  // se ut att inte ha gjort något.
+  await setLicenseCount(companyId, next);
 }
 
 export interface BillingOverview {
+  /** Antal licenser, alltså vad kunden betalar för. */
   screens: number;
+  /** Antal aktiva skärmar av dessa. */
+  used: number;
   monthlyAmount: number;
   yearlyAmount: number;
   /** Vad kunden sparar på att betala ett år i förskott. */
@@ -160,7 +188,8 @@ export interface BillingOverview {
 export async function getBillingOverview(
   companyId: string
 ): Promise<BillingOverview> {
-  const screens = await countBillableScreens(companyId);
+  const licenses = await getLicenseState(companyId);
+  const screens = licenses.total;
 
   const company = await unsafeGlobalPrisma.company.findUnique({
     where: { id: companyId },
@@ -169,6 +198,7 @@ export async function getBillingOverview(
 
   const overview: BillingOverview = {
     screens,
+    used: licenses.used,
     monthlyAmount: screens * PRICE_PER_SCREEN.month,
     yearlyAmount: screens * PRICE_PER_SCREEN.year,
     yearlySaving:

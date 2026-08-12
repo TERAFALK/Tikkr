@@ -58,6 +58,14 @@ model Company {
   /// panelen i samma sekund som ett kort råkar gå ut.
   pastDueSince DateTime? @map("past_due_since")
 
+  /// Hur många stämplingsskärmar företaget får ha aktiva samtidigt.
+  ///
+  /// Under provperioden två stycken, vilket räcker för att prova på riktigt.
+  /// Vid köp väljer kunden antal, och det antalet blir kvantiteten på
+  /// prenumerationen. Vill de ha fler ökar de licenserna, vilket ändrar
+  /// fakturan — så att kostnaden aldrig växer utan att någon bestämt det.
+  screenLicenses Int @default(2) @map("screen_licenses")
+
   /// Kopplingen till Stripe. Kunden hos oss och kunden hos Stripe är samma
   /// företag, men har olika id — de här raderna binder ihop dem.
   ///

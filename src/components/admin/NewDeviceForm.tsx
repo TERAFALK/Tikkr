@@ -11,14 +11,29 @@ import { Alert, Button, Field, Input } from "@/components/ui";
  * Länken går inte att ta fram igen — bara ett fingeravtryck av den sparas —
  * så stängdes rutan direkt vore skärmen omöjlig att koppla.
  */
-export default function NewDeviceForm({ baseUrl }: { baseUrl: string }) {
+export default function NewDeviceForm({
+  baseUrl,
+  available,
+}: {
+  baseUrl: string;
+  /** Lediga licenser. Är den noll går ingen skärm att skapa. */
+  available: number;
+}) {
   const dialog = useRef<HTMLDialogElement>(null);
   const [link, setLink] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
 
   async function handle(formData: FormData) {
     const result = await addDevice(formData);
+
+    if (result?.error) {
+      setError(result.error);
+      return;
+    }
+
     if (result?.token) {
+      setError(null);
       setLink(`${baseUrl}/kiosk/koppla/${result.token}`);
       setCopied(false);
     }
@@ -26,14 +41,15 @@ export default function NewDeviceForm({ baseUrl }: { baseUrl: string }) {
 
   function open() {
     setLink(null);
+    setError(null);
     setCopied(false);
     dialog.current?.showModal();
   }
 
   return (
     <>
-      <Button type="button" onClick={open}>
-        Ny skärm
+      <Button type="button" onClick={open} disabled={available <= 0}>
+        {available > 0 ? "Ny skärm" : "Inga lediga licenser"}
       </Button>
 
       <dialog
@@ -84,8 +100,13 @@ export default function NewDeviceForm({ baseUrl }: { baseUrl: string }) {
           </div>
         ) : (
           <form action={handle}>
-            <div className="px-5 py-5">
-              <Field label="Namn">
+            <div className="space-y-4 px-5 py-5">
+              {error && <Alert>{error}</Alert>}
+
+              <Field
+                label="Namn"
+                hint={`${available} av era licenser är lediga.`}
+              >
                 <Input
                   name="name"
                   placeholder="Verkstaden, entrén, monteringen…"
