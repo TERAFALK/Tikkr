@@ -167,7 +167,7 @@ export default async function SubscriptionPage({
               <div className="w-40">
                 <Field
                   label="Antal licenser"
-                  hint="En licens ger en stämplingsskärm. Antalet kan ändras i efterhand."
+                  hint="En licens ger en stämplingsskärm."
                 >
                   <Input
                     type="number"
