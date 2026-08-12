@@ -49,7 +49,7 @@ export default function NewDeviceForm({
   return (
     <>
       <Button type="button" onClick={open} disabled={available <= 0}>
-        {available > 0 ? "Ny skärm" : "Inga lediga licenser"}
+        {available > 0 ? "Ny skärm" : "Alla skärmar kopplade"}
       </Button>
 
       <dialog
@@ -105,7 +105,11 @@ export default function NewDeviceForm({
 
               <Field
                 label="Namn"
-                hint={`${available} lediga licenser.`}
+                hint={
+                  available === 1
+                    ? "Utrymme för en skärm till."
+                    : `Utrymme för ${available} skärmar till.`
+                }
               >
                 <Input
                   name="name"

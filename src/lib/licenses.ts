@@ -61,9 +61,9 @@ export async function assertLicenseAvailable(companyId: string): Promise<void> {
   if (state.available > 0) return;
 
   throw new LicenseError(
-    `Alla ${state.total} licenser är använda. Öka antalet under ` +
-      `Inställningar → Prenumeration, eller återkalla en skärm ni inte ` +
-      `längre använder.`
+    `Prenumerationen omfattar ${state.total} skärmar och samtliga är ` +
+      `kopplade. Utöka antalet under Inställningar → Prenumeration, eller ` +
+      `återkalla en skärm ni inte längre använder.`
   );
 }
 

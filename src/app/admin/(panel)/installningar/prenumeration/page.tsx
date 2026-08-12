@@ -1,11 +1,7 @@
 import { requireAdmin } from "@/lib/admin-session";
 import { unsafeGlobalPrisma } from "@/lib/db";
 import { getBillingOverview } from "@/lib/billing";
-import {
-  getScreenPricing,
-  isStripeConfigured,
-  yearlyAvailable,
-} from "@/lib/stripe";
+import { isStripeConfigured, yearlyAvailable } from "@/lib/stripe";
 import { evaluateAccess } from "@/lib/subscription";
 import { TRIAL_LICENSES } from "@/lib/licenses";
 import LicenseForm from "@/components/admin/LicenseForm";
@@ -44,23 +40,17 @@ export default async function SubscriptionPage({
   const configured = isStripeConfigured();
   const yearly = yearlyAvailable();
 
-  const overview = configured
-    ? await getBillingOverview(companyId)
-    : {
-        screens: 0,
-        used: 0,
-        monthlyAmount: 0,
-        yearlyAmount: null,
-        yearlySaving: null,
-        hasSubscription: false,
-        currentPeriodEnd: null,
-        cancelAtPeriodEnd: false,
-        interval: null,
-        pricing: await getScreenPricing(),
-      };
+  // Hämtas alltid, även utan kortbetalning. Antalet skärmar och priset finns i
+  // vår egen databas respektive i reservpriserna — tidigare visades noll
+  // skärmar i den miljön, vilket var direkt fel.
+  const overview = await getBillingOverview(companyId);
 
   const { pricing } = overview;
   const kr = (amount: number) => amount.toLocaleString("sv-SE");
+
+  // Avgifter visas bara när det faktiskt finns en avgift. Under provperioden
+  // betalar kunden ingenting, och då ska ingen summa stå någonstans.
+  const paying = overview.hasSubscription;
 
   return (
     <div className="space-y-6">
@@ -73,7 +63,7 @@ export default async function SubscriptionPage({
 
       {params.uppdaterad === "1" && (
         <Alert tone="info">
-          Ändringen är godkänd. Antalet licenser uppdateras inom kort — ladda om
+          Ändringen är godkänd. Antalet skärmar uppdateras inom kort — ladda om
           sidan om det inte ändrats.
         </Alert>
       )}
@@ -87,39 +77,41 @@ export default async function SubscriptionPage({
         <div className="space-y-5 p-5">
           <dl className="divide-y divide-neutral-100 text-[13px]">
             <Row label="Status" value={statusText(company.subscriptionStatus)} />
-            <Row
-              label="Licenser"
-              value={`${overview.screens} skärmar`}
-            />
-            <Row
-              label="Använda just nu"
-              value={`${overview.used} av ${overview.screens}`}
-            />
+
             <Row
               label={
-                overview.interval === "year"
-                  ? "Kostnad per år"
-                  : "Kostnad per månad"
+                paying ? "Skärmar i prenumerationen" : "Skärmar i provperioden"
               }
-              value={`${kr(
-                overview.interval === "year"
-                  ? (overview.yearlyAmount ?? 0)
-                  : overview.monthlyAmount
-              )} kr`}
+              value={String(overview.screens)}
             />
+
+            <Row label="Kopplade skärmar" value={String(overview.used)} />
+
+            {/* Ingen avgift visas under provperioden. En kostnad i en tabell
+                läses som något som ska betalas, och det ska den inte. */}
+            {paying && (
+              <Row
+                label={
+                  overview.interval === "year" ? "Avgift per år" : "Avgift per månad"
+                }
+                value={`${kr(
+                  overview.interval === "year"
+                    ? (overview.yearlyAmount ?? 0)
+                    : overview.monthlyAmount
+                )} kr`}
+              />
+            )}
+
             {company.trialEndsAt && company.subscriptionStatus === "TRIALING" && (
               <Row
-                label="Provperioden går ut"
+                label="Provperioden avslutas"
                 value={formatDate(company.trialEndsAt)}
               />
             )}
+
             {overview.currentPeriodEnd && (
               <Row
-                label={
-                  overview.cancelAtPeriodEnd
-                    ? "Avslutas"
-                    : "Nästa betalning"
-                }
+                label={overview.cancelAtPeriodEnd ? "Avslutas" : "Nästa betalning"}
                 value={formatDate(overview.currentPeriodEnd)}
               />
             )}
@@ -136,10 +128,10 @@ export default async function SubscriptionPage({
               bort är kundens beslut, inte vårt. */}
           {overview.used > overview.screens && (
             <Alert tone="warning">
-              Ni har {overview.used} aktiva skärmar men betalar för{" "}
+              {overview.used} skärmar är kopplade, men prenumerationen omfattar{" "}
               {overview.screens}. Återkalla de skärmar ni inte längre använder
-              under Stämplingsskärmar, eller utöka antalet licenser igen.
-              Skärmarna fortsätter fungera under tiden.
+              under Stämplingsskärmar, eller utöka antalet igen. Skärmarna
+              fortsätter fungera under tiden.
             </Alert>
           )}
 
@@ -176,7 +168,7 @@ export default async function SubscriptionPage({
               <div className="w-40">
                 <Field
                   label="Antal skärmar"
-                  hint="Antalet licenser, och därmed antalet skärmar som kan kopplas. Kan ändras i efterhand."
+                  hint="Så många stämplingsskärmar får kopplas. Kan ändras i efterhand."
                 >
                   <Input
                     type="number"
@@ -224,22 +216,18 @@ export default async function SubscriptionPage({
         <CardHeader title="Så räknas priset" />
         <div className="space-y-2 p-5 text-[13px] leading-relaxed text-neutral-600">
           <p>
-            Priset avser antalet licenser. Varje licens ger rätt att koppla en
-            stämplingsskärm. Antalet anställda, ordrar och stämplingar påverkar
-            inte priset, och ingen grundavgift tillkommer.
+            Avgiften avser antalet stämplingsskärmar. Antalet anställda, ordrar
+            och stämplingar påverkar inte priset, och ingen grundavgift
+            tillkommer. Under provperioden ingår {TRIAL_LICENSES} skärmar.
           </p>
           <p>
-            Under provperioden ingår {TRIAL_LICENSES} licenser. Antalet licenser
-            ändras endast av er, aldrig automatiskt.
+            Antalet ändras endast av er, aldrig automatiskt. Vid utökning under
+            pågående period debiteras enbart återstående dagar av perioden.
           </p>
           <p>
-            Vid utökning under pågående period debiteras endast återstående
-            dagar av perioden.
-          </p>
-          <p>
-            Stämplingsskärmarna påverkas inte av betalningsläget. Vid utebliven
-            betalning låses rapporter och export, medan tidregistreringen
-            fortsätter som vanligt.
+            Skärmarna påverkas inte av betalningsläget. Vid utebliven betalning
+            låses rapporter och export, medan tidregistreringen fortsätter som
+            vanligt.
           </p>
         </div>
       </Card>

@@ -49,7 +49,7 @@ export default async function DevicesPage() {
     <>
       <PageHeader
         title="Stämplingsskärmar"
-        description={`${licenses.used} av ${licenses.total} licenser används. Varje skärm kopplas en gång med en egen länk och behöver ingen inloggning sedan.`}
+        description={`${licenses.used} av ${licenses.total} skärmar i prenumerationen är kopplade. Varje skärm kopplas en gång med en egen länk och kräver därefter ingen inloggning.`}
         action={
           <NewDeviceForm baseUrl={baseUrl} available={licenses.available} />
         }
@@ -60,10 +60,10 @@ export default async function DevicesPage() {
           får själv peka ut vilken skärm som ska bort. */}
       {licenses.used > licenses.total ? (
         <Alert tone="warning">
-          Ni har {licenses.used} aktiva skärmar men betalar för{" "}
+          {licenses.used} skärmar är kopplade, men prenumerationen omfattar{" "}
           {licenses.total}. Återkalla {licenses.used - licenses.total}{" "}
           {licenses.used - licenses.total === 1 ? "skärm" : "skärmar"} nedan,
-          eller utöka antalet licenser under{" "}
+          eller utöka antalet under{" "}
           <Link
             href="/admin/installningar/prenumeration"
             className="font-medium underline"
@@ -75,15 +75,15 @@ export default async function DevicesPage() {
       ) : (
         licenses.available === 0 && (
           <Alert tone="warning">
-            Samtliga {licenses.total} licenser är i bruk. Antalet licenser
-            utökas under{" "}
+            Samtliga {licenses.total} skärmar i prenumerationen är kopplade.
+            Antalet utökas under{" "}
             <Link
               href="/admin/installningar/prenumeration"
               className="font-medium underline"
             >
               Inställningar → Prenumeration
             </Link>
-            , eller återkallar en skärm ni inte längre använder.
+            , alternativt återkallas en skärm som inte längre används.
           </Alert>
         )
       )}

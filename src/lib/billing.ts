@@ -153,9 +153,15 @@ export async function openLicenseUpdate(params: {
     );
   }
 
+  // Saknas en egen konfiguration används kontots standardportal. Den duger så
+  // länge kvantitetsändring är påslagen där, och ett fel i vår konfiguration
+  // ska inte vara skillnaden mellan att kunden kan köpa en skärm till eller
+  // inte.
+  const configuration = await licenseUpdateConfiguration();
+
   const session = await stripe().billingPortal.sessions.create({
     customer: company.stripeCustomerId,
-    configuration: await licenseUpdateConfiguration(),
+    ...(configuration && { configuration }),
     return_url: `${params.baseUrl}/admin/installningar/prenumeration`,
 
     flow_data: {
@@ -184,30 +190,77 @@ export async function openLicenseUpdate(params: {
  * Den vanliga kundportalen (kort, kvitton, uppsägning) rörs inte: den använder
  * fortfarande Stripes standardkonfiguration.
  */
+const CONFIGURATION_MARKER = "tikkr-license-update";
 let licenseConfigurationId: string | null = null;
 
-async function licenseUpdateConfiguration(): Promise<string> {
+async function licenseUpdateConfiguration(): Promise<string | null> {
   const fromEnv = process.env.STRIPE_PORTAL_CONFIGURATION_ID;
   if (fromEnv) return fromEnv;
 
   if (licenseConfigurationId) return licenseConfigurationId;
 
-  const marker = "tikkr-license-update";
+  try {
+    // Letar upp en tidigare skapad först. Appen startas om vid varje deploy,
+    // och en ny konfiguration per omstart skulle fylla Stripe-kontot med
+    // dubbletter.
+    const existing = await stripe().billingPortal.configurations.list({
+      active: true,
+      limit: 100,
+    });
 
-  // Letar upp en tidigare skapad först. Appen startas om vid varje deploy, och
-  // en ny konfiguration per omstart skulle fylla Stripe-kontot med dubbletter.
-  const existing = await stripe().billingPortal.configurations.list({
-    active: true,
-    limit: 100,
-  });
+    const found = existing.data.find(
+      (item) => item.metadata?.tikkr === CONFIGURATION_MARKER
+    );
 
-  const found = existing.data.find((item) => item.metadata?.tikkr === marker);
-  if (found) {
-    licenseConfigurationId = found.id;
-    return found.id;
+    if (found) {
+      licenseConfigurationId = found.id;
+      return found.id;
+    }
+
+    const created = await stripe().billingPortal.configurations.create({
+      metadata: { tikkr: CONFIGURATION_MARKER },
+      business_profile: { headline: "Antal stämplingsskärmar" },
+
+      features: {
+        subscription_update: {
+          enabled: true,
+          default_allowed_updates: ["quantity"],
+
+          // Samma avräkning som tidigare: en skärm som läggs till mitt i
+          // perioden kostar resterande dagar, varken en hel period eller noll.
+          proration_behavior: "create_prorations",
+          products: await updatableProducts(),
+        },
+
+        // Allt annat stängs av. Konfigurationen används enbart för att ändra
+        // antalet — kort, kvitton och uppsägning ligger kvar i den vanliga
+        // portalen.
+        invoice_history: { enabled: false },
+        payment_method_update: { enabled: false },
+        customer_update: { enabled: false },
+        subscription_cancel: { enabled: false },
+      },
+    });
+
+    licenseConfigurationId = created.id;
+    return created.id;
+  } catch (error) {
+    // Vanligaste orsaken i skarpt läge: Stripe kräver att kundportalens
+    // villkors- och integritetslänkar är ifyllda innan en konfiguration får
+    // skapas. Vi ger inte upp för det — kontots standardportal används i
+    // stället, och fungerar så länge kvantitetsändring är påslagen där.
+    console.error(
+      "Kunde inte skapa portalkonfiguration hos Stripe, använder kontots " +
+        "standardkonfiguration i stället",
+      error
+    );
+
+    return null;
   }
+}
 
-  // Priserna hör oftast till samma produkt, men behöver inte göra det.
+/** Artiklarna kunden får ändra antal på. Priserna kan ligga på samma produkt. */
+async function updatableProducts() {
   const byProduct = new Map<string, string[]>();
 
   for (const id of [
@@ -221,58 +274,7 @@ async function licenseUpdateConfiguration(): Promise<string> {
     byProduct.set(product, [...(byProduct.get(product) ?? []), id]);
   }
 
-  const created = await createConfiguration(byProduct, marker);
-
-  licenseConfigurationId = created.id;
-  return created.id;
-}
-
-async function createConfiguration(
-  byProduct: Map<string, string[]>,
-  marker: string
-) {
-  try {
-    return await stripe().billingPortal.configurations.create({
-      metadata: { tikkr: marker },
-      business_profile: { headline: "Tikkr — antal stämplingsskärmar" },
-
-      features: {
-        subscription_update: {
-          enabled: true,
-          default_allowed_updates: ["quantity"],
-
-          // Samma avräkning som tidigare: en skärm som läggs till mitt i
-          // perioden kostar resterande dagar, varken en hel period eller noll.
-          proration_behavior: "create_prorations",
-
-          products: [...byProduct].map(([product, prices]) => ({
-            product,
-            prices,
-          })),
-        },
-
-        // Allt annat stängs av. Konfigurationen används enbart för att
-        // bekräfta ett ändrat antal — kort, kvitton och uppsägning ligger kvar
-        // i den vanliga portalen.
-        invoice_history: { enabled: false },
-        payment_method_update: { enabled: false },
-        customer_update: { enabled: false },
-        subscription_cancel: { enabled: false },
-      },
-    });
-  } catch (error) {
-    // I skarpt läge kräver Stripe att kundportalens villkors- och
-    // integritetslänkar är ifyllda innan en konfiguration får skapas. Utan den
-    // upplysningen ser felet ut att komma från oss.
-    console.error("Kunde inte skapa portalkonfiguration hos Stripe", error);
-
-    throw new Error(
-      "Stripe kunde inte skapa kundportalens konfiguration. Kontrollera att " +
-        "villkors- och integritetslänk är ifyllda under Inställningar → " +
-        "Kundportal i Stripe, eller ange en befintlig konfiguration i " +
-        "STRIPE_PORTAL_CONFIGURATION_ID."
-    );
-  }
+  return [...byProduct].map(([product, prices]) => ({ product, prices }));
 }
 
 export interface BillingOverview {

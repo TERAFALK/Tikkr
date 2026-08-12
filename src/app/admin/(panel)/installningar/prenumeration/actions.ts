@@ -61,7 +61,14 @@ export async function changeLicenses(
       baseUrl: await baseUrl(),
     });
   } catch (error) {
-    console.error("Kunde inte öppna betaltjänstens sida för licenser", error);
+    // Felet skrivs ut i klartext och med ett sökbart prefix. Det som går fel
+    // här är nästan alltid en inställning hos betaltjänsten, och då behöver
+    // den som sköter driften kunna läsa orsaken utan att gissa.
+    console.error(
+      "[licensändring] Kunde inte öppna betaltjänstens sida:",
+      error instanceof Error ? error.message : error
+    );
+
     return {
       error:
         "Sidan för att ändra antalet kunde inte öppnas. Försök igen, eller kontakta support@tikkr.se om felet kvarstår.",

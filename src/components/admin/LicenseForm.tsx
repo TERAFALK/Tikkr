@@ -44,10 +44,8 @@ export default function LicenseForm({
       <div className="rounded-md border border-neutral-200 bg-neutral-50 px-4 py-3">
         <dl className="space-y-1.5 text-[13px]">
           <div className="flex items-center justify-between">
-            <dt className="text-neutral-500">Licenser</dt>
-            <dd className="tabular-nums text-neutral-900">
-              {current} {current === 1 ? "skärm" : "skärmar"}
-            </dd>
+            <dt className="text-neutral-500">Skärmar i prenumerationen</dt>
+            <dd className="tabular-nums text-neutral-900">{current}</dd>
           </div>
           <div className="flex items-center justify-between">
             <dt className="text-neutral-500">Avgift</dt>
@@ -68,9 +66,11 @@ export default function LicenseForm({
         {used > 0 && (
           <>
             {" "}
-            Ni har {used} aktiva {used === 1 ? "skärm" : "skärmar"}. Sänks
-            antalet under det behöver skärmar återkallas här i panelen —
-            stämplingen fortsätter fungera under tiden.
+            {used === 1
+              ? "En skärm är kopplad."
+              : `${used} skärmar är kopplade.`}{" "}
+            Sänks antalet under det behöver skärmar återkallas under
+            Stämplingsskärmar — stämplingen fortsätter fungera under tiden.
           </>
         )}
       </p>
