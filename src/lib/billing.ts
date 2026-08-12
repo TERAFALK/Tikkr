@@ -172,7 +172,18 @@ export async function getBillingOverview(
       company.stripeSubscriptionId
     );
 
-    const periodEnd = subscription.items.data[0]?.current_period_end;
+    // Slutdatumet för perioden ligger på olika ställen i olika versioner av
+    // Stripes API: på prenumerationen i äldre, på raden i nyare. Vi läser
+    // båda och tar det som finns, istället för att låsa oss vid en version
+    // som ändras under fötterna på oss.
+    const shape = subscription as unknown as {
+      current_period_end?: number;
+      items?: { data?: Array<{ current_period_end?: number }> };
+    };
+
+    const periodEnd =
+      shape.current_period_end ?? shape.items?.data?.[0]?.current_period_end;
+
     overview.currentPeriodEnd = periodEnd ? new Date(periodEnd * 1000) : null;
     overview.cancelAtPeriodEnd = subscription.cancel_at_period_end;
   } catch (error) {
