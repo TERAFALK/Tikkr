@@ -2,7 +2,6 @@ import { describe, it, expect, beforeEach, afterEach, afterAll } from "vitest";
 import { unsafeGlobalPrisma } from "@/lib/db";
 import {
   assertLicenseAvailable,
-  assertLicenseCountAllowed,
   getLicenseState,
   setLicenseCount,
   LicenseError,
@@ -12,8 +11,9 @@ import {
 /**
  * Licenser för stämplingsskärmar.
  *
- * Regeln som skyddar kunden: kostnaden växer aldrig av sig själv. Regeln som
- * skyddar oss: ingen kan skapa fler skärmar än de betalar för.
+ * Regeln som skyddar kunden: antalet ändras bara när de själva ändrar det hos
+ * Stripe, och en sänkning stänger aldrig en skärm. Regeln som skyddar oss:
+ * ingen kan skapa fler skärmar än de betalar för.
  */
 
 let companyId: string;
@@ -87,49 +87,49 @@ describe("återkallade skärmar räknas inte", () => {
 });
 
 describe("ändra antalet licenser", () => {
-  it("går att öka", async () => {
-    await expect(assertLicenseCountAllowed(companyId, 5)).resolves.toBeUndefined();
-  });
-
-  it("går inte att sänka under antalet aktiva skärmar", async () => {
-    await setLicenseCount(companyId, 3);
-    await addDevice();
-    await addDevice();
-    await addDevice();
-
-    // Tre aktiva skärmar — två licenser skulle släcka en av dem, och kunden
-    // har inte pekat ut vilken.
-    await expect(assertLicenseCountAllowed(companyId, 2)).rejects.toThrow(
-      LicenseError
-    );
-
-    await expect(assertLicenseCountAllowed(companyId, 3)).resolves.toBeUndefined();
-  });
-
-  it("noll eller negativa antal avvisas", async () => {
-    await expect(assertLicenseCountAllowed(companyId, 0)).rejects.toThrow(
-      LicenseError
-    );
-    await expect(assertLicenseCountAllowed(companyId, -1)).rejects.toThrow(
-      LicenseError
-    );
-    await expect(assertLicenseCountAllowed(companyId, 1.5)).rejects.toThrow(
-      LicenseError
-    );
-  });
-
-  it("orimligt stora antal avvisas", async () => {
-    await expect(assertLicenseCountAllowed(companyId, 500)).rejects.toThrow(
-      LicenseError
-    );
-  });
-
   it("nytt antal syns direkt", async () => {
     await setLicenseCount(companyId, 7);
 
     const state = await getLicenseState(companyId);
     expect(state.total).toBe(7);
     expect(state.available).toBe(7);
+  });
+
+  it("antalet kan aldrig bli noll", async () => {
+    // Stripe ska inte kunna skicka ned oss till noll licenser, oavsett vad
+    // som händer där. En kund utan licenser vore en kund utan stämpling.
+    await setLicenseCount(companyId, 0);
+
+    const state = await getLicenseState(companyId);
+    expect(state.total).toBe(1);
+  });
+
+  it("färre licenser än aktiva skärmar stänger ingen skärm", async () => {
+    await setLicenseCount(companyId, 3);
+    const first = await addDevice();
+    await addDevice();
+    await addDevice();
+
+    // Kunden sänker till en licens hos Stripe. Vi kan inte hindra det, och
+    // ska inte gissa vilken av de tre skärmarna som ska bort.
+    await setLicenseCount(companyId, 1);
+
+    const state = await getLicenseState(companyId);
+    expect(state.total).toBe(1);
+    expect(state.used).toBe(3);
+
+    // Inget negativt tal, och inga lediga licenser att skapa fler på.
+    expect(state.available).toBe(0);
+    await expect(assertLicenseAvailable(companyId)).rejects.toThrow(
+      LicenseError
+    );
+
+    // Skärmarna är kvar och fungerar.
+    const device = await unsafeGlobalPrisma.kioskDevice.findUnique({
+      where: { id: first.id },
+      select: { active: true },
+    });
+    expect(device?.active).toBe(true);
   });
 });
 

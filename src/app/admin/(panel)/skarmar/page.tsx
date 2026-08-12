@@ -55,18 +55,37 @@ export default async function DevicesPage() {
         }
       />
 
-      {licenses.available === 0 && (
+      {/* Antalet licenser kan sänkas hos Stripe utan att vi kan hindra det.
+          Skärmarna stängs inte av — stämplingen fortsätter, och kunden får
+          själv peka ut vilken skärm som ska bort. */}
+      {licenses.used > licenses.total ? (
         <Alert tone="warning">
-          Samtliga {licenses.total} licenser är i bruk. Antalet licenser utökas
-          under{" "}
+          Ni har {licenses.used} aktiva skärmar men betalar för{" "}
+          {licenses.total}. Återkalla {licenses.used - licenses.total}{" "}
+          {licenses.used - licenses.total === 1 ? "skärm" : "skärmar"} nedan,
+          eller utöka antalet licenser under{" "}
           <Link
             href="/admin/installningar/prenumeration"
             className="font-medium underline"
           >
             Inställningar → Prenumeration
           </Link>
-          , eller återkallar en skärm ni inte längre använder.
+          . Skärmarna fortsätter fungera under tiden.
         </Alert>
+      ) : (
+        licenses.available === 0 && (
+          <Alert tone="warning">
+            Samtliga {licenses.total} licenser är i bruk. Antalet licenser
+            utökas under{" "}
+            <Link
+              href="/admin/installningar/prenumeration"
+              className="font-medium underline"
+            >
+              Inställningar → Prenumeration
+            </Link>
+            , eller återkallar en skärm ni inte längre använder.
+          </Alert>
+        )
       )}
 
       {devices.length === 0 ? (

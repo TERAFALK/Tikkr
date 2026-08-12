@@ -1,9 +1,5 @@
 import { unsafeGlobalPrisma } from "./db";
-import {
-  assertLicenseCountAllowed,
-  getLicenseState,
-  setLicenseCount,
-} from "./licenses";
+import { getLicenseState, setLicenseCount } from "./licenses";
 import {
   priceId,
   stripe,
@@ -126,32 +122,24 @@ export async function createPortalSession(params: {
 }
 
 /**
- * Påbörjar en ändring av antalet licenser.
+ * Öppnar Stripes sida där kunden ändrar antalet licenser.
  *
- * Ändringen görs inte här. Kunden skickas till Stripes egen bekräftelsesida,
- * där det exakta beloppet står innan något genomförs — både vad ändringen
- * kostar för resterande dagar av perioden och vad den nya avgiften blir.
+ * Antalet väljs och bekräftas i ett och samma steg hos Stripe, inte här. Skälet
+ * är att beloppet ska räknas fram av den part som faktiskt debiterar, i samma
+ * stund som antalet ändras — en siffra vi räknat ut i förväg är en gissning om
+ * vad Stripe kommer att fakturera, och en gissning duger inte för något som
+ * ändrar en faktura.
  *
- * Skälet: ett antal i en ruta och en knapp är för lite bekräftelse för något
- * som ändrar en faktura. Beloppet ska stå framför den som godkänner det, och
- * det ska stå hos den part som faktiskt debiterar.
- *
- * Antalet skrivs in i vår databas först när webhooken bekräftar att kunden
- * godkänt ändringen. Avbryter de hos Stripe har ingenting hänt.
+ * Antalet skrivs in i vår databas först när Stripe bekräftar ändringen.
+ * Avbryter kunden har ingenting hänt.
  *
  * Utan prenumeration går antalet inte att ändra. Under provperioden ingår ett
  * fast antal, och fler får man genom att börja betala.
  */
-export async function startLicenseChange(params: {
+export async function openLicenseUpdate(params: {
   companyId: string;
-  next: number;
   baseUrl: string;
 }): Promise<string> {
-  // Kontrolleras här, inte hos Stripe. Att sänka under antalet aktiva skärmar
-  // är vår regel och ska förklaras i vår panel, inte tas emot som ett fel på
-  // en främmande sida.
-  await assertLicenseCountAllowed(params.companyId, params.next);
-
   const company = await unsafeGlobalPrisma.company.findUnique({
     where: { id: params.companyId },
     select: { stripeCustomerId: true, stripeSubscriptionId: true },
@@ -163,24 +151,14 @@ export async function startLicenseChange(params: {
     );
   }
 
-  const subscription = await stripe().subscriptions.retrieve(
-    company.stripeSubscriptionId
-  );
-
-  const item = subscription.items.data[0];
-  if (!item) throw new Error("Prenumerationen saknar prisrad hos Stripe.");
-
   const session = await stripe().billingPortal.sessions.create({
     customer: company.stripeCustomerId,
     configuration: await licenseUpdateConfiguration(),
     return_url: `${params.baseUrl}/admin/installningar/prenumeration`,
 
     flow_data: {
-      type: "subscription_update_confirm",
-      subscription_update_confirm: {
-        subscription: company.stripeSubscriptionId,
-        items: [{ id: item.id, quantity: params.next }],
-      },
+      type: "subscription_update",
+      subscription_update: { subscription: company.stripeSubscriptionId },
       after_completion: {
         type: "redirect",
         redirect: {

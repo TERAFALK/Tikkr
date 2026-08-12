@@ -126,6 +126,18 @@ export default async function SubscriptionPage({
             </Alert>
           )}
 
+          {/* Antalet kan sänkas hos Stripe under antalet aktiva skärmar. Vi
+              stänger ingen skärm av oss själva — vilken som ska bort är
+              kundens beslut, inte vårt. */}
+          {overview.used > overview.screens && (
+            <Alert tone="warning">
+              Ni har {overview.used} aktiva skärmar men betalar för{" "}
+              {overview.screens}. Återkalla de skärmar ni inte längre använder
+              under Stämplingsskärmar, eller utöka antalet licenser igen.
+              Skärmarna fortsätter fungera under tiden.
+            </Alert>
+          )}
+
           {!configured ? (
             <Alert tone="info">
               Kortbetalning är inte aktiverad för den här installationen.

@@ -68,36 +68,13 @@ export async function assertLicenseAvailable(companyId: string): Promise<void> {
 }
 
 /**
- * Kontrollerar att ett nytt antal licenser går att sätta.
+ * Sätter antalet licenser. Anropas när Stripe bekräftat en ändring.
  *
- * Att sänka under antalet aktiva skärmar skulle betyda att någon skärm slutar
- * fungera utan att kunden pekat ut vilken. Den valet måste de göra själva.
+ * Antalet kan bli lägre än antalet aktiva skärmar: kunden väljer det hos
+ * Stripe, och vi kan inte hindra dem där. Ingen skärm stängs av för det.
+ * Stämplingen ska aldrig sluta fungera, och vilken skärm som ska bort är
+ * kundens beslut — panelen påpekar skillnaden istället.
  */
-export async function assertLicenseCountAllowed(
-  companyId: string,
-  next: number
-): Promise<void> {
-  if (!Number.isInteger(next) || next < 1) {
-    throw new LicenseError("Antalet måste vara minst en skärm.");
-  }
-
-  if (next > 100) {
-    throw new LicenseError(
-      "Fler än hundra licenser hanteras manuellt. Kontakta support@tikkr.se."
-    );
-  }
-
-  const state = await getLicenseState(companyId);
-
-  if (next < state.used) {
-    throw new LicenseError(
-      `Ni har ${state.used} aktiva skärmar. Återkalla de ni inte längre ` +
-        `använder innan ni sänker antalet licenser.`
-    );
-  }
-}
-
-/** Sätter antalet licenser. Anropas när Stripe bekräftat en ändring. */
 export async function setLicenseCount(
   companyId: string,
   count: number

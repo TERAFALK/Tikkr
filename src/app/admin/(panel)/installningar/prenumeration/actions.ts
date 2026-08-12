@@ -6,9 +6,8 @@ import { requireAdmin } from "@/lib/admin-session";
 import {
   createCheckoutSession,
   createPortalSession,
-  startLicenseChange,
+  openLicenseUpdate,
 } from "@/lib/billing";
-import { LicenseError } from "@/lib/licenses";
 
 /**
  * Adressen byggs ur anropet istället för att gissas, så att Stripe skickar
@@ -43,34 +42,29 @@ export interface LicenseFormState {
 }
 
 /**
- * Påbörjar en ändring av antalet licenser.
+ * Skickar vidare till Stripe, där antalet licenser ändras.
  *
- * Ändringen genomförs inte här, utan på Stripes bekräftelsesida där beloppet
- * står. Rutan stannar öppen vid fel — den vanligaste orsaken är ett försök att
- * sänka under antalet aktiva skärmar, och då behöver man läsa vad som gäller.
+ * Formuläret stannar kvar vid fel, så att orsaken går att läsa. Ett fel här är
+ * nästan alltid en driftsak — Stripe svarar inte, eller saknar den
+ * portalkonfiguration som krävs — och detaljerna hamnar i serverloggen.
  */
 export async function changeLicenses(
-  _previous: LicenseFormState,
-  formData: FormData
+  _previous: LicenseFormState
 ): Promise<LicenseFormState> {
   const session = await requireAdmin();
-  const next = Number(formData.get("screens"));
 
   let url: string;
 
   try {
-    url = await startLicenseChange({
+    url = await openLicenseUpdate({
       companyId: session.companyId,
-      next,
       baseUrl: await baseUrl(),
     });
   } catch (error) {
-    if (error instanceof LicenseError) return { error: error.message };
-
-    console.error("Kunde inte påbörja ändring av antalet licenser", error);
+    console.error("Kunde inte öppna Stripes sida för antal licenser", error);
     return {
       error:
-        "Ändringen kunde inte påbörjas hos Stripe. Försök igen, eller kontakta support@tikkr.se om felet kvarstår.",
+        "Stripes sida kunde inte öppnas. Försök igen, eller kontakta support@tikkr.se om felet kvarstår.",
     };
   }
 
