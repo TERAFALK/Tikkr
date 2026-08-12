@@ -53,7 +53,7 @@ export default function SubscriptionLocked({
             <form action={startCheckout} className="space-y-3">
               <label className="block">
                 <span className="mb-1 block text-[13px] font-medium text-neutral-700">
-                  Antal stämplingsskärmar
+                  Antal licenser
                 </span>
                 <input
                   type="number"
@@ -74,7 +74,7 @@ export default function SubscriptionLocked({
                   className="rounded-md bg-blue-600 px-3 py-1.5 text-[13px] font-medium text-white transition-colors hover:bg-blue-700"
                 >
                   Månadsvis · {pricing.month.toLocaleString("sv-SE")} kr per
-                  skärm
+                  licens
                 </button>
 
                 {yearlyAvailable && pricing.year !== null && (
@@ -84,7 +84,8 @@ export default function SubscriptionLocked({
                     value="year"
                     className="rounded-md bg-white px-3 py-1.5 text-[13px] font-medium text-neutral-700 ring-1 ring-inset ring-neutral-200 transition-colors hover:bg-neutral-50"
                   >
-                    Årsvis · {pricing.year.toLocaleString("sv-SE")} kr per skärm
+                    Årsvis · {pricing.year.toLocaleString("sv-SE")} kr per
+                    licens
                     {pricing.yearlyDiscountPercent !== null && (
                       <span className="ml-2 rounded bg-emerald-100 px-1.5 py-0.5 text-[11px] font-semibold text-emerald-700">
                         −{pricing.yearlyDiscountPercent} %
@@ -95,8 +96,9 @@ export default function SubscriptionLocked({
               </div>
 
               <p className="text-xs leading-relaxed text-neutral-500">
-                Kortuppgifter hanteras av vår betalningsleverantör och lagras
-                aldrig hos Tikkr. Ingen bindningstid tillämpas.
+                En licens ger en stämplingsskärm. Kortuppgifter hanteras av vår
+                betalningsleverantör och lagras aldrig hos Tikkr. Ingen
+                bindningstid tillämpas.
               </p>
             </form>
           ) : (

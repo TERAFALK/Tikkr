@@ -63,29 +63,27 @@ export default async function SubscriptionPage({
 
       {params.uppdaterad === "1" && (
         <Alert tone="info">
-          Ändringen är godkänd. Antalet skärmar uppdateras inom kort — ladda om
-          sidan om det inte ändrats.
+          Ändringen är godkänd. Antalet licenser uppdateras inom kort — ladda
+          om sidan om det inte ändrats.
         </Alert>
       )}
 
       <Card>
         <CardHeader
           title="Prenumeration"
-          description={`${kr(pricing.month)} kr per stämplingsskärm och månad, exklusive moms. Ingen bindningstid.`}
+          description={`${kr(pricing.month)} kr per licens och månad, exklusive moms. En licens ger en stämplingsskärm. Ingen bindningstid.`}
         />
 
         <div className="space-y-5 p-5">
           <dl className="divide-y divide-neutral-100 text-[13px]">
             <Row label="Status" value={statusText(company.subscriptionStatus)} />
 
-            <Row
-              label={
-                paying ? "Skärmar i prenumerationen" : "Skärmar i provperioden"
-              }
-              value={String(overview.screens)}
-            />
+            <Row label="Licenser" value={String(overview.screens)} />
 
-            <Row label="Kopplade skärmar" value={String(overview.used)} />
+            <Row
+              label="Använda"
+              value={`${overview.used} av ${overview.screens}`}
+            />
 
             {/* Ingen avgift visas under provperioden. En kostnad i en tabell
                 läses som något som ska betalas, och det ska den inte. */}
@@ -128,10 +126,11 @@ export default async function SubscriptionPage({
               bort är kundens beslut, inte vårt. */}
           {overview.used > overview.screens && (
             <Alert tone="warning">
-              {overview.used} skärmar är kopplade, men prenumerationen omfattar{" "}
-              {overview.screens}. Återkalla de skärmar ni inte längre använder
-              under Stämplingsskärmar, eller utöka antalet igen. Skärmarna
-              fortsätter fungera under tiden.
+              {overview.used} skärmar är kopplade men ni har {overview.screens}{" "}
+              {overview.screens === 1 ? "licens" : "licenser"}. Återkalla de
+              skärmar ni inte längre använder under Stämplingsskärmar, eller
+              utöka antalet licenser igen. Skärmarna fortsätter fungera under
+              tiden.
             </Alert>
           )}
 
@@ -167,8 +166,8 @@ export default async function SubscriptionPage({
             <form action={startCheckout} className="space-y-4">
               <div className="w-40">
                 <Field
-                  label="Antal skärmar"
-                  hint="Så många stämplingsskärmar får kopplas. Kan ändras i efterhand."
+                  label="Antal licenser"
+                  hint="En licens ger en stämplingsskärm. Antalet kan ändras i efterhand."
                 >
                   <Input
                     type="number"
@@ -183,7 +182,7 @@ export default async function SubscriptionPage({
 
               <div className="flex flex-wrap gap-2">
                 <Button type="submit" name="interval" value="month">
-                  Betala månadsvis · {kr(pricing.month)} kr per skärm
+                  Betala månadsvis · {kr(pricing.month)} kr per licens
                 </Button>
 
                 {yearly && pricing.year !== null && (
@@ -193,7 +192,7 @@ export default async function SubscriptionPage({
                     value="year"
                     tone="secondary"
                   >
-                    Betala årsvis · {kr(pricing.year)} kr per skärm
+                    Betala årsvis · {kr(pricing.year)} kr per licens
                     {pricing.yearlyDiscountPercent !== null && (
                       <span className="ml-2 rounded bg-emerald-100 px-1.5 py-0.5 text-[11px] font-semibold text-emerald-700">
                         −{pricing.yearlyDiscountPercent} %
@@ -216,18 +215,19 @@ export default async function SubscriptionPage({
         <CardHeader title="Så räknas priset" />
         <div className="space-y-2 p-5 text-[13px] leading-relaxed text-neutral-600">
           <p>
-            Avgiften avser antalet stämplingsskärmar. Antalet anställda, ordrar
-            och stämplingar påverkar inte priset, och ingen grundavgift
-            tillkommer. Under provperioden ingår {TRIAL_LICENSES} skärmar.
+            Avgiften avser antalet licenser. En licens ger rätt att koppla en
+            stämplingsskärm. Antalet anställda, ordrar och stämplingar påverkar
+            inte priset, och ingen grundavgift tillkommer. Under provperioden
+            ingår {TRIAL_LICENSES} licenser.
           </p>
           <p>
             Antalet ändras endast av er, aldrig automatiskt. Vid utökning under
             pågående period debiteras enbart återstående dagar av perioden.
           </p>
           <p>
-            Skärmarna påverkas inte av betalningsläget. Vid utebliven betalning
-            låses rapporter och export, medan tidregistreringen fortsätter som
-            vanligt.
+            Stämplingsskärmarna påverkas inte av betalningsläget. Vid utebliven
+            betalning låses rapporter och export, medan tidregistreringen
+            fortsätter som vanligt.
           </p>
         </div>
       </Card>

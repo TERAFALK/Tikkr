@@ -44,8 +44,10 @@ export default function LicenseForm({
       <div className="rounded-md border border-neutral-200 bg-neutral-50 px-4 py-3">
         <dl className="space-y-1.5 text-[13px]">
           <div className="flex items-center justify-between">
-            <dt className="text-neutral-500">Skärmar i prenumerationen</dt>
-            <dd className="tabular-nums text-neutral-900">{current}</dd>
+            <dt className="text-neutral-500">Licenser</dt>
+            <dd className="tabular-nums text-neutral-900">
+              {current}, varav {used} använda
+            </dd>
           </div>
           <div className="flex items-center justify-between">
             <dt className="text-neutral-500">Avgift</dt>
@@ -60,16 +62,14 @@ export default function LicenseForm({
       <SubmitButton />
 
       <p className="text-xs leading-relaxed text-neutral-500">
-        Antalet ändras i nästa steg, där det nya beloppet och avräkningen för
-        resterande dagar av perioden räknas fram och godkänns. Ingenting
-        debiteras dessförinnan, och avbryts ändringen sker ingenting.
+        En licens ger en stämplingsskärm. Antalet ändras i nästa steg, där det
+        nya beloppet och avräkningen för resterande dagar av perioden räknas
+        fram och godkänns. Ingenting debiteras dessförinnan, och avbryts
+        ändringen sker ingenting.
         {used > 0 && (
           <>
             {" "}
-            {used === 1
-              ? "En skärm är kopplad."
-              : `${used} skärmar är kopplade.`}{" "}
-            Sänks antalet under det behöver skärmar återkallas under
+            Sänks antalet under {used} behöver skärmar återkallas under
             Stämplingsskärmar — stämplingen fortsätter fungera under tiden.
           </>
         )}
@@ -83,7 +83,7 @@ function SubmitButton() {
 
   return (
     <Button type="submit" tone="secondary" disabled={pending}>
-      {pending ? "Öppnar…" : "Ändra antal skärmar"}
+      {pending ? "Öppnar…" : "Ändra antal licenser"}
     </Button>
   );
 }
