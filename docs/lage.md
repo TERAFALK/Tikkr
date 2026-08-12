@@ -1,6 +1,6 @@
 # Läget mot originalplanen
 
-Uppdaterad 2026-08-11. Jämförelse mellan uppdraget som beskrevs från början och
+Uppdaterad 2026-08-12. Jämförelse mellan uppdraget som beskrevs från början och
 vad som faktiskt finns byggt.
 
 ---
@@ -38,7 +38,7 @@ vad som faktiskt finns byggt.
 | CRUD anställda, ordrar, moment | ✅ |
 | Rapportvy med filter | ✅ med tester |
 | Excel-export | ✅ |
-| PDF-export | ⏸ medvetet uppskjutet till Fas 4 |
+| PDF-export | ✅ underlag per order, med kundens logotyp |
 
 ## Fas 3 — Multi-tenant och onboarding
 
@@ -46,7 +46,7 @@ vad som faktiskt finns byggt.
 |---|---|
 | Signup-flöde | ✅ |
 | Onboarding-guide | ✅ fyra steg, status räknas ur databasen |
-| Stripe-prenumeration | ❌ all åtkomstlogik klar, betalflödet väntar på konto |
+| Stripe-prenumeration | ✅ kassa, kundportal, webhook och licenser per skärm |
 
 ## Fas 4 — Polish och lansering
 
@@ -69,6 +69,8 @@ kom ur ett upptäckt hål snarare än en idé:
 - **Plattformspanel** med egen inloggning, siffror per kund och åtgärdslogg
 - **Mejlabstraktion** förberedd för Microsoft Graph
 - **Prenumerationslogik** med provperiod, respit och låsning
+- **Licenser per stämplingsskärm**, där ändrat antal bekräftas hos Stripe
+- **Intäktsöversikt** i plattformspanelen
 - **Driftkontroll** `status.sh` och driftmanual
 - **Spärrar** mot att köra tester mot skarp databas
 
@@ -100,6 +102,10 @@ före första kunden.
 
 **3. Ingen tvåfaktorsautentisering.** Varken för kundadministratörer eller för
 plattformskontot, som ser alla kunders driftuppgifter.
+
+**4. Ingen lösenordsåterställning via e-post.** Mejlabstraktionen finns, men
+Microsoft Graph är inte inkopplat. Tills det är gjort återställs lösenord
+manuellt.
 
 ---
 

@@ -18,7 +18,7 @@ export const dynamic = "force-dynamic";
 export default async function SubscriptionPage({
   searchParams,
 }: {
-  searchParams: Promise<{ klart?: string }>;
+  searchParams: Promise<{ klart?: string; uppdaterad?: string }>;
 }) {
   const { companyId } = await requireAdmin();
   const params = await searchParams;
@@ -64,6 +64,13 @@ export default async function SubscriptionPage({
         <Alert tone="info">
           Betalningen behandlas av Stripe. Statusen uppdateras inom kort. Ladda
           om sidan om den inte ändrats.
+        </Alert>
+      )}
+
+      {params.uppdaterad === "1" && (
+        <Alert tone="info">
+          Ändringen är godkänd hos Stripe. Antalet licenser uppdateras inom
+          kort. Ladda om sidan om det inte ändrats.
         </Alert>
       )}
 

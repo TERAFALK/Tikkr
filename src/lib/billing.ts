@@ -7,6 +7,7 @@ import {
 import {
   priceId,
   stripe,
+  yearlyAvailable,
   PRICE_PER_SCREEN,
   type BillingInterval,
 } from "./stripe";
@@ -125,27 +126,38 @@ export async function createPortalSession(params: {
 }
 
 /**
- * Ändrar antalet licenser.
+ * Påbörjar en ändring av antalet licenser.
  *
- * Finns en prenumeration ändras kvantiteten hos Stripe, som räknar av
- * resterande dagar — en skärm som läggs till den femtonde kostar halva
- * månaden, inte en hel och inte noll.
+ * Ändringen görs inte här. Kunden skickas till Stripes egen bekräftelsesida,
+ * där det exakta beloppet står innan något genomförs — både vad ändringen
+ * kostar för resterande dagar av perioden och vad den nya avgiften blir.
  *
- * Utan prenumeration går antalet inte att ändra. Under provperioden ingår två,
- * och fler får man genom att börja betala.
+ * Skälet: ett antal i en ruta och en knapp är för lite bekräftelse för något
+ * som ändrar en faktura. Beloppet ska stå framför den som godkänner det, och
+ * det ska stå hos den part som faktiskt debiterar.
+ *
+ * Antalet skrivs in i vår databas först när webhooken bekräftar att kunden
+ * godkänt ändringen. Avbryter de hos Stripe har ingenting hänt.
+ *
+ * Utan prenumeration går antalet inte att ändra. Under provperioden ingår ett
+ * fast antal, och fler får man genom att börja betala.
  */
-export async function changeLicenseCount(
-  companyId: string,
-  next: number
-): Promise<void> {
-  await assertLicenseCountAllowed(companyId, next);
+export async function startLicenseChange(params: {
+  companyId: string;
+  next: number;
+  baseUrl: string;
+}): Promise<string> {
+  // Kontrolleras här, inte hos Stripe. Att sänka under antalet aktiva skärmar
+  // är vår regel och ska förklaras i vår panel, inte tas emot som ett fel på
+  // en främmande sida.
+  await assertLicenseCountAllowed(params.companyId, params.next);
 
   const company = await unsafeGlobalPrisma.company.findUnique({
-    where: { id: companyId },
-    select: { stripeSubscriptionId: true },
+    where: { id: params.companyId },
+    select: { stripeCustomerId: true, stripeSubscriptionId: true },
   });
 
-  if (!company?.stripeSubscriptionId) {
+  if (!company?.stripeSubscriptionId || !company.stripeCustomerId) {
     throw new Error(
       "Antalet licenser kan ändras först när prenumerationen är aktiv."
     );
@@ -158,15 +170,129 @@ export async function changeLicenseCount(
   const item = subscription.items.data[0];
   if (!item) throw new Error("Prenumerationen saknar prisrad hos Stripe.");
 
-  await stripe().subscriptions.update(company.stripeSubscriptionId, {
-    items: [{ id: item.id, quantity: next }],
-    proration_behavior: "create_prorations",
+  const session = await stripe().billingPortal.sessions.create({
+    customer: company.stripeCustomerId,
+    configuration: await licenseUpdateConfiguration(),
+    return_url: `${params.baseUrl}/admin/installningar/prenumeration`,
+
+    flow_data: {
+      type: "subscription_update_confirm",
+      subscription_update_confirm: {
+        subscription: company.stripeSubscriptionId,
+        items: [{ id: item.id, quantity: params.next }],
+      },
+      after_completion: {
+        type: "redirect",
+        redirect: {
+          return_url: `${params.baseUrl}/admin/installningar/prenumeration?uppdaterad=1`,
+        },
+      },
+    },
   });
 
-  // Sätts direkt så att kunden kan skapa skärmen på en gång. Webhooken
-  // bekräftar samma värde strax efter — hade vi väntat på den skulle knappen
-  // se ut att inte ha gjort något.
-  await setLicenseCount(companyId, next);
+  return session.url;
+}
+
+/**
+ * Portalkonfigurationen som tillåter ändrat antal.
+ *
+ * Stripes bekräftelsesida kräver att kundportalen har kvantitetsändring
+ * påslagen. Vi skapar därför en egen konfiguration som bara gör den enda
+ * saken, istället för att be någon klicka rätt i Stripes gränssnitt — då
+ * fungerar det likadant i labbet som i skarp drift, utan manuella steg.
+ *
+ * Den vanliga kundportalen (kort, kvitton, uppsägning) rörs inte: den använder
+ * fortfarande Stripes standardkonfiguration.
+ */
+let licenseConfigurationId: string | null = null;
+
+async function licenseUpdateConfiguration(): Promise<string> {
+  const fromEnv = process.env.STRIPE_PORTAL_CONFIGURATION_ID;
+  if (fromEnv) return fromEnv;
+
+  if (licenseConfigurationId) return licenseConfigurationId;
+
+  const marker = "tikkr-license-update";
+
+  // Letar upp en tidigare skapad först. Appen startas om vid varje deploy, och
+  // en ny konfiguration per omstart skulle fylla Stripe-kontot med dubbletter.
+  const existing = await stripe().billingPortal.configurations.list({
+    active: true,
+    limit: 100,
+  });
+
+  const found = existing.data.find((item) => item.metadata?.tikkr === marker);
+  if (found) {
+    licenseConfigurationId = found.id;
+    return found.id;
+  }
+
+  // Priserna hör oftast till samma produkt, men behöver inte göra det.
+  const byProduct = new Map<string, string[]>();
+
+  for (const id of [
+    priceId("month"),
+    ...(yearlyAvailable() ? [priceId("year")] : []),
+  ]) {
+    const price = await stripe().prices.retrieve(id);
+    const product =
+      typeof price.product === "string" ? price.product : price.product.id;
+
+    byProduct.set(product, [...(byProduct.get(product) ?? []), id]);
+  }
+
+  const created = await createConfiguration(byProduct, marker);
+
+  licenseConfigurationId = created.id;
+  return created.id;
+}
+
+async function createConfiguration(
+  byProduct: Map<string, string[]>,
+  marker: string
+) {
+  try {
+    return await stripe().billingPortal.configurations.create({
+      metadata: { tikkr: marker },
+      business_profile: { headline: "Tikkr — antal stämplingsskärmar" },
+
+      features: {
+        subscription_update: {
+          enabled: true,
+          default_allowed_updates: ["quantity"],
+
+          // Samma avräkning som tidigare: en skärm som läggs till mitt i
+          // perioden kostar resterande dagar, varken en hel period eller noll.
+          proration_behavior: "create_prorations",
+
+          products: [...byProduct].map(([product, prices]) => ({
+            product,
+            prices,
+          })),
+        },
+
+        // Allt annat stängs av. Konfigurationen används enbart för att
+        // bekräfta ett ändrat antal — kort, kvitton och uppsägning ligger kvar
+        // i den vanliga portalen.
+        invoice_history: { enabled: false },
+        payment_method_update: { enabled: false },
+        customer_update: { enabled: false },
+        subscription_cancel: { enabled: false },
+      },
+    });
+  } catch (error) {
+    // I skarpt läge kräver Stripe att kundportalens villkors- och
+    // integritetslänkar är ifyllda innan en konfiguration får skapas. Utan den
+    // upplysningen ser felet ut att komma från oss.
+    console.error("Kunde inte skapa portalkonfiguration hos Stripe", error);
+
+    throw new Error(
+      "Stripe kunde inte skapa kundportalens konfiguration. Kontrollera att " +
+        "villkors- och integritetslänk är ifyllda under Inställningar → " +
+        "Kundportal i Stripe, eller ange en befintlig konfiguration i " +
+        "STRIPE_PORTAL_CONFIGURATION_ID."
+    );
+  }
 }
 
 export interface BillingOverview {
@@ -234,6 +360,22 @@ export async function getBillingOverview(
       subscription.items.data[0]?.price?.recurring?.interval === "year"
         ? "year"
         : "month";
+
+    // Stämmer av mot Stripe varje gång sidan visas. Normalt har webhooken
+    // redan skrivit samma siffra, men den kan vara försenad eller ha missats
+    // — och då ska kunden som just godkänt en ändring ändå se rätt antal när
+    // de kommer tillbaka hit, utan att behöva höra av sig.
+    const quantity = subscription.items.data[0]?.quantity;
+
+    if (quantity && quantity !== screens) {
+      await setLicenseCount(companyId, quantity);
+
+      overview.screens = quantity;
+      overview.monthlyAmount = quantity * PRICE_PER_SCREEN.month;
+      overview.yearlyAmount = quantity * PRICE_PER_SCREEN.year;
+      overview.yearlySaving =
+        quantity * (PRICE_PER_SCREEN.month * 12 - PRICE_PER_SCREEN.year);
+    }
   } catch (error) {
     // Sidan ska gå att öppna även när Stripe inte svarar.
     console.error("Kunde inte hämta prenumerationen från Stripe", error);

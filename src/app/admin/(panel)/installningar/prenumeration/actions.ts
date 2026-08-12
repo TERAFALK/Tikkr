@@ -1,13 +1,12 @@
 "use server";
 
 import { headers } from "next/headers";
-import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { requireAdmin } from "@/lib/admin-session";
 import {
-  changeLicenseCount,
   createCheckoutSession,
   createPortalSession,
+  startLicenseChange,
 } from "@/lib/billing";
 import { LicenseError } from "@/lib/licenses";
 
@@ -41,13 +40,13 @@ export async function startCheckout(formData: FormData) {
 
 export interface LicenseFormState {
   error?: string;
-  ok?: string;
 }
 
 /**
- * Ändrar antalet licenser.
+ * Påbörjar en ändring av antalet licenser.
  *
- * Rutan stannar öppen vid fel — den vanligaste orsaken är att man försöker
+ * Ändringen genomförs inte här, utan på Stripes bekräftelsesida där beloppet
+ * står. Rutan stannar öppen vid fel — den vanligaste orsaken är ett försök att
  * sänka under antalet aktiva skärmar, och då behöver man läsa vad som gäller.
  */
 export async function changeLicenses(
@@ -57,22 +56,27 @@ export async function changeLicenses(
   const session = await requireAdmin();
   const next = Number(formData.get("screens"));
 
+  let url: string;
+
   try {
-    await changeLicenseCount(session.companyId, next);
+    url = await startLicenseChange({
+      companyId: session.companyId,
+      next,
+      baseUrl: await baseUrl(),
+    });
   } catch (error) {
     if (error instanceof LicenseError) return { error: error.message };
 
-    console.error("Kunde inte ändra antalet licenser", error);
+    console.error("Kunde inte påbörja ändring av antalet licenser", error);
     return {
       error:
-        "Antalet kunde inte ändras. Försök igen, eller hör av dig om det står kvar.",
+        "Ändringen kunde inte påbörjas hos Stripe. Försök igen, eller kontakta support@tikkr.se om felet kvarstår.",
     };
   }
 
-  revalidatePath("/admin/installningar/prenumeration");
-  revalidatePath("/admin/skarmar");
-
-  return { ok: `Ni har nu ${next} licenser.` };
+  // Ligger utanför try-blocket. redirect() avbryter genom att kasta, och hade
+  // fångats som ett fel om den låg innanför.
+  redirect(url);
 }
 
 export async function openBillingPortal() {

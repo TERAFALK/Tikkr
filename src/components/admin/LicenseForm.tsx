@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 import { useFormStatus } from "react-dom";
 import {
   changeLicenses,
@@ -11,9 +11,10 @@ import { Alert, Button, Field, Input } from "@/components/ui";
 /**
  * Ändrar antalet licenser på en pågående prenumeration.
  *
- * Priset räknas ut här och nu, så att kunden ser vad ändringen kostar innan
- * de trycker. En knapp som ändrar en faktura utan att säga hur mycket är en
- * knapp folk inte vågar trycka på.
+ * Formuläret genomför ingen ändring. Det räknar fram vad den nya avgiften blir
+ * och skickar sedan vidare till Stripes bekräftelsesida, där det exakta
+ * beloppet står — inklusive vad ändringen kostar för resterande dagar av
+ * perioden. Ingenting debiteras förrän kunden godkänt beloppet där.
  */
 export default function LicenseForm({
   current,
@@ -31,10 +32,15 @@ export default function LicenseForm({
     {}
   );
 
+  const [screens, setScreens] = useState(current);
+
+  const period = interval === "year" ? "år" : "månad";
+  const valid = Number.isInteger(screens) && screens >= 1 && screens <= 100;
+  const changed = valid && screens !== current;
+
   return (
     <form action={action} className="space-y-4">
       {state.error && <Alert>{state.error}</Alert>}
-      {state.ok && <Alert tone="info">{state.ok}</Alert>}
 
       <div className="flex flex-wrap items-end gap-3">
         <div className="w-32">
@@ -44,18 +50,47 @@ export default function LicenseForm({
               name="screens"
               min={Math.max(1, used)}
               max={100}
-              defaultValue={current}
+              value={screens}
+              onChange={(event) => setScreens(Number(event.target.value))}
               required
             />
           </Field>
         </div>
-        <SubmitButton />
+        <SubmitButton disabled={!changed} />
       </div>
 
+      {/* Räknas fram medan man skriver. Den som funderar på en skärm till ska
+          se vad det innebär innan de lämnar sidan. */}
+      {changed && (
+        <div className="rounded-md border border-neutral-200 bg-neutral-50 px-4 py-3">
+          <dl className="space-y-1.5 text-[13px]">
+            <div className="flex items-center justify-between">
+              <dt className="text-neutral-500">Nuvarande avgift</dt>
+              <dd className="tabular-nums text-neutral-600">
+                {(current * pricePerScreen).toLocaleString("sv-SE")} kr per{" "}
+                {period}
+              </dd>
+            </div>
+            <div className="flex items-center justify-between">
+              <dt className="font-medium text-neutral-700">Ny avgift</dt>
+              <dd className="font-medium tabular-nums text-neutral-900">
+                {(screens * pricePerScreen).toLocaleString("sv-SE")} kr per{" "}
+                {period}
+              </dd>
+            </div>
+          </dl>
+          <p className="mt-2 border-t border-neutral-200 pt-2 text-xs leading-relaxed text-neutral-500">
+            Beloppen är exklusive moms. Det exakta beloppet, inklusive
+            avräkningen för resterande dagar av innevarande period, visas för
+            godkännande hos Stripe. Ingenting debiteras dessförinnan.
+          </p>
+        </div>
+      )}
+
       <p className="text-xs leading-relaxed text-neutral-500">
-        {pricePerScreen.toLocaleString("sv-SE")} kr per skärm och{" "}
-        {interval === "year" ? "år" : "månad"}. Vid utökning under pågående
-        period debiteras endast återstående dagar av perioden.
+        {pricePerScreen.toLocaleString("sv-SE")} kr per skärm och {period}. Vid
+        utökning under pågående period debiteras endast återstående dagar av
+        perioden.
         {used > 0 && (
           <>
             {" "}
@@ -68,12 +103,12 @@ export default function LicenseForm({
   );
 }
 
-function SubmitButton() {
+function SubmitButton({ disabled }: { disabled: boolean }) {
   const { pending } = useFormStatus();
 
   return (
-    <Button type="submit" tone="secondary" disabled={pending}>
-      {pending ? "Ändrar…" : "Ändra antal"}
+    <Button type="submit" tone="secondary" disabled={disabled || pending}>
+      {pending ? "Öppnar Stripe…" : "Granska ändringen"}
     </Button>
   );
 }
