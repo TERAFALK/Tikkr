@@ -40,25 +40,24 @@ export default async function TimeSettingsPage() {
       <Card>
         <CardHeader
           title="Automatisk utstämpling"
-          description="Vad som händer när någon glömmer stämpla ut."
+          description="Hantering av stämplingar utan registrerad utstämpling."
         />
 
         <div className="space-y-5 p-5">
           <Alert tone="info">
-            Vid klockslaget nedan stängs alla stämplingar som fortfarande är
-            öppna. Posten <strong>flaggas för granskning</strong> och dyker upp
-            under Granskning — systemet gissar sluttiden för att underlaget ska
-            gå att använda, men talar alltid om att det gissat.
+            Vid angivet klockslag stängs stämplingar som fortfarande är
+            öppna. Posten <strong>flaggas för granskning</strong> och visas
+            under Granskning. Den beräknade sluttiden är alltid markerad som
+            sådan.
             <span className="mt-1.5 block">
-              Stämplar någon in <em>efter</em> klockslaget stängs posten först
-              nästa dygn. Kvälls- och nattskift avbryts alltså inte.
+              Stämplingar som påbörjas efter klockslaget stängs först nästa dygn, vilket gör att kvälls- och nattskift inte avbryts.
             </span>
           </Alert>
 
           <form action={saveTimeSettings} className="max-w-md space-y-4">
             <Field
               label="Stäng glömda stämplingar klockan"
-              hint="Skrivs som HH:MM. Har du skiftarbete, sätt klockslaget till en tid då ingen normalt arbetar — till exempel 02:00."
+              hint="Anges som HH:MM. Vid skiftarbete rekommenderas ett klockslag då ingen normalt arbetar, exempelvis 02:00."
             >
               <Input
                 name="autoCloseAt"
@@ -71,7 +70,7 @@ export default async function TimeSettingsPage() {
 
             <Field
               label="Tidszon"
-              hint="Avgör vad klockslaget ovan betyder. Utan rätt tidszon glider tiden en timme vid sommar- och vintertid."
+              hint="Avgör hur klockslaget tolkas. Fel tidszon medför en timmes avvikelse vid övergång mellan sommar- och vintertid."
             >
               <Select name="timezone" defaultValue={company.timezone}>
                 {TIMEZONES.map((zone) => (

@@ -185,7 +185,7 @@ function renderOrder(
     if (row.needsReview || row.manual) {
       doc.fillColor("#a16207").fontSize(7);
       doc.text(
-        row.needsReview ? "gissad sluttid" : "inlagd för hand",
+        row.needsReview ? "beräknad sluttid" : "manuellt registrerad",
         MARGIN + 8,
         y + 15,
         { width: 200 }
@@ -224,17 +224,19 @@ function renderOrder(
     const notes: string[] = [];
     if (order.ongoingCount > 0) {
       notes.push(
-        `${order.ongoingCount} stämpling${order.ongoingCount === 1 ? "" : "ar"} pågår och räknas fram till nu`
+        `${order.ongoingCount} stämpling${order.ongoingCount === 1 ? "" : "ar"} pågår och är beräknad till och med utskriftstillfället`
       );
     }
     if (order.ungradedCount > 0) {
       notes.push(
-        `${order.ungradedCount} post${order.ungradedCount === 1 ? "" : "er"} har en sluttid som systemet gissat och som ännu inte granskats`
+        `${order.ungradedCount} post${order.ungradedCount === 1 ? "" : "er"} har en sluttid beräknad av systemet och är ännu inte granskad`
       );
     }
 
     doc.font("Helvetica").fontSize(8).fillColor("#a16207");
-    doc.text(`Obs: ${notes.join(". ")}.`, MARGIN, y, { width: CONTENT_WIDTH });
+    doc.text(`Anmärkning: ${notes.join(". ")}.`, MARGIN, y, {
+      width: CONTENT_WIDTH,
+    });
   }
 
   /* --- Sidfot ------------------------------------------------------------- */

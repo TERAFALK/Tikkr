@@ -80,7 +80,7 @@ export function evaluateAccess(
           headline: "Provperioden har tagit slut",
           detail:
             "Rapporter och export är låsta tills en prenumeration startats. " +
-            "Stämplingen fortsätter fungera — ingen arbetstid går förlorad.",
+            "Stämplingsskärmarna är opåverkade och all tid fortsätter registreras.",
           daysLeft: 0,
         };
       }
@@ -90,8 +90,8 @@ export function evaluateAccess(
           level: "warning",
           headline: `Provperioden tar slut om ${left} ${left === 1 ? "dag" : "dagar"}`,
           detail:
-            `Starta prenumerationen för att behålla rapporter och export. ` +
-            `Stämplingen påverkas inte.`,
+            "Starta prenumerationen för att behålla tillgången till rapporter " +
+            "och export. Stämplingsskärmarna påverkas inte.",
           daysLeft: left,
         };
       }
@@ -113,8 +113,8 @@ export function evaluateAccess(
           level: "locked",
           headline: "Betalningen har inte gått igenom",
           detail:
-            "Rapporter och export är låsta tills betalningen är ordnad. " +
-            "Stämplingen fortsätter fungera — ingen arbetstid går förlorad.",
+            "Rapporter och export är låsta tills betalningen genomförts. " +
+            "Stämplingsskärmarna är opåverkade och all tid fortsätter registreras.",
           daysLeft: 0,
         };
       }
@@ -134,8 +134,8 @@ export function evaluateAccess(
         level: "locked",
         headline: "Prenumerationen är avslutad",
         detail:
-          "Rapporter och export är låsta. Stämplingen fortsätter fungera, så " +
-          "ingen tid går förlorad medan ni bestämmer er.",
+          "Rapporter och export är låsta. Stämplingsskärmarna är opåverkade " +
+          "och all tid fortsätter registreras.",
         daysLeft: 0,
       };
   }

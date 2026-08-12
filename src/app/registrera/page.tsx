@@ -8,7 +8,7 @@ export default function SignupPage() {
   return (
     <AuthShell
       title="Skapa en arbetsyta"
-      subtitle="30 dagar utan kostnad. Inget kort behövs."
+      subtitle="30 dagars provperiod. Inget betalkort krävs."
       footer={
         <>
           Har du redan ett konto?{" "}

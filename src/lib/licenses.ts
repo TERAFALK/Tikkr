@@ -83,7 +83,7 @@ export async function assertLicenseCountAllowed(
 
   if (next > 100) {
     throw new LicenseError(
-      "Fler än hundra skärmar? Hör av dig till oss så tar vi det manuellt."
+      "Fler än hundra licenser hanteras manuellt. Kontakta support@tikkr.se."
     );
   }
 

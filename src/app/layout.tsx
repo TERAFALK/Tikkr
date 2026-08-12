@@ -3,7 +3,7 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: "Tikkr",
-  description: "Stämplingssystem för verkstad och tillverkning",
+  description: "Stämplingssystem för verkstads- och tillverkningsindustri",
   manifest: "/manifest.json",
   appleWebApp: { capable: true, title: "Tikkr", statusBarStyle: "black-translucent" },
   icons: { icon: "/icon.svg", apple: "/icon.svg" },

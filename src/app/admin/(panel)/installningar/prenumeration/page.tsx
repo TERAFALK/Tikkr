@@ -62,15 +62,15 @@ export default async function SubscriptionPage({
     <div className="space-y-6">
       {params.klart === "1" && (
         <Alert tone="info">
-          Tack. Betalningen behandlas av Stripe och statusen uppdateras här om
-          någon sekund — ladda om sidan om den inte hunnit ändras.
+          Betalningen behandlas av Stripe. Statusen uppdateras inom kort. Ladda
+          om sidan om den inte ändrats.
         </Alert>
       )}
 
       <Card>
         <CardHeader
           title="Prenumeration"
-          description="399 kr per aktiv stämplingsskärm och månad, exklusive moms."
+          description="399 kr per stämplingsskärm och månad, exklusive moms. Ingen bindningstid."
         />
 
         <div className="space-y-5 p-5">
@@ -121,8 +121,8 @@ export default async function SubscriptionPage({
 
           {!configured ? (
             <Alert tone="info">
-              Betalning via kort är inte påkopplad än. Hör av dig till oss så
-              ordnar vi prenumerationen manuellt under tiden.
+              Kortbetalning är inte aktiverad för den här installationen.
+              Kontakta support@tikkr.se för att aktivera prenumerationen.
             </Alert>
           ) : overview.hasSubscription ? (
             <div className="space-y-6">
@@ -142,7 +142,7 @@ export default async function SubscriptionPage({
                   Hantera betalning och fakturor
                 </Button>
                 <p className="mt-2 text-xs text-neutral-500">
-                  Byt kort, se kvitton eller säg upp. Sköts hos Stripe.
+                  Byte av betalkort, kvitton och uppsägning hanteras hos Stripe.
                 </p>
               </form>
             </div>
@@ -150,8 +150,8 @@ export default async function SubscriptionPage({
             <form action={startCheckout} className="space-y-4">
               <div className="w-40">
                 <Field
-                  label="Hur många skärmar?"
-                  hint="Så många kan ni koppla. Antalet går att ändra sedan."
+                  label="Antal skärmar"
+                  hint="Antalet licenser, och därmed antalet skärmar som kan kopplas. Kan ändras i efterhand."
                 >
                   <Input
                     type="number"
@@ -188,9 +188,8 @@ export default async function SubscriptionPage({
               )}
 
               <p className="text-xs text-neutral-500">
-                Ni skickas till Stripe för att fylla i kortuppgifter.
-                Kortnumret passerar aldrig Tikkr. Ingen bindningstid — säg upp
-                när ni vill.
+                Betalningen genomförs hos Stripe. Kortuppgifter hanteras aldrig
+                av Tikkr. Ingen bindningstid tillämpas.
               </p>
             </form>
           )}
@@ -201,23 +200,22 @@ export default async function SubscriptionPage({
         <CardHeader title="Så räknas priset" />
         <div className="space-y-2 p-5 text-[13px] leading-relaxed text-neutral-600">
           <p>
-            Ni betalar för ett antal <strong>licenser</strong>, och kan koppla
-            lika många stämplingsskärmar. Antalet anställda, ordrar och
-            stämplingar spelar ingen roll, och det finns ingen grundavgift.
+            Priset avser antalet licenser. Varje licens ger rätt att koppla en
+            stämplingsskärm. Antalet anställda, ordrar och stämplingar påverkar
+            inte priset, och ingen grundavgift tillkommer.
           </p>
           <p>
-            Under provperioden ingår {TRIAL_LICENSES} licenser. Behöver ni
-            fler ökar ni antalet här — kostnaden växer aldrig av sig själv för
-            att någon lagt upp en skärm till.
+            Under provperioden ingår {TRIAL_LICENSES} licenser. Antalet licenser
+            ändras endast av er, aldrig automatiskt.
           </p>
           <p>
-            Ökar ni mitt i perioden räknar Stripe av de dagar som återstår, så
-            ni betalar bara för den tid ni faktiskt har skärmen.
+            Vid utökning under pågående period debiteras endast återstående
+            dagar av perioden.
           </p>
           <p>
-            <strong>Stämplingen slutar aldrig fungera</strong>, oavsett
-            betalningsläge. Uteblir betalningen låses rapporter och export, men
-            all tid fortsätter registreras och finns kvar när det är löst.
+            Stämplingsskärmarna påverkas inte av betalningsläget. Vid utebliven
+            betalning låses rapporter och export, medan tidregistreringen
+            fortsätter som vanligt.
           </p>
         </div>
       </Card>

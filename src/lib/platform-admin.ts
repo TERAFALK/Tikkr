@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { unsafeGlobalPrisma } from "./db";
 import { isPlatformAdmin } from "./platform-access";
 import { readPlatformSession } from "./platform-session";
+import { PRICE_PER_SCREEN } from "./stripe";
 
 /**
  * PLATTFORMSADMINISTRATION.
@@ -56,6 +57,28 @@ export interface CompanyOverview {
   openOrders: number;
   entriesLast30Days: number;
   lastActivityAt: Date | null;
+  /** Antal licenser företaget betalar för. */
+  licenses: number;
+  /** Månadsintäkt i kronor. Årsbetalningar räknas om till per månad. */
+  monthlyRevenue: number;
+  /** true när Stripe styr prenumerationen. */
+  managedByStripe: boolean;
+}
+
+/** Månadsintäkt för ett företag, oavsett betalningsintervall. */
+export function monthlyRevenueFor(company: {
+  subscriptionStatus: string;
+  screenLicenses: number;
+  subscriptionInterval: string | null;
+}): number {
+  if (company.subscriptionStatus !== "ACTIVE") return 0;
+
+  const perScreen =
+    company.subscriptionInterval === "year"
+      ? PRICE_PER_SCREEN.year / 12
+      : PRICE_PER_SCREEN.month;
+
+  return Math.round(company.screenLicenses * perScreen);
 }
 
 /**
@@ -74,6 +97,9 @@ export async function listCompanies(): Promise<CompanyOverview[]> {
       id: true,
       name: true,
       subscriptionStatus: true,
+      subscriptionInterval: true,
+      screenLicenses: true,
+      stripeSubscriptionId: true,
       createdAt: true,
       _count: {
         select: {
@@ -125,7 +151,45 @@ export async function listCompanies(): Promise<CompanyOverview[]> {
     openOrders: ordersByCompany.get(company.id) ?? 0,
     entriesLast30Days: recentByCompany.get(company.id) ?? 0,
     lastActivityAt: latestByCompany.get(company.id) ?? null,
+    licenses: company.screenLicenses,
+    monthlyRevenue: monthlyRevenueFor(company),
+    managedByStripe: Boolean(company.stripeSubscriptionId),
   }));
+}
+
+export interface RevenueSummary {
+  /** Återkommande månadsintäkt. */
+  mrr: number;
+  /** Årsvärde av nuvarande månadsintäkt. */
+  arr: number;
+  payingCompanies: number;
+  trialingCompanies: number;
+  pastDueCompanies: number;
+  licensesSold: number;
+  /** Genomsnittlig månadsintäkt per betalande företag. */
+  averagePerCompany: number;
+}
+
+export function summarizeRevenue(companies: CompanyOverview[]): RevenueSummary {
+  const paying = companies.filter(
+    (company) => company.subscriptionStatus === "ACTIVE"
+  );
+
+  const mrr = paying.reduce((sum, company) => sum + company.monthlyRevenue, 0);
+
+  return {
+    mrr,
+    arr: mrr * 12,
+    payingCompanies: paying.length,
+    trialingCompanies: companies.filter(
+      (company) => company.subscriptionStatus === "TRIALING"
+    ).length,
+    pastDueCompanies: companies.filter(
+      (company) => company.subscriptionStatus === "PAST_DUE"
+    ).length,
+    licensesSold: paying.reduce((sum, company) => sum + company.licenses, 0),
+    averagePerCompany: paying.length > 0 ? Math.round(mrr / paying.length) : 0,
+  };
 }
 
 /* -------------------------------------------------------------------------- */
@@ -155,6 +219,9 @@ export async function getCompanyDetail(companyId: string) {
       id: true,
       name: true,
       subscriptionStatus: true,
+      subscriptionInterval: true,
+      screenLicenses: true,
+      stripeSubscriptionId: true,
       autoCloseAt: true,
       timezone: true,
       createdAt: true,
@@ -237,6 +304,13 @@ export type SubscriptionStatus =
   | "PAST_DUE"
   | "CANCELED";
 
+export class PlatformActionError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "PlatformActionError";
+  }
+}
+
 async function record(params: {
   actorEmail: string;
   action: string;
@@ -268,11 +342,26 @@ export async function setSubscriptionStatus(params: {
 }) {
   const before = await unsafeGlobalPrisma.company.findUnique({
     where: { id: params.companyId },
-    select: { subscriptionStatus: true, name: true },
+    select: {
+      subscriptionStatus: true,
+      name: true,
+      stripeSubscriptionId: true,
+    },
   });
 
   if (!before) return;
   if (before.subscriptionStatus === params.status) return;
+
+  // Företag med en prenumeration hos Stripe styrs därifrån. En manuell
+  // ändring här skulle skrivas över vid nästa besked från Stripe, och under
+  // tiden visa ett läge som inte stämmer med vad kunden faktiskt betalar.
+  // Ändringar för sådana företag görs i Stripe.
+  if (before.stripeSubscriptionId) {
+    throw new PlatformActionError(
+      "Företaget har en aktiv prenumeration hos Stripe. Ändra den i Stripe — " +
+        "en ändring här skulle skrivas över vid nästa uppdatering."
+    );
+  }
 
   await unsafeGlobalPrisma.company.update({
     where: { id: params.companyId },

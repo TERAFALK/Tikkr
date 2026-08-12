@@ -10,10 +10,7 @@ import {
   Button,
   Card,
   CardHeader,
-  Field,
-  Input,
   PageHeader,
-  Select,
   Stat,
   Table,
   Td,
@@ -21,7 +18,9 @@ import {
   Tr,
 } from "@/components/ui";
 import { formatDate, formatDateTime } from "@/lib/format";
-import { changeSubscription, updateNote } from "./actions";
+import SubscriptionOverrideForm from "@/components/admin/SubscriptionOverrideForm";
+import { monthlyRevenueFor } from "@/lib/platform-admin";
+import { updateNote } from "./actions";
 
 export const dynamic = "force-dynamic";
 
@@ -37,6 +36,7 @@ export default async function CompanyPage({
   if (!detail) notFound();
 
   const { company, admins, devices, note, history, stats } = detail;
+  const monthlyRevenue = monthlyRevenueFor(company);
 
   const inactiveDays = stats.lastActivityAt
     ? Math.floor(
@@ -63,9 +63,8 @@ export default async function CompanyPage({
 
         {inactiveDays !== null && inactiveDays >= 14 && (
           <Alert tone="warning">
-            Ingen stämpling på {inactiveDays} dagar. En kund som slutat använda
-            systemet säger oftast upp sig långt efter att de slutat — det här är
-            tidpunkten att höra av sig, inte när uppsägningen kommer.
+            Ingen registrerad tid på {inactiveDays} dagar. Utebliven aktivitet
+            kan indikera en kund på väg att avsluta.
           </Alert>
         )}
 
@@ -91,39 +90,43 @@ export default async function CompanyPage({
           <Card>
             <CardHeader
               title="Prenumeration"
-              description="Sätts för hand tills Stripe är kopplat. Även därefter behövs den för fakturakunder och förlängda provperioder."
+              description="Manuell status används för fakturakunder och förlängda provperioder."
             />
             <div className="space-y-4 p-5">
-              <div className="flex items-center gap-2 text-[13px]">
-                <span className="text-neutral-500">Nu:</span>
-                <SubscriptionBadge status={company.subscriptionStatus} />
-              </div>
+              <dl className="divide-y divide-neutral-100 text-[13px]">
+                <Row
+                  label="Status"
+                  value={<SubscriptionBadge status={company.subscriptionStatus} />}
+                />
+                <Row
+                  label="Licenser"
+                  value={`${company.screenLicenses} skärmar`}
+                />
+                <Row
+                  label="Betalningsintervall"
+                  value={
+                    company.subscriptionInterval === "year"
+                      ? "Årsvis"
+                      : company.subscriptionInterval === "month"
+                        ? "Månadsvis"
+                        : "—"
+                  }
+                />
+                <Row
+                  label="Månadsintäkt"
+                  value={
+                    monthlyRevenue > 0
+                      ? `${monthlyRevenue.toLocaleString("sv-SE")} kr`
+                      : "—"
+                  }
+                />
+              </dl>
 
-              <form action={changeSubscription} className="space-y-3">
-                <input type="hidden" name="companyId" value={company.id} />
-
-                <Field label="Ny status">
-                  <Select name="status" defaultValue={company.subscriptionStatus}>
-                    <option value="TRIALING">Provperiod</option>
-                    <option value="ACTIVE">Aktiv</option>
-                    <option value="PAST_DUE">Obetald</option>
-                    <option value="CANCELED">Avslutad</option>
-                  </Select>
-                </Field>
-
-                <Field
-                  label="Anledning"
-                  hint="Obligatorisk. En statusändring utan förklaring är värdelös den dag någon undrar varför en kund spärrades."
-                >
-                  <Input
-                    name="reason"
-                    placeholder="Betalt mot faktura, förfaller 2026-12-31"
-                    required
-                  />
-                </Field>
-
-                <Button type="submit">Spara</Button>
-              </form>
+              <SubscriptionOverrideForm
+                companyId={company.id}
+                currentStatus={company.subscriptionStatus}
+                managedByStripe={Boolean(company.stripeSubscriptionId)}
+              />
             </div>
           </Card>
 
@@ -131,7 +134,7 @@ export default async function CompanyPage({
           <Card>
             <CardHeader
               title="Intern anteckning"
-              description="Syns bara här. Kunden ser den aldrig."
+              description="Interna noteringar. Visas inte för kunden."
             />
             <form action={updateNote} className="space-y-3 p-5">
               <input type="hidden" name="companyId" value={company.id} />
@@ -159,7 +162,7 @@ export default async function CompanyPage({
         <Card className="mt-6">
           <CardHeader
             title="Vilka som kan logga in"
-            description="Adresserna du kontaktar vid supportärenden och fakturering."
+            description="Kontaktadresser för supportärenden och fakturering."
           />
           <Table>
             <thead>
@@ -194,7 +197,7 @@ export default async function CompanyPage({
         <Card className="mt-6">
           <CardHeader
             title="Stämplingsskärmar"
-            description="Vanligaste supportärendet: en skärm som slutat höra av sig."
+            description="Kopplade stämplingsskärmar och tidpunkt för senaste kontakt."
           />
           {devices.length === 0 ? (
             <p className="p-5 text-[13px] text-neutral-500">
@@ -236,7 +239,7 @@ export default async function CompanyPage({
         <Card className="mt-6">
           <CardHeader
             title="Vad som gjorts härifrån"
-            description="Allt som ändrar något i den här panelen loggas. Utan det är det din utsaga mot kundens den dag något ifrågasätts."
+            description="Samtliga åtgärder i panelen loggas och kan redovisas i efterhand."
           />
           {history.length === 0 ? (
             <p className="p-5 text-[13px] text-neutral-500">
@@ -273,9 +276,9 @@ export default async function CompanyPage({
 
         <Alert tone="info">
           Innehållet i kundens data — namn på anställda, ordernummer och
-          registrerade tider — går inte att nå härifrån, med flit. Behöver du
-          hjälpa till med något konkret får kunden bjuda in dig som
-          administratör hos sig, med en länk de kan återkalla efteråt.
+          registrerade tider — är inte åtkomligt från plattformspanelen. För
+          åtgärder som kräver sådan åtkomst krävs en inbjudan som administratör
+          i kundens arbetsyta, med en behörighet kunden själv kan återkalla.
         </Alert>
       </main>
     </div>
@@ -287,4 +290,13 @@ function SubscriptionBadge({ status }: { status: string }) {
   if (status === "TRIALING") return <Badge>Provperiod</Badge>;
   if (status === "PAST_DUE") return <Badge tone="warning">Obetald</Badge>;
   return <Badge tone="muted">Avslutad</Badge>;
+}
+
+function Row({ label, value }: { label: string; value: React.ReactNode }) {
+  return (
+    <div className="flex items-center justify-between py-2.5">
+      <dt className="text-neutral-500">{label}</dt>
+      <dd className="font-medium text-neutral-900">{value}</dd>
+    </div>
+  );
 }

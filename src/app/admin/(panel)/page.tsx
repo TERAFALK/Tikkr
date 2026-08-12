@@ -75,7 +75,7 @@ export default async function OverviewPage() {
                 {onboarding.completed} av {onboarding.total} steg klara
               </p>
               <p className="mt-0.5 text-[13px] text-blue-800">
-                Stämplingsskärmen fungerar först när uppsättningen är klar.
+                Stämplingsskärmen kan användas när uppsättningen är slutförd.
               </p>
             </div>
             <ButtonLink href="/admin/kom-igang">Fortsätt uppsättningen</ButtonLink>
@@ -116,8 +116,8 @@ export default async function OverviewPage() {
                 granskas
               </p>
               <p className="mt-0.5 text-[13px] text-amber-800">
-                Någon glömde stämpla ut. Systemet har gissat sluttiden — rätta
-                den innan du fakturerar.
+                Utstämpling saknas. Sluttiden är beräknad av systemet och bör
+                kontrolleras före fakturering.
               </p>
             </div>
             <ButtonLink href="/admin/granskning">Granska nu</ButtonLink>
@@ -129,13 +129,13 @@ export default async function OverviewPage() {
         {working.length === 0 ? (
           <EmptyState
             title="Ingen är instämplad just nu"
-            description="När någon stämplar in på en order dyker det upp här direkt."
+            description="Pågående arbete visas här så snart någon stämplat in."
           />
         ) : (
           <Card>
             <CardHeader
               title="Pågående arbete"
-              description="Tiden räknas upp så länge posten är öppen."
+              description="Tiden räknas upp till dess att posten avslutas."
             />
             <Table>
             <thead>

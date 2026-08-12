@@ -84,8 +84,8 @@ export async function verifyPlatformLogin(
     return {
       ok: false,
       problem:
-        "För många misslyckade försök. Vänta en kvart och försök igen, eller " +
-        "sätt ett nytt lösenord på servern.",
+        "För många misslyckade försök. Försök igen om femton minuter, " +
+        "eller sätt ett nytt lösenord på servern.",
     };
   }
 

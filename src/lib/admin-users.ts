@@ -46,7 +46,7 @@ export async function inviteAdmin(params: {
   asRole: "OWNER" | "ADMIN";
 }) {
   if (params.role !== "OWNER") {
-    throw new AdminUserError("Bara ägaren kan bjuda in fler administratörer.");
+    throw new AdminUserError("Endast ägare kan bjuda in fler administratörer.");
   }
 
   const email = normalizeEmail(params.email);
@@ -64,7 +64,7 @@ export async function inviteAdmin(params: {
   if (existing) {
     throw new AdminUserError(
       existing.companyId === params.companyId
-        ? "Personen är redan administratör här."
+        ? "Adressen tillhör redan en administratör i arbetsytan."
         : "Adressen används redan av ett konto i Tikkr."
     );
   }
@@ -142,7 +142,7 @@ export async function acceptInvite(token: string, password: string) {
 
   if (!invite || invite.acceptedAt || invite.expiresAt < new Date()) {
     throw new AdminUserError(
-      "Länken är ogiltig eller har gått ut. Be om en ny inbjudan."
+      "Länken är ogiltig eller har upphört att gälla. Begär en ny inbjudan."
     );
   }
 
@@ -184,7 +184,7 @@ export async function removeAdmin(params: {
   targetUserId: string;
 }) {
   if (params.actingRole !== "OWNER") {
-    throw new AdminUserError("Bara ägaren kan ta bort administratörer.");
+    throw new AdminUserError("Endast ägare kan ta bort administratörer.");
   }
 
   if (params.actingUserId === params.targetUserId) {
@@ -202,7 +202,7 @@ export async function removeAdmin(params: {
     const owners = await db.adminUser.count({ where: { role: "OWNER" } });
     if (owners <= 1) {
       throw new AdminUserError(
-        "Det måste finnas minst en ägare. Gör någon annan till ägare först."
+        "Arbetsytan måste ha minst en ägare. Utse en ny ägare först."
       );
     }
   }
@@ -217,7 +217,7 @@ export async function revokeInvite(params: {
   inviteId: string;
 }) {
   if (params.actingRole !== "OWNER") {
-    throw new AdminUserError("Bara ägaren kan återkalla inbjudningar.");
+    throw new AdminUserError("Endast ägare kan återkalla inbjudningar.");
   }
 
   const db = forCompany(params.companyId);

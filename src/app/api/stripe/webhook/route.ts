@@ -92,12 +92,16 @@ async function handle(event: Stripe.Event) {
       // Antalet betalda platser är antalet licenser. Stripe är sanningen —
       // ändrar kunden kvantiteten där, i kassan eller i kundportalen, följer
       // vår siffra med.
-      const quantity = subscription.items.data[0]?.quantity;
+      const item = subscription.items.data[0];
+      const quantity = item?.quantity;
+      const interval = item?.price?.recurring?.interval ?? null;
 
       await unsafeGlobalPrisma.company.update({
         where: { id: companyId },
         data: {
           subscriptionStatus: status,
+          subscriptionInterval:
+            event.type === "customer.subscription.deleted" ? null : interval,
           ...(event.type !== "customer.subscription.deleted" &&
             quantity && { screenLicenses: quantity }),
           stripeSubscriptionId:

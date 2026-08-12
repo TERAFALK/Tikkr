@@ -18,7 +18,7 @@ const base = siteUrl();
 export const metadata: Metadata = {
   title: "Tikkr — tidregistrering per order för verkstad",
   description:
-    "Stämplingssystem för touchskärm. Ett tryck registrerar tid på rätt order och arbetsmoment. Fungerar utan nät, underlag som PDF med er egen logotyp. 399 kr per skärm och månad.",
+    "Stämplingssystem för touchskärm. Personalen registrerar tid på rätt order och arbetsmoment med ett tryck. Fungerar vid nätverksavbrott och ger underlag som PDF med er egen logotyp. 399 kr per stämplingsskärm och månad.",
 
   // Talar om vilken adress som är den riktiga. Utan den kan tikkr.se och
   // www.tikkr.se räknas som två sidor med samma innehåll, och deras värde
@@ -33,7 +33,7 @@ export const metadata: Metadata = {
       siteName: "Tikkr",
       title: "Tikkr — tidregistrering per order för verkstad",
       description:
-        "Ett tryck på skärmen i verkstaden, så vet du hur mycket tid som lagts på varje order.",
+        "Tidregistrering per order och arbetsmoment, direkt i verkstaden.",
     },
   }),
 };

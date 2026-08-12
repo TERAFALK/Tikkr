@@ -57,8 +57,8 @@ export default async function DevicesPage() {
 
       {licenses.available === 0 && (
         <Alert tone="warning">
-          Alla {licenses.total} licenser används. Vill ni ha fler skärmar ökar
-          ni antalet under{" "}
+          Samtliga {licenses.total} licenser är i bruk. Antalet licenser utökas
+          under{" "}
           <Link
             href="/admin/installningar/prenumeration"
             className="font-medium underline"
@@ -72,7 +72,7 @@ export default async function DevicesPage() {
       {devices.length === 0 ? (
         <EmptyState
           title="Inga skärmar upplagda"
-          description="Skapa en skärm och öppna dess kopplingslänk på surfplattan eller datorn som ska stå i verkstaden."
+          description="Skapa en skärm och öppna dess kopplingslänk på den enhet som ska användas för stämpling."
           action={
           <NewDeviceForm baseUrl={baseUrl} available={licenses.available} />
         }
@@ -81,7 +81,7 @@ export default async function DevicesPage() {
         <Card>
           <CardHeader
             title={`${devices.length} ${devices.length === 1 ? "skärm" : "skärmar"}`}
-            description="Aktiva först. En återkallad skärm slutar fungera omedelbart."
+            description="Aktiva visas först. En återkallad skärm slutar fungera omedelbart."
           />
           <Table>
             <thead>

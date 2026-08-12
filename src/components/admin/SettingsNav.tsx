@@ -49,7 +49,7 @@ const pages: SettingsPage[] = [
   {
     href: "/admin/installningar/anvandare",
     label: "Användare",
-    description: "Vilka som kan logga in",
+    description: "Konton med åtkomst",
     icon: IconPeople,
   },
   {

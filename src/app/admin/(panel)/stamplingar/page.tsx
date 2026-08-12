@@ -105,7 +105,7 @@ export default async function EntriesPage({
     <>
       <PageHeader
         title="Stämplingar"
-        description="Alla registrerade tider. Här läggs tid in som aldrig blev stämplad, och felaktiga poster rättas."
+        description="Samtliga registrerade tider. Här kompletteras tid som inte blivit stämplad och felaktiga poster rättas."
         action={
           <NewEntryDialog
             employees={employeeOptions}
@@ -149,13 +149,13 @@ export default async function EntriesPage({
       {entries.length === 0 ? (
         <EmptyState
           title="Inga stämplingar i perioden"
-          description="Vidga datumintervallet, eller lägg till en stämpling om tid saknas."
+          description="Utöka datumintervallet, eller lägg till en stämpling om tid saknas."
         />
       ) : (
         <Card>
           <CardHeader
             title={`${entries.length} ${entries.length === 1 ? "post" : "poster"}`}
-            description="Senaste först. Ändringar märks som manuella."
+            description="Senaste posten först. Manuella ändringar markeras i listan."
           />
           <Table>
             <thead>
@@ -229,7 +229,7 @@ export default async function EntriesPage({
                             trigger="Ändra"
                             triggerTone="ghost"
                             title={`Ändra stämpling — ${entry.employee.name}`}
-                            description="Ändringen märks som manuell, så den aldrig går att förväxla med en riktig stämpling."
+                            description="Ändringen markeras som manuell och skiljs därmed från registrerade stämplingar."
                             action={editEntry}
                             submitLabel="Spara"
                           >

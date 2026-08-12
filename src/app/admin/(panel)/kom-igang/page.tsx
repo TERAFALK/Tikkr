@@ -45,8 +45,8 @@ export default async function OnboardingPage() {
         title={state.ready ? "Klart att använda" : "Kom igång"}
         description={
           state.ready
-            ? `${companyName} har allt som behövs. Skärmen är redo att stämpla på.`
-            : `Fyra steg innan ${companyName} kan börja stämpla. Tar några minuter.`
+            ? `${companyName} har allt som krävs. Stämplingsskärmen är redo att användas.`
+            : `Fyra steg återstår innan ${companyName} kan börja registrera tid.`
         }
         action={
           state.ready ? (
@@ -61,13 +61,13 @@ export default async function OnboardingPage() {
       <StepCard
         number={1}
         title="Lägg upp anställda"
-        description="Namnen blir knappar på stämplingsskärmen. Skriv dem som folk känner igen dem, inte som de står i personalsystemet."
+        description="Namnen visas som knappar på stämplingsskärmen. Använd den form personerna känns igen på."
         done={state.steps[0].done}
       >
         <form action={addEmployees} className="space-y-3">
           <Field
             label="Ett namn per rad"
-            hint="Klistra gärna in en lista du redan har. Dubbletter hoppas över."
+            hint="En befintlig lista kan klistras in direkt. Dubbletter hoppas över."
           >
             <textarea
               name="names"
@@ -92,13 +92,13 @@ export default async function OnboardingPage() {
       <StepCard
         number={2}
         title="Lägg upp arbetsmoment"
-        description="Vad tiden läggs på. Håll listan kort — många moment gör skärmen svårare att använda och rapporterna svårare att läsa."
+        description="Den typ av arbete tiden avser. En kort lista ger överskådliga val på skärmen och läsbara rapporter."
         done={state.steps[1].done}
       >
         <form action={addMoments} className="space-y-4">
           <div>
             <p className="mb-2 text-[13px] font-medium text-neutral-700">
-              Vanliga moment — kryssa i det som passar
+              Vanligt förekommande moment
             </p>
             <div className="flex flex-wrap gap-2">
               {SUGGESTED_MOMENTS.filter(
@@ -145,7 +145,7 @@ export default async function OnboardingPage() {
       <StepCard
         number={3}
         title="Lägg upp minst en order"
-        description="All tid hör till en kundorder som ska faktureras. Utan en öppen order går det inte att stämpla in."
+        description="All registrerad tid hör till en kundorder. Minst en öppen order krävs för att kunna stämpla in."
         done={state.steps[2].done}
       >
         <form action={addOrder} className="flex flex-wrap items-end gap-3">
@@ -179,7 +179,7 @@ export default async function OnboardingPage() {
       <StepCard
         number={4}
         title="Koppla en stämplingsskärm"
-        description="Skapa skärmen och öppna dess kopplingslänk en gång på surfplattan eller datorn som ska stå i verkstaden. Sedan behöver ingen logga in där igen."
+        description="Skapa skärmen och öppna dess kopplingslänk en gång på den enhet som ska användas för stämpling. Därefter krävs ingen inloggning."
         done={state.steps[3].done}
         last
       >
@@ -194,8 +194,8 @@ export default async function OnboardingPage() {
             Allt är på plats
           </p>
           <p className="mt-1 text-[13px] text-emerald-800">
-            Stämplingsskärmen fungerar. Guiden försvinner nu ur menyn, men
-            sidan finns kvar på sin adress och är länkad från Inställningar.
+            Stämplingsskärmen är redo att användas. Guiden döljs i menyn men
+            förblir tillgänglig via Inställningar.
           </p>
         </Card>
       )}

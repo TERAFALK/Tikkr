@@ -183,14 +183,14 @@ export default async function ReportsPage({
           label="Ogranskade"
           value={report.needsReviewCount}
           tone={report.needsReviewCount > 0 ? "warning" : "neutral"}
-          hint="gissad sluttid"
+          hint="beräknad sluttid"
         />
       </div>
 
       {report.rows.length === 0 ? (
         <EmptyState
           title="Inga stämplingar matchar"
-          description="Prova att vidga datumintervallet eller ta bort ett filter."
+          description="Utöka datumintervallet eller ta bort ett filter."
         />
       ) : (
         <>

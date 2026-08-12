@@ -31,16 +31,14 @@ export default async function AdminUsersPage() {
   return (
     <div className="space-y-6">
       <Alert tone="info">
-        Lägg upp minst två konton. Med bara ett konto är hela arbetsytan
-        oåtkomlig om lösenordet tappas bort — det finns ingen återställning via
-        mejl än.
+        Lägg upp minst två konton. Med endast ett konto blir arbetsytan otillgänglig om lösenordet tappas bort, eftersom återställning via e-post ännu inte är tillgänglig.
       </Alert>
 
       {isOwner && (
         <Card>
           <CardHeader
             title="Bjud in en administratör"
-            description="Personen väljer sitt eget lösenord via länken. Du behöver aldrig hitta på ett åt någon annan."
+            description="Den inbjudne väljer sitt eget lösenord via länken."
           />
           <InviteAdminForm baseUrl={`${proto}://${host}`} />
         </Card>
@@ -49,7 +47,7 @@ export default async function AdminUsersPage() {
       <Card>
         <CardHeader
           title="Administratörer"
-          description="Ägare kan bjuda in och ta bort konton. Administratörer sköter verksamheten men inte kontona."
+          description="Ägare kan bjuda in och ta bort konton. Administratörer har tillgång till verksamheten men inte till kontohantering."
         />
         <Table>
           <thead>

@@ -41,7 +41,7 @@ export function normalizeEmail(value: string): string {
  */
 export function validateSignup(input: SignupInput): string | null {
   if (input.companyName.trim().length < 2) {
-    return "Skriv företagets namn.";
+    return "Ange företagets namn.";
   }
 
   const email = normalizeEmail(input.email);
@@ -72,7 +72,7 @@ export async function createCompanyWithOwner(input: SignupInput) {
 
   if (existing) {
     throw new SignupError(
-      "Det finns redan ett konto med den e-postadressen. Logga in istället."
+      "Det finns redan ett konto med den e-postadressen. Logga in i stället."
     );
   }
 

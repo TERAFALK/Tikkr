@@ -9,7 +9,7 @@ import { Wordmark } from "@/components/ui/Logo";
  */
 
 const NAV = [
-  { href: "#sa-funkar-det", label: "Så funkar det" },
+  { href: "#sa-funkar-det", label: "Så fungerar det" },
   { href: "#funktioner", label: "Funktioner" },
   { href: "#pris", label: "Pris" },
   { href: "#fragor", label: "Frågor" },
@@ -62,8 +62,7 @@ export function SiteFooter() {
           <div className="max-w-xs">
             <Wordmark size={30} />
             <p className="mt-3 text-[13px] leading-relaxed text-neutral-500">
-              Tidregistrering per order och arbetsmoment, byggd för svensk
-              verkstads- och tillverkningsindustri.
+              Tidregistrering per order och arbetsmoment för svensk verkstads- och tillverkningsindustri.
             </p>
             <p className="mt-3 text-[13px] text-neutral-500">
               En del av{" "}

@@ -54,11 +54,14 @@ export default function LicenseForm({
 
       <p className="text-xs leading-relaxed text-neutral-500">
         {pricePerScreen.toLocaleString("sv-SE")} kr per skärm och{" "}
-        {interval === "year" ? "år" : "månad"}. Ökar ni mitt i perioden räknar
-        Stripe av de dagar som återstår — ni betalar bara för den tid ni
-        faktiskt har skärmen.
+        {interval === "year" ? "år" : "månad"}. Vid utökning under pågående
+        period debiteras endast återstående dagar av perioden.
         {used > 0 && (
-          <> Ni kan inte gå under {used}, som är antalet aktiva skärmar just nu.</>
+          <>
+            {" "}
+            Antalet kan inte understiga {used}, vilket motsvarar antalet aktiva
+            skärmar.
+          </>
         )}
       </p>
     </form>

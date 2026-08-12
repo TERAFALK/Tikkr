@@ -74,7 +74,7 @@ export default async function DataProtectionPage() {
 
             <Field
               label="Skriv ANONYMISERA för att bekräfta"
-              hint="En extra spärr, eftersom åtgärden inte går att ångra och namnen i listan ligger nära varandra."
+              hint="Bekräftelse krävs eftersom åtgärden inte kan ångras."
             >
               <Input name="confirm" placeholder="ANONYMISERA" required />
             </Field>
@@ -96,9 +96,7 @@ export default async function DataProtectionPage() {
             reda ut i efterhand.
           </p>
           <p>
-            Tikkr registrerar <strong>ingen</strong> löneinformation, frånvaro
-            eller sjukdom. Systemet är underlag för fakturering av kundordrar,
-            inget annat.
+            Tikkr registrerar ingen löneinformation, frånvaro eller sjukdom. Systemet avser tidsunderlag för fakturering av kundordrar.
           </p>
         </div>
       </Card>

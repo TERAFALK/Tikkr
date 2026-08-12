@@ -22,8 +22,8 @@ export default async function KioskPage() {
             Skärmen är inte kopplad
           </h1>
           <p className="mt-3 text-[15px] leading-relaxed text-neutral-500">
-            Öppna kopplingslänken du fått av administratören en gång på den här
-            skärmen. Sedan behöver du aldrig göra det igen.
+            Öppna kopplingslänken från administratören en gång på den här
+            enheten. Därefter krävs ingen ytterligare åtgärd.
           </p>
         </div>
       </main>

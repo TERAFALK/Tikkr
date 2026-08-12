@@ -62,17 +62,17 @@ export default function NewDeviceForm({
           </h2>
           <p className="mt-0.5 text-[13px] leading-relaxed text-neutral-500">
             {link
-              ? "Öppna länken en gång på skärmen som ska stå i verkstaden."
-              : "Ge skärmen ett namn som säger var den står. Du får en kopplingslänk direkt."}
+              ? "Öppna länken en gång på den enhet som ska användas för stämpling."
+              : "Ange ett namn som beskriver var skärmen är placerad. Kopplingslänken visas direkt."}
           </p>
         </div>
 
         {link ? (
           <div className="space-y-4 px-5 py-5">
             <Alert tone="warning">
-              <strong>Länken visas bara nu.</strong> Av säkerhetsskäl sparas den
-              inte — tappar du bort den skapar du en ny skärm och återkallar den
-              här.
+              <strong>Länken visas endast en gång.</strong> Den sparas inte av
+              säkerhetsskäl. Om länken går förlorad skapas en ny skärm och den
+              befintliga återkallas.
             </Alert>
 
             <code className="block overflow-x-auto rounded-md bg-neutral-900 px-3 py-2.5 text-[13px] text-neutral-100">
@@ -105,7 +105,7 @@ export default function NewDeviceForm({
 
               <Field
                 label="Namn"
-                hint={`${available} av era licenser är lediga.`}
+                hint={`${available} lediga licenser.`}
               >
                 <Input
                   name="name"

@@ -35,7 +35,7 @@ export default async function MomentsPage() {
     <FormDialog
       trigger="Nytt arbetsmoment"
       title="Lägg till arbetsmoment"
-      description="Håll listan kort. Många moment gör skärmen svårare att använda och rapporterna svårare att läsa — fem till tio brukar räcka."
+      description="En kort lista rekommenderas. Fem till tio moment ger överskådliga val på skärmen och läsbara rapporter."
       action={createMoment}
       submitLabel="Lägg till"
     >
@@ -49,14 +49,14 @@ export default async function MomentsPage() {
     <>
       <PageHeader
         title="Arbetsmoment"
-        description="Vad tiden läggs på. Väljs efter ordern på stämplingsskärmen."
+        description="Den typ av arbete tiden avser. Väljs efter order på stämplingsskärmen."
         action={newMoment}
       />
 
       {moments.length === 0 ? (
         <EmptyState
           title="Inga arbetsmoment upplagda"
-          description="Utan minst ett moment går det inte att stämpla in. Lägg till de vanligaste först — fler kan tillkomma efterhand."
+          description="Minst ett arbetsmoment krävs för att kunna stämpla in. Börja med de vanligaste och komplettera vid behov."
           action={newMoment}
         />
       ) : (

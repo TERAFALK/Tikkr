@@ -256,7 +256,7 @@ export default function KioskScreen({
         <div className="flex items-center gap-3 bg-amber-500 px-6 py-3 text-white">
           <span className="text-lg font-semibold">{subscriptionWarning}</span>
           <span className="text-sm opacity-90">
-            Stämplingen fungerar som vanligt — visa det här för din chef.
+            Stämplingen fungerar som vanligt. Informera närmaste chef.
           </span>
         </div>
       )}
@@ -297,7 +297,7 @@ export default function KioskScreen({
         {view.name === "order" && (
           <Chooser
             title={`${view.employee.name} — välj order`}
-            empty="Inga öppna ordrar. Be administratören lägga upp en."
+            empty="Inga öppna ordrar. Kontakta administratören."
             items={orders.map((order) => ({
               key: order.id,
               primary: order.orderNumber,
@@ -311,7 +311,7 @@ export default function KioskScreen({
         {view.name === "moment" && (
           <Chooser
             title={`Order ${view.order.orderNumber} — välj arbetsmoment`}
-            empty="Inga arbetsmoment upplagda."
+            empty="Inga arbetsmoment upplagda. Kontakta administratören."
             items={moments.map((moment) => ({
               key: moment.id,
               primary: moment.name,
@@ -377,7 +377,9 @@ function Header({
         {waiting > 0 && (
           <span className="rounded-lg bg-amber-50 px-3 py-2 text-center text-[13px] font-medium text-amber-700 ring-1 ring-inset ring-amber-200">
             {waiting} väntar
-            <span className="block text-xs font-normal">skickas när nätet är tillbaka</span>
+            <span className="block text-xs font-normal">
+              skickas när anslutningen återupprättas
+            </span>
           </span>
         )}
 
@@ -451,7 +453,7 @@ function EmployeeGrid({
   onPick: (employee: Employee) => void;
 }) {
   if (employees.length === 0) {
-    return <Empty>Inga anställda upplagda. Be administratören lägga till.</Empty>;
+    return <Empty>Inga anställda upplagda. Kontakta administratören.</Empty>;
   }
 
   return (
@@ -551,7 +553,7 @@ function ActionChoice({
         >
           Byt jobb
           <span className="mt-1.5 block text-base font-normal text-neutral-500">
-            Stämplar ut från nuvarande automatiskt
+            Nuvarande jobb stämplas ut automatiskt
           </span>
         </button>
       </div>

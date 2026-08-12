@@ -3,6 +3,7 @@ import {
   listCompanies,
   recentPlatformActivity,
   requirePlatformAdmin,
+  summarizeRevenue,
 } from "@/lib/platform-admin";
 import { emailIsConfigured } from "@/lib/email";
 import { isStripeConfigured } from "@/lib/stripe";
@@ -33,19 +34,12 @@ export default async function PlatformPage() {
   ]);
   const stripeReady = isStripeConfigured();
 
-  const active = companies.filter(
-    (company) => company.subscriptionStatus === "ACTIVE"
-  ).length;
-  const trialing = companies.filter(
-    (company) => company.subscriptionStatus === "TRIALING"
-  ).length;
-  const totalDevices = companies.reduce(
-    (sum, company) => sum + company.devices,
-    0
-  );
+  const revenue = summarizeRevenue(companies);
   const usedLast30 = companies.filter(
     (company) => company.entriesLast30Days > 0
   ).length;
+
+  const kr = (value: number) => `${value.toLocaleString("sv-SE")} kr`;
 
   return (
     <div className="min-h-screen bg-neutral-50">
@@ -74,53 +68,72 @@ export default async function PlatformPage() {
         />
 
         <Alert tone="info">
-          Vyn visar bara siffror — antal och tidpunkter. Innehållet i kundernas
-          data, alltså namn på anställda, ordrar och registrerade tider, är
-          medvetet inte åtkomligt härifrån. Behöver du hjälpa en kund med något
-          konkret får de bjuda in dig som administratör hos sig.
+          Panelen visar enbart aggregerade uppgifter: antal och tidpunkter.
+          Kundernas innehåll — namn på anställda, ordrar och registrerade tider
+          — är inte åtkomligt härifrån. För åtgärder i en kunds data krävs en
+          inbjudan som administratör hos kunden.
           <span className="mt-1.5 block">
-            Det här kontot tillhör inget kundföretag. Vill du använda Tikkr för
-            egen tidregistrering behöver du en vanlig arbetsyta, skild från
-            det här.
+            Kontot tillhör inget kundföretag. För egen tidregistrering krävs en
+            separat arbetsyta.
           </span>
         </Alert>
 
         <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <Stat label="Kundföretag" value={companies.length} />
           <Stat
-            label="Betalande"
-            value={active}
-            tone={active > 0 ? "active" : "neutral"}
+            label="Månadsintäkt"
+            value={kr(revenue.mrr)}
+            tone={revenue.mrr > 0 ? "active" : "neutral"}
+            hint={`${kr(revenue.arr)} på årsbasis`}
           />
-          <Stat label="Provperiod" value={trialing} />
           <Stat
-            label="Aktiva senaste 30 dagarna"
-            value={usedLast30}
-            hint={`${totalDevices} skärmar totalt`}
+            label="Betalande företag"
+            value={revenue.payingCompanies}
+            hint={`${kr(revenue.averagePerCompany)} i snitt per företag`}
+          />
+          <Stat
+            label="Sålda licenser"
+            value={revenue.licensesSold}
+            hint="stämplingsskärmar"
+          />
+          <Stat
+            label="Provperiod"
+            value={revenue.trialingCompanies}
+            hint={`${revenue.pastDueCompanies} med utebliven betalning`}
+            tone={revenue.pastDueCompanies > 0 ? "warning" : "neutral"}
           />
         </div>
+
+        <p className="mt-3 text-xs text-neutral-500">
+          Månadsintäkten avser återkommande intäkt från aktiva prenumerationer.
+          Årsbetalningar räknas om till motsvarande månadsbelopp. Belopp anges
+          exklusive moms och tar inte hänsyn till Stripes avgifter.
+        </p>
+
+        <p className="mt-1 text-xs text-neutral-500">
+          {usedLast30} av {companies.length} företag har registrerat tid de
+          senaste 30 dagarna.
+        </p>
 
         <div className="mt-6">
           {companies.length === 0 ? (
             <EmptyState
-              title="Inga företag än"
-              description="Så fort någon registrerar sig dyker de upp här."
+              title="Inga registrerade företag"
+              description="Registrerade företag visas här."
             />
           ) : (
             <Card>
               <CardHeader
                 title="Företag"
-                description="Nyast först. Ett företag utan aktivitet på länge är en kund på väg att sluta."
+                description="Senast registrerade först. Utebliven aktivitet kan indikera en kund på väg att avsluta."
               />
               <Table>
                 <thead>
                   <tr>
                     <Th>Företag</Th>
                     <Th>Prenumeration</Th>
-                    <Th numeric>Admins</Th>
+                    <Th numeric>Licenser</Th>
+                    <Th numeric>Per månad</Th>
                     <Th numeric>Anställda</Th>
-                    <Th numeric>Skärmar</Th>
-                    <Th numeric>Ordrar</Th>
                     <Th numeric>Stämplingar 30 d</Th>
                     <Th>Senaste aktivitet</Th>
                     <Th>Upplagt</Th>
@@ -141,16 +154,13 @@ export default async function PlatformPage() {
                         <SubscriptionBadge status={company.subscriptionStatus} />
                       </Td>
                       <Td numeric muted>
-                        {company.admins}
+                        {company.licenses}
+                      </Td>
+                      <Td numeric>
+                        {company.monthlyRevenue > 0 ? kr(company.monthlyRevenue) : "—"}
                       </Td>
                       <Td numeric muted>
                         {company.employees}
-                      </Td>
-                      <Td numeric muted>
-                        {company.devices}
-                      </Td>
-                      <Td numeric muted>
-                        {company.openOrders}
                       </Td>
                       <Td numeric>
                         {company.entriesLast30Days === 0 ? (
@@ -177,7 +187,7 @@ export default async function PlatformPage() {
           <Card className="mt-6">
             <CardHeader
               title="Senaste åtgärderna"
-              description="Allt som ändrats från den här panelen, oavsett kund."
+              description="Åtgärder utförda från den här panelen, samtliga kunder."
             />
             <Table>
               <thead>

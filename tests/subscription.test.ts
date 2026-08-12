@@ -68,7 +68,7 @@ describe("provperiod", () => {
     const state = evaluateAccess(facts({ trialEndsAt: inDays(-1) }), now);
 
     expect(state.level).toBe("locked");
-    expect(state.detail).toContain("Stämplingen fortsätter fungera");
+    expect(state.detail).toContain("Stämplingsskärmarna är opåverkade");
   });
 
   it("saknat slutdatum låser ingen ute", () => {
@@ -151,7 +151,7 @@ describe("stämplingen spärras aldrig", () => {
       expect(["full", "warning", "locked"]).toContain(state.level);
 
       if (state.level === "locked") {
-        expect(state.detail).toContain("Stämplingen fortsätter fungera");
+        expect(state.detail).toContain("Stämplingsskärmarna är opåverkade");
       }
     }
   });

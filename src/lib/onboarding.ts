@@ -46,7 +46,7 @@ export async function getOnboardingState(
       key: "employees",
       title: "Lägg upp anställda",
       description:
-        "Namnen blir knappar på stämplingsskärmen. Skriv dem som folk känner igen dem.",
+        "Namnen visas som knappar på stämplingsskärmen. Använd den form personerna känns igen på.",
       href: "/admin/kom-igang",
       done: employees > 0,
     },
@@ -54,7 +54,7 @@ export async function getOnboardingState(
       key: "moments",
       title: "Lägg upp arbetsmoment",
       description:
-        "Vad tiden läggs på — svetsning, montering, lackering. Håll listan kort.",
+        "Den typ av arbete tiden avser, exempelvis svetsning, montering eller lackering. En kort lista rekommenderas.",
       href: "/admin/kom-igang",
       done: moments > 0,
     },
@@ -62,7 +62,7 @@ export async function getOnboardingState(
       key: "orders",
       title: "Lägg upp minst en order",
       description:
-        "All tid hör till en kundorder som ska faktureras. Utan order går det inte att stämpla in.",
+        "All registrerad tid hör till en kundorder. Minst en öppen order krävs för att kunna stämpla in.",
       href: "/admin/kom-igang",
       done: orders > 0,
     },
@@ -70,7 +70,7 @@ export async function getOnboardingState(
       key: "device",
       title: "Koppla en stämplingsskärm",
       description:
-        "Skapa skärmen och öppna dess länk en gång på surfplattan som ska stå i verkstaden.",
+        "Skapa skärmen och öppna dess kopplingslänk en gång på den enhet som ska användas för stämpling.",
       href: "/admin/skarmar",
       done: devices > 0,
     },

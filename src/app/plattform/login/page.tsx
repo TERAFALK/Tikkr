@@ -13,12 +13,12 @@ export default function PlatformLoginPage() {
     <AuthShell
       tone="platform"
       title="Plattformsadministration"
-      subtitle="Översikt över alla kundföretag"
+      subtitle="Översikt över samtliga kundföretag"
       note={
         <>
           Konton skapas på servern med scripts/platform-user.sh.
           <br />
-          Är du kund loggar du in på /admin/login.
+          Kundinloggning sker på /admin/login.
         </>
       }
     >

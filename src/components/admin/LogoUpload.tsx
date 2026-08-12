@@ -72,8 +72,8 @@ export default function LogoUpload({
           label={hasLogo ? "Byt bild" : "Ladda upp bild"}
           hint={
             wide
-              ? "PNG eller JPEG, högst 512 kB. Bred bild med namnet utskrivet fungerar bäst — den läggs överst på underlaget som en brevhuvud."
-              : "PNG eller JPEG, högst 512 kB. Bilden fyller rutan helt, så en kvadratisk bild blir bäst. En PNG med genomskinlig bakgrund ser snyggast ut på stämplingsskärmen."
+              ? "PNG eller JPEG, högst 512 kB. Bred bild med företagsnamnet rekommenderas, eftersom den placeras överst på underlaget."
+              : "PNG eller JPEG, högst 512 kB. Bilden fyller hela ytan, varför en kvadratisk bild rekommenderas. PNG med genomskinlig bakgrund ger bäst resultat."
           }
         >
           <input

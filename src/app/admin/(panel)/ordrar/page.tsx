@@ -37,7 +37,7 @@ export default async function OrdersPage() {
     <FormDialog
       trigger="Ny order"
       title="Lägg till order"
-      description="Öppna ordrar går att stämpla på. All registrerad tid hör till en order som ska faktureras."
+      description="Öppna ordrar är valbara på stämplingsskärmen. All registrerad tid hör till en order."
       action={createOrder}
       submitLabel="Lägg till"
     >
@@ -46,7 +46,7 @@ export default async function OrdersPage() {
       </Field>
       <Field
         label="Kund"
-        hint="Valfritt, men syns som rubrik på underlaget ni skickar vidare."
+        hint="Valfritt. Visas som rubrik på underlag som skickas vidare."
       >
         <Input name="customerName" placeholder="Volvo Lastvagnar" />
       </Field>
@@ -57,14 +57,14 @@ export default async function OrdersPage() {
     <>
       <PageHeader
         title="Ordrar"
-        description="Klicka på ett ordernummer för underlag och ändringar. Även stängda ordrar går att ta fram — ofta för att se vad ett liknande jobb tog i tid."
+        description="Välj ett ordernummer för underlag och ändringar. Även stängda ordrar är tillgängliga, exempelvis för jämförelse med tidigare arbeten."
         action={newOrder}
       />
 
       {rows.length === 0 ? (
         <EmptyState
           title="Inga ordrar upplagda"
-          description="Utan minst en öppen order kan ingen stämpla in — all tid måste höra till en order som ska faktureras."
+          description="Minst en öppen order krävs för att kunna stämpla in, eftersom all tid hör till en order."
           action={newOrder}
         />
       ) : (

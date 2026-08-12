@@ -107,7 +107,7 @@ export async function clockIn(
         // Kan hända när offline-kön levererar tryck i fel ordning.
         throw new ClockError(
           "Stämplingen ligger före den pågående stämplingens starttid. " +
-            "Registrera den i rätt ordning, eller låt admin rätta posten."
+            "Registrera i rätt ordning eller låt en administratör rätta posten."
         );
       }
 
@@ -167,7 +167,7 @@ export async function clockOut(
 
   if (open.clockInAt > at) {
     throw new ClockError(
-      "Utstämplingen ligger före instämplingen. Låt admin rätta posten."
+      "Utstämplingen ligger före instämplingen. Låt en administratör rätta posten."
     );
   }
 

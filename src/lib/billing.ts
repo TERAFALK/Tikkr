@@ -90,7 +90,7 @@ export async function createCheckoutSession(params: {
   });
 
   if (!session.url) {
-    throw new Error("Stripe gav ingen adress till kassan.");
+    throw new Error("Stripe returnerade ingen kassaadress.");
   }
 
   return session.url;
@@ -113,7 +113,7 @@ export async function createPortalSession(params: {
   });
 
   if (!company?.stripeCustomerId) {
-    throw new Error("Företaget har ingen prenumeration hos Stripe än.");
+    throw new Error("Företaget har ännu ingen prenumeration hos Stripe.");
   }
 
   const session = await stripe().billingPortal.sessions.create({
@@ -147,7 +147,7 @@ export async function changeLicenseCount(
 
   if (!company?.stripeSubscriptionId) {
     throw new Error(
-      "Antalet licenser går att ändra först när prenumerationen är igång."
+      "Antalet licenser kan ändras först när prenumerationen är aktiv."
     );
   }
 
@@ -156,7 +156,7 @@ export async function changeLicenseCount(
   );
 
   const item = subscription.items.data[0];
-  if (!item) throw new Error("Prenumerationen saknar rad hos Stripe.");
+  if (!item) throw new Error("Prenumerationen saknar prisrad hos Stripe.");
 
   await stripe().subscriptions.update(company.stripeSubscriptionId, {
     items: [{ id: item.id, quantity: next }],

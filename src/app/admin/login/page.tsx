@@ -10,7 +10,7 @@ export default function LoginPage() {
   return (
     <AuthShell
       title="Logga in"
-      subtitle="Adminpanelen för ditt företags tidregistrering"
+      subtitle="Adminpanel för tidregistrering"
       footer={
         <>
           Nytt företag?{" "}
@@ -24,9 +24,9 @@ export default function LoginPage() {
       }
       note={
         <>
-          Glömt lösenordet? Hör av dig till oss — återställning via mejl är på väg.
+          Vid glömt lösenord, kontakta support@tikkr.se. Återställning via e-post införs senare.
           <br />
-          Stämplingsskärmar loggar inte in här, de kopplas med en egen länk.
+          Stämplingsskärmar loggar inte in här. De kopplas via en egen länk från adminpanelen.
         </>
       }
     >

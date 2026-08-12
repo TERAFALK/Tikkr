@@ -52,13 +52,13 @@ export default async function ReviewPage() {
       {entries.length === 0 ? (
         <EmptyState
           title="Inget att granska"
-          description="Alla stämplingar har en utstämpling som någon faktiskt gjort. Dyker det upp poster här har någon glömt stämpla ut."
+          description="Samtliga stämplingar har en registrerad utstämpling. Poster visas här när utstämpling saknas vid dagens slut."
         />
       ) : (
         <Card>
           <CardHeader
             title={`${entries.length} ${entries.length === 1 ? "post" : "poster"} att gå igenom`}
-            description="Ändra sluttiden om du vet när personen slutade, annars godkänn systemets gissning. Båda märks som granskade."
+            description="Ange korrekt sluttid om den är känd, i annat fall godkänn den beräknade tiden. Båda alternativen markerar posten som granskad."
           />
           <Table>
             <thead>
@@ -90,7 +90,7 @@ export default async function ReviewPage() {
                       )}
                     </Badge>
                     <span className="mt-1 block text-xs text-neutral-400">
-                      gissad till{" "}
+                      beräknad till{" "}
                       {entry.clockOutAt &&
                         formatDateTime(entry.clockOutAt, timeZone)}
                     </span>

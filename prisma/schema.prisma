@@ -74,6 +74,10 @@ model Company {
   stripeCustomerId     String? @unique @map("stripe_customer_id")
   stripeSubscriptionId String? @unique @map("stripe_subscription_id")
 
+  /// "month" eller "year". Behövs för att räkna om årsbetalningar till en
+  /// jämförbar månadsintäkt i plattformsöversikten.
+  subscriptionInterval String? @map("subscription_interval")
+
   /// Klockslag då glömda stämplingar stängs automatiskt, "HH:MM".
   /// Posten stängs men flaggas för granskning — systemet gissar aldrig tyst.
   autoCloseAt String @default("18:00") @map("auto_close_at")

@@ -34,24 +34,22 @@ export function Hero() {
         <div className="mx-auto max-w-2xl text-center">
           <span className="animate-rise inline-flex items-center gap-2 rounded-full border border-neutral-200 bg-white px-3 py-1 text-xs font-medium text-neutral-600">
             <span className="animate-breathe h-1.5 w-1.5 rounded-full bg-emerald-500" />
-            Byggt för svensk verkstadsindustri
+            Utvecklat för svensk verkstadsindustri
           </span>
 
           <h1
             className="animate-rise mt-6 text-4xl font-semibold leading-[1.1] tracking-tight text-neutral-900 sm:text-5xl"
             style={{ animationDelay: "60ms" }}
           >
-            Tidregistrering som
-            <br className="hidden sm:block" /> faktiskt blir gjord
+            Tidregistrering per order,
+            <br className="hidden sm:block" /> direkt i verkstaden
           </h1>
 
           <p
             className="animate-rise mx-auto mt-5 max-w-xl text-base leading-relaxed text-neutral-600 sm:text-lg"
             style={{ animationDelay: "120ms" }}
           >
-            Ett tryck på skärmen i verkstaden, så vet du hur mycket tid som lagts
-            på varje order. Ingen PIN-kod, inga blanketter, ingen som sitter och
-            gissar på fredagen.
+            Personalen registrerar tid med ett tryck på en skärm i verkstaden. Tiden hamnar direkt på rätt order och arbetsmoment, utan blanketter och utan efterhandsrapportering.
           </p>
 
           <div
@@ -62,7 +60,7 @@ export function Hero() {
               href="/registrera"
               className="rounded-lg bg-blue-600 px-5 py-2.5 text-sm font-medium text-white shadow-sm transition-colors hover:bg-blue-700"
             >
-              Kom igång — 30 dagar fritt
+              Prova i 30 dagar
             </Link>
             <a
               href="#sa-funkar-det"
@@ -76,7 +74,7 @@ export function Hero() {
             className="animate-rise mt-4 text-[13px] text-neutral-400"
             style={{ animationDelay: "240ms" }}
           >
-            Inget kort behövs · Igång på en kvart · Säg upp när du vill
+            Inget betalkort krävs · Uppsättning på cirka 15 minuter · Ingen bindningstid
           </p>
         </div>
 
@@ -112,15 +110,15 @@ export function Problem() {
   const points = [
     {
       title: "Tiden skrivs upp i efterhand",
-      body: "På fredagen ska någon minnas vad de gjorde på tisdagen. Det som skrivs blir en gissning, och gissningen blir en faktura.",
+      body: "Vid veckans slut ska medarbetaren minnas vad som utfördes tidigare i veckan. Uppskattningar blir underlag för fakturering.",
     },
     {
       title: "Timmar som aldrig faktureras",
-      body: "Det som inte hann skrivas upp försvinner. Kunden betalar för mindre än ni gjorde, och ingen märker det.",
+      body: "Arbete som inte hinner rapporteras faktureras inte. Bortfallet är svårt att upptäcka i efterhand.",
     },
     {
       title: "Ingen vet vad en order kostade",
-      body: "Utan tid per order går det inte att se vilka jobb som lönar sig. Nästa offert blir en gissning den också.",
+      body: "Utan tid per order saknas underlag för att bedöma lönsamhet, vilket försvårar kommande offerter.",
     },
   ];
 
@@ -132,7 +130,7 @@ export function Problem() {
             Problemet
           </p>
           <h2 className="mt-3 text-2xl font-semibold tracking-tight text-neutral-900 sm:text-3xl">
-            Tid som inte registreras när den läggs ner går inte att få tillbaka
+            Tid som inte registreras när arbetet utförs går inte att rekonstruera
           </h2>
         </div>
 
@@ -158,7 +156,7 @@ export function Problem() {
 }
 
 /* -------------------------------------------------------------------------- */
-/* Så funkar det                                                               */
+/* Så fungerar det                                                               */
 /* -------------------------------------------------------------------------- */
 
 export function HowItWorks() {
@@ -167,10 +165,10 @@ export function HowItWorks() {
       <div className="mx-auto max-w-6xl px-6">
         <div className="max-w-2xl">
           <p className="text-[13px] font-semibold uppercase tracking-wider text-blue-600">
-            Så funkar det
+            Så fungerar det
           </p>
           <h2 className="mt-3 text-2xl font-semibold tracking-tight text-neutral-900 sm:text-3xl">
-            Ett tryck vid skärmen, färdig rapport hos dig
+            Från tryck på skärmen till färdigt underlag
           </h2>
         </div>
 
@@ -179,17 +177,17 @@ export function HowItWorks() {
             <Step
               number={1}
               title="Den anställde trycker på sitt namn"
-              body="Väljer order och arbetsmoment. Ingen PIN-kod, ingen bekräftelseruta. Byter någon jobb stämplas det förra ut automatiskt, så samma timme kan aldrig hamna på två ordrar."
+              body="Order och arbetsmoment väljs i två steg. Vid byte av arbete stängs föregående post automatiskt, vilket säkerställer att samma tid aldrig registreras på två ordrar."
             />
             <Step
               number={2}
               title="Tiden räknas medan arbetet pågår"
-              body="Namnet blir grönt och visar hur länge jobbet hållit på. Hackar wifit sparas stämplingen i skärmen och skickas när nätet är tillbaka — med den tid den faktiskt gjordes."
+              body="Pågående arbete markeras på skärmen med förfluten tid. Vid nätverksavbrott lagras stämplingen lokalt och överförs när anslutningen återupprättas, med den tidpunkt registreringen faktiskt skedde."
             />
             <Step
               number={3}
-              title="Du tar ut underlaget"
-              body="Klicka på en order och ladda ner en färdig PDF att bifoga fakturan — med er logotyp, alla stämplingar och en summa. Glömde någon stämpla ut står det utskrivet vilka tider som är gissade, så ingen faktureras för en gissning i smyg."
+              title="Underlaget tas ut ur adminpanelen"
+              body="Underlag per order laddas ned som PDF eller Excel, med er logotyp, samtliga stämplingar och totalsumma. Poster där sluttiden beräknats av systemet är markerade i dokumentet."
               last
             />
           </div>
@@ -243,32 +241,32 @@ export function Features() {
     {
       icon: <IconClock />,
       title: "Automatisk utstämpling",
-      body: "Byter någon jobb stängs det förra i samma sekund. Glöms utstämplingen stänger systemet posten vid ett klockslag du väljer — och flaggar den, istället för att gissa tyst.",
+      body: "Vid byte av arbete stängs föregående post automatiskt. Saknas utstämpling stängs posten vid ett klockslag ni själva anger, och markeras för granskning.",
     },
     {
       icon: <IconDevice />,
       title: "Fungerar utan nät",
-      body: "Stämplingar sparas i skärmen och skickas när nätet är tillbaka. Tiden som registreras är när personen tryckte, inte när anropet kom fram.",
+      body: "Stämplingar lagras lokalt vid nätverksavbrott och överförs automatiskt. Registrerad tidpunkt är när stämplingen gjordes, inte när överföringen skedde.",
     },
     {
       icon: <IconReport />,
       title: "Underlag per order, med er logotyp",
-      body: "Ladda ner en färdig PDF att bifoga fakturan: ordernummer och kund som rubrik, alla stämplingar och en summa längst ner. Eller Excel om siffrorna ska räknas vidare på.",
+      body: "PDF avsedd att bifogas fakturan, med ordernummer och kund som rubrik, samtliga stämplingar och totalsumma. Excel finns för vidare bearbetning.",
     },
     {
       icon: <IconOrder />,
       title: "All tid hör till en order",
-      body: "Inget internt konto att gömma timmar i. Varje registrerad minut går att koppla till ett jobb som ska faktureras.",
+      body: "Varje registrerad minut är kopplad till en kundorder. Systemet innehåller inga interna konton för icke fakturerbar tid.",
     },
     {
       icon: <IconPeople />,
       title: "Ingen inloggning i verkstaden",
-      body: "Skärmen kopplas en gång med en länk och kommer ihåg sig. En anställd behöver aldrig ett lösenord, och skärmen kan återkallas när som helst.",
+      body: "Skärmen kopplas en gång med en engångslänk. Personalen behöver inga inloggningsuppgifter, och behörigheten kan återkallas när som helst.",
     },
     {
       icon: <IconShield />,
       title: "Spårbart i efterhand",
-      body: "Varje stämpling sparar tidpunkt, skärm och IP. Rättar du en tid märks den som manuell, så den aldrig går att förväxla med en riktig stämpling.",
+      body: "Varje stämpling registrerar tidpunkt, skärm och IP-adress. Manuella ändringar markeras och kan därmed särskiljas från registrerade stämplingar.",
     },
   ];
 
@@ -283,7 +281,7 @@ export function Features() {
             Funktioner
           </p>
           <h2 className="mt-3 text-2xl font-semibold tracking-tight text-neutral-900 sm:text-3xl">
-            Byggt för hur en verkstad faktiskt fungerar
+            Anpassat efter verkstadens arbetssätt
           </h2>
         </div>
 
@@ -315,12 +313,12 @@ export function Features() {
 
 export function AdminSection() {
   const points = [
-    "Se vem som arbetar just nu och på vilken order",
-    "Ladda ner underlag per order som PDF eller Excel",
-    "Markera flera ordrar och få ut dem samlat",
-    "Rätta glömda utstämplingar innan du fakturerar",
-    "Lägg in tid som aldrig hann stämplas",
-    "Er egen logotyp på skärmen och på underlagen",
+    "Pågående arbete i realtid, per anställd och order",
+    "Underlag per order som PDF eller Excel",
+    "Samlad export av flera markerade ordrar",
+    "Granskning och rättning av saknade utstämplingar",
+    "Manuell registrering av tid i efterhand",
+    "Egen logotyp på stämplingsskärmar och underlag",
   ];
 
   return (
@@ -331,11 +329,10 @@ export function AdminSection() {
             Adminpanelen
           </p>
           <h2 className="mt-3 text-2xl font-semibold tracking-tight text-neutral-900 sm:text-3xl">
-            Överblick utan att jaga någon
+            Överblick i realtid
           </h2>
           <p className="mt-4 text-[15px] leading-relaxed text-neutral-600">
-            Allt som registreras hamnar direkt i panelen. Du behöver inte fråga
-            någon hur långt de kommit, och ingen behöver skriva en lapp.
+            Registrerad tid är tillgänglig i panelen omedelbart. Ingen manuell insamling eller sammanställning krävs.
           </p>
 
           <ul className="mt-6 space-y-2.5">
@@ -389,11 +386,10 @@ export function Pricing() {
             Pris
           </p>
           <h2 className="mt-3 text-2xl font-semibold tracking-tight text-neutral-900 sm:text-3xl">
-            En siffra, inget mer
+            Ett pris
           </h2>
           <p className="mt-4 text-[15px] leading-relaxed text-neutral-600">
-            Ni betalar per stämplingsskärm. Antalet anställda spelar ingen roll,
-            och det finns ingen grundavgift.
+            Priset avser antalet stämplingsskärmar. Antalet anställda påverkar inte priset, och ingen grundavgift tillkommer.
           </p>
         </div>
 
@@ -413,7 +409,7 @@ export function Pricing() {
                 exklusive moms · ingen bindningstid
               </p>
               <p className="mt-3 inline-block rounded-md bg-emerald-50 px-3 py-1.5 text-xs font-medium text-emerald-700 ring-1 ring-inset ring-emerald-200">
-                Eller 3 990 kr per år — tio månaders pris för tolv
+                3 990 kr per år motsvarar tio månaders avgift
               </p>
             </div>
 
@@ -445,8 +441,7 @@ export function Pricing() {
                 Prova i 30 dagar
               </Link>
               <p className="mt-2.5 text-center text-xs text-neutral-400">
-                Inget kort behövs. Provperioden övergår inte automatiskt i
-                betalning.
+                Inget betalkort krävs. Provperioden övergår inte automatiskt i betalning.
               </p>
             </div>
           </div>
@@ -464,31 +459,31 @@ export function Faq() {
   const questions = [
     {
       q: "Vad händer om nätet ligger nere?",
-      a: "Stämplingen fungerar ändå. Trycket sparas i skärmen och skickas när nätet är tillbaka, med den tid det faktiskt gjordes. En ruta på skärmen visar hur många som väntar på att skickas.",
+      a: "Stämplingen fungerar som vanligt. Registreringen lagras lokalt och överförs när anslutningen återupprättas, med den tidpunkt den faktiskt gjordes. Antalet väntande registreringar visas på skärmen.",
     },
     {
       q: "Vad krävs för att köra det i verkstaden?",
-      a: "En surfplatta eller en dator med pekskärm och en webbläsare. Inget att installera. Skärmen kopplas en gång med en länk och behöver aldrig loggas in igen.",
+      a: "En surfplatta eller dator med pekskärm och webbläsare. Ingen installation krävs. Skärmen kopplas en gång med en länk och kräver därefter ingen inloggning.",
     },
     {
       q: "Vad händer om någon glömmer stämpla ut?",
-      a: "Systemet stänger posten vid ett klockslag ni väljer, till exempel 18:00, och flaggar den för granskning. Ni ser exakt vilka tider som är gissade och kan rätta dem innan ni fakturerar. Systemet gissar aldrig tyst.",
+      a: "Posten stängs vid ett klockslag ni själva anger, exempelvis 18:00, och markeras för granskning. Beräknade sluttider är alltid markerade och kan korrigeras innan fakturering.",
     },
     {
       q: "Går det att rätta en felaktig stämpling?",
-      a: "Ja. Administratören kan ändra tider och lägga in stämplingar som aldrig gjordes. Varje sådan ändring märks som manuell, så den aldrig går att förväxla med en riktig stämpling.",
+      a: "Ja. Administratören kan korrigera tider och registrera stämplingar i efterhand. Samtliga manuella ändringar markeras och kan därmed särskiljas från registrerade stämplingar.",
     },
     {
       q: "Kan Tikkr användas för löner?",
-      a: "Nej, och det är ett medvetet val. Tikkr registrerar tid som ska faktureras en kund. Ingen frånvaro, ingen övertid, inga lönearter. Det håller systemet enkelt nog att faktiskt användas.",
+      a: "Nej. Tikkr avser tid som ska faktureras kund och innehåller varken frånvaro, övertidsregler eller lönearter. Avgränsningen är medveten och håller systemet enkelt att använda.",
     },
     {
       q: "Kan vi skicka underlaget vidare till vår kund?",
-      a: "Ja, det är vad PDF:en är till för. Ordernummer och kundnamn står som rubrik, alla stämplingar listas och summan finns längst ner. Laddar ni upp er logotyp hamnar den överst, och Tikkr nämns bara diskret i foten. Poster där sluttiden är gissad märks ut — mottagaren ska aldrig faktureras för en gissning utan att veta om det.",
+      a: "Ja. PDF-underlaget innehåller ordernummer och kundnamn som rubrik, samtliga stämplingar och totalsumma. Er logotyp placeras överst. Poster med beräknad sluttid är markerade i dokumentet.",
     },
     {
       q: "Vem kan se vår data?",
-      a: "Bara ni. Varje företag är helt avskilt från andra i systemet, vilket är testat automatiskt. Vi som driver tjänsten ser hur mycket ni använder den, men inte namn på anställda, ordrar eller registrerade tider.",
+      a: "Endast er organisation. Varje företags data är avskild från övrigas, vilket verifieras med automatiska tester. Vi som driver tjänsten ser omfattningen av användningen, men inte namn på anställda, ordrar eller registrerade tider.",
     },
   ];
 
@@ -500,7 +495,7 @@ export function Faq() {
             Frågor
           </p>
           <h2 className="mt-3 text-2xl font-semibold tracking-tight text-neutral-900 sm:text-3xl">
-            Det folk brukar undra
+            Vanliga frågor
           </h2>
         </div>
 
@@ -547,11 +542,10 @@ export function FinalCta() {
     <section className="bg-neutral-900 py-20">
       <div className="mx-auto max-w-3xl px-6 text-center">
         <h2 className="text-2xl font-semibold tracking-tight text-white sm:text-3xl">
-          Sätt upp en skärm och se skillnaden på en vecka
+          Utvärdera systemet i er egen verksamhet
         </h2>
         <p className="mx-auto mt-4 max-w-xl text-[15px] leading-relaxed text-neutral-300">
-          Det tar en kvart att komma igång: lägg upp anställda, ordrar och
-          moment, koppla skärmen och låt verkstaden börja stämpla.
+          Uppsättningen tar omkring 15 minuter: lägg upp anställda, ordrar och arbetsmoment, koppla skärmen och börja registrera tid.
         </p>
 
         <div className="mt-8 flex flex-wrap justify-center gap-3">
@@ -570,7 +564,7 @@ export function FinalCta() {
         </div>
 
         <p className="mt-4 text-[13px] text-neutral-400">
-          30 dagar utan kostnad · inget kort · 399 kr per skärm och månad därefter
+          30 dagars provperiod · inget betalkort · därefter 399 kr per skärm och månad
         </p>
       </div>
     </section>

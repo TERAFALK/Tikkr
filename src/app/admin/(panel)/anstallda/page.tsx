@@ -35,7 +35,7 @@ export default async function EmployeesPage() {
     <FormDialog
       trigger="Ny anställd"
       title="Lägg till anställd"
-      description="Namnet blir en knapp på stämplingsskärmen. Skriv det som folk känner igen det, inte som det står i personalsystemet."
+      description="Namnet visas som knapp på stämplingsskärmen. Använd den form personen känns igen på."
       action={createEmployee}
       submitLabel="Lägg till"
     >
@@ -49,14 +49,14 @@ export default async function EmployeesPage() {
     <>
       <PageHeader
         title="Anställda"
-        description="De som visas på stämplingsskärmen. Avaktiverade döljs där men behåller sin registrerade tid."
+        description="Personer som visas på stämplingsskärmen. Avaktiverade döljs men behåller registrerad tid."
         action={newEmployee}
       />
 
       {employees.length === 0 ? (
         <EmptyState
           title="Inga anställda upplagda"
-          description="Lägg till alla som ska kunna stämpla. Utan minst en anställd visar skärmen ingenting."
+          description="Lägg upp de personer som ska kunna stämpla. Utan minst en anställd visas inga val på skärmen."
           action={newEmployee}
         />
       ) : (
