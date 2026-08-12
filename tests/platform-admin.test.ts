@@ -1,5 +1,12 @@
-import { describe, it, expect, afterEach } from "vitest";
+import { describe, it, expect, afterEach, afterAll } from "vitest";
 import { isPlatformAdmin, platformAdminEmails } from "@/lib/platform-access";
+import {
+  PlatformActionError,
+  setSubscriptionStatus,
+  type SubscriptionStatus,
+} from "@/lib/platform-admin";
+import { TRIAL_LICENSES } from "@/lib/licenses";
+import { unsafeGlobalPrisma } from "@/lib/db";
 
 /**
  * Behörigheten till plattformspanelen.
@@ -57,5 +64,108 @@ describe("ingen kommer in av misstag", () => {
     expect(isPlatformAdmin("")).toBe(false);
     expect(isPlatformAdmin(null)).toBe(false);
     expect(isPlatformAdmin(undefined)).toBe(false);
+  });
+});
+
+/**
+ * Manuell statusändring.
+ *
+ * Två regler att vakta: ett företag som betalar via Stripe får inte ändras
+ * här, och ett företag som sätts tillbaka i provperiod ska tillbaka till
+ * provperiodens villkor. Utan den andra behöll ett företag sina köpta licenser
+ * gratis efter att prenumerationen avslutats.
+ */
+describe("ändra status från plattformspanelen", () => {
+  const actor = "adi@terafalk.com";
+
+  async function company(data: {
+    status: SubscriptionStatus;
+    licenses: number;
+    subscription?: string;
+  }) {
+    return unsafeGlobalPrisma.company.create({
+      data: {
+        name: `Platformtest ${Math.random().toString(36).slice(2, 8)}`,
+        subscriptionStatus: data.status,
+        screenLicenses: data.licenses,
+        stripeSubscriptionId: data.subscription ?? null,
+      },
+    });
+  }
+
+  afterEach(async () => {
+    await unsafeGlobalPrisma.company.deleteMany({
+      where: { name: { startsWith: "Platformtest " } },
+    });
+    await unsafeGlobalPrisma.platformAuditLog.deleteMany({
+      where: { actorEmail: actor },
+    });
+  });
+
+  afterAll(async () => {
+    await unsafeGlobalPrisma.$disconnect();
+  });
+
+  it("tillbaka till provperiod återställer antalet licenser", async () => {
+    const before = await company({ status: "CANCELED", licenses: 3 });
+
+    await setSubscriptionStatus({
+      actorEmail: actor,
+      companyId: before.id,
+      status: "TRIALING",
+      reason: "Förlängd utvärdering",
+    });
+
+    const after = await unsafeGlobalPrisma.company.findUnique({
+      where: { id: before.id },
+      select: { subscriptionStatus: true, screenLicenses: true },
+    });
+
+    expect(after?.subscriptionStatus).toBe("TRIALING");
+    expect(after?.screenLicenses).toBe(TRIAL_LICENSES);
+  });
+
+  it("licenser rörs inte när status sätts till aktiv", async () => {
+    // Fakturakund som betalar för fem skärmar utanför Stripe.
+    const before = await company({ status: "TRIALING", licenses: 5 });
+
+    await setSubscriptionStatus({
+      actorEmail: actor,
+      companyId: before.id,
+      status: "ACTIVE",
+      reason: "Fakturakund",
+    });
+
+    const after = await unsafeGlobalPrisma.company.findUnique({
+      where: { id: before.id },
+      select: { screenLicenses: true },
+    });
+
+    expect(after?.screenLicenses).toBe(5);
+  });
+
+  it("företag med prenumeration hos Stripe går inte att ändra", async () => {
+    const before = await company({
+      status: "ACTIVE",
+      licenses: 3,
+      subscription: `sub_test_${Math.random().toString(36).slice(2, 10)}`,
+    });
+
+    await expect(
+      setSubscriptionStatus({
+        actorEmail: actor,
+        companyId: before.id,
+        status: "TRIALING",
+        reason: "Borde inte gå",
+      })
+    ).rejects.toThrow(PlatformActionError);
+
+    const after = await unsafeGlobalPrisma.company.findUnique({
+      where: { id: before.id },
+      select: { subscriptionStatus: true, screenLicenses: true },
+    });
+
+    expect(after?.subscriptionStatus).toBe("ACTIVE");
+    expect(after?.screenLicenses).toBe(3);
   });
 });

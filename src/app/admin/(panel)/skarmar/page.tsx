@@ -55,9 +55,9 @@ export default async function DevicesPage() {
         }
       />
 
-      {/* Antalet licenser kan sänkas hos Stripe utan att vi kan hindra det.
-          Skärmarna stängs inte av — stämplingen fortsätter, och kunden får
-          själv peka ut vilken skärm som ska bort. */}
+      {/* Antalet licenser kan sänkas hos betaltjänsten utan att vi kan hindra
+          det. Skärmarna stängs inte av — stämplingen fortsätter, och kunden
+          får själv peka ut vilken skärm som ska bort. */}
       {licenses.used > licenses.total ? (
         <Alert tone="warning">
           Ni har {licenses.used} aktiva skärmar men betalar för{" "}

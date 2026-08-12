@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { Card } from "@/components/ui";
 import type { AccessState } from "@/lib/subscription";
-import { PRICE_PER_SCREEN } from "@/lib/stripe";
+import type { ScreenPricing } from "@/lib/stripe";
 import { startCheckout } from "@/app/admin/(panel)/installningar/prenumeration/actions";
 
 /**
@@ -15,14 +15,16 @@ export default function SubscriptionLocked({
   state,
   companyName,
   screens,
-  stripeConfigured,
+  paymentsAvailable,
   yearlyAvailable,
+  pricing,
 }: {
   state: AccessState;
   companyName: string;
   screens: number;
-  stripeConfigured: boolean;
+  paymentsAvailable: boolean;
   yearlyAvailable: boolean;
+  pricing: ScreenPricing;
 }) {
   return (
     <div className="mx-auto max-w-lg py-12">
@@ -47,7 +49,7 @@ export default function SubscriptionLocked({
         </div>
 
         <div className="mt-6 border-t border-neutral-200 pt-5">
-          {stripeConfigured ? (
+          {paymentsAvailable ? (
             <form action={startCheckout} className="space-y-3">
               <label className="block">
                 <span className="mb-1 block text-[13px] font-medium text-neutral-700">
@@ -71,25 +73,30 @@ export default function SubscriptionLocked({
                   value="month"
                   className="rounded-md bg-blue-600 px-3 py-1.5 text-[13px] font-medium text-white transition-colors hover:bg-blue-700"
                 >
-                  Månadsvis · {PRICE_PER_SCREEN.month} kr per skärm
+                  Månadsvis · {pricing.month.toLocaleString("sv-SE")} kr per
+                  skärm
                 </button>
 
-                {yearlyAvailable && (
+                {yearlyAvailable && pricing.year !== null && (
                   <button
                     type="submit"
                     name="interval"
                     value="year"
                     className="rounded-md bg-white px-3 py-1.5 text-[13px] font-medium text-neutral-700 ring-1 ring-inset ring-neutral-200 transition-colors hover:bg-neutral-50"
                   >
-                    Årsvis ·{" "}
-                    {PRICE_PER_SCREEN.year.toLocaleString("sv-SE")} kr per skärm
+                    Årsvis · {pricing.year.toLocaleString("sv-SE")} kr per skärm
+                    {pricing.yearlyDiscountPercent !== null && (
+                      <span className="ml-2 rounded bg-emerald-100 px-1.5 py-0.5 text-[11px] font-semibold text-emerald-700">
+                        −{pricing.yearlyDiscountPercent} %
+                      </span>
+                    )}
                   </button>
                 )}
               </div>
 
               <p className="text-xs leading-relaxed text-neutral-500">
-                Betalningen genomförs hos Stripe. Kortuppgifter hanteras aldrig
-                av Tikkr. Ingen bindningstid tillämpas.
+                Kortuppgifter hanteras av vår betalningsleverantör och lagras
+                aldrig hos Tikkr. Ingen bindningstid tillämpas.
               </p>
             </form>
           ) : (

@@ -2,7 +2,8 @@ import { redirect } from "next/navigation";
 import { unsafeGlobalPrisma } from "./db";
 import { isPlatformAdmin } from "./platform-access";
 import { readPlatformSession } from "./platform-session";
-import { PRICE_PER_SCREEN } from "./stripe";
+import { getScreenPricing, type ScreenPricing } from "./stripe";
+import { TRIAL_LICENSES } from "./licenses";
 
 /**
  * PLATTFORMSADMINISTRATION.
@@ -65,18 +66,26 @@ export interface CompanyOverview {
   managedByStripe: boolean;
 }
 
-/** Månadsintäkt för ett företag, oavsett betalningsintervall. */
-export function monthlyRevenueFor(company: {
-  subscriptionStatus: string;
-  screenLicenses: number;
-  subscriptionInterval: string | null;
-}): number {
+/**
+ * Månadsintäkt för ett företag, oavsett betalningsintervall.
+ *
+ * Priset skickas in istället för att läsas här, så att samma siffra används i
+ * hela vyn även om artikeln hos betaltjänsten ändras mitt under en sidladdning.
+ */
+export function monthlyRevenueFor(
+  company: {
+    subscriptionStatus: string;
+    screenLicenses: number;
+    subscriptionInterval: string | null;
+  },
+  pricing: ScreenPricing
+): number {
   if (company.subscriptionStatus !== "ACTIVE") return 0;
 
   const perScreen =
-    company.subscriptionInterval === "year"
-      ? PRICE_PER_SCREEN.year / 12
-      : PRICE_PER_SCREEN.month;
+    company.subscriptionInterval === "year" && pricing.year !== null
+      ? pricing.year / 12
+      : pricing.month;
 
   return Math.round(company.screenLicenses * perScreen);
 }
@@ -90,6 +99,8 @@ export function monthlyRevenueFor(company: {
 export async function listCompanies(): Promise<CompanyOverview[]> {
   const since = new Date();
   since.setDate(since.getDate() - 30);
+
+  const pricing = await getScreenPricing();
 
   const companies = await unsafeGlobalPrisma.company.findMany({
     orderBy: { createdAt: "desc" },
@@ -152,7 +163,7 @@ export async function listCompanies(): Promise<CompanyOverview[]> {
     entriesLast30Days: recentByCompany.get(company.id) ?? 0,
     lastActivityAt: latestByCompany.get(company.id) ?? null,
     licenses: company.screenLicenses,
-    monthlyRevenue: monthlyRevenueFor(company),
+    monthlyRevenue: monthlyRevenueFor(company, pricing),
     managedByStripe: Boolean(company.stripeSubscriptionId),
   }));
 }
@@ -346,6 +357,7 @@ export async function setSubscriptionStatus(params: {
       subscriptionStatus: true,
       name: true,
       stripeSubscriptionId: true,
+      screenLicenses: true,
     },
   });
 
@@ -363,16 +375,29 @@ export async function setSubscriptionStatus(params: {
     );
   }
 
+  // Tillbaka till provperiod betyder tillbaka till provperiodens villkor.
+  // Utan den här raden behöll ett företag som köpt tre licenser dem gratis
+  // efter att prenumerationen avslutats — de betalade för noll och kunde köra
+  // tre skärmar.
+  const backToTrial = params.status === "TRIALING";
+
   await unsafeGlobalPrisma.company.update({
     where: { id: params.companyId },
-    data: { subscriptionStatus: params.status },
+    data: {
+      subscriptionStatus: params.status,
+      ...(backToTrial && { screenLicenses: TRIAL_LICENSES }),
+    },
   });
 
   await record({
     actorEmail: params.actorEmail,
     action: "Ändrade prenumeration",
     targetCompanyId: params.companyId,
-    detail: `${before.subscriptionStatus} → ${params.status}. ${params.reason}`.trim(),
+    detail:
+      `${before.subscriptionStatus} → ${params.status}. ${params.reason}`.trim() +
+      (backToTrial && before.screenLicenses !== TRIAL_LICENSES
+        ? ` Licenser återställda från ${before.screenLicenses} till ${TRIAL_LICENSES}.`
+        : ""),
   });
 }
 

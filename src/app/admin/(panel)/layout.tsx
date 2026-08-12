@@ -2,7 +2,11 @@ import { requireAdmin } from "@/lib/admin-session";
 import { unsafeGlobalPrisma } from "@/lib/db";
 import { getOnboardingState } from "@/lib/onboarding";
 import { evaluateAccess } from "@/lib/subscription";
-import { isStripeConfigured, yearlyAvailable } from "@/lib/stripe";
+import {
+  getScreenPricing,
+  isStripeConfigured,
+  yearlyAvailable,
+} from "@/lib/stripe";
 import AdminSidebar from "@/components/admin/AdminSidebar";
 import SubscriptionLocked from "@/components/admin/SubscriptionLocked";
 
@@ -77,8 +81,9 @@ export default async function PanelLayout({
               state={access}
               companyName={session.companyName}
               screens={company?.screenLicenses ?? 1}
-              stripeConfigured={isStripeConfigured()}
+              paymentsAvailable={isStripeConfigured()}
               yearlyAvailable={yearlyAvailable()}
+              pricing={await getScreenPricing()}
             />
           ) : (
             children

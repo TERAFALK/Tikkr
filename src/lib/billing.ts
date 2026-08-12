@@ -1,17 +1,19 @@
 import { unsafeGlobalPrisma } from "./db";
 import { getLicenseState, setLicenseCount } from "./licenses";
 import {
+  getScreenPricing,
   priceId,
   stripe,
   yearlyAvailable,
-  PRICE_PER_SCREEN,
   type BillingInterval,
+  type ScreenPricing,
 } from "./stripe";
 
 /**
  * PRENUMERATIONEN.
  *
- * Priset är 399 kr per aktiv stämplingsskärm och månad. Antalet skärmar är
+ * Priset sätts på artikeln hos Stripe och läses därifrån, se getScreenPricing
+ * i stripe.ts. Det gäller per stämplingsskärm och månad. Antalet skärmar är
  * alltså kvantiteten på prenumerationen, och den måste hållas i takt med
  * verkligheten — annars fakturerar vi för skärmar som återkallats, eller
  * missar att ta betalt för nya.
@@ -279,20 +281,26 @@ export interface BillingOverview {
   /** Antal aktiva skärmar av dessa. */
   used: number;
   monthlyAmount: number;
-  yearlyAmount: number;
+  yearlyAmount: number | null;
   /** Vad kunden sparar på att betala ett år i förskott. */
-  yearlySaving: number;
+  yearlySaving: number | null;
   hasSubscription: boolean;
   currentPeriodEnd: Date | null;
   cancelAtPeriodEnd: boolean;
   interval: BillingInterval | null;
+  /** Priset per skärm, hämtat från artikeln hos betaltjänsten. */
+  pricing: ScreenPricing;
 }
 
 /** Vad kunden ser på prenumerationssidan. */
 export async function getBillingOverview(
   companyId: string
 ): Promise<BillingOverview> {
-  const licenses = await getLicenseState(companyId);
+  const [licenses, pricing] = await Promise.all([
+    getLicenseState(companyId),
+    getScreenPricing(),
+  ]);
+
   const screens = licenses.total;
 
   const company = await unsafeGlobalPrisma.company.findUnique({
@@ -300,17 +308,22 @@ export async function getBillingOverview(
     select: { stripeSubscriptionId: true },
   });
 
+  const amounts = (count: number) => ({
+    monthlyAmount: count * pricing.month,
+    yearlyAmount: pricing.year === null ? null : count * pricing.year,
+    yearlySaving:
+      pricing.year === null ? null : count * (pricing.month * 12 - pricing.year),
+  });
+
   const overview: BillingOverview = {
     screens,
     used: licenses.used,
-    monthlyAmount: screens * PRICE_PER_SCREEN.month,
-    yearlyAmount: screens * PRICE_PER_SCREEN.year,
-    yearlySaving:
-      screens * (PRICE_PER_SCREEN.month * 12 - PRICE_PER_SCREEN.year),
+    ...amounts(screens),
     hasSubscription: Boolean(company?.stripeSubscriptionId),
     currentPeriodEnd: null,
     cancelAtPeriodEnd: false,
     interval: null,
+    pricing,
   };
 
   if (!company?.stripeSubscriptionId) return overview;
@@ -349,10 +362,7 @@ export async function getBillingOverview(
       await setLicenseCount(companyId, quantity);
 
       overview.screens = quantity;
-      overview.monthlyAmount = quantity * PRICE_PER_SCREEN.month;
-      overview.yearlyAmount = quantity * PRICE_PER_SCREEN.year;
-      overview.yearlySaving =
-        quantity * (PRICE_PER_SCREEN.month * 12 - PRICE_PER_SCREEN.year);
+      Object.assign(overview, amounts(quantity));
     }
   } catch (error) {
     // Sidan ska gå att öppna även när Stripe inte svarar.

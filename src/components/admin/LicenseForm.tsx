@@ -9,12 +9,15 @@ import {
 import { Alert, Button } from "@/components/ui";
 
 /**
- * Leder till Stripe, där antalet licenser ändras.
+ * Leder till betaltjänstens sida, där antalet licenser ändras.
  *
  * Antalet väljs inte här. Att skriva en siffra i vår panel och sedan bekräfta
  * ett belopp någon annanstans är två steg som beskriver samma sak på två
- * ställen. Hos Stripe hör siffran och beloppet ihop: det som står där är det
- * som debiteras.
+ * ställen. Där ändringen görs hör siffran och beloppet ihop: det som står är
+ * det som debiteras.
+ *
+ * Stripe nämns inte i texten mot kunden. Vilken leverantör som hanterar
+ * betalningen är vårt val, inte något kunden behöver förhålla sig till.
  */
 export default function LicenseForm({
   current,
@@ -59,7 +62,7 @@ export default function LicenseForm({
       <SubmitButton />
 
       <p className="text-xs leading-relaxed text-neutral-500">
-        Antalet ändras hos Stripe, där det nya beloppet och avräkningen för
+        Antalet ändras i nästa steg, där det nya beloppet och avräkningen för
         resterande dagar av perioden räknas fram och godkänns. Ingenting
         debiteras dessförinnan, och avbryts ändringen sker ingenting.
         {used > 0 && (
@@ -80,7 +83,7 @@ function SubmitButton() {
 
   return (
     <Button type="submit" tone="secondary" disabled={pending}>
-      {pending ? "Öppnar Stripe…" : "Ändra antal skärmar hos Stripe"}
+      {pending ? "Öppnar…" : "Ändra antal skärmar"}
     </Button>
   );
 }

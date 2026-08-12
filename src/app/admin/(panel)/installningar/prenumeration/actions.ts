@@ -61,10 +61,10 @@ export async function changeLicenses(
       baseUrl: await baseUrl(),
     });
   } catch (error) {
-    console.error("Kunde inte öppna Stripes sida för antal licenser", error);
+    console.error("Kunde inte öppna betaltjänstens sida för licenser", error);
     return {
       error:
-        "Stripes sida kunde inte öppnas. Försök igen, eller kontakta support@tikkr.se om felet kvarstår.",
+        "Sidan för att ändra antalet kunde inte öppnas. Försök igen, eller kontakta support@tikkr.se om felet kvarstår.",
     };
   }
 

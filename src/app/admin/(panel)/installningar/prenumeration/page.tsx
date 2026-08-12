@@ -2,9 +2,9 @@ import { requireAdmin } from "@/lib/admin-session";
 import { unsafeGlobalPrisma } from "@/lib/db";
 import { getBillingOverview } from "@/lib/billing";
 import {
+  getScreenPricing,
   isStripeConfigured,
   yearlyAvailable,
-  PRICE_PER_SCREEN,
 } from "@/lib/stripe";
 import { evaluateAccess } from "@/lib/subscription";
 import { TRIAL_LICENSES } from "@/lib/licenses";
@@ -50,34 +50,38 @@ export default async function SubscriptionPage({
         screens: 0,
         used: 0,
         monthlyAmount: 0,
-        yearlyAmount: 0,
-        yearlySaving: 0,
+        yearlyAmount: null,
+        yearlySaving: null,
         hasSubscription: false,
         currentPeriodEnd: null,
         cancelAtPeriodEnd: false,
         interval: null,
+        pricing: await getScreenPricing(),
       };
+
+  const { pricing } = overview;
+  const kr = (amount: number) => amount.toLocaleString("sv-SE");
 
   return (
     <div className="space-y-6">
       {params.klart === "1" && (
         <Alert tone="info">
-          Betalningen behandlas av Stripe. Statusen uppdateras inom kort. Ladda
-          om sidan om den inte ändrats.
+          Betalningen behandlas. Statusen uppdateras inom kort — ladda om sidan
+          om den inte ändrats.
         </Alert>
       )}
 
       {params.uppdaterad === "1" && (
         <Alert tone="info">
-          Ändringen är godkänd hos Stripe. Antalet licenser uppdateras inom
-          kort. Ladda om sidan om det inte ändrats.
+          Ändringen är godkänd. Antalet licenser uppdateras inom kort — ladda om
+          sidan om det inte ändrats.
         </Alert>
       )}
 
       <Card>
         <CardHeader
           title="Prenumeration"
-          description="399 kr per stämplingsskärm och månad, exklusive moms. Ingen bindningstid."
+          description={`${kr(pricing.month)} kr per stämplingsskärm och månad, exklusive moms. Ingen bindningstid.`}
         />
 
         <div className="space-y-5 p-5">
@@ -97,10 +101,11 @@ export default async function SubscriptionPage({
                   ? "Kostnad per år"
                   : "Kostnad per månad"
               }
-              value={`${(overview.interval === "year"
-                ? overview.yearlyAmount
-                : overview.monthlyAmount
-              ).toLocaleString("sv-SE")} kr`}
+              value={`${kr(
+                overview.interval === "year"
+                  ? (overview.yearlyAmount ?? 0)
+                  : overview.monthlyAmount
+              )} kr`}
             />
             {company.trialEndsAt && company.subscriptionStatus === "TRIALING" && (
               <Row
@@ -126,9 +131,9 @@ export default async function SubscriptionPage({
             </Alert>
           )}
 
-          {/* Antalet kan sänkas hos Stripe under antalet aktiva skärmar. Vi
-              stänger ingen skärm av oss själva — vilken som ska bort är
-              kundens beslut, inte vårt. */}
+          {/* Antalet kan sänkas hos betaltjänsten under antalet aktiva
+              skärmar. Vi stänger ingen skärm av oss själva — vilken som ska
+              bort är kundens beslut, inte vårt. */}
           {overview.used > overview.screens && (
             <Alert tone="warning">
               Ni har {overview.used} aktiva skärmar men betalar för{" "}
@@ -150,8 +155,8 @@ export default async function SubscriptionPage({
                 used={overview.used}
                 pricePerScreen={
                   overview.interval === "year"
-                    ? PRICE_PER_SCREEN.year
-                    : PRICE_PER_SCREEN.month
+                    ? (pricing.year ?? pricing.month * 12)
+                    : pricing.month
                 }
                 interval={overview.interval ?? "month"}
               />
@@ -161,7 +166,8 @@ export default async function SubscriptionPage({
                   Hantera betalning och fakturor
                 </Button>
                 <p className="mt-2 text-xs text-neutral-500">
-                  Byte av betalkort, kvitton och uppsägning hanteras hos Stripe.
+                  Byte av betalkort, kvitton och uppsägning sker hos vår
+                  betalningsleverantör.
                 </p>
               </form>
             </div>
@@ -185,30 +191,29 @@ export default async function SubscriptionPage({
 
               <div className="flex flex-wrap gap-2">
                 <Button type="submit" name="interval" value="month">
-                  Betala månadsvis · {PRICE_PER_SCREEN.month} kr per skärm
+                  Betala månadsvis · {kr(pricing.month)} kr per skärm
                 </Button>
 
-                {yearly && (
+                {yearly && pricing.year !== null && (
                   <Button
                     type="submit"
                     name="interval"
                     value="year"
                     tone="secondary"
                   >
-                    Betala årsvis · {PRICE_PER_SCREEN.year.toLocaleString("sv-SE")} kr per skärm
+                    Betala årsvis · {kr(pricing.year)} kr per skärm
+                    {pricing.yearlyDiscountPercent !== null && (
+                      <span className="ml-2 rounded bg-emerald-100 px-1.5 py-0.5 text-[11px] font-semibold text-emerald-700">
+                        −{pricing.yearlyDiscountPercent} %
+                      </span>
+                    )}
                   </Button>
                 )}
               </div>
 
-              {yearly && (
-                <p className="text-xs text-emerald-700">
-                  Årsbetalning motsvarar tio månaders pris för tolv månader.
-                </p>
-              )}
-
               <p className="text-xs text-neutral-500">
-                Betalningen genomförs hos Stripe. Kortuppgifter hanteras aldrig
-                av Tikkr. Ingen bindningstid tillämpas.
+                Kortuppgifter hanteras av vår betalningsleverantör och lagras
+                aldrig hos Tikkr. Ingen bindningstid tillämpas.
               </p>
             </form>
           )}

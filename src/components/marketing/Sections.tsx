@@ -9,6 +9,7 @@ import {
 } from "@/components/ui/icons";
 import { AdminMockup, ExportMockup } from "./Mockups";
 import LiveKiosk from "./LiveKiosk";
+import type { ScreenPricing } from "@/lib/stripe";
 import Reveal from "./Reveal";
 
 /* -------------------------------------------------------------------------- */
@@ -368,7 +369,7 @@ export function AdminSection() {
 /* Pris                                                                        */
 /* -------------------------------------------------------------------------- */
 
-export function Pricing() {
+export function Pricing({ pricing }: { pricing: ScreenPricing }) {
   const included = [
     "Obegränsat antal anställda",
     "Obegränsat antal ordrar och arbetsmoment",
@@ -401,16 +402,23 @@ export function Pricing() {
               </p>
               <p className="mt-2 flex items-baseline justify-center gap-1.5">
                 <span className="text-4xl font-semibold tracking-tight text-neutral-900">
-                  399
+                  {pricing.month.toLocaleString("sv-SE")}
                 </span>
                 <span className="text-sm text-neutral-500">kr / månad</span>
               </p>
               <p className="mt-1 text-xs text-neutral-400">
                 exklusive moms · ingen bindningstid
               </p>
-              <p className="mt-3 inline-block rounded-md bg-emerald-50 px-3 py-1.5 text-xs font-medium text-emerald-700 ring-1 ring-inset ring-emerald-200">
-                3 990 kr per år motsvarar tio månaders avgift
-              </p>
+              {pricing.year !== null && (
+                <p className="mt-3 inline-flex items-center gap-2 rounded-md bg-emerald-50 px-3 py-1.5 text-xs font-medium text-emerald-700 ring-1 ring-inset ring-emerald-200">
+                  {pricing.yearlyDiscountPercent !== null && (
+                    <span className="rounded bg-emerald-600 px-1.5 py-0.5 text-[11px] font-semibold text-white">
+                      −{pricing.yearlyDiscountPercent} %
+                    </span>
+                  )}
+                  {pricing.year.toLocaleString("sv-SE")} kr per år
+                </p>
+              )}
             </div>
 
             <ul className="space-y-2.5 px-6 py-6">
@@ -537,7 +545,7 @@ export function Faq() {
 /* Avslutande uppmaning                                                        */
 /* -------------------------------------------------------------------------- */
 
-export function FinalCta() {
+export function FinalCta({ pricing }: { pricing: ScreenPricing }) {
   return (
     <section className="bg-neutral-900 py-20">
       <div className="mx-auto max-w-3xl px-6 text-center">
@@ -564,7 +572,8 @@ export function FinalCta() {
         </div>
 
         <p className="mt-4 text-[13px] text-neutral-400">
-          30 dagars provperiod · inget betalkort · därefter 399 kr per skärm och månad
+          30 dagars provperiod · inget betalkort · därefter{" "}
+          {pricing.month.toLocaleString("sv-SE")} kr per skärm och månad
         </p>
       </div>
     </section>

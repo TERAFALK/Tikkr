@@ -20,6 +20,7 @@ import {
 import { formatDate, formatDateTime } from "@/lib/format";
 import SubscriptionOverrideForm from "@/components/admin/SubscriptionOverrideForm";
 import { monthlyRevenueFor } from "@/lib/platform-admin";
+import { getScreenPricing } from "@/lib/stripe";
 import { updateNote } from "./actions";
 
 export const dynamic = "force-dynamic";
@@ -36,7 +37,7 @@ export default async function CompanyPage({
   if (!detail) notFound();
 
   const { company, admins, devices, note, history, stats } = detail;
-  const monthlyRevenue = monthlyRevenueFor(company);
+  const monthlyRevenue = monthlyRevenueFor(company, await getScreenPricing());
 
   const inactiveDays = stats.lastActivityAt
     ? Math.floor(
