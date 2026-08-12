@@ -74,6 +74,9 @@ services:
       PLATFORM_ADMIN_EMAILS: ${PLATFORM_ADMIN_EMAILS:-}
       MARKETING_HOST: ${MARKETING_HOST:-}
       PORTAL_HOST: ${PORTAL_HOST:-}
+      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-}
+      STRIPE_PRICE_ID: ${STRIPE_PRICE_ID:-}
+      STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-}
     ports:
       # Vänsterledet är porten på servern och går att ändra i .env om något
       # annat redan använder 3000.

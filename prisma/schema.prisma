@@ -58,6 +58,14 @@ model Company {
   /// panelen i samma sekund som ett kort råkar gå ut.
   pastDueSince DateTime? @map("past_due_since")
 
+  /// Kopplingen till Stripe. Kunden hos oss och kunden hos Stripe är samma
+  /// företag, men har olika id — de här raderna binder ihop dem.
+  ///
+  /// Betalningsuppgifter lagras aldrig här. Kortnummer rör aldrig vår server;
+  /// kunden fyller i dem hos Stripe och vi får bara veta att det gick bra.
+  stripeCustomerId     String? @unique @map("stripe_customer_id")
+  stripeSubscriptionId String? @unique @map("stripe_subscription_id")
+
   /// Klockslag då glömda stämplingar stängs automatiskt, "HH:MM".
   /// Posten stängs men flaggas för granskning — systemet gissar aldrig tyst.
   autoCloseAt String @default("18:00") @map("auto_close_at")

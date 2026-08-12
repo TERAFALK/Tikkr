@@ -5,6 +5,7 @@ import {
   requirePlatformAdmin,
 } from "@/lib/platform-admin";
 import { emailIsConfigured } from "@/lib/email";
+import { isStripeConfigured } from "@/lib/stripe";
 import {
   Alert,
   Badge,
@@ -30,6 +31,7 @@ export default async function PlatformPage() {
     listCompanies(),
     recentPlatformActivity(10),
   ]);
+  const stripeReady = isStripeConfigured();
 
   const active = companies.filter(
     (company) => company.subscriptionStatus === "ACTIVE"
@@ -218,7 +220,11 @@ export default async function PlatformPage() {
             />
             <Row
               label="Betalningar"
-              value="Stripe är inte kopplat än"
+              value={
+                stripeReady
+                  ? "Stripe är kopplat"
+                  : "Stripe är inte kopplat — status sätts för hand"
+              }
             />
           </dl>
         </Card>

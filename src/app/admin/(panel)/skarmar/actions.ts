@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { requireAdmin } from "@/lib/admin-session";
 import { createKioskDevice } from "@/lib/kiosk-auth";
+import { syncSubscriptionQuantity } from "@/lib/billing";
 
 const PATH = "/admin/skarmar";
 
@@ -22,6 +23,9 @@ export async function addDevice(formData: FormData) {
 
   const { token } = await createKioskDevice(companyId, name);
 
+  // Antalet betalda skärmar följer antalet aktiva. Fel här stoppar aldrig
+  // det kunden höll på med — se syncSubscriptionQuantity.
+  await syncSubscriptionQuantity(companyId);
   revalidatePath(PATH);
   return { token };
 }
@@ -34,13 +38,16 @@ export async function addDevice(formData: FormData) {
  * kopplingslänk kommer på avvägar.
  */
 export async function toggleDevice(formData: FormData) {
-  const { db } = await requireAdmin();
+  const { db, companyId } = await requireAdmin();
 
   const id = String(formData.get("id") ?? "");
   const active = formData.get("active") === "true";
   if (!id) return;
 
   await db.kioskDevice.update({ where: { id }, data: { active: !active } });
+  // Antalet betalda skärmar följer antalet aktiva. Fel här stoppar aldrig
+  // det kunden höll på med — se syncSubscriptionQuantity.
+  await syncSubscriptionQuantity(companyId);
   revalidatePath(PATH);
 }
 
@@ -55,7 +62,7 @@ export async function toggleDevice(formData: FormData) {
  * står i bekräftelsen så att ingen blir överraskad.
  */
 export async function deleteDevice(formData: FormData) {
-  const { db } = await requireAdmin();
+  const { db, companyId } = await requireAdmin();
 
   const id = String(formData.get("id") ?? "");
   if (!id) return;
@@ -64,5 +71,8 @@ export async function deleteDevice(formData: FormData) {
   if (!device || device.active) return;
 
   await db.kioskDevice.delete({ where: { id } });
+  // Antalet betalda skärmar följer antalet aktiva. Fel här stoppar aldrig
+  // det kunden höll på med — se syncSubscriptionQuantity.
+  await syncSubscriptionQuantity(companyId);
   revalidatePath(PATH);
 }

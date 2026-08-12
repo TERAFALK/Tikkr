@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import {
   IconBuilding,
   IconClock,
+  IconOrder,
   IconPeople,
   IconShield,
 } from "@/components/ui/icons";
@@ -38,6 +39,12 @@ const pages: SettingsPage[] = [
     label: "Tid och automatik",
     description: "Klockslag och tidszon",
     icon: IconClock,
+  },
+  {
+    href: "/admin/installningar/prenumeration",
+    label: "Prenumeration",
+    description: "Betalning och skärmar",
+    icon: IconOrder,
   },
   {
     href: "/admin/installningar/anvandare",
