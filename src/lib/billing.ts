@@ -232,11 +232,18 @@ async function licenseUpdateConfiguration(): Promise<string | null> {
           products: await updatableProducts(),
         },
 
-        // Allt annat stängs av. Konfigurationen används enbart för att ändra
-        // antalet — kort, kvitton och uppsägning ligger kvar i den vanliga
-        // portalen.
+        // Kortbyte MÅSTE vara påslaget. Stripe vägrar annars skapa
+        // konfigurationen: "Cannot enable subscription updates while payment
+        // method update is disabled." Rimligt nog — en höjning kan kräva att
+        // kortet går att byta för att gå igenom.
+        //
+        // Det syns ändå inte här. Kunden landar direkt på sidan för antal,
+        // eftersom sessionen styrs av flow_data.
+        payment_method_update: { enabled: true },
+
+        // Resten stängs av. Kvitton och uppsägning ligger kvar i den vanliga
+        // kundportalen, dit knappen "Hantera betalning och fakturor" leder.
         invoice_history: { enabled: false },
-        payment_method_update: { enabled: false },
         customer_update: { enabled: false },
         subscription_cancel: { enabled: false },
       },
