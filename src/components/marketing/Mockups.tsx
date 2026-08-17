@@ -40,70 +40,146 @@ function Frame({
   );
 }
 
-/* -------------------------------------------------------------------------- */
-/* Stämplingsskärmen                                                           */
-/* -------------------------------------------------------------------------- */
+/** Företagsraden som återkommer överst i kioskbilderna. */
+function KioskHeader({ children }: { children?: React.ReactNode }) {
+  return (
+    <div className="flex items-center gap-2.5 border-b border-neutral-200 px-4 py-3">
+      <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-neutral-900 text-[11px] font-semibold text-white">
+        D
+      </span>
+      <span className="min-w-0">
+        <span className="block truncate text-[13px] font-semibold leading-tight text-neutral-900">
+          Demo Mekaniska AB
+        </span>
+        <span className="block text-[11px] leading-tight text-neutral-400">
+          Verkstaden
+        </span>
+      </span>
+      {children}
+    </div>
+  );
+}
 
+/**
+ * Personerna som återkommer i bilderna.
+ *
+ * Samma namn överallt, så att den som skrollar känner igen sig och förstår att
+ * bilderna visar samma verkstad från olika håll.
+ */
 const NAMES = [
-  { name: "Anna Andersson", job: "2601 · Svetsning", since: "2 tim 15 min" },
-  { name: "Björn Bergqvist", job: null, since: null },
-  { name: "Carina Cederlund", job: "2603 · Montering", since: "48 min" },
-  { name: "David Dahl", job: null, since: null },
-  { name: "Erik Ek", job: "2601 · Fräsning", since: "5 tim 02 min" },
-  { name: "Frida Falk", job: null, since: null },
+  { name: "Anna Andersson", job: "2601 · Svetsning" },
+  { name: "Björn Bergqvist", job: null },
+  { name: "Carina Cederlund", job: "2603 · Montering" },
+  { name: "David Dahl", job: null },
 ];
 
-export function KioskMockup({ className = "" }: { className?: string }) {
-  return (
-    <Frame label="Stämplingsskärmen" className={className}>
-      <div className="flex items-center gap-2.5 border-b border-neutral-200 px-4 py-3">
-        <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-neutral-900 text-[11px] font-semibold text-white">
-          D
-        </span>
-        <span>
-          <span className="block text-[13px] font-semibold leading-tight text-neutral-900">
-            Demo Mekaniska AB
-          </span>
-          <span className="block text-[11px] leading-tight text-neutral-400">
-            Verkstaden
-          </span>
-        </span>
-      </div>
+/* -------------------------------------------------------------------------- */
+/* Stämplingsskärmen — steg två, välj order                                    */
+/* -------------------------------------------------------------------------- */
 
-      <div className="grid grid-cols-2 gap-2 bg-neutral-50 p-3 sm:grid-cols-3">
-        {NAMES.map((person, index) => (
+const ORDERS = [
+  { number: "2601", customer: "Volvo Lastvagnar" },
+  { number: "2603", customer: "Atlas Copco" },
+  { number: "2604", customer: "Sandvik Coromant" },
+  { number: "2605", customer: "SKF Sverige" },
+];
+
+/**
+ * Andra steget i kiosken.
+ *
+ * Finns med för att visa att valet är knappar och inte en rullgardinslista.
+ * Skillnaden är hela poängen för någon som står med handskar på.
+ */
+export function OrderPickMockup({ className = "" }: { className?: string }) {
+  return (
+    <Frame label="Stämplingsskärmen · steg 2" className={className}>
+      <KioskHeader>
+        <span className="ml-auto flex items-center gap-2">
+          <span className="hidden items-center gap-1.5 text-[10px] font-medium text-neutral-500 sm:flex">
+            <span className="flex h-4 w-4 items-center justify-center rounded-full bg-blue-600 text-[8px] font-semibold text-white">
+              2
+            </span>
+            Välj order
+          </span>
+          <span className="rounded-md border border-neutral-200 px-2 py-1 text-[10px] font-semibold text-neutral-500">
+            Avbryt
+          </span>
+        </span>
+      </KioskHeader>
+
+      <div className="bg-neutral-50 p-3">
+        <p className="mb-2 text-[11px] font-semibold text-neutral-900">
+          Anna Andersson — välj order
+        </p>
+
+        <div className="grid grid-cols-2 gap-2">
+          {ORDERS.map((order, index) => (
+            <div
+              key={order.number}
+              className="animate-rise rounded-lg border border-neutral-200 bg-white p-3"
+              style={{ animationDelay: `${200 + index * 80}ms` }}
+            >
+              <span className="block text-sm font-semibold leading-tight text-neutral-900">
+                {order.number}
+              </span>
+              <span className="mt-0.5 block truncate text-[10px] text-neutral-500">
+                {order.customer}
+              </span>
+            </div>
+          ))}
+        </div>
+      </div>
+    </Frame>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+/* Stämplingsskärmen — utan nätverk                                            */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Kön som byggs upp vid nätverksavbrott.
+ *
+ * Den här bilden säljer inget nytt — den lugnar. Frågan "vad händer om nätet
+ * går ner" ställs av alla, och ett svar man kan se är starkare än ett man ska
+ * tro på.
+ */
+export function OfflineMockup({ className = "" }: { className?: string }) {
+  return (
+    <Frame label="Stämplingsskärmen · utan nätverk" className={className}>
+      <KioskHeader>
+        <span className="ml-auto rounded-lg bg-amber-50 px-2 py-1 text-center text-[10px] font-semibold text-amber-700 ring-1 ring-inset ring-amber-200">
+          3 väntar
+          <span className="block text-[8px] font-normal">
+            skickas när anslutningen återupprättas
+          </span>
+        </span>
+      </KioskHeader>
+
+      <div className="grid grid-cols-2 gap-2 bg-neutral-50 p-3">
+        {NAMES.map((person) => (
           <div
             key={person.name}
-            className={`animate-rise rounded-lg border p-3 ${
+            className={`rounded-lg border p-2.5 ${
               person.job
                 ? "border-emerald-600 bg-emerald-600"
                 : "border-neutral-200 bg-white"
             }`}
-            style={{ animationDelay: `${300 + index * 70}ms` }}
           >
             <span
-              className={`block text-[13px] font-semibold leading-tight ${
+              className={`block truncate text-[11px] font-semibold leading-tight ${
                 person.job ? "text-white" : "text-neutral-900"
               }`}
             >
               {person.name}
             </span>
-
-            {person.job ? (
-              <>
-                <span className="mt-2 inline-flex items-center gap-1.5 rounded bg-white/20 px-1.5 py-0.5 text-[10px] font-semibold text-white ring-1 ring-inset ring-white/25">
-                  <span className="animate-breathe h-1.5 w-1.5 rounded-full bg-white" />
-                  {person.since}
-                </span>
-                <span className="mt-1 block truncate text-[10px] text-white/80">
-                  {person.job}
-                </span>
-              </>
-            ) : (
-              <span className="mt-2 block text-[10px] text-neutral-400">
-                Ej instämplad
-              </span>
-            )}
+            <span
+              className={`mt-1 block text-[9px] ${
+                person.job ? "text-white/80" : "text-neutral-400"
+              }`}
+            >
+              {person.job ?? "Ej instämplad"}
+            </span>
           </div>
         ))}
       </div>
@@ -112,7 +188,7 @@ export function KioskMockup({ className = "" }: { className?: string }) {
 }
 
 /* -------------------------------------------------------------------------- */
-/* Adminpanelen                                                                */
+/* Adminpanelen — översikten                                                   */
 /* -------------------------------------------------------------------------- */
 
 const ROWS = [
@@ -121,35 +197,41 @@ const ROWS = [
   { name: "Carina Cederlund", order: "2603", customer: "Atlas Copco", time: "48 min" },
 ];
 
+const MENU = ["Översikt", "Rapporter", "Granskning", "Ordrar", "Anställda"];
+
+function Sidebar({ active = 0 }: { active?: number }) {
+  return (
+    <div className="hidden w-32 shrink-0 border-r border-neutral-200 p-2 sm:block">
+      <div className="mb-3 flex items-center gap-1.5 px-1">
+        <span className="flex h-5 w-5 items-center justify-center rounded bg-neutral-900 text-[9px] font-semibold text-white">
+          D
+        </span>
+        <span className="truncate text-[10px] font-semibold text-neutral-900">
+          Demo Mekaniska
+        </span>
+      </div>
+
+      {MENU.map((item, index) => (
+        <div
+          key={item}
+          className={`mb-0.5 rounded px-2 py-1 text-[10px] font-medium ${
+            index === active
+              ? "bg-neutral-100 text-neutral-900"
+              : "text-neutral-500"
+          }`}
+        >
+          {item}
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export function AdminMockup({ className = "" }: { className?: string }) {
   return (
     <Frame label="Adminpanelen" className={className}>
       <div className="flex">
-        <div className="hidden w-32 shrink-0 border-r border-neutral-200 p-2 sm:block">
-          <div className="mb-3 flex items-center gap-1.5 px-1">
-            <span className="flex h-5 w-5 items-center justify-center rounded bg-neutral-900 text-[9px] font-semibold text-white">
-              D
-            </span>
-            <span className="truncate text-[10px] font-semibold text-neutral-900">
-              Demo Mekaniska
-            </span>
-          </div>
-
-          {["Översikt", "Rapporter", "Granskning", "Ordrar", "Anställda"].map(
-            (item, index) => (
-              <div
-                key={item}
-                className={`mb-0.5 rounded px-2 py-1 text-[10px] font-medium ${
-                  index === 0
-                    ? "bg-neutral-100 text-neutral-900"
-                    : "text-neutral-500"
-                }`}
-              >
-                {item}
-              </div>
-            )
-          )}
-        </div>
+        <Sidebar active={0} />
 
         <div className="min-w-0 flex-1 bg-neutral-50 p-3">
           <div className="mb-3 grid grid-cols-3 gap-2">
@@ -218,7 +300,146 @@ function Stat({
 }
 
 /* -------------------------------------------------------------------------- */
-/* Excel-exporten                                                              */
+/* Adminpanelen — rapporten                                                    */
+/* -------------------------------------------------------------------------- */
+
+const REPORT = [
+  { order: "2601", customer: "Volvo Lastvagnar", hours: "42,25", share: 100 },
+  { order: "2603", customer: "Atlas Copco", hours: "28,00", share: 66 },
+  { order: "2604", customer: "Sandvik Coromant", hours: "14,25", share: 34 },
+];
+
+/** Summeringen per order — svaret på vad som ska faktureras. */
+export function ReportMockup({ className = "" }: { className?: string }) {
+  return (
+    <Frame label="Adminpanelen · rapporter" className={className}>
+      <div className="flex">
+        <Sidebar active={1} />
+
+        <div className="min-w-0 flex-1 bg-neutral-50 p-3">
+          <div className="mb-2.5 flex flex-wrap gap-1.5">
+            {["1–31 augusti", "Alla ordrar", "Alla anställda"].map((chip) => (
+              <span
+                key={chip}
+                className="rounded-md border border-neutral-200 bg-white px-2 py-1 text-[9px] font-medium text-neutral-600"
+              >
+                {chip}
+              </span>
+            ))}
+            <span className="ml-auto rounded-md bg-neutral-900 px-2 py-1 text-[9px] font-semibold text-white">
+              Exportera
+            </span>
+          </div>
+
+          <div className="overflow-hidden rounded-lg border border-neutral-200 bg-white">
+            <div className="flex items-center justify-between border-b border-neutral-200 bg-neutral-50/70 px-3 py-1.5">
+              <span className="text-[10px] font-medium text-neutral-500">
+                Tid per order
+              </span>
+              <span className="text-[10px] font-semibold tabular-nums text-neutral-900">
+                84,50 tim
+              </span>
+            </div>
+
+            {REPORT.map((row, index) => (
+              <div
+                key={row.order}
+                className="border-b border-neutral-100 px-3 py-2 last:border-0"
+              >
+                <div className="flex items-center gap-2">
+                  <span className="text-[11px] font-medium text-neutral-900">
+                    {row.order}
+                  </span>
+                  <span className="min-w-0 flex-1 truncate text-[10px] text-neutral-500">
+                    {row.customer}
+                  </span>
+                  <span className="text-[10px] font-semibold tabular-nums text-neutral-900">
+                    {row.hours}
+                  </span>
+                </div>
+
+                {/* Stapeln gör förhållandet mellan ordrarna läsbart utan att
+                    någon behöver jämföra siffror i huvudet. */}
+                <div className="mt-1.5 h-1 overflow-hidden rounded-full bg-neutral-100">
+                  <div
+                    className="animate-rise h-full rounded-full bg-blue-600"
+                    style={{
+                      width: `${row.share}%`,
+                      animationDelay: `${300 + index * 120}ms`,
+                    }}
+                  />
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </Frame>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+/* Adminpanelen — granskning                                                   */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Posten där utstämplingen saknas.
+ *
+ * Visar det som skiljer Tikkr från ett system som gissar tyst: sluttiden är
+ * beräknad, den är märkt som beräknad, och den ligger i en lista som ska
+ * gås igenom före fakturering.
+ */
+export function ReviewMockup({ className = "" }: { className?: string }) {
+  return (
+    <Frame label="Adminpanelen · granskning" className={className}>
+      <div className="bg-neutral-50 p-3">
+        <div className="mb-2.5 flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2">
+          <span className="animate-breathe h-1.5 w-1.5 shrink-0 rounded-full bg-amber-500" />
+          <span className="text-[10px] font-medium text-amber-900">
+            1 post behöver granskas före fakturering
+          </span>
+        </div>
+
+        <div className="overflow-hidden rounded-lg border border-neutral-200 bg-white">
+          <div className="border-b border-neutral-100 px-3 py-2.5">
+            <div className="flex items-center gap-2">
+              <span className="text-[11px] font-medium text-neutral-900">
+                David Dahl
+              </span>
+              <span className="text-[10px] text-neutral-500">
+                2601 · Lackering
+              </span>
+              <span className="ml-auto rounded bg-amber-50 px-1.5 py-0.5 text-[10px] font-medium tabular-nums text-amber-700 ring-1 ring-inset ring-amber-200">
+                9 tim 48 min
+              </span>
+            </div>
+
+            <div className="mt-1.5 flex flex-wrap gap-x-4 gap-y-1 text-[9px] text-neutral-500">
+              <span>
+                Instämplad <span className="tabular-nums">07:12</span>
+              </span>
+              <span className="text-amber-700">
+                Beräknad sluttid <span className="tabular-nums">18:00</span>
+              </span>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-1.5 bg-neutral-50/70 px-3 py-2">
+            <span className="rounded border border-neutral-200 bg-white px-2 py-1 text-[9px] font-medium text-neutral-600">
+              Ange rätt sluttid
+            </span>
+            <span className="rounded bg-neutral-900 px-2 py-1 text-[9px] font-semibold text-white">
+              Godkänn
+            </span>
+          </div>
+        </div>
+      </div>
+    </Frame>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+/* Underlaget                                                                  */
 /* -------------------------------------------------------------------------- */
 
 /**

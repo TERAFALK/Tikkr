@@ -7,10 +7,73 @@ import {
   IconReport,
   IconShield,
 } from "@/components/ui/icons";
-import { AdminMockup, ExportMockup } from "./Mockups";
+import {
+  AdminMockup,
+  ExportMockup,
+  OfflineMockup,
+  OrderPickMockup,
+  ReportMockup,
+  ReviewMockup,
+} from "./Mockups";
 import LiveKiosk from "./LiveKiosk";
 import type { ScreenPricing } from "@/lib/stripe";
 import Reveal from "./Reveal";
+
+/* -------------------------------------------------------------------------- */
+/* Gemensamma byggstenar                                                       */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Rubriken som inleder varje avsnitt.
+ *
+ * Samma uppbyggnad hela vägen ned: en liten etikett som säger var man är, en
+ * rubrik som säger vad avsnittet hävdar, och vid behov en mening som utvecklar.
+ * En sida där varje avsnitt ser olika ut läses som flera sidor.
+ */
+function SectionHeading({
+  eyebrow,
+  title,
+  body,
+  centered,
+}: {
+  eyebrow: string;
+  title: string;
+  body?: string;
+  centered?: boolean;
+}) {
+  return (
+    <div className={centered ? "mx-auto max-w-2xl text-center" : "max-w-2xl"}>
+      <p className="text-[13px] font-semibold uppercase tracking-wider text-blue-600">
+        {eyebrow}
+      </p>
+      <h2 className="mt-3 text-2xl font-semibold tracking-tight text-neutral-900 sm:text-3xl">
+        {title}
+      </h2>
+      {body && (
+        <p className="mt-4 text-[15px] leading-relaxed text-neutral-600">
+          {body}
+        </p>
+      )}
+    </div>
+  );
+}
+
+function Check() {
+  return (
+    <svg
+      viewBox="0 0 20 20"
+      className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={2}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="m4 10.5 4 4 8-9" />
+    </svg>
+  );
+}
 
 /* -------------------------------------------------------------------------- */
 /* Hero                                                                        */
@@ -19,6 +82,14 @@ import Reveal from "./Reveal";
 export function Hero() {
   return (
     <section className="relative overflow-hidden border-b border-neutral-200 bg-white">
+      {/* Rutnät i bakgrunden, urtonat mot kanterna. Ger djup åt ytan utan att
+          konkurrera med texten — masken gör att det aldrig får en synlig kant
+          där mönstret tar slut. */}
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-0 bg-[linear-gradient(to_right,rgba(15,23,42,0.05)_1px,transparent_1px),linear-gradient(to_bottom,rgba(15,23,42,0.05)_1px,transparent_1px)] bg-[size:56px_56px] [mask-image:radial-gradient(ellipse_70%_60%_at_50%_0%,black,transparent)]"
+      />
+
       {/* Mjukt ljus bakom rubriken.
           En gradient i en låda med bestämd höjd får en synlig kant där lådan
           tar slut. En suddad fläck har ingen kant att se. */}
@@ -50,7 +121,9 @@ export function Hero() {
             className="animate-rise mx-auto mt-5 max-w-xl text-base leading-relaxed text-neutral-600 sm:text-lg"
             style={{ animationDelay: "120ms" }}
           >
-            Personalen registrerar tid med ett tryck på en skärm i verkstaden. Tiden hamnar direkt på rätt order och arbetsmoment, utan blanketter och utan efterhandsrapportering.
+            Personalen registrerar tid med ett tryck på en skärm i verkstaden.
+            Tiden hamnar direkt på rätt order och arbetsmoment, utan blanketter
+            och utan efterhandsrapportering.
           </p>
 
           <div
@@ -75,17 +148,15 @@ export function Hero() {
             className="animate-rise mt-4 text-[13px] text-neutral-400"
             style={{ animationDelay: "240ms" }}
           >
-            Inget betalkort krävs · Uppsättning på cirka 15 minuter · Ingen bindningstid
+            Inget betalkort krävs · Uppsättning på cirka 15 minuter · Ingen
+            bindningstid
           </p>
         </div>
 
         {/* Produktbilderna. Kiosken ligger framför panelen, eftersom det är
             den anställda ser och den som avgör om systemet används. */}
         <div className="relative mx-auto mt-16 max-w-4xl">
-          <div
-            className="animate-rise-soft"
-            style={{ animationDelay: "300ms" }}
-          >
+          <div className="animate-rise-soft" style={{ animationDelay: "300ms" }}>
             <AdminMockup />
           </div>
 
@@ -98,6 +169,43 @@ export function Hero() {
             </div>
           </div>
         </div>
+      </div>
+    </section>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+/* Kapabilitetsremsa                                                           */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Fyra påståenden direkt under hero.
+ *
+ * Ersätter den kundlogotyprad som annars brukar stå här. Vi har inga kunder
+ * att visa upp ännu, och påhittade logotyper är det snabbaste sättet att
+ * förlora förtroendet hos någon som känner branschen.
+ */
+export function Capabilities() {
+  const items = [
+    { title: "Ett tryck", body: "Ingen inloggning i verkstaden" },
+    { title: "Utan nätverk", body: "Stämplingar köas och överförs" },
+    { title: "Per order", body: "Underlag som PDF och Excel" },
+    { title: "Utan bindningstid", body: "Månadsvis eller årsvis" },
+  ];
+
+  return (
+    <section className="border-b border-neutral-200 bg-white">
+      <div className="mx-auto grid max-w-6xl grid-cols-2 gap-px overflow-hidden bg-neutral-200 lg:grid-cols-4">
+        {items.map((item) => (
+          <div key={item.title} className="bg-white px-6 py-6">
+            <p className="text-sm font-semibold text-neutral-900">
+              {item.title}
+            </p>
+            <p className="mt-1 text-[13px] leading-relaxed text-neutral-500">
+              {item.body}
+            </p>
+          </div>
+        ))}
       </div>
     </section>
   );
@@ -126,14 +234,10 @@ export function Problem() {
   return (
     <section className="border-b border-neutral-200 bg-neutral-50 py-20">
       <div className="mx-auto max-w-6xl px-6">
-        <div className="max-w-2xl">
-          <p className="text-[13px] font-semibold uppercase tracking-wider text-blue-600">
-            Problemet
-          </p>
-          <h2 className="mt-3 text-2xl font-semibold tracking-tight text-neutral-900 sm:text-3xl">
-            Tid som inte registreras när arbetet utförs går inte att rekonstruera
-          </h2>
-        </div>
+        <SectionHeading
+          eyebrow="Problemet"
+          title="Tid som inte registreras när arbetet utförs går inte att rekonstruera"
+        />
 
         <div className="mt-10 grid gap-5 sm:grid-cols-3">
           {points.map((point, index) => (
@@ -157,79 +261,67 @@ export function Problem() {
 }
 
 /* -------------------------------------------------------------------------- */
-/* Så fungerar det                                                               */
+/* Så fungerar det                                                             */
 /* -------------------------------------------------------------------------- */
+
+const STEPS = [
+  {
+    number: 1,
+    title: "Den anställde trycker på sitt namn",
+    body: "Order och arbetsmoment väljs i två steg, med knappar stora nog att träffa med arbetshandskar. Vid byte av arbete stängs föregående post automatiskt, vilket säkerställer att samma tid aldrig registreras på två ordrar.",
+    mockup: <OrderPickMockup />,
+  },
+  {
+    number: 2,
+    title: "Tiden räknas medan arbetet pågår",
+    body: "Pågående arbete markeras på skärmen med förfluten tid. Vid nätverksavbrott lagras stämplingen lokalt och överförs när anslutningen återupprättas, med den tidpunkt registreringen faktiskt skedde.",
+    mockup: <OfflineMockup />,
+  },
+  {
+    number: 3,
+    title: "Avvikelser markeras före fakturering",
+    body: "Saknas utstämpling stängs posten vid ett klockslag ni själva anger och markeras för granskning. Systemet gissar aldrig tyst — den beräknade sluttiden är märkt som beräknad, både i panelen och i underlaget.",
+    mockup: <ReviewMockup />,
+  },
+];
 
 export function HowItWorks() {
   return (
     <section id="sa-funkar-det" className="border-b border-neutral-200 py-20">
       <div className="mx-auto max-w-6xl px-6">
-        <div className="max-w-2xl">
-          <p className="text-[13px] font-semibold uppercase tracking-wider text-blue-600">
-            Så fungerar det
-          </p>
-          <h2 className="mt-3 text-2xl font-semibold tracking-tight text-neutral-900 sm:text-3xl">
-            Från tryck på skärmen till färdigt underlag
-          </h2>
-        </div>
+        <SectionHeading
+          eyebrow="Så fungerar det"
+          title="Från tryck på skärmen till färdigt underlag"
+          body="Tre steg, varav de två första sker i verkstaden utan att någon behöver logga in."
+        />
 
-        <div className="mt-12 grid items-center gap-10 lg:grid-cols-2">
-          <div className="order-2 lg:order-1">
-            <Step
-              number={1}
-              title="Den anställde trycker på sitt namn"
-              body="Order och arbetsmoment väljs i två steg. Vid byte av arbete stängs föregående post automatiskt, vilket säkerställer att samma tid aldrig registreras på två ordrar."
-            />
-            <Step
-              number={2}
-              title="Tiden räknas medan arbetet pågår"
-              body="Pågående arbete markeras på skärmen med förfluten tid. Vid nätverksavbrott lagras stämplingen lokalt och överförs när anslutningen återupprättas, med den tidpunkt registreringen faktiskt skedde."
-            />
-            <Step
-              number={3}
-              title="Underlaget tas ut ur adminpanelen"
-              body="Underlag per order laddas ned som PDF eller Excel, med er logotyp, samtliga stämplingar och totalsumma. Poster där sluttiden beräknats av systemet är markerade i dokumentet."
-              last
-            />
-          </div>
+        <div className="mt-14 space-y-16">
+          {STEPS.map((step, index) => (
+            <Reveal key={step.number}>
+              <div className="grid items-center gap-10 lg:grid-cols-2">
+                {/* Vartannat avsnitt speglas, så att blicken flyttas i sidled
+                    på vägen ned istället för att falla rakt igenom. */}
+                <div className={index % 2 === 1 ? "lg:order-2" : ""}>
+                  <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-neutral-900 text-[13px] font-semibold text-white">
+                    {step.number}
+                  </span>
+                  <h3 className="mt-4 text-xl font-semibold tracking-tight text-neutral-900">
+                    {step.title}
+                  </h3>
+                  <p className="mt-3 max-w-md text-[15px] leading-relaxed text-neutral-600">
+                    {step.body}
+                  </p>
+                </div>
 
-          <div className="order-1 space-y-6 lg:order-2">
-            <LiveKiosk />
-            <ExportMockup className="ml-6" />
-          </div>
+                <div className={index % 2 === 1 ? "lg:order-1" : ""}>
+                  {step.mockup}
+                </div>
+              </div>
+            </Reveal>
+          ))}
         </div>
       </div>
     </section>
-  );
-}
-
-function Step({
-  number,
-  title,
-  body,
-  last,
-}: {
-  number: number;
-  title: string;
-  body: string;
-  last?: boolean;
-}) {
-  return (
-    <div className="flex gap-4">
-      <div className="flex flex-col items-center">
-        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-neutral-900 text-[13px] font-semibold text-white">
-          {number}
-        </span>
-        {!last && <span className="mt-1 w-px flex-1 bg-neutral-200" />}
-      </div>
-
-      <div className={last ? "" : "pb-8"}>
-        <h3 className="text-base font-semibold text-neutral-900">{title}</h3>
-        <p className="mt-1.5 text-[13px] leading-relaxed text-neutral-600">
-          {body}
-        </p>
-      </div>
-    </div>
   );
 }
 
@@ -246,12 +338,12 @@ export function Features() {
     },
     {
       icon: <IconDevice />,
-      title: "Fungerar utan nät",
-      body: "Stämplingar lagras lokalt vid nätverksavbrott och överförs automatiskt. Registrerad tidpunkt är när stämplingen gjordes, inte när överföringen skedde.",
+      title: "Fungerar utan nätverk",
+      body: "Stämplingar lagras lokalt vid avbrott och överförs automatiskt. Registrerad tidpunkt är när stämplingen gjordes, inte när överföringen skedde.",
     },
     {
       icon: <IconReport />,
-      title: "Underlag per order, med er logotyp",
+      title: "Underlag med er logotyp",
       body: "PDF avsedd att bifogas fakturan, med ordernummer och kund som rubrik, samtliga stämplingar och totalsumma. Excel finns för vidare bearbetning.",
     },
     {
@@ -277,19 +369,15 @@ export function Features() {
       className="border-b border-neutral-200 bg-neutral-50 py-20"
     >
       <div className="mx-auto max-w-6xl px-6">
-        <div className="max-w-2xl">
-          <p className="text-[13px] font-semibold uppercase tracking-wider text-blue-600">
-            Funktioner
-          </p>
-          <h2 className="mt-3 text-2xl font-semibold tracking-tight text-neutral-900 sm:text-3xl">
-            Anpassat efter verkstadens arbetssätt
-          </h2>
-        </div>
+        <SectionHeading
+          eyebrow="Funktioner"
+          title="Anpassat efter verkstadens arbetssätt"
+        />
 
         <div className="mt-10 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
           {features.map((feature, index) => (
             <Reveal key={feature.title} delay={index * 70}>
-              <div className="group h-full rounded-xl border border-neutral-200 bg-white p-5 transition-shadow hover:shadow-md">
+              <div className="group h-full rounded-xl border border-neutral-200 bg-white p-5 transition-all hover:-translate-y-0.5 hover:border-neutral-300 hover:shadow-md">
                 <span className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-neutral-200 text-neutral-500 transition-colors group-hover:border-blue-200 group-hover:bg-blue-50 group-hover:text-blue-600">
                   {feature.icon}
                 </span>
@@ -315,51 +403,101 @@ export function Features() {
 export function AdminSection() {
   const points = [
     "Pågående arbete i realtid, per anställd och order",
-    "Underlag per order som PDF eller Excel",
-    "Samlad export av flera markerade ordrar",
-    "Granskning och rättning av saknade utstämplingar",
-    "Manuell registrering av tid i efterhand",
-    "Egen logotyp på stämplingsskärmar och underlag",
+    "Rapporter filtrerade på datum, order, anställd och arbetsmoment",
+    "Granskning av poster där utstämpling saknas",
+    "Manuell registrering av tid i efterhand, tydligt märkt",
+    "Flera administratörer med olika behörighet",
   ];
 
   return (
     <section className="border-b border-neutral-200 py-20">
-      <div className="mx-auto grid max-w-6xl items-center gap-12 px-6 lg:grid-cols-2">
-        <div>
-          <p className="text-[13px] font-semibold uppercase tracking-wider text-blue-600">
-            Adminpanelen
-          </p>
-          <h2 className="mt-3 text-2xl font-semibold tracking-tight text-neutral-900 sm:text-3xl">
-            Överblick i realtid
-          </h2>
-          <p className="mt-4 text-[15px] leading-relaxed text-neutral-600">
-            Registrerad tid är tillgänglig i panelen omedelbart. Ingen manuell insamling eller sammanställning krävs.
-          </p>
+      <div className="mx-auto max-w-6xl px-6">
+        <div className="grid items-center gap-12 lg:grid-cols-2">
+          <div>
+            <SectionHeading
+              eyebrow="Adminpanelen"
+              title="Överblick i realtid"
+              body="Registrerad tid är tillgänglig i panelen omedelbart. Ingen manuell insamling eller sammanställning krävs."
+            />
 
-          <ul className="mt-6 space-y-2.5">
-            {points.map((point) => (
-              <li key={point} className="flex items-start gap-2.5">
-                <svg
-                  viewBox="0 0 20 20"
-                  className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth={2}
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  aria-hidden="true"
-                >
-                  <path d="m4 10.5 4 4 8-9" />
-                </svg>
-                <span className="text-[13px] leading-relaxed text-neutral-700">
-                  {point}
-                </span>
-              </li>
-            ))}
-          </ul>
+            <ul className="mt-6 space-y-2.5">
+              {points.map((point) => (
+                <li key={point} className="flex items-start gap-2.5">
+                  <Check />
+                  <span className="text-[13px] leading-relaxed text-neutral-700">
+                    {point}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </div>
+
+          <ReportMockup />
         </div>
+      </div>
+    </section>
+  );
+}
 
-        <AdminMockup />
+/* -------------------------------------------------------------------------- */
+/* Underlaget                                                                  */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Avsnittet som säljer produkten till den som betalar för den.
+ *
+ * Kiosken avgör om systemet används, men underlaget är skälet att skaffa det.
+ * Det förtjänar en egen plats i stället för en punkt i en lista.
+ */
+export function Documents() {
+  const points = [
+    "Ordernummer och kund som rubrik, er logotyp överst",
+    "Samtliga stämplingar med anställd, arbetsmoment och timmar",
+    "Totalsumma, och beräknade sluttider tydligt markerade",
+    "Flera ordrar kan markeras och exporteras samlat",
+  ];
+
+  return (
+    <section
+      id="underlag"
+      className="border-b border-neutral-200 bg-neutral-50 py-20"
+    >
+      <div className="mx-auto max-w-6xl px-6">
+        <div className="grid items-center gap-12 lg:grid-cols-2">
+          <div className="lg:order-2">
+            <SectionHeading
+              eyebrow="Underlaget"
+              title="Ett dokument som går att skicka vidare"
+              body="Underlag per order laddas ned som PDF eller Excel och är utformat för att bifogas fakturan till er kund."
+            />
+
+            <ul className="mt-6 space-y-2.5">
+              {points.map((point) => (
+                <li key={point} className="flex items-start gap-2.5">
+                  <Check />
+                  <span className="text-[13px] leading-relaxed text-neutral-700">
+                    {point}
+                  </span>
+                </li>
+              ))}
+            </ul>
+
+            <div className="mt-6 flex flex-wrap gap-2">
+              {["order-2601.pdf", "order-2601.xlsx"].map((file) => (
+                <span
+                  key={file}
+                  className="rounded-md border border-neutral-200 bg-white px-2.5 py-1.5 text-xs font-medium text-neutral-600"
+                >
+                  {file}
+                </span>
+              ))}
+            </div>
+          </div>
+
+          <div className="lg:order-1">
+            <ExportMockup className="mx-auto max-w-sm" />
+          </div>
+        </div>
       </div>
     </section>
   );
@@ -373,32 +511,27 @@ export function Pricing({ pricing }: { pricing: ScreenPricing }) {
   const included = [
     "Obegränsat antal anställda",
     "Obegränsat antal ordrar och arbetsmoment",
-    "Rapporter och Excel-export",
-    "Offline-stöd på skärmarna",
+    "Rapporter, PDF och Excel-export",
+    "Offline-stöd på stämplingsskärmarna",
     "Flera administratörer",
     "Support på svenska",
   ];
 
   return (
-    <section id="pris" className="border-b border-neutral-200 bg-neutral-50 py-20">
+    <section id="pris" className="border-b border-neutral-200 py-20">
       <div className="mx-auto max-w-6xl px-6">
-        <div className="mx-auto max-w-2xl text-center">
-          <p className="text-[13px] font-semibold uppercase tracking-wider text-blue-600">
-            Pris
-          </p>
-          <h2 className="mt-3 text-2xl font-semibold tracking-tight text-neutral-900 sm:text-3xl">
-            Ett pris
-          </h2>
-          <p className="mt-4 text-[15px] leading-relaxed text-neutral-600">
-            Priset avser antalet stämplingsskärmar. Antalet anställda påverkar inte priset, och ingen grundavgift tillkommer.
-          </p>
-        </div>
+        <SectionHeading
+          centered
+          eyebrow="Pris"
+          title="Ett pris"
+          body="Avgiften avser antalet licenser. En licens ger en stämplingsskärm. Antalet anställda påverkar inte priset, och ingen grundavgift tillkommer."
+        />
 
         <div className="mx-auto mt-10 max-w-md">
           <div className="overflow-hidden rounded-xl border border-neutral-200 bg-white shadow-sm">
-            <div className="border-b border-neutral-200 px-6 py-6 text-center">
+            <div className="border-b border-neutral-200 bg-neutral-50/60 px-6 py-6 text-center">
               <p className="text-[13px] font-medium text-neutral-500">
-                Per stämplingsskärm
+                Per licens
               </p>
               <p className="mt-2 flex items-baseline justify-center gap-1.5">
                 <span className="text-4xl font-semibold tracking-tight text-neutral-900">
@@ -409,6 +542,7 @@ export function Pricing({ pricing }: { pricing: ScreenPricing }) {
               <p className="mt-1 text-xs text-neutral-400">
                 exklusive moms · ingen bindningstid
               </p>
+
               {pricing.year !== null && (
                 <p className="mt-3 inline-flex items-center gap-2 rounded-md bg-emerald-50 px-3 py-1.5 text-xs font-medium text-emerald-700 ring-1 ring-inset ring-emerald-200">
                   {pricing.yearlyDiscountPercent !== null && (
@@ -424,18 +558,7 @@ export function Pricing({ pricing }: { pricing: ScreenPricing }) {
             <ul className="space-y-2.5 px-6 py-6">
               {included.map((item) => (
                 <li key={item} className="flex items-start gap-2.5">
-                  <svg
-                    viewBox="0 0 20 20"
-                    className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth={2}
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    aria-hidden="true"
-                  >
-                    <path d="m4 10.5 4 4 8-9" />
-                  </svg>
+                  <Check />
                   <span className="text-[13px] text-neutral-700">{item}</span>
                 </li>
               ))}
@@ -449,7 +572,8 @@ export function Pricing({ pricing }: { pricing: ScreenPricing }) {
                 Prova i 30 dagar
               </Link>
               <p className="mt-2.5 text-center text-xs text-neutral-400">
-                Inget betalkort krävs. Provperioden övergår inte automatiskt i betalning.
+                Inget betalkort krävs. Provperioden övergår inte automatiskt i
+                betalning.
               </p>
             </div>
           </div>
@@ -466,52 +590,52 @@ export function Pricing({ pricing }: { pricing: ScreenPricing }) {
 export function Faq() {
   const questions = [
     {
-      q: "Vad händer om nätet ligger nere?",
-      a: "Stämplingen fungerar som vanligt. Registreringen lagras lokalt och överförs när anslutningen återupprättas, med den tidpunkt den faktiskt gjordes. Antalet väntande registreringar visas på skärmen.",
-    },
-    {
-      q: "Vad krävs för att köra det i verkstaden?",
+      q: "Vilken utrustning krävs i verkstaden?",
       a: "En surfplatta eller dator med pekskärm och webbläsare. Ingen installation krävs. Skärmen kopplas en gång med en länk och kräver därefter ingen inloggning.",
     },
     {
+      q: "Vad händer vid nätverksavbrott?",
+      a: "Stämplingen fungerar som vanligt. Registreringen lagras lokalt och överförs när anslutningen återupprättas, med den tidpunkt den faktiskt gjordes. Antalet väntande registreringar visas på skärmen.",
+    },
+    {
       q: "Vad händer om någon glömmer stämpla ut?",
-      a: "Posten stängs vid ett klockslag ni själva anger, exempelvis 18:00, och markeras för granskning. Beräknade sluttider är alltid markerade och kan korrigeras innan fakturering.",
+      a: "Posten stängs vid ett klockslag ni själva anger, exempelvis 18:00, och markeras för granskning. Beräknade sluttider är alltid markerade som beräknade och kan korrigeras före fakturering.",
     },
     {
       q: "Går det att rätta en felaktig stämpling?",
       a: "Ja. Administratören kan korrigera tider och registrera stämplingar i efterhand. Samtliga manuella ändringar markeras och kan därmed särskiljas från registrerade stämplingar.",
     },
     {
-      q: "Kan Tikkr användas för löner?",
-      a: "Nej. Tikkr avser tid som ska faktureras kund och innehåller varken frånvaro, övertidsregler eller lönearter. Avgränsningen är medveten och håller systemet enkelt att använda.",
+      q: "Kan underlaget skickas vidare till vår kund?",
+      a: "Ja. PDF-underlaget innehåller ordernummer och kundnamn som rubrik, samtliga stämplingar och totalsumma, med er logotyp överst. Excel finns för vidare bearbetning.",
     },
     {
-      q: "Kan vi skicka underlaget vidare till vår kund?",
-      a: "Ja. PDF-underlaget innehåller ordernummer och kundnamn som rubrik, samtliga stämplingar och totalsumma. Er logotyp placeras överst. Poster med beräknad sluttid är markerade i dokumentet.",
+      q: "Kan Tikkr användas för löneunderlag?",
+      a: "Nej. Tikkr avser tid som ska faktureras kund och innehåller varken frånvaro, övertidsregler eller lönearter. Avgränsningen är medveten och håller systemet enkelt att använda i verkstaden.",
     },
     {
-      q: "Vem kan se vår data?",
-      a: "Endast er organisation. Varje företags data är avskild från övrigas, vilket verifieras med automatiska tester. Vi som driver tjänsten ser omfattningen av användningen, men inte namn på anställda, ordrar eller registrerade tider.",
+      q: "Hur hanteras personuppgifter?",
+      a: "Uppgifterna om en anställd begränsas till namn och registrerad tid. Administratören kan när som helst exportera eller radera en enskild anställds uppgifter, i enlighet med dataskyddsförordningen.",
+    },
+    {
+      q: "Vad händer med registrerad tid om prenumerationen avslutas?",
+      a: "Tiden finns kvar. Stämplingsskärmarna fortsätter dessutom att fungera vid utebliven betalning — det är rapporter och export som låses, eftersom oregistrerad arbetstid inte går att rekonstruera i efterhand.",
     },
   ];
 
   return (
-    <section id="fragor" className="border-b border-neutral-200 py-20">
+    <section
+      id="fragor"
+      className="border-b border-neutral-200 bg-neutral-50 py-20"
+    >
       <div className="mx-auto max-w-3xl px-6">
-        <div className="text-center">
-          <p className="text-[13px] font-semibold uppercase tracking-wider text-blue-600">
-            Frågor
-          </p>
-          <h2 className="mt-3 text-2xl font-semibold tracking-tight text-neutral-900 sm:text-3xl">
-            Vanliga frågor
-          </h2>
-        </div>
+        <SectionHeading centered eyebrow="Frågor" title="Vanliga frågor" />
 
-        <div className="mt-10 divide-y divide-neutral-200 border-y border-neutral-200">
+        <div className="mt-10 divide-y divide-neutral-200 overflow-hidden rounded-xl border border-neutral-200 bg-white">
           {questions.map((item) => (
             // <details> ger utfällbara svar utan JavaScript. Fungerar även om
-            // något strular, och går att söka i med webbläsarens egen sökfunktion.
-            <details key={item.q} className="group py-4">
+            // något går fel, och går att söka i med webbläsarens egen funktion.
+            <details key={item.q} className="group px-5 py-4">
               <summary className="flex cursor-pointer list-none items-center justify-between gap-4 text-[15px] font-medium text-neutral-900">
                 {item.q}
                 <span
@@ -547,13 +671,19 @@ export function Faq() {
 
 export function FinalCta({ pricing }: { pricing: ScreenPricing }) {
   return (
-    <section className="bg-neutral-900 py-20">
-      <div className="mx-auto max-w-3xl px-6 text-center">
+    <section className="relative overflow-hidden bg-neutral-900 py-20">
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute left-1/2 top-0 h-[420px] w-[900px] -translate-x-1/2 rounded-full bg-blue-500/20 blur-[130px]"
+      />
+
+      <div className="relative mx-auto max-w-3xl px-6 text-center">
         <h2 className="text-2xl font-semibold tracking-tight text-white sm:text-3xl">
           Utvärdera systemet i er egen verksamhet
         </h2>
         <p className="mx-auto mt-4 max-w-xl text-[15px] leading-relaxed text-neutral-300">
-          Uppsättningen tar omkring 15 minuter: lägg upp anställda, ordrar och arbetsmoment, koppla skärmen och börja registrera tid.
+          Uppsättningen tar omkring 15 minuter: lägg upp anställda, ordrar och
+          arbetsmoment, koppla skärmen och börja registrera tid.
         </p>
 
         <div className="mt-8 flex flex-wrap justify-center gap-3">
@@ -573,7 +703,7 @@ export function FinalCta({ pricing }: { pricing: ScreenPricing }) {
 
         <p className="mt-4 text-[13px] text-neutral-400">
           30 dagars provperiod · inget betalkort · därefter{" "}
-          {pricing.month.toLocaleString("sv-SE")} kr per skärm och månad
+          {pricing.month.toLocaleString("sv-SE")} kr per licens och månad
         </p>
       </div>
     </section>

@@ -11,6 +11,7 @@ import { Wordmark } from "@/components/ui/Logo";
 const NAV = [
   { href: "#sa-funkar-det", label: "Så fungerar det" },
   { href: "#funktioner", label: "Funktioner" },
+  { href: "#underlag", label: "Underlag" },
   { href: "#pris", label: "Pris" },
   { href: "#fragor", label: "Frågor" },
 ];

@@ -5,6 +5,8 @@ import Reveal from "@/components/marketing/Reveal";
 import { SiteFooter, SiteHeader } from "@/components/marketing/SiteChrome";
 import {
   AdminSection,
+  Capabilities,
+  Documents,
   Faq,
   Features,
   FinalCta,
@@ -68,6 +70,7 @@ export default async function Home() {
       {/* Hero animeras vid inladdning — den syns direkt och har inget att
           vänta på. Resten tonas in när man skrollar dit. */}
       <Hero />
+      <Capabilities />
 
       <Reveal>
         <Problem />
@@ -80,6 +83,9 @@ export default async function Home() {
       </Reveal>
       <Reveal>
         <AdminSection />
+      </Reveal>
+      <Reveal>
+        <Documents />
       </Reveal>
       <Reveal>
         <Pricing pricing={pricing} />
