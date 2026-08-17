@@ -3,6 +3,15 @@ import Link from "next/link";
 import LegalPage, { List, type Section } from "@/components/marketing/LegalPage";
 import { LEGAL_UPDATED } from "@/lib/legal";
 
+/**
+ * Byggs om varje minut, likt startsidan.
+ *
+ * Sidan är i praktiken oföränderlig, men den visar driftmeddelanderemsan i
+ * toppen via SiteHeader. Utan omvärdering hade remsan bakats in som tom när
+ * containern byggdes och aldrig uppdaterats.
+ */
+export const revalidate = 60;
+
 export const metadata: Metadata = {
   title: "Användarvillkor — Tikkr",
   description:

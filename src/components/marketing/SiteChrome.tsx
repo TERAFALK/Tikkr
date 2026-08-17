@@ -38,6 +38,29 @@ const NAV = [
 ];
 
 /**
+ * Hämtar meddelandena, eller inga alls.
+ *
+ * Säljsidan förrenderas när containern byggs, och då finns ingen databas — den
+ * startar först efteråt. Utan det här skyddet stoppar en frånvarande databas
+ * hela bygget, vilket den inte ska: en säljsida som beskriver en produkt
+ * behöver inte produktens databas för att gå att läsa.
+ *
+ * Samma sak gäller i drift. Skulle databasen ligga nere är en säljsida utan
+ * driftmeddelande bättre än ingen säljsida alls.
+ *
+ * Panelen och kiosken har medvetet INTE det här skyddet. Där ska ett
+ * databasfel synas, eftersom sidorna ändå inte fungerar utan den.
+ */
+async function noticesOrNone() {
+  try {
+    return await activeNotices("site");
+  } catch (error) {
+    console.error("Kunde inte hämta driftmeddelanden till säljsidan", error);
+    return [];
+  }
+}
+
+/**
  * Driftmeddelande på säljsidan.
  *
  * En smal remsa ovanför menyn, i löptextens storlek och utan färgblock. Den
@@ -51,7 +74,7 @@ const NAV = [
  * enda ytan som når någon som ännu inte är kund.
  */
 async function SiteNotices() {
-  const notices = await activeNotices("site");
+  const notices = await noticesOrNone();
   if (notices.length === 0) return null;
 
   return (
