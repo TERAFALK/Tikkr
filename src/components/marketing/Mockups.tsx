@@ -67,10 +67,10 @@ function KioskHeader({ children }: { children?: React.ReactNode }) {
  * bilderna visar samma verkstad från olika håll.
  */
 const NAMES = [
-  { name: "Anna Andersson", job: "2601 · Svetsning" },
-  { name: "Björn Bergqvist", job: null },
-  { name: "Carina Cederlund", job: "2603 · Montering" },
-  { name: "David Dahl", job: null },
+  { name: "Anna Andersson", job: "2601 · Svetsning", elapsed: "2 tim 15 min" },
+  { name: "Björn Bergqvist", job: null, elapsed: null },
+  { name: "Carina Cederlund", job: "2603 · Montering", elapsed: "48 min" },
+  { name: "David Dahl", job: null, elapsed: null },
 ];
 
 /* -------------------------------------------------------------------------- */
@@ -134,52 +134,55 @@ export function OrderPickMockup({ className = "" }: { className?: string }) {
 }
 
 /* -------------------------------------------------------------------------- */
-/* Stämplingsskärmen — utan nätverk                                            */
+/* Stämplingsskärmen — pågående arbete                                         */
 /* -------------------------------------------------------------------------- */
 
 /**
- * Kön som byggs upp vid nätverksavbrott.
+ * Namnrutnätet med tiden som räknas.
  *
- * Den här bilden säljer inget nytt — den lugnar. Frågan "vad händer om nätet
- * går ner" ställs av alla, och ett svar man kan se är starkare än ett man ska
- * tro på.
+ * Grönt kort betyder instämplad, och den förflutna tiden står på kortet. Vem
+ * som arbetar med vad går att läsa från andra sidan verkstaden, vilket är
+ * skälet att korten är så stora.
  */
-export function OfflineMockup({ className = "" }: { className?: string }) {
+export function RunningMockup({ className = "" }: { className?: string }) {
   return (
-    <Frame label="Stämplingsskärmen · utan nätverk" className={className}>
-      <KioskHeader>
-        <span className="ml-auto rounded-lg bg-amber-50 px-2 py-1 text-center text-[10px] font-semibold text-amber-700 ring-1 ring-inset ring-amber-200">
-          3 väntar
-          <span className="block text-[8px] font-normal">
-            skickas när anslutningen återupprättas
-          </span>
-        </span>
-      </KioskHeader>
+    <Frame label="Stämplingsskärmen" className={className}>
+      <KioskHeader />
 
       <div className="grid grid-cols-2 gap-2 bg-neutral-50 p-3">
-        {NAMES.map((person) => (
+        {NAMES.map((person, index) => (
           <div
             key={person.name}
-            className={`rounded-lg border p-2.5 ${
+            className={`animate-rise rounded-lg border p-3 ${
               person.job
                 ? "border-emerald-600 bg-emerald-600"
                 : "border-neutral-200 bg-white"
             }`}
+            style={{ animationDelay: `${200 + index * 80}ms` }}
           >
             <span
-              className={`block truncate text-[11px] font-semibold leading-tight ${
+              className={`block truncate text-[12px] font-semibold leading-tight ${
                 person.job ? "text-white" : "text-neutral-900"
               }`}
             >
               {person.name}
             </span>
-            <span
-              className={`mt-1 block text-[9px] ${
-                person.job ? "text-white/80" : "text-neutral-400"
-              }`}
-            >
-              {person.job ?? "Ej instämplad"}
-            </span>
+
+            {person.job ? (
+              <>
+                <span className="mt-2 inline-flex items-center gap-1.5 rounded bg-white/20 px-1.5 py-0.5 text-[10px] font-semibold tabular-nums text-white ring-1 ring-inset ring-white/25">
+                  <span className="animate-breathe h-1.5 w-1.5 rounded-full bg-white" />
+                  {person.elapsed}
+                </span>
+                <span className="mt-1 block truncate text-[10px] text-white/80">
+                  {person.job}
+                </span>
+              </>
+            ) : (
+              <span className="mt-2 block text-[10px] text-neutral-400">
+                Ej instämplad
+              </span>
+            )}
           </div>
         ))}
       </div>

@@ -10,10 +10,10 @@ import {
 import {
   AdminMockup,
   ExportMockup,
-  OfflineMockup,
   OrderPickMockup,
   ReportMockup,
   ReviewMockup,
+  RunningMockup,
 } from "./Mockups";
 import LiveKiosk from "./LiveKiosk";
 import type { ScreenPricing } from "@/lib/stripe";
@@ -188,7 +188,7 @@ export function Hero() {
 export function Capabilities() {
   const items = [
     { title: "Ett tryck", body: "Ingen inloggning i verkstaden" },
-    { title: "Utan nätverk", body: "Stämplingar köas och överförs" },
+    { title: "Automatisk utstämpling", body: "Vid jobbyte och dagens slut" },
     { title: "Per order", body: "Underlag som PDF och Excel" },
     { title: "Utan bindningstid", body: "Månadsvis eller årsvis" },
   ];
@@ -274,8 +274,8 @@ const STEPS = [
   {
     number: 2,
     title: "Tiden räknas medan arbetet pågår",
-    body: "Pågående arbete markeras på skärmen med förfluten tid. Vid nätverksavbrott lagras stämplingen lokalt och överförs när anslutningen återupprättas, med den tidpunkt registreringen faktiskt skedde.",
-    mockup: <OfflineMockup />,
+    body: "Vem som är instämplad, på vilken order och sedan när syns direkt på skärmen. Samma bild finns i adminpanelen, så att kontoret ser läget i verkstaden utan att fråga.",
+    mockup: <RunningMockup />,
   },
   {
     number: 3,
@@ -338,8 +338,8 @@ export function Features() {
     },
     {
       icon: <IconDevice />,
-      title: "Fungerar utan nätverk",
-      body: "Stämplingar lagras lokalt vid avbrott och överförs automatiskt. Registrerad tidpunkt är när stämplingen gjordes, inte när överföringen skedde.",
+      title: "Ingen installation",
+      body: "Skärmen är en surfplatta eller dator med webbläsare. Ingenting installeras, och samma panel nås från kontoret utan särskild programvara.",
     },
     {
       icon: <IconReport />,
@@ -512,7 +512,7 @@ export function Pricing({ pricing }: { pricing: ScreenPricing }) {
     "Obegränsat antal anställda",
     "Obegränsat antal ordrar och arbetsmoment",
     "Rapporter, PDF och Excel-export",
-    "Offline-stöd på stämplingsskärmarna",
+    "Obegränsat antal stämplingar",
     "Flera administratörer",
     "Support på svenska",
   ];
@@ -594,8 +594,8 @@ export function Faq() {
       a: "En surfplatta eller dator med pekskärm och webbläsare. Ingen installation krävs. Skärmen kopplas en gång med en länk och kräver därefter ingen inloggning.",
     },
     {
-      q: "Vad händer vid nätverksavbrott?",
-      a: "Stämplingen fungerar som vanligt. Registreringen lagras lokalt och överförs när anslutningen återupprättas, med den tidpunkt den faktiskt gjordes. Antalet väntande registreringar visas på skärmen.",
+      q: "Hur lång tid tar uppsättningen?",
+      a: "Omkring 15 minuter. Anställda, ordrar och arbetsmoment läggs upp i en guide, och skärmen kopplas med en länk som öppnas en gång på den enhet som ska användas.",
     },
     {
       q: "Vad händer om någon glömmer stämpla ut?",

@@ -37,8 +37,8 @@ export async function generateMetadata(): Promise<Metadata> {
     title: "Tikkr — tidregistrering per order för verkstad",
     description:
       "Stämplingssystem för touchskärm. Personalen registrerar tid på rätt " +
-      "order och arbetsmoment med ett tryck. Fungerar vid nätverksavbrott och " +
-      "ger underlag som PDF med er egen logotyp. " +
+      "order och arbetsmoment med ett tryck, och underlaget per order laddas " +
+      "ned som PDF eller Excel med er egen logotyp. " +
       `${pricing.month.toLocaleString("sv-SE")} kr per stämplingsskärm och månad.`,
 
     // Talar om vilken adress som är den riktiga. Utan den kan tikkr.se och
