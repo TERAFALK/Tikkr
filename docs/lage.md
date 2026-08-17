@@ -103,11 +103,7 @@ före första kunden.
 **3. Ingen tvåfaktorsautentisering.** Varken för kundadministratörer eller för
 plattformskontot, som ser alla kunders driftuppgifter.
 
-**4. Ingen lösenordsåterställning via e-post.** Mejlabstraktionen finns, men
-Microsoft Graph är inte inkopplat. Tills det är gjort återställs lösenord
-manuellt.
-
-**5. Ingen kontroll av e-postadressen vid registrering.** Vem som helst kan
+**4. Ingen kontroll av e-postadressen vid registrering.** Vem som helst kan
 registrera vilken adress som helst och få trettio dagars provperiod. Ingen
 omedelbar risk, men en skräpvektor — och adressen går inte att lita på vid
 utskick förrän den bekräftats. Stängs enklast när utskicken är på plats.
@@ -115,6 +111,14 @@ utskick förrän den bekräftats. Stängs enklast när utskicken är på plats.
 ---
 
 ## Löst sedan förra genomgången
+
+**Lösenordsåterställning via e-post** (2026-08-12). En kund som tappade sitt
+lösenord var utelåst tills någon gick in i databasen. Länken gäller en timme,
+går att lösa in en gång, och svaret på en begäran är detsamma oavsett om
+adressen finns — annars vore formuläret ett sätt att kartlägga vilka företag
+som är kunder. Ett byte loggar ut alla enheter och bekräftas med ett mejl, som
+är den enda signal en person får om någon annan bytt lösenord på deras konto.
+Inbjudningar till nya administratörer mejlas nu i stället för att kopieras.
 
 **Återkallad behörighet gäller omedelbart** (2026-08-12). `requireAdmin()`
 läste tidigare enbart sessionens token och slog aldrig upp kontot. Att ta bort

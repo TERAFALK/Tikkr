@@ -24,7 +24,7 @@ export class AdminUserError extends Error {
 }
 
 /** En inbjudan som ingen använt blir ogiltig efter en vecka. */
-const INVITE_DAYS = 7;
+export const INVITE_DAYS = 7;
 
 const MIN_PASSWORD_LENGTH = 10;
 

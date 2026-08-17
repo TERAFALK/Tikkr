@@ -232,10 +232,46 @@ model AdminUser {
   createdAt    DateTime  @default(now()) @map("created_at")
   updatedAt    DateTime  @updatedAt @map("updated_at")
 
-  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  /// När lösenordet senast byttes.
+  ///
+  /// Sessioner som skapats före den tidpunkten avvisas. Utan det fältet skulle
+  /// ett lösenordsbyte inte kasta ut den som redan är inne — och det är just
+  /// vad man byter lösenord för när man misstänker att någon annan kommit åt
+  /// kontot.
+  passwordChangedAt DateTime? @map("password_changed_at")
+
+  company        Company         @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  passwordResets PasswordReset[]
 
   @@index([companyId])
   @@map("admin_users")
+}
+
+/// En begärd lösenordsåterställning.
+///
+/// Byggd som AdminInvite: bara fingeravtrycket av länken sparas, den har en
+/// utgångstid och den går att lösa in exakt en gång. Skillnaden är livslängden
+/// — en inbjudan får ligga en vecka, en återställning en timme. Den som glömt
+/// sitt lösenord sitter framför datorn just nu, och en länk som ligger kvar i
+/// en inkorg i en vecka är en väg in för den som kommer åt inkorgen senare.
+model PasswordReset {
+  id     String @id @default(cuid())
+  userId String @map("user_id")
+
+  /// Bara fingeravtrycket sparas. Länken finns aldrig i databasen.
+  tokenHash String @unique @map("token_hash")
+
+  expiresAt DateTime  @map("expires_at")
+  usedAt    DateTime? @map("used_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  /// Vem som bad om den, för att kunna reda ut ett ifrågasatt lösenordsbyte.
+  requestedFromIp String? @map("requested_from_ip")
+
+  user AdminUser @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, usedAt])
+  @@map("password_resets")
 }
 
 /// Ett konto för den som driver hela Tikkr — inte en kund.

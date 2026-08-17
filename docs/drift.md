@@ -160,10 +160,65 @@ kundens synvinkel, och ska larma.
 
 ---
 
-## 6. Innan riktig kunddata
+## 6. E-post
+
+**Varför det spelar roll:** utan utskick är en kund som tappat sitt lösenord
+utelåst tills någon går in i databasen åt dem. Inbjudningar till nya
+administratörer måste också kopieras för hand.
+
+Skickas via Microsoft Graph från en delad postlåda i Terafalks tenant.
+Avsändaren är `noreply@tikkr.se`, svar styrs till `support@tikkr.se`.
+
+```bash
+MAIL_PROVIDER=graph
+GRAPH_TENANT_ID=...
+GRAPH_CLIENT_ID=...
+GRAPH_CLIENT_SECRET=...
+GRAPH_SENDER=noreply@tikkr.se
+MAIL_REPLY_TO=support@tikkr.se
+```
+
+Lämnas `MAIL_PROVIDER` på `log` skrivs mejlen i loggen i stället för att
+skickas. Det är rätt läge i labbet — inga mejl går ut av misstag till adresser
+i testdata, och länken går att hämta ur loggen:
+
+```bash
+docker compose logs app | grep -A6 "E-POST"
+```
+
+### Appen får bara skicka som en enda brevlåda
+
+`Mail.Send` som applikationsbehörighet ger rätt att skicka som **vilken
+postlåda som helst** i tenanten. Hemligheten ligger i `.env` på servern — utan
+begränsning skulle ett intrång där räcka för att skicka mejl i hela
+organisationens namn.
+
+Begränsningen är en åtkomstpolicy i Exchange Online, satt en gång från
+laptopen:
+
+```powershell
+New-ApplicationAccessPolicy -AppId <program-id> -PolicyScopeGroupId "tikkr-utskick@tikkr.se" -AccessRight RestrictAccess -Description "Tikkr far bara skicka som noreply@tikkr.se"
+```
+
+Kontrollera att den sitter. Det första ska svara `Granted`, det andra `Denied`:
+
+```powershell
+Test-ApplicationAccessPolicy -Identity "noreply@tikkr.se" -AppId <program-id>
+```
+
+### Leverans
+
+SPF, DKIM och DMARC måste vara satta för `tikkr.se`, annars hamnar
+återställningsmejlen i skräpposten och funktionen är värdelös. DKIM slås på i
+`security.microsoft.com`, inte i vanliga admin center.
+
+---
+
+## 7. Innan riktig kunddata
 
 - [ ] Baslinjemigration skapad och incheckad (punkt 1)
 - [ ] Offsite-backup satt upp (punkt 3)
+- [ ] E-post kopplad och åtkomstpolicyn kontrollerad (punkt 6)
 - [ ] Repot satt till **privat** på GitHub
 - [ ] Adminlösenordet från testdatan (`tikkr123`) borttaget eller bytt
 - [ ] Testskärmens fasta token (`demo-labb-token-…`) återkallad under Skärmar

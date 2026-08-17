@@ -56,9 +56,21 @@ export default function InviteAdminForm({ baseUrl }: { baseUrl: string }) {
       {fullLink && (
         <div className="space-y-3">
           <Alert tone="info">
-            <strong>Skicka länken till {state.email}.</strong> Personen väljer
-            sitt eget lösenord när den öppnas. Länken visas bara nu, gäller i
-            sju dagar och kan bara användas en gång.
+            {state.mailed ? (
+              <>
+                <strong>Inbjudan är skickad till {state.email}.</strong>{" "}
+                Personen väljer sitt eget lösenord när länken öppnas. Länken
+                nedan är samma som i mejlet och visas bara nu — den kan skickas
+                på annat sätt om mejlet inte kommer fram.
+              </>
+            ) : (
+              <>
+                <strong>Skicka länken till {state.email}.</strong> Inbjudan
+                kunde inte mejlas, så den behöver skickas på annat sätt.
+                Personen väljer sitt eget lösenord när länken öppnas. Den visas
+                bara nu, gäller i sju dagar och kan bara användas en gång.
+              </>
+            )}
           </Alert>
 
           <div className="flex flex-wrap items-center gap-2">

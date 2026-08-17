@@ -57,11 +57,24 @@ export async function currentAdmin(): Promise<AdminSession | null> {
       email: true,
       role: true,
       companyId: true,
+      passwordChangedAt: true,
       company: { select: { name: true } },
     },
   });
 
   if (!account) return null;
+
+  // En session som utfärdades före det senaste lösenordsbytet gäller inte.
+  // Annars vore det meningslöst att byta lösenord när man misstänker att någon
+  // annan är inne — den andras inloggning skulle fortsätta fungera.
+  //
+  // Utfärdandetiden räknas i hela sekunder. En marginal på en sekund gör att
+  // den som byter sitt eget lösenord och loggas in på nytt i samma ögonblick
+  // inte råkar kastas ut av sin egen ändring.
+  if (account.passwordChangedAt && session.user.issuedAt) {
+    const issued = session.user.issuedAt * 1000;
+    if (issued < account.passwordChangedAt.getTime() - 1000) return null;
+  }
 
   // Allt kommer från databasen, inget från token. Ett företagsnamn som ändrats
   // under Inställningar slår därmed igenom direkt i stället för vid nästa

@@ -23,6 +23,14 @@ export interface EmailMessage {
   /** Ren text. Skickas alltid — vissa läser mejl utan formatering. */
   text: string;
   html?: string;
+  /**
+   * Dit svar ska gå.
+   *
+   * Utskicken kommer från en avsändare som inte tar emot post. Någon som fått
+   * ett mejl de inte förstår kommer ändå att svara på det, och då ska svaret
+   * landa hos en människa i stället för att studsa.
+   */
+  replyTo?: string;
 }
 
 export interface EmailResult {
@@ -94,15 +102,22 @@ function logInstead(message: EmailMessage): EmailResult {
  * fungerar och är att föredra framför en personlig.
  *
  * Observera: Mail.Send som applikationsbehörighet ger rätt att skicka som
- * VILKEN postlåda som helst i tenanten. Vill du begränsa det till en enda
- * finns "application access policy" i Exchange Online — värt att sätta upp om
- * Tikkr ska dela tenant med din vanliga verksamhet.
+ * VILKEN postlåda som helst i tenanten. Begränsningen till en enda görs med en
+ * "application access policy" i Exchange Online, och ÄR uppsatt — se
+ * docs/drift.md. Utan den skulle en komprometterad Tikkr-server kunna skicka
+ * mejl i hela organisationens namn.
+ *
+ * MAIL_REPLY_TO anger vart svar ska gå, eftersom avsändaren inte tar emot post.
  */
 async function sendViaGraph(message: EmailMessage): Promise<EmailResult> {
   const tenantId = process.env.GRAPH_TENANT_ID;
   const clientId = process.env.GRAPH_CLIENT_ID;
   const clientSecret = process.env.GRAPH_CLIENT_SECRET;
   const sender = process.env.GRAPH_SENDER;
+
+  // Faller tillbaka på en gemensam supportadress, så att svar aldrig går till
+  // en brevlåda som studsar allt.
+  const replyTo = message.replyTo ?? process.env.MAIL_REPLY_TO;
 
   if (!tenantId || !clientId || !clientSecret || !sender) {
     const problem =
@@ -136,6 +151,9 @@ async function sendViaGraph(message: EmailMessage): Promise<EmailResult> {
             ? { contentType: "HTML", content: message.html }
             : { contentType: "Text", content: message.text },
           toRecipients: [{ emailAddress: { address: message.to } }],
+          ...(replyTo && {
+            replyTo: [{ emailAddress: { address: replyTo } }],
+          }),
         },
         // Kvitton i avsändarens skickat-mapp fyller den med automatmejl som
         // ingen läser. Innehållet finns i loggen om något behöver redas ut.

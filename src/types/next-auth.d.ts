@@ -10,6 +10,13 @@ declare module "next-auth" {
       companyId: string;
       companyName: string;
       role: string;
+      /**
+       * När sessionen utfärdades, i sekunder.
+       *
+       * Jämförs mot kontots passwordChangedAt, så att ett lösenordsbyte gör
+       * äldre sessioner ogiltiga. Se currentAdmin() i src/lib/admin-session.ts.
+       */
+      issuedAt?: number;
     } & DefaultSession["user"];
   }
 

@@ -20,9 +20,14 @@ import { unsafeGlobalPrisma } from "@/lib/db";
 /** Vad den påhittade sessionen ska svara. Ändras per test. */
 let sessionUserId: string | null = null;
 
+/** När sessionen utfärdades, i sekunder. Som next-auth anger den. */
+let sessionIssuedAt: number | undefined;
+
 vi.mock("@/lib/auth", () => ({
   auth: async () =>
-    sessionUserId ? { user: { id: sessionUserId } } : null,
+    sessionUserId
+      ? { user: { id: sessionUserId, issuedAt: sessionIssuedAt } }
+      : null,
 }));
 
 // Ersätts för att modulen hör hemma i en webbserver, inte i ett test. Ingen av
@@ -67,10 +72,12 @@ beforeEach(async () => {
 
   ownerId = owner.id;
   sessionUserId = owner.id;
+  sessionIssuedAt = Math.floor(Date.now() / 1000);
 });
 
 afterEach(async () => {
   sessionUserId = null;
+  sessionIssuedAt = undefined;
   await unsafeGlobalPrisma.company.deleteMany({
     where: { name: { startsWith: "Sessionstest " } },
   });
@@ -127,6 +134,39 @@ describe("återkallad behörighet gäller omedelbart", () => {
     const admin = await currentAdmin();
 
     expect(admin?.companyId).toBe(otherCompanyId);
+  });
+});
+
+describe("lösenordsbyte ogiltigförklarar äldre sessioner", () => {
+  it("session utfärdad före bytet nekas", async () => {
+    // Situationen: någon annan har kommit åt kontot och är inloggad. Ägaren
+    // byter lösenord. Då ska inkräktarens session sluta gälla, annars var
+    // bytet meningslöst.
+    sessionIssuedAt = Math.floor(Date.now() / 1000) - 3600;
+
+    await unsafeGlobalPrisma.adminUser.update({
+      where: { id: ownerId },
+      data: { passwordChangedAt: new Date() },
+    });
+
+    expect(await currentAdmin()).toBeNull();
+  });
+
+  it("session utfärdad efter bytet gäller", async () => {
+    await unsafeGlobalPrisma.adminUser.update({
+      where: { id: ownerId },
+      data: { passwordChangedAt: new Date(Date.now() - 3600 * 1000) },
+    });
+
+    sessionIssuedAt = Math.floor(Date.now() / 1000);
+
+    expect(await currentAdmin()).not.toBeNull();
+  });
+
+  it("konto som aldrig bytt lösenord påverkas inte", async () => {
+    sessionIssuedAt = Math.floor(Date.now() / 1000) - 30 * 24 * 3600;
+
+    expect(await currentAdmin()).not.toBeNull();
   });
 });
 

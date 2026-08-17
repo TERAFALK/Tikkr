@@ -102,6 +102,11 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       session.user.companyId = String(token.companyId);
       session.user.companyName = String(token.companyName);
       session.user.role = String(token.role);
+
+      // Utfärdandetiden sätts av next-auth och följer med hit. Den behövs för
+      // att kunna avvisa sessioner som är äldre än ett lösenordsbyte.
+      session.user.issuedAt = typeof token.iat === "number" ? token.iat : undefined;
+
       return session;
     },
   },

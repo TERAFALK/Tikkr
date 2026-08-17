@@ -24,9 +24,15 @@ export default function LoginPage() {
       }
       note={
         <>
-          Vid glömt lösenord, kontakta support@tikkr.se. Återställning via e-post införs senare.
+          <Link
+            href="/admin/glomt-losenord"
+            className="font-medium text-blue-600 hover:underline"
+          >
+            Glömt lösenordet?
+          </Link>
           <br />
-          Stämplingsskärmar loggar inte in här. De kopplas via en egen länk från adminpanelen.
+          Stämplingsskärmar loggar inte in här. De kopplas via en egen länk från
+          adminpanelen.
         </>
       }
     >

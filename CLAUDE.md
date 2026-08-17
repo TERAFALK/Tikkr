@@ -68,6 +68,7 @@ via `company_id`-filtrering i koden.
 | Offline-stöd | PWA + service worker + lokal kö (IndexedDB) | Stämpling ska funka vid wifi-hack, synkar sen |
 | Auth (admin) | Auth.js, i samma Next.js-app | Ingen separat auth-server |
 | Auth (kiosk) | Device-token, kontrolleras i appens egen API-kod | Några rader kod, ingen extra tjänst |
+| E-post | Microsoft Graph, avsändare `noreply@tikkr.se` i Terafalks tenant | Återställning av lösenord och inbjudningar. Appen är låst till en enda postlåda med en åtkomstpolicy |
 
 **Designprincip: så få containrar som möjligt.** I praktiken **två** — app och
 databas — eftersom servern redan har en reverse proxy. `docker compose up -d`
@@ -291,7 +292,7 @@ Före produktion skapas en baslinjemigration, raden tas bort ur `.gitignore`,
 och därefter krävs en migration vid varje schemaändring. `scripts/migrate.sh`
 byter gren automatiskt så fort mappen finns. Se `docs/drift.md` punkt 1.
 
-**Spärrar innan skarp drift** (se `docs/drift.md` punkt 6): baslinjemigration
+**Spärrar innan skarp drift** (se `docs/drift.md` punkt 7): baslinjemigration
 incheckad, offsite-backup satt, repot privat, demolösenordet `tikkr123`
 borttaget, testskärmens fasta token återkallad, och `./scripts/status.sh` utan
 röda punkter.
