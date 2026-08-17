@@ -20,6 +20,31 @@ export default function SignupPage() {
           </Link>
         </>
       }
+      note={
+        // Villkoren accepteras här, alltså ska de gå att läsa här. En länk
+        // efteråt är för sent.
+        <>
+          Genom att skapa en arbetsyta godkänner du{" "}
+          <Link href="/villkor" className="text-blue-600 hover:underline">
+            användarvillkoren
+          </Link>
+          ,{" "}
+          <Link
+            href="/integritetspolicy"
+            className="text-blue-600 hover:underline"
+          >
+            integritetspolicyn
+          </Link>{" "}
+          och{" "}
+          <Link
+            href="/personuppgiftsbitradesavtal"
+            className="text-blue-600 hover:underline"
+          >
+            personuppgiftsbiträdesavtalet
+          </Link>
+          .
+        </>
+      }
     >
       <SignupForm />
     </AuthShell>

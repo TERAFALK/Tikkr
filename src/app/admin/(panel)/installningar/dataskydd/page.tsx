@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { requireAdmin } from "@/lib/admin-session";
 import {
   Alert,
@@ -97,6 +98,18 @@ export default async function DataProtectionPage() {
           </p>
           <p>
             Tikkr registrerar ingen löneinformation, frånvaro eller sjukdom. Systemet avser tidsunderlag för fakturering av kundordrar.
+          </p>
+          <p>
+            Ert företag är personuppgiftsansvarigt och TERAFALK AB är
+            personuppgiftsbiträde. Villkoren för det står i{" "}
+            <Link
+              href="/personuppgiftsbitradesavtal"
+              className="font-medium text-blue-600 hover:underline"
+            >
+              personuppgiftsbiträdesavtalet
+            </Link>
+            , tillsammans med vilka underleverantörer som anlitas och vilka
+            säkerhetsåtgärder som är vidtagna.
           </p>
         </div>
       </Card>

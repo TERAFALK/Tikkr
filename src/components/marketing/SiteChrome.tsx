@@ -8,6 +8,18 @@ import { Wordmark } from "@/components/ui/Logo";
  * ska knappen som leder vidare aldrig vara utanför skärmen.
  */
 
+/**
+ * De rättsliga sidorna.
+ *
+ * Länkas i foten på varje sida. Adresserna anges också i betaltjänstens
+ * kundportal, som kräver att villkor och integritetspolicy går att nå.
+ */
+export const LEGAL = [
+  { href: "/villkor", label: "Användarvillkor" },
+  { href: "/integritetspolicy", label: "Integritetspolicy" },
+  { href: "/personuppgiftsbitradesavtal", label: "Biträdesavtal" },
+];
+
 const NAV = [
   { href: "#sa-funkar-det", label: "Så fungerar det" },
   { href: "#funktioner", label: "Funktioner" },
@@ -105,6 +117,24 @@ export function SiteFooter() {
                     Logga in
                   </Link>
                 </li>
+              </ul>
+            </div>
+
+            <div>
+              <p className="text-[11px] font-semibold uppercase tracking-wider text-neutral-400">
+                Villkor
+              </p>
+              <ul className="mt-3 space-y-2 text-[13px]">
+                {LEGAL.map((item) => (
+                  <li key={item.href}>
+                    <Link
+                      href={item.href}
+                      className="text-neutral-600 hover:text-neutral-900"
+                    >
+                      {item.label}
+                    </Link>
+                  </li>
+                ))}
               </ul>
             </div>
 

@@ -112,6 +112,13 @@ utskick förrän den bekräftats. Stängs enklast när utskicken är på plats.
 
 ## Löst sedan förra genomgången
 
+**Rättsliga sidor** (2026-08-12). Integritetspolicy, användarvillkor och
+personuppgiftsbiträdesavtal finns publicerade och länkade i foten, vid
+registreringen och från dataskyddssidan i panelen. Biträdesavtalet krävs enligt
+artikel 28 eftersom kunden är personuppgiftsansvarig och TERAFALK AB
+personuppgiftsbiträde. Adresserna behövs också av betaltjänstens kundportal.
+**Utkasten är inte granskade av jurist.**
+
 **Lösenordsåterställning via e-post** (2026-08-12). En kund som tappade sitt
 lösenord var utelåst tills någon gick in i databasen. Länken gäller en timme,
 går att lösa in en gång, och svaret på en begäran är detsamma oavsett om

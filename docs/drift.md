@@ -219,6 +219,9 @@ SPF, DKIM och DMARC måste vara satta för `tikkr.se`, annars hamnar
 - [ ] Baslinjemigration skapad och incheckad (punkt 1)
 - [ ] Offsite-backup satt upp (punkt 3)
 - [ ] E-post kopplad och åtkomstpolicyn kontrollerad (punkt 6)
+- [ ] Rättsliga sidorna lästa och godkända av dig eller jurist
+- [ ] Adresserna till villkor och integritetspolicy inlagda i betaltjänstens
+      kundportal
 - [ ] Repot satt till **privat** på GitHub
 - [ ] Adminlösenordet från testdatan (`tikkr123`) borttaget eller bytt
 - [ ] Testskärmens fasta token (`demo-labb-token-…`) återkallad under Skärmar

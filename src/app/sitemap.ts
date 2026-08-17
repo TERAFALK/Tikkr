@@ -13,5 +13,15 @@ export default function sitemap(): MetadataRoute.Sitemap {
       changeFrequency: "monthly",
       priority: 1,
     },
+    // De rättsliga sidorna. Läses av den som utvärderar tjänsten, och ska gå
+    // att hitta utan att först bli kund.
+    ...["/villkor", "/integritetspolicy", "/personuppgiftsbitradesavtal"].map(
+      (path) => ({
+        url: `${base}${path}`,
+        lastModified: new Date(),
+        changeFrequency: "yearly" as const,
+        priority: 0.3,
+      })
+    ),
   ];
 }
