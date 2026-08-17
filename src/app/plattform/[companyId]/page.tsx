@@ -128,20 +128,18 @@ export default async function CompanyPage({
                 managedByStripe={Boolean(company.stripeSubscriptionId)}
               />
             </div>
-          </Card>
 
-          {/* Licenser för fakturakunder */}
-          <Card>
-            <CardHeader
-              title="Antal licenser"
-              description="En licens ger en stämplingsskärm. Avser fakturakunder."
-            />
-            <ManualLicenseForm
-              companyId={company.id}
-              current={company.screenLicenses}
-              used={devices.filter((device) => device.active).length}
-              managedByStripe={Boolean(company.stripeSubscriptionId)}
-            />
+            {/* Licenserna hör ihop med statusen — båda beskriver vad kunden
+                betalar för. Som eget kort blev det bara ett halvtomt kort
+                bredvid ett fullt. */}
+            <div className="border-t border-neutral-100 p-5">
+              <ManualLicenseForm
+                companyId={company.id}
+                current={company.screenLicenses}
+                used={devices.filter((device) => device.active).length}
+                managedByStripe={Boolean(company.stripeSubscriptionId)}
+              />
+            </div>
           </Card>
 
           {/* Anteckning */}

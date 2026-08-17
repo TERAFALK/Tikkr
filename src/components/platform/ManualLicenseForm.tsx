@@ -33,24 +33,31 @@ export default function ManualLicenseForm({
 
   if (managedByStripe) {
     return (
-      <div className="p-5">
-        <Alert tone="info">
-          Antalet styrs av prenumerationen hos Stripe och ändras av kunden.
-        </Alert>
-      </div>
+      <Alert tone="info">
+        Antalet licenser styrs av prenumerationen hos Stripe och ändras av
+        kunden.
+      </Alert>
     );
   }
 
   return (
-    <form action={action} className="space-y-4 p-5">
+    <form action={action} className="space-y-3">
+      <p className="text-[13px] font-medium text-neutral-700">
+        Antal licenser
+      </p>
+
       {state.error && <Alert>{state.error}</Alert>}
       {state.ok && <Alert tone="info">{state.ok}</Alert>}
 
       <input type="hidden" name="companyId" value={companyId} />
 
-      <div className="flex flex-wrap items-end gap-3">
-        <div className="w-32">
-          <Field label="Antal licenser">
+      {/* Fälten saknar hjälptext med flit. Ett fält med text under och ett utan
+          får olika höjd, och då hamnar etiketterna på olika rader — vilket är
+          precis vad som hände förut. Förklaringarna står i stället samlade
+          under raden. */}
+      <div className="flex flex-wrap items-end gap-2">
+        <div className="w-24">
+          <Field label="Antal">
             <Input
               type="number"
               name="licenses"
@@ -62,8 +69,8 @@ export default function ManualLicenseForm({
           </Field>
         </div>
 
-        <div className="min-w-56 flex-1">
-          <Field label="Anledning" hint="Sparas i åtgärdsloggen.">
+        <div className="min-w-48 flex-1">
+          <Field label="Anledning">
             <Input
               name="reason"
               placeholder="Fakturakund, avtalat tre skärmar"
@@ -76,8 +83,8 @@ export default function ManualLicenseForm({
       </div>
 
       <p className="text-xs leading-relaxed text-neutral-500">
-        {used} av {current} används. Ett lägre antal stänger ingen skärm —
-        skillnaden påpekas i kundens panel.
+        {used} av {current} används. Ett lägre antal stänger ingen skärm.
+        Anledningen sparas i åtgärdsloggen.
       </p>
     </form>
   );
