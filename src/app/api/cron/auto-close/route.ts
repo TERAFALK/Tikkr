@@ -2,6 +2,8 @@ import { NextResponse, type NextRequest } from "next/server";
 import { timingSafeEqual } from "node:crypto";
 import { unsafeGlobalPrisma } from "@/lib/db";
 import { autoCloseForgottenEntries } from "@/lib/clock";
+import { noteCronRun } from "@/lib/platform-health";
+import { recordSnapshot } from "@/lib/revenue-history";
 
 /**
  * Stänger glömda stämplingar. Anropas av ett schemalagt jobb på servern.
@@ -50,6 +52,15 @@ export async function POST(request: NextRequest) {
       // Ett företag med trasig inställning ska inte stoppa de andra.
       console.error(`Autoutstämpling misslyckades för ${company.name}`, error);
     }
+  }
+
+  // Två anteckningar på vägen ut. Ingen av dem får fälla körningen — den
+  // huvudsakliga uppgiften är gjord, och en misslyckad bokföring av den är
+  // ett mindre problem än en post som ligger öppen till i morgon.
+  try {
+    await Promise.all([noteCronRun(now), recordSnapshot(now)]);
+  } catch (error) {
+    console.error("Kunde inte skriva driftläge eller intäktsmätning", error);
   }
 
   return NextResponse.json({

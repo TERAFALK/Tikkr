@@ -305,6 +305,41 @@ model PlatformUser {
 ///
 /// Fältet heter targetCompanyId och inte companyId med flit: raden tillhör
 /// plattformen, inte kunden, och ska aldrig omfattas av det filtrerande lagret.
+/// Intäktsläget en viss dag.
+///
+/// Skrivs av schemajobbet, en rad per dag. Utan den här tabellen går det bara
+/// att se nuläget — och nuläget säger ingenting om riktningen, som är det som
+/// betyder något. Historiken kan inte räknas fram i efterhand, eftersom en
+/// avslutad prenumeration inte lämnar spår om vad den var värd.
+model RevenueSnapshot {
+  /// Dagen raden avser, satt till midnatt. Unik, så att jobbet kan köra ofta
+  /// utan att skapa dubbletter.
+  day DateTime @id
+
+  /// Återkommande månadsintäkt i kronor. Årsbetalningar omräknade.
+  mrr Int
+
+  payingCompanies   Int @map("paying_companies")
+  trialingCompanies Int @map("trialing_companies")
+  licensesSold      Int @map("licenses_sold")
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("revenue_snapshots")
+}
+
+/// Små driftvärden som inte förtjänar en egen tabell.
+///
+/// Exempelvis när schemajobbet senast kördes. Ett fält per rad, så att ett
+/// nytt värde inte kräver en schemaändring.
+model PlatformState {
+  key       String   @id
+  value     String
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("platform_state")
+}
+
 /// Vad ett driftmeddelande gäller. Styr färg och rubrik, inget annat.
 enum NoticeKind {
   /// Planerat underhåll, känt i förväg.

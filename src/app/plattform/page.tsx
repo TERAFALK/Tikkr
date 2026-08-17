@@ -22,22 +22,56 @@ import {
 } from "@/components/ui";
 import { formatDate, formatDateTime } from "@/lib/format";
 import PlatformShell from "@/components/platform/PlatformShell";
+import RevenueChart from "@/components/platform/RevenueChart";
+import {
+  EndingTrialList,
+  QuietCustomerList,
+  SilentDeviceList,
+} from "@/components/platform/WatchLists";
+import {
+  endingTrials,
+  quietCustomers,
+  silentDevices,
+  systemHealth,
+} from "@/lib/platform-health";
+import { monthlyRevenueHistory } from "@/lib/revenue-history";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Plattform — Tikkr" };
 
-export default async function PlatformPage() {
+export default async function PlatformPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ q?: string }>;
+}) {
   const { email } = await requirePlatformAdmin();
-  const [companies, activity] = await Promise.all([
-    listCompanies(),
-    recentPlatformActivity(10),
-  ]);
+  const query = ((await searchParams).q ?? "").trim();
+
+  const [companies, activity, devices, trials, quiet, history, health] =
+    await Promise.all([
+      listCompanies(),
+      recentPlatformActivity(10),
+      silentDevices(),
+      endingTrials(),
+      quietCustomers(),
+      monthlyRevenueHistory(),
+      systemHealth(),
+    ]);
+
   const stripeReady = isStripeConfigured();
 
+  // Siffrorna raknas pa ALLA foretag, aldrig pa soktraffarna. En manadsintakt
+  // som andrar sig nar man soker ar inte en manadsintakt.
   const revenue = summarizeRevenue(companies);
   const usedLast30 = companies.filter(
     (company) => company.entriesLast30Days > 0
   ).length;
+
+  const matches = query
+    ? companies.filter((company) =>
+        company.name.toLowerCase().includes(query.toLowerCase())
+      )
+    : companies;
 
   const kr = (value: number) => `${value.toLocaleString("sv-SE")} kr`;
 
@@ -96,6 +130,18 @@ export default async function PlatformPage() {
       </p>
 
       <div className="mt-6">
+        <RevenueChart points={history} />
+      </div>
+
+      {/* Bevakningslistorna. Var och en visas bara när den har innehåll — är
+          allt i sin ordning syns ingenting alls, vilket är rätt svar. */}
+      <div className="mt-6 space-y-4">
+        <SilentDeviceList devices={devices} />
+        <EndingTrialList trials={trials} />
+        <QuietCustomerList customers={quiet} />
+      </div>
+
+      <div className="mt-6">
         {companies.length === 0 ? (
           <EmptyState
             title="Inga registrerade företag"
@@ -106,6 +152,25 @@ export default async function PlatformPage() {
             <CardHeader
               title="Företag"
               description="Senast registrerade först. Utebliven aktivitet kan indikera en kund på väg att avsluta."
+              action={
+                // Formulär utan JavaScript. Sökningen hamnar i adressen, så
+                // att en träfflista går att spara och skicka vidare.
+                <form className="flex gap-2">
+                  <input
+                    type="search"
+                    name="q"
+                    defaultValue={query}
+                    placeholder="Sök företag…"
+                    className="w-44 rounded-md border-0 bg-white px-2.5 py-1.5 text-[13px] text-neutral-900 ring-1 ring-inset ring-neutral-200 placeholder:text-neutral-400 focus:ring-2 focus:ring-inset focus:ring-blue-600"
+                  />
+                  <button
+                    type="submit"
+                    className="rounded-md bg-neutral-900 px-3 py-1.5 text-[13px] font-medium text-white"
+                  >
+                    Sök
+                  </button>
+                </form>
+              }
             />
             <Table>
               <thead>
@@ -121,7 +186,7 @@ export default async function PlatformPage() {
                 </tr>
               </thead>
               <tbody>
-                {companies.map((company) => (
+                {matches.map((company) => (
                   <Tr key={company.id}>
                     <Td>
                       <Link
@@ -160,6 +225,15 @@ export default async function PlatformPage() {
                 ))}
               </tbody>
             </Table>
+
+            {matches.length === 0 && (
+              <p className="px-5 py-6 text-center text-[13px] text-neutral-500">
+                Inget företag matchar ”{query}”.{" "}
+                <Link href="/plattform" className="text-blue-600">
+                  Visa alla
+                </Link>
+              </p>
+            )}
           </Card>
         )}
       </div>
@@ -199,8 +273,38 @@ export default async function PlatformPage() {
       )}
 
       <Card className="mt-6">
-        <CardHeader title="Driftläge" />
+        <CardHeader
+          title="Driftläge"
+          description="Siffror som visar om något är på väg att gå fel innan det gör det."
+        />
         <dl className="divide-y divide-neutral-100 text-[13px]">
+          <Row
+            label="Schemajobbet"
+            value={
+              health.lastCronRun
+                ? `Senast ${formatDateTime(health.lastCronRun)}${
+                    // Jobbet ska köra var femtonde minut. Har det inte hörts av
+                    // på en timme har det slutat köra, och glömda stämplingar
+                    // ligger öppna tills någon upptäcker det.
+                    Date.now() - health.lastCronRun.getTime() > 60 * 60 * 1000
+                      ? " — har inte kört på över en timme"
+                      : ""
+                  }`
+                : "Har aldrig rapporterat in — kontrollera crontab"
+            }
+          />
+          <Row
+            label="Öppna stämplingar"
+            value={`${health.openEntries} just nu`}
+          />
+          <Row
+            label="Väntar på granskning"
+            value={`${health.needsReview} poster hos kunderna`}
+          />
+          <Row
+            label="Databasens storlek"
+            value={health.databaseSize ?? "Kunde inte läsas"}
+          />
           <Row
             label="E-postutskick"
             value={

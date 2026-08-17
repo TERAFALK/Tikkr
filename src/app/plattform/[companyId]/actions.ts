@@ -5,6 +5,7 @@ import {
   PlatformActionError,
   requirePlatformAdmin,
   saveNote,
+  setLicensesManually,
   setSubscriptionStatus,
   type SubscriptionStatus,
 } from "@/lib/platform-admin";
@@ -57,6 +58,49 @@ export async function changeSubscription(
   revalidatePath("/plattform");
 
   return { ok: "Statusen är ändrad." };
+}
+
+export interface LicenseFormState {
+  error?: string;
+  ok?: string;
+}
+
+/**
+ * Sätter antalet licenser för en fakturakund.
+ *
+ * Samma krav på dokumenterad anledning som statusändringen. Ett ändrat antal
+ * licenser är en ändring av vad kunden ska faktureras, och den ska gå att
+ * förklara ett halvår senare.
+ */
+export async function changeLicenseCount(
+  _previous: LicenseFormState,
+  formData: FormData
+): Promise<LicenseFormState> {
+  const { email } = await requirePlatformAdmin();
+
+  const companyId = String(formData.get("companyId") ?? "");
+  const licenses = Number(formData.get("licenses"));
+  const reason = String(formData.get("reason") ?? "").trim();
+
+  if (!companyId) return { error: "Okänt företag." };
+  if (!reason) return { error: "Ange en anledning till ändringen." };
+
+  try {
+    await setLicensesManually({
+      actorEmail: email,
+      companyId,
+      licenses,
+      reason,
+    });
+  } catch (error) {
+    if (error instanceof PlatformActionError) return { error: error.message };
+    throw error;
+  }
+
+  revalidatePath(`/plattform/${companyId}`);
+  revalidatePath("/plattform");
+
+  return { ok: `Antalet är satt till ${licenses}.` };
 }
 
 export async function updateNote(formData: FormData) {

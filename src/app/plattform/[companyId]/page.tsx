@@ -20,6 +20,7 @@ import {
 import { formatDate, formatDateTime } from "@/lib/format";
 import SubscriptionOverrideForm from "@/components/admin/SubscriptionOverrideForm";
 import PlatformShell from "@/components/platform/PlatformShell";
+import ManualLicenseForm from "@/components/platform/ManualLicenseForm";
 import { monthlyRevenueFor } from "@/lib/platform-admin";
 import { getScreenPricing } from "@/lib/stripe";
 import { updateNote } from "./actions";
@@ -128,6 +129,20 @@ export default async function CompanyPage({
                 managedByStripe={Boolean(company.stripeSubscriptionId)}
               />
             </div>
+          </Card>
+
+          {/* Licenser för fakturakunder */}
+          <Card>
+            <CardHeader
+              title="Antal licenser"
+              description="En licens ger en stämplingsskärm. Sätts här för kunder som betalar mot faktura."
+            />
+            <ManualLicenseForm
+              companyId={company.id}
+              current={company.screenLicenses}
+              used={devices.filter((device) => device.active).length}
+              managedByStripe={Boolean(company.stripeSubscriptionId)}
+            />
           </Card>
 
           {/* Anteckning */}

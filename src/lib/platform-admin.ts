@@ -339,6 +339,61 @@ async function record(params: {
 }
 
 /**
+ * Sätter antalet licenser för hand.
+ *
+ * Behövs för fakturakunder. Utan den kan en kund som betalar mot faktura sättas
+ * till aktiv men aldrig få fler än provperiodens två skärmar, vilket gör
+ * fakturakunder oanvändbara i praktiken.
+ *
+ * Spärras för företag som betalar via Stripe, av samma skäl som statusen:
+ * antalet styrs av prenumerationen där och skulle skrivas över vid nästa
+ * besked. Kunden ändrar det själv i sin panel.
+ */
+export async function setLicensesManually(params: {
+  actorEmail: string;
+  companyId: string;
+  licenses: number;
+  reason: string;
+}) {
+  if (!Number.isInteger(params.licenses) || params.licenses < 1) {
+    throw new PlatformActionError("Antalet måste vara minst en licens.");
+  }
+
+  if (params.licenses > 100) {
+    throw new PlatformActionError("Fler än hundra licenser hanteras manuellt.");
+  }
+
+  const before = await unsafeGlobalPrisma.company.findUnique({
+    where: { id: params.companyId },
+    select: { screenLicenses: true, stripeSubscriptionId: true },
+  });
+
+  if (!before) return;
+
+  if (before.stripeSubscriptionId) {
+    throw new PlatformActionError(
+      "Antalet styrs av prenumerationen hos Stripe. Kunden ändrar det själv " +
+        "under Inställningar → Prenumeration."
+    );
+  }
+
+  if (before.screenLicenses === params.licenses) return;
+
+  await unsafeGlobalPrisma.company.update({
+    where: { id: params.companyId },
+    data: { screenLicenses: params.licenses },
+  });
+
+  await record({
+    actorEmail: params.actorEmail,
+    action: "Ändrade antal licenser",
+    targetCompanyId: params.companyId,
+    detail:
+      `${before.screenLicenses} → ${params.licenses}. ${params.reason}`.trim(),
+  });
+}
+
+/**
  * Sätter prenumerationsstatus för hand.
  *
  * Behövs tills Stripe är kopplat, och även efteråt: en kund som betalar mot
