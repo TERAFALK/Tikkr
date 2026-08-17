@@ -83,7 +83,9 @@ skyddar mot råkade raderingar, men inte mot att servern dör, blir hackad eller
 krypteras — och det är just då man behöver den.
 
 Installera rclone och koppla en objektlagring. Backblaze B2 är billigast för
-den här mängden data; Hetzner Storage Box fungerar lika bra.
+den här mängden data. Observera dock att integritetspolicyn anger att data
+lagras i Sverige — välj ett mål inom EU, helst svenskt, så att även kopiorna
+stämmer med det som utlovats.
 
 ```bash
 sudo apt update && sudo apt install -y rclone && rclone config

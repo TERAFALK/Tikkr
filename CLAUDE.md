@@ -62,7 +62,7 @@ via `company_id`-filtrering i koden.
 | Databas | Vanlig Postgres-container (bara databasen) | Enklast möjliga — ingen plattform ovanpå att sköta |
 | Databaskoppling | Prisma (ORM) | Enkelt och säkert sätt att prata med databasen |
 | Reverse proxy / HTTPS | **Labb:** Nginx Proxy Manager (fanns redan). **Produktion:** Caddy. | NPM äger redan port 80/443 i labbet — rör det inte. I produktion väljs Caddy för att konfigurationen då ligger som textfil i git och servern kan återskapas identiskt, vilket NPM:s webbgränssnitt inte tillåter. |
-| Server | Egen VPS (t.ex. Hetzner) | Enda löpande kostnaden |
+| Server | Egen VPS hos **Glesys** (Falkenberg/Stockholm) | Enda löpande kostnaden. Svensk drift krävs — integritetspolicyn och biträdesavtalet anger servrar i Sverige |
 | Betalning | Stripe (Billing/Subscriptions) | Ingen fast avgift, styr åtkomst automatiskt, självbetjäning |
 | Bokföring | Fortnox, matas med Stripes intäktsdata | Vanlig bokföring/moms, slipper manuella fakturor |
 | Offline-stöd | PWA + service worker + lokal kö (IndexedDB) | Stämpling ska funka vid wifi-hack, synkar sen |
@@ -149,8 +149,9 @@ Måste finnas stöd för:
   (`unattended-upgrades`).
 - **Uptime-övervakning** — enkel gratis monitor (t.ex. UptimeRobot) pingar tjänsten.
 
-Kostnadsbild: VPS ca 50–150 kr/mån, Postgres 0 kr, Caddy 0 kr, Stripe 0 kr fast
-(bara procent per transaktion), domän ca 100–150 kr/år.
+Kostnadsbild: VPS ca 150–350 kr/mån hos svensk leverantör, Postgres 0 kr,
+Caddy 0 kr, Stripe 0 kr fast (bara procent per transaktion), domän ca
+100–150 kr/år.
 
 ## 6. Faser
 
