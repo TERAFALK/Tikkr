@@ -147,6 +147,11 @@ async function sendViaGraph(message: EmailMessage): Promise<EmailResult> {
       body: JSON.stringify({
         message: {
           subject: message.subject,
+          // Graph tar emot EN kroppstyp per mejl i det här formatet. Finns en
+          // HTML-version är det den som skickas, och textversionen används då
+          // bara i labbläget. Vill man skicka båda samtidigt krävs att hela
+          // mejlet byggs som MIME och skickas base64-kodat — mer maskineri än
+          // det är värt så länge HTML-versionen är läsbar.
           body: message.html
             ? { contentType: "HTML", content: message.html }
             : { contentType: "Text", content: message.text },
