@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { auth } from "@/lib/auth";
+import { currentAdmin } from "@/lib/admin-session";
 import { getKioskSession } from "@/lib/kiosk-auth";
 import { unsafeGlobalPrisma } from "@/lib/db";
 
@@ -22,9 +22,10 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function GET(request: NextRequest) {
-  const session = await auth();
+  // Adminkontot slås upp på riktigt, precis som på panelens sidor. Ett
+  // återkallat konto ska inte ha kvar någon väg in alls — inte ens den här.
   const companyId =
-    session?.user?.companyId ?? (await getKioskSession())?.companyId;
+    (await currentAdmin())?.companyId ?? (await getKioskSession())?.companyId;
 
   if (!companyId) {
     return new NextResponse(null, { status: 401 });

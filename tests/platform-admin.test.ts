@@ -1,5 +1,14 @@
-import { describe, it, expect, afterEach, afterAll } from "vitest";
+import { describe, it, expect, afterEach, afterAll, vi } from "vitest";
 import { isPlatformAdmin, platformAdminEmails } from "@/lib/platform-access";
+
+// Modulen hör hemma i en webbserver, inte i ett test. Ingen av funktionerna
+// som prövas här omdirigerar.
+vi.mock("next/navigation", () => ({
+  redirect: (to: string) => {
+    throw new Error(`Oväntad omdirigering till ${to}`);
+  },
+}));
+
 import {
   PlatformActionError,
   setSubscriptionStatus,

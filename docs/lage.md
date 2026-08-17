@@ -107,9 +107,30 @@ plattformskontot, som ser alla kunders driftuppgifter.
 Microsoft Graph är inte inkopplat. Tills det är gjort återställs lösenord
 manuellt.
 
+**5. Ingen kontroll av e-postadressen vid registrering.** Vem som helst kan
+registrera vilken adress som helst och få trettio dagars provperiod. Ingen
+omedelbar risk, men en skräpvektor — och adressen går inte att lita på vid
+utskick förrän den bekräftats. Stängs enklast när utskicken är på plats.
+
 ---
 
 ## Löst sedan förra genomgången
+
+**Återkallad behörighet gäller omedelbart** (2026-08-12). `requireAdmin()`
+läste tidigare enbart sessionens token och slog aldrig upp kontot. Att ta bort
+en administratör återkallade därför ingenting — personen kom in tills token
+gick ut, som mest trettio dagar senare, och en degraderad ägare behöll under
+tiden rätten att bjuda in och ta bort konton. Kontot läses nu ur databasen vid
+varje anrop, precis som plattformspanelen alltid gjort.
+
+**Tak på antalet lösenordsgissningar** (2026-08-12). Adminpanelen hade inget.
+bcrypt gör en gissning långsam men hindrar ingen från att hålla på i timmar.
+Spärren som plattformspanelen redan hade ligger nu i `src/lib/login-throttle.ts`
+och används av båda, med skilda räknare så att den ena aldrig låser den andra.
+
+**Tak på loggarna** (2026-08-12). Docker sparade containerloggar utan gräns.
+En full disk stoppar databasen från att skriva, vilket ser ut som att allt gått
+sönder långt ifrån där orsaken finns.
 
 **HTTPS** (2026-08-11). Via Nginx Proxy Manager mot `tikkr.terafalk.com`, med
 **Force SSL** — okrypterade anrop besvaras med `301` till HTTPS istället för att

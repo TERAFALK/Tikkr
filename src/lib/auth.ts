@@ -2,6 +2,11 @@ import NextAuth from "next-auth";
 import Credentials from "next-auth/providers/credentials";
 import bcrypt from "bcryptjs";
 import { unsafeGlobalPrisma } from "./db";
+import {
+  clearFailedLogins,
+  isLockedOut,
+  noteFailedLogin,
+} from "./login-throttle";
 
 /**
  * INLOGGNING FÖR ADMINISTRATÖRER.
@@ -18,7 +23,13 @@ import { unsafeGlobalPrisma } from "./db";
  * inte vet vilket företag personen tillhör förrän vi hittat kontot. Efter
  * inloggning går all åtkomst via forCompany() — se requireAdmin() i
  * src/lib/admin-session.ts.
+ *
+ * Antalet gissningar är begränsat, se src/lib/login-throttle.ts. Utan den
+ * spärren skyddar bcrypt bara mot att gissa SNABBT, inte mot att gissa länge.
  */
+
+/** Håller bromsen åtskild från plattformsinloggningens. */
+const THROTTLE_SCOPE = "admin";
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
   session: { strategy: "jwt" },
@@ -42,6 +53,10 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
 
         if (!email || !password) return null;
 
+        // Kontrolleras före uppslaget. Är adressen låst ska ingen tid läggas
+        // på att jämföra lösenord — det är hela poängen med spärren.
+        if (isLockedOut(THROTTLE_SCOPE, email)) return null;
+
         const user = await unsafeGlobalPrisma.adminUser.findUnique({
           where: { email },
           include: { company: { select: { id: true, name: true } } },
@@ -52,7 +67,12 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         const hash = user?.passwordHash ?? UNKNOWN_USER_HASH;
         const correct = await bcrypt.compare(password, hash);
 
-        if (!user || !correct) return null;
+        if (!user || !correct) {
+          noteFailedLogin(THROTTLE_SCOPE, email);
+          return null;
+        }
+
+        clearFailedLogins(THROTTLE_SCOPE, email);
 
         return {
           id: user.id,

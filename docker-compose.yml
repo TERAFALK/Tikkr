@@ -8,11 +8,27 @@
 # Stoppa:  docker compose down
 # Loggar:  docker compose logs -f app
 
+# Tak för loggarna.
+#
+# Docker sparar annars containerloggar utan gräns. En server som kört ett halvår
+# får då en loggfil på flera gigabyte, och när disken tar slut slutar databasen
+# att kunna skriva — vilket ser ut som att hela systemet gått sönder, långt
+# ifrån där orsaken finns.
+#
+# Tre filer om tio megabyte vardera räcker gott för att felsöka en händelse som
+# är några dagar gammal.
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
 services:
   db:
     image: postgres:17-alpine
     container_name: tikkr-db
     restart: unless-stopped
+    logging: *logging
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-tikkr}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD saknas i .env}
@@ -38,6 +54,7 @@ services:
       dockerfile: Dockerfile
       target: builder
     container_name: tikkr-migrate
+    logging: *logging
     restart: "no"
     depends_on:
       db:
@@ -53,6 +70,7 @@ services:
     # Fast namn så att Nginx Proxy Manager kan peka på "tikkr-app" istället för
     # en IP-adress som ändrar sig varje gång containern startas om.
     container_name: tikkr-app
+    logging: *logging
     restart: unless-stopped
     depends_on:
       db:

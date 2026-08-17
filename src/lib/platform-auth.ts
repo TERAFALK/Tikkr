@@ -1,6 +1,12 @@
 import bcrypt from "bcryptjs";
 import { unsafeGlobalPrisma } from "./db";
 import { isPlatformAdmin } from "./platform-access";
+import {
+  clearFailedLogins,
+  isLockedOut,
+  noteFailedLogin,
+  LOCKED_OUT_MESSAGE,
+} from "./login-throttle";
 
 /**
  * INLOGGNING TILL PLATTFORMSPANELEN.
@@ -22,44 +28,12 @@ import { isPlatformAdmin } from "./platform-access";
 /** Hash av ett lösenord ingen har. Ger samma svarstid för okända konton. */
 const UNKNOWN_ACCOUNT_HASH = bcrypt.hashSync("inget-konto-har-detta", 12);
 
-/* -------------------------------------------------------------------------- */
-/* Bromsning av gissningar                                                     */
-/* -------------------------------------------------------------------------- */
-
-const MAX_ATTEMPTS = 5;
-const LOCKOUT_MS = 15 * 60 * 1000;
-
 /**
- * Räknas i minnet, inte i databasen.
- *
- * Räcker så länge appen kör som en process. Blir det flera i framtiden nollas
- * räknaren per process, vilket försvagar skyddet — då ska det flyttas till
- * databasen. Noterat här så att det inte glöms bort.
+ * Bromsen delas med kundernas inloggning, se src/lib/login-throttle.ts.
+ * Nyckeln håller dem åtskilda: misslyckade försök här låser aldrig ett
+ * kundkonto med samma adress.
  */
-const attempts = new Map<string, { count: number; until: number }>();
-
-function lockedOut(email: string): boolean {
-  const record = attempts.get(email);
-  if (!record) return false;
-
-  if (record.until < Date.now()) {
-    attempts.delete(email);
-    return false;
-  }
-
-  return record.count >= MAX_ATTEMPTS;
-}
-
-function noteFailure(email: string): void {
-  const record = attempts.get(email) ?? { count: 0, until: 0 };
-  record.count += 1;
-  record.until = Date.now() + LOCKOUT_MS;
-  attempts.set(email, record);
-}
-
-function clearFailures(email: string): void {
-  attempts.delete(email);
-}
+const SCOPE = "platform";
 
 /* -------------------------------------------------------------------------- */
 
@@ -80,12 +54,10 @@ export async function verifyPlatformLogin(
     return { ok: false, problem: "Fyll i både adress och lösenord." };
   }
 
-  if (lockedOut(email)) {
+  if (isLockedOut(SCOPE, email)) {
     return {
       ok: false,
-      problem:
-        "För många misslyckade försök. Försök igen om femton minuter, " +
-        "eller sätt ett nytt lösenord på servern.",
+      problem: `${LOCKED_OUT_MESSAGE} Lösenordet kan sättas om på servern.`,
     };
   }
 
@@ -105,14 +77,14 @@ export async function verifyPlatformLogin(
   const allowed = isPlatformAdmin(email);
 
   if (!account || !correct || !allowed) {
-    noteFailure(email);
+    noteFailedLogin(SCOPE, email);
 
     // Samma meddelande oavsett vad som var fel. Ett mer hjälpsamt svar är
     // hjälpsamt även för den som inte ska in.
     return { ok: false, problem: "Fel adress eller lösenord." };
   }
 
-  clearFailures(email);
+  clearFailedLogins(SCOPE, email);
 
   await unsafeGlobalPrisma.platformUser.update({
     where: { email },
@@ -124,9 +96,4 @@ export async function verifyPlatformLogin(
   });
 
   return { ok: true, email };
-}
-
-/** Nollställer bromsen. Används av testerna. */
-export function __resetThrottle(): void {
-  attempts.clear();
 }
