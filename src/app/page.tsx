@@ -19,13 +19,14 @@ import {
 const base = siteUrl();
 
 /**
- * Sidan byggs om var tionde minut istället för en gång vid deploy.
+ * Sidan byggs om varje minut istället för en gång vid deploy.
  *
- * Priset hämtas numera från artikeln hos betaltjänsten. Utan den här raden
- * hade siffran bakats in när containern byggdes — och en prisändring hade
- * synts först vid nästa deploy, vilket är precis det vi vill undvika.
+ * Två skäl. Priset hämtas från artikeln hos betaltjänsten, och utan den här
+ * raden hade siffran bakats in när containern byggdes. Driftmeddelanden visas
+ * dessutom överst, och ett pågående avbrott som dyker upp tio minuter senare
+ * är inte värt mycket.
  */
-export const revalidate = 600;
+export const revalidate = 60;
 
 // Priset står även här, i texten sökmotorer visar. Det hämtas därför ur samma
 // källa som resten av sidan — en prisändring ska inte kunna lämna kvar en

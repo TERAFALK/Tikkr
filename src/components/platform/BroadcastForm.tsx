@@ -67,10 +67,7 @@ export default function BroadcastForm({
         </div>
       </div>
 
-      <Field
-        label="Meddelande"
-        hint="Tomrad ger nytt stycke. Enkel radbrytning behålls."
-      >
+      <Field label="Meddelande" hint="Tomrad ger nytt stycke.">
         <textarea
           name="body"
           rows={7}
@@ -84,12 +81,10 @@ export default function BroadcastForm({
 
       <div className="rounded-md border border-amber-200 bg-amber-50 p-4">
         <p className="text-[13px] font-medium text-amber-900">
-          Utskicket går till {expected}{" "}
-          {expected === 1 ? "mottagare" : "mottagare"} och kan inte ångras.
+          {expected} mottagare. Utskicket kan inte ångras.
         </p>
         <p className="mt-1 text-[13px] leading-relaxed text-amber-800">
-          Varje mottagare får ett eget mejl — adresserna syns aldrig för
-          varandra. Avsändare är noreply@tikkr.se med svar till supporten.
+          Ett separat mejl per mottagare. Adresserna syns inte för varandra.
         </p>
 
         <div className="mt-3 w-48">

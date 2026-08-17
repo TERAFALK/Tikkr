@@ -32,6 +32,7 @@ async function add(overrides: Partial<Parameters<typeof createNotice>[0]> = {}) 
     endsAt: at(HOUR),
     showInAdmin: true,
     showOnKiosk: false,
+    showOnSite: false,
     createdByEmail: "adi@terafalk.com",
     ...overrides,
   });
@@ -102,12 +103,26 @@ describe("ytorna hålls isär", () => {
       notice.id
     );
   });
+
+  it("säljsidan är en egen yta", async () => {
+    // Den enda ytan som når någon som inte är kund. Ett meddelande hamnar där
+    // bara om det uttryckligen markerats för det.
+    const notice = await add({ showInAdmin: true, showOnSite: false });
+
+    expect((await activeNotices("site")).map((r) => r.id)).not.toContain(
+      notice.id
+    );
+
+    const publik = await add({ showInAdmin: false, showOnSite: true });
+
+    expect((await activeNotices("site")).map((r) => r.id)).toContain(publik.id);
+  });
 });
 
 describe("kontroller innan något läggs in", () => {
   it("meddelande utan yta avvisas", async () => {
     await expect(
-      add({ showInAdmin: false, showOnKiosk: false })
+      add({ showInAdmin: false, showOnKiosk: false, showOnSite: false })
     ).rejects.toThrow(NoticeError);
   });
 

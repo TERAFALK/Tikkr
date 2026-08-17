@@ -42,13 +42,13 @@ export default async function NoticesPage() {
     <PlatformShell email={email} current="/plattform/meddelanden">
       <PageHeader
         title="Driftmeddelanden"
-        description="Banner i kundernas paneler och på stämplingsskärmarna, samt utskick till administratörerna."
+        description="Banner hos kunderna och utskick till administratörer."
       />
 
       <Card>
         <CardHeader
           title="Nytt meddelande"
-          description="Visas för alla kunder. Läggs in i förväg och dyker upp av sig självt vid starttiden."
+          description="Gäller samtliga kunder. Visas från angiven starttid."
         />
         <NoticeForm />
       </Card>
@@ -56,14 +56,14 @@ export default async function NoticesPage() {
       <Card className="mt-6">
         <CardHeader
           title="Inlagda meddelanden"
-          description="Pågående och kommande överst. Arkiverade sparas för att det ska gå att se vad kunderna faktiskt fick se."
+          description="Arkiverade sparas som underlag."
         />
 
         {notices.length === 0 ? (
           <div className="p-5">
             <EmptyState
               title="Inga meddelanden inlagda"
-              description="Ett meddelande läggs in när något planerat underhåll eller avbrott ska nå kunderna."
+              description="Inlagda meddelanden visas här."
             />
           </div>
         ) : (
@@ -103,9 +103,10 @@ export default async function NoticesPage() {
                       {[
                         notice.showInAdmin ? "panel" : null,
                         notice.showOnKiosk ? "skärmar" : null,
+                        notice.showOnSite ? "säljsida" : null,
                       ]
                         .filter(Boolean)
-                        .join(" och ")}
+                        .join(", ")}
                       {" · "}
                       {notice.createdByEmail}
                     </p>
@@ -133,7 +134,7 @@ export default async function NoticesPage() {
       <Card className="mt-6">
         <CardHeader
           title="Utskick till administratörer"
-          description="Går till kundernas administratörer, aldrig till deras anställda. Avsett för driftinformation."
+          description="Går till kundernas administratörer. Avsett för driftinformation."
         />
 
         {mailReady ? (
@@ -147,18 +148,16 @@ export default async function NoticesPage() {
         ) : (
           <div className="p-5">
             <Alert tone="warning">
-              E-post är inte konfigurerad för den här installationen. Sätt
-              MAIL_PROVIDER och uppgifterna för utskick i .env, så går det att
-              skicka härifrån.
+              E-post är inte konfigurerad för installationen. Utskick kräver
+              MAIL_PROVIDER i .env.
             </Alert>
           </div>
         )}
       </Card>
 
       <p className="mt-6 text-xs leading-relaxed text-neutral-500">
-        Utskicket är avsett för driftinformation — underhåll, avbrott och
-        förändringar som påverkar användningen. Marknadsföring kräver annan
-        rättslig grund och ska inte skickas den här vägen.
+        Marknadsföring kräver annan rättslig grund och omfattas inte av
+        funktionen.
       </p>
     </PlatformShell>
   );

@@ -83,14 +83,8 @@ export default async function PlatformPage({
       />
 
       <Alert tone="info">
-        Panelen visar enbart aggregerade uppgifter: antal och tidpunkter.
-        Kundernas innehåll — namn på anställda, ordrar och registrerade tider
-        — är inte åtkomligt härifrån. För åtgärder i en kunds data krävs en
-        inbjudan som administratör hos kunden.
-        <span className="mt-1.5 block">
-          Kontot tillhör inget kundföretag. För egen tidregistrering krävs en
-          separat arbetsyta.
-        </span>
+        Panelen visar aggregerade uppgifter. Kundernas innehåll — namn på
+        anställda, ordrar och registrerade tider — är inte åtkomligt härifrån.
       </Alert>
 
       <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -119,14 +113,8 @@ export default async function PlatformPage({
       </div>
 
       <p className="mt-3 text-xs text-neutral-500">
-        Månadsintäkten avser återkommande intäkt från aktiva prenumerationer.
-        Årsbetalningar räknas om till motsvarande månadsbelopp. Belopp anges
-        exklusive moms och tar inte hänsyn till Stripes avgifter.
-      </p>
-
-      <p className="mt-1 text-xs text-neutral-500">
-        {usedLast30} av {companies.length} företag har registrerat tid de
-        senaste 30 dagarna.
+        Belopp exklusive moms och före betaltjänstens avgifter. {usedLast30} av{" "}
+        {companies.length} företag har registrerat tid de senaste 30 dagarna.
       </p>
 
       <div className="mt-6">
@@ -151,7 +139,7 @@ export default async function PlatformPage({
           <Card>
             <CardHeader
               title="Företag"
-              description="Senast registrerade först. Utebliven aktivitet kan indikera en kund på väg att avsluta."
+              description="Senast registrerade först."
               action={
                 // Formulär utan JavaScript. Sökningen hamnar i adressen, så
                 // att en träfflista går att spara och skicka vidare.
@@ -242,7 +230,7 @@ export default async function PlatformPage({
         <Card className="mt-6">
           <CardHeader
             title="Senaste åtgärderna"
-            description="Åtgärder utförda från den här panelen, samtliga kunder."
+            description="Åtgärder utförda från panelen."
           />
           <Table>
             <thead>
@@ -273,10 +261,7 @@ export default async function PlatformPage({
       )}
 
       <Card className="mt-6">
-        <CardHeader
-          title="Driftläge"
-          description="Siffror som visar om något är på väg att gå fel innan det gör det."
-        />
+        <CardHeader title="Driftläge" />
         <dl className="divide-y divide-neutral-100 text-[13px]">
           <Row
             label="Schemajobbet"
@@ -287,10 +272,10 @@ export default async function PlatformPage({
                     // på en timme har det slutat köra, och glömda stämplingar
                     // ligger öppna tills någon upptäcker det.
                     Date.now() - health.lastCronRun.getTime() > 60 * 60 * 1000
-                      ? " — har inte kört på över en timme"
+                      ? " (över en timme sedan)"
                       : ""
                   }`
-                : "Har aldrig rapporterat in — kontrollera crontab"
+                : "Ingen registrerad körning"
             }
           />
           <Row
@@ -299,7 +284,7 @@ export default async function PlatformPage({
           />
           <Row
             label="Väntar på granskning"
-            value={`${health.needsReview} poster hos kunderna`}
+            value={`${health.needsReview} poster`}
           />
           <Row
             label="Databasens storlek"

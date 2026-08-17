@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Wordmark } from "@/components/ui/Logo";
+import { activeNotices } from "@/lib/notices";
 
 /**
  * Toppmeny och sidfot för säljsidan.
@@ -36,7 +37,60 @@ const NAV = [
   { href: "/#fragor", label: "Frågor" },
 ];
 
+/**
+ * Driftmeddelande på säljsidan.
+ *
+ * En smal remsa ovanför menyn, i löptextens storlek och utan färgblock. Den
+ * ska synas av den som läser, inte skrika åt den som skummar.
+ *
+ * Ligger ovanför den fastnitade menyn med flit och följer alltså inte med när
+ * man skrollar. Ett driftmeddelande är relevant vid ankomsten, inte hela vägen
+ * ned genom prislistan.
+ *
+ * Bara meddelanden som uttryckligen märkts för säljsidan visas. Det är den
+ * enda ytan som når någon som ännu inte är kund.
+ */
+async function SiteNotices() {
+  const notices = await activeNotices("site");
+  if (notices.length === 0) return null;
+
+  return (
+    <div className="border-b border-neutral-200 bg-neutral-50">
+      <div className="mx-auto max-w-6xl px-6 py-2.5">
+        {notices.map((notice) => (
+          <p
+            key={notice.id}
+            className="flex items-start gap-2 text-[13px] leading-relaxed text-neutral-600"
+          >
+            <span
+              aria-hidden="true"
+              className={`mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full ${
+                notice.kind === "INCIDENT" ? "bg-amber-500" : "bg-neutral-400"
+              }`}
+            />
+            <span>
+              <span className="font-medium text-neutral-900">
+                {notice.title}.
+              </span>{" "}
+              {notice.body}
+            </span>
+          </p>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export function SiteHeader() {
+  return (
+    <>
+      <SiteNotices />
+      <SiteHeaderBar />
+    </>
+  );
+}
+
+function SiteHeaderBar() {
   return (
     <header className="sticky top-0 z-50 border-b border-neutral-200/80 bg-white/85 backdrop-blur">
       <div className="mx-auto flex max-w-6xl items-center gap-6 px-6 py-3.5">

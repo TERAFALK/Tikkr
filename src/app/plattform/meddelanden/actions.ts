@@ -52,6 +52,7 @@ export async function addNotice(
       endsAt: parseMoment(formData.get("endsAt")),
       showInAdmin: formData.get("showInAdmin") === "on",
       showOnKiosk: formData.get("showOnKiosk") === "on",
+      showOnSite: formData.get("showOnSite") === "on",
       createdByEmail: email,
     });
 

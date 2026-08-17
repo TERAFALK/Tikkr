@@ -374,8 +374,13 @@ model SystemNotice {
 
   /// Var det syns. Ett underhåll som bara rör rapporterna behöver inte stå på
   /// väggen i verkstaden, och tvärtom.
+  ///
+  /// Säljsidan är den enda ytan som når någon som inte är kund. Ett pågående
+  /// avbrott där är en trovärdighetsfråga: den som utvärderar tjänsten och
+  /// märker att den inte svarar ska se att vi vet om det.
   showInAdmin Boolean @default(true) @map("show_in_admin")
   showOnKiosk Boolean @default(false) @map("show_on_kiosk")
+  showOnSite  Boolean @default(false) @map("show_on_site")
 
   /// Satt när meddelandet tagits bort ur cirkulation. Raderas aldrig, så att
   /// det går att se i efterhand vad kunderna faktiskt fick se.

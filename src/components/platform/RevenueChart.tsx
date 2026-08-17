@@ -20,13 +20,8 @@ export default function RevenueChart({ points }: { points: MonthPoint[] }) {
       <Card>
         <CardHeader
           title="Intäktsutveckling"
-          description="Mätningen görs av schemajobbet, en gång per dygn. Grafen visas när det finns minst två månader att jämföra."
+          description="Mätpunkter registreras dagligen. Grafen visas när minst två månader finns registrerade."
         />
-        <p className="px-5 pb-5 text-[13px] leading-relaxed text-neutral-500">
-          Historiken kan inte räknas fram i efterhand — en avslutad
-          prenumeration lämnar inga spår om vad den var värd. Därför börjar
-          grafen den dag mätningen först kördes.
-        </p>
       </Card>
     );
   }
@@ -40,7 +35,7 @@ export default function RevenueChart({ points }: { points: MonthPoint[] }) {
     <Card>
       <CardHeader
         title="Intäktsutveckling"
-        description="Månadsintäkt vid varje månads slut. Årsbetalningar omräknade till månad."
+        description="Månadsintäkt vid respektive månads slut. Årsbetalningar omräknade."
         action={
           <span
             className={`text-[13px] font-medium tabular-nums ${

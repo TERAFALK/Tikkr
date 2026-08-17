@@ -8,13 +8,14 @@ import type {
 } from "@/lib/platform-health";
 
 /**
- * DET SOM BEHÖVER ÅTGÄRDAS I DAG.
+ * BEVAKNINGSLISTOR.
  *
- * Tre listor överst i panelen. Var och en visas BARA när den har innehåll —
- * en panel full av tomma rutor lär ögat att hoppa över dem, och då syns inte
- * den dagen något faktiskt står där.
+ * Tre listor överst i panelen. Var och en visas BARA när den har innehåll — en
+ * panel full av tomma rutor lär ögat att hoppa över dem, och då syns inte den
+ * dagen något faktiskt står där.
  *
- * Är allt i sin ordning ser du ingenting alls, vilket är rätt svar.
+ * Rubrikerna beskriver urvalet, inte vad läsaren bör göra åt det. Panelen är
+ * ett underlag, inte en instruktion.
  */
 
 function Rows({ children }: { children: React.ReactNode }) {
@@ -64,8 +65,8 @@ export function SilentDeviceList({ devices }: { devices: SilentDevice[] }) {
   return (
     <Card className="border-amber-200">
       <CardHeader
-        title={`${devices.length} ${devices.length === 1 ? "skärm har" : "skärmar har"} slutat höra av sig`}
-        description="En skärm som varit tyst ett dygn har ofta stått oanvänd lika länge. Ring innan kunden ringer."
+        title={`Skärmar utan kontakt (${devices.length})`}
+        description="Aktiva skärmar som inte hört av sig det senaste dygnet."
       />
       <Rows>
         {devices.map((device) => (
@@ -78,7 +79,7 @@ export function SilentDeviceList({ devices }: { devices: SilentDevice[] }) {
             }`}
             value={
               device.silentHours === null
-                ? "aldrig kopplad"
+                ? "—"
                 : device.silentHours >= 48
                   ? `${Math.floor(device.silentHours / 24)} dygn`
                   : `${device.silentHours} tim`
@@ -97,8 +98,8 @@ export function EndingTrialList({ trials }: { trials: EndingTrial[] }) {
   return (
     <Card className="border-blue-200">
       <CardHeader
-        title={`${trials.length} ${trials.length === 1 ? "provperiod" : "provperioder"} går snart ut`}
-        description="Antalet stämplingar avgör vilket samtal som behövs: en påminnelse, eller en fråga om vad som gick fel."
+        title={`Provperioder som upphör (${trials.length})`}
+        description="Inom sju dagar. Antalet stämplingar visar i vilken grad tjänsten tagits i bruk."
       />
       <Rows>
         {trials.map((trial) => (
@@ -108,10 +109,10 @@ export function EndingTrialList({ trials }: { trials: EndingTrial[] }) {
             title={trial.companyName}
             detail={`${trial.entries} stämplingar · ${trial.devices} ${
               trial.devices === 1 ? "skärm" : "skärmar"
-            } · går ut ${formatDate(trial.trialEndsAt)}`}
+            } · upphör ${formatDate(trial.trialEndsAt)}`}
             value={
               trial.daysLeft <= 0
-                ? "går ut i dag"
+                ? "i dag"
                 : `${trial.daysLeft} ${trial.daysLeft === 1 ? "dag" : "dagar"}`
             }
           />
@@ -131,10 +132,8 @@ export function QuietCustomerList({
   return (
     <Card className="border-amber-200">
       <CardHeader
-        title={`${customers.length} betalande ${
-          customers.length === 1 ? "kund" : "kunder"
-        } har slutat registrera tid`}
-        description="Det tidigaste tecknet på en uppsägning — långt före att någon säger upp."
+        title={`Prenumerationer utan aktivitet (${customers.length})`}
+        description="Betalande företag utan registrerad tid de senaste fjorton dagarna."
       />
       <Rows>
         {customers.map((customer) => (
@@ -142,15 +141,13 @@ export function QuietCustomerList({
             key={customer.companyId}
             href={`/plattform/${customer.companyId}`}
             title={customer.companyName}
-            detail={
+            detail={`${
               customer.lastActivityAt
-                ? `senaste stämpling ${formatDate(customer.lastActivityAt)} · ${customer.monthlyRevenue.toLocaleString("sv-SE")} kr per månad`
-                : `har aldrig registrerat tid · ${customer.monthlyRevenue.toLocaleString("sv-SE")} kr per månad`
-            }
+                ? `senast ${formatDate(customer.lastActivityAt)}`
+                : "ingen registrerad tid"
+            } · ${customer.monthlyRevenue.toLocaleString("sv-SE")} kr per månad`}
             value={
-              customer.quietDays === null
-                ? "aldrig"
-                : `${customer.quietDays} dagar`
+              customer.quietDays === null ? "—" : `${customer.quietDays} dagar`
             }
             tone="warning"
           />

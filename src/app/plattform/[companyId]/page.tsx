@@ -64,8 +64,7 @@ export default async function CompanyPage({
 
         {inactiveDays !== null && inactiveDays >= 14 && (
           <Alert tone="warning">
-            Ingen registrerad tid på {inactiveDays} dagar. Utebliven aktivitet
-            kan indikera en kund på väg att avsluta.
+            Ingen registrerad tid på {inactiveDays} dagar.
           </Alert>
         )}
 
@@ -135,7 +134,7 @@ export default async function CompanyPage({
           <Card>
             <CardHeader
               title="Antal licenser"
-              description="En licens ger en stämplingsskärm. Sätts här för kunder som betalar mot faktura."
+              description="En licens ger en stämplingsskärm. Avser fakturakunder."
             />
             <ManualLicenseForm
               companyId={company.id}
@@ -157,7 +156,7 @@ export default async function CompanyPage({
                 name="body"
                 rows={6}
                 defaultValue={note?.body ?? ""}
-                placeholder="Kontaktperson, avtalsdetaljer, vad supportärendet handlade om…"
+                placeholder="Kontaktperson, avtalsdetaljer, supportärenden…"
                 className="block w-full rounded-md border-0 bg-white px-2.5 py-1.5 text-[13px] text-neutral-900 ring-1 ring-inset ring-neutral-200 placeholder:text-neutral-400 focus:ring-2 focus:ring-inset focus:ring-blue-600"
               />
               {note && (
@@ -176,8 +175,8 @@ export default async function CompanyPage({
         {/* Kontakter */}
         <Card className="mt-6">
           <CardHeader
-            title="Vilka som kan logga in"
-            description="Kontaktadresser för supportärenden och fakturering."
+            title="Administratörer"
+            description="Konton med åtkomst till kundens arbetsyta."
           />
           <Table>
             <thead>
@@ -212,7 +211,7 @@ export default async function CompanyPage({
         <Card className="mt-6">
           <CardHeader
             title="Stämplingsskärmar"
-            description="Kopplade stämplingsskärmar och tidpunkt för senaste kontakt."
+            description="Kopplade skärmar och senaste kontakt."
           />
           {devices.length === 0 ? (
             <p className="p-5 text-[13px] text-neutral-500">
@@ -254,7 +253,7 @@ export default async function CompanyPage({
         <Card className="mt-6">
           <CardHeader
             title="Vad som gjorts härifrån"
-            description="Samtliga åtgärder i panelen loggas och kan redovisas i efterhand."
+            description="Åtgärder utförda från panelen."
           />
           {history.length === 0 ? (
             <p className="p-5 text-[13px] text-neutral-500">
@@ -291,9 +290,8 @@ export default async function CompanyPage({
 
         <Alert tone="info">
           Innehållet i kundens data — namn på anställda, ordernummer och
-          registrerade tider — är inte åtkomligt från plattformspanelen. För
-          åtgärder som kräver sådan åtkomst krävs en inbjudan som administratör
-          i kundens arbetsyta, med en behörighet kunden själv kan återkalla.
+          registrerade tider — är inte åtkomligt härifrån. Sådan åtkomst kräver
+          en inbjudan som administratör i kundens arbetsyta.
         </Alert>
       </div>
     </PlatformShell>

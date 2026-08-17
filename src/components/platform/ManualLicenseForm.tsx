@@ -35,8 +35,7 @@ export default function ManualLicenseForm({
     return (
       <div className="p-5">
         <Alert tone="info">
-          Antalet licenser styrs av prenumerationen hos Stripe. Kunden ändrar
-          det själv under Inställningar → Prenumeration.
+          Antalet styrs av prenumerationen hos Stripe och ändras av kunden.
         </Alert>
       </div>
     );
@@ -77,9 +76,8 @@ export default function ManualLicenseForm({
       </div>
 
       <p className="text-xs leading-relaxed text-neutral-500">
-        {used} av {current} används just nu. Sänks antalet under det stängs
-        ingen skärm av — kunden får själv återkalla de som ska bort, och
-        panelen påpekar skillnaden för dem.
+        {used} av {current} används. Ett lägre antal stänger ingen skärm —
+        skillnaden påpekas i kundens panel.
       </p>
     </form>
   );

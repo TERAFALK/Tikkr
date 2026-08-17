@@ -11,10 +11,32 @@ import { Alert, Button, Field, Input, Select } from "@/components/ui";
 /**
  * Lägger in ett driftmeddelande.
  *
- * Ytorna är två kryssrutor och inte ett val i en lista, eftersom ett
- * meddelande ofta ska synas på båda — och den vanligaste missen är att glömma
- * kiosken vid ett avbrott som stoppar stämplingen.
+ * Ytorna är kryssrutor och inte ett val i en lista, eftersom ett meddelande
+ * ofta ska synas på flera — och den vanligaste missen är att glömma kiosken
+ * vid ett avbrott som stoppar stämplingen.
  */
+
+const SURFACES = [
+  {
+    name: "showInAdmin",
+    label: "Adminpanelen",
+    detail: "Kundernas administratörer.",
+    defaultOn: true,
+  },
+  {
+    name: "showOnKiosk",
+    label: "Stämplingsskärmarna",
+    detail: "Verkstadsgolvet. Endast när stämplingen påverkas.",
+    defaultOn: false,
+  },
+  {
+    name: "showOnSite",
+    label: "Säljsidan",
+    detail: "Publik. Även för den som ännu inte är kund.",
+    defaultOn: false,
+  },
+];
+
 export default function NoticeForm() {
   const [state, action] = useActionState<NoticeFormState, FormData>(
     addNotice,
@@ -44,7 +66,7 @@ export default function NoticeForm() {
         </div>
 
         <div className="min-w-64 flex-1">
-          <Field label="Rubrik" hint="Visas i fetstil i bannern.">
+          <Field label="Rubrik">
             <Input
               name="title"
               required
@@ -58,10 +80,7 @@ export default function NoticeForm() {
         </div>
       </div>
 
-      <Field
-        label="Meddelande"
-        hint="En eller två meningar. Säg vad som gäller och vad kunden behöver göra, om något."
-      >
+      <Field label="Meddelande">
         <textarea
           name="body"
           rows={3}
@@ -73,7 +92,7 @@ export default function NoticeForm() {
 
       <div className="flex flex-wrap gap-3">
         <div className="w-56">
-          <Field label="Visas från" hint="Lämnas tomt för direkt.">
+          <Field label="Visas från" hint="Tomt = omedelbart.">
             <Input type="datetime-local" name="startsAt" />
           </Field>
         </div>
@@ -89,36 +108,25 @@ export default function NoticeForm() {
           Var det ska synas
         </legend>
 
-        <label className="flex items-start gap-2.5 text-[13px] text-neutral-700">
-          <input
-            type="checkbox"
-            name="showInAdmin"
-            defaultChecked
-            className="mt-0.5 h-3.5 w-3.5 rounded border-neutral-300 text-blue-600 focus:ring-blue-600"
-          />
-          <span>
-            <span className="font-medium">Adminpanelen</span>
-            <span className="mt-0.5 block text-neutral-500">
-              Syns för den som administrerar. Rätt för allt som rör rapporter,
-              export och fakturering.
+        {SURFACES.map((surface) => (
+          <label
+            key={surface.name}
+            className="mt-2 flex items-start gap-2.5 text-[13px] text-neutral-700 first:mt-0"
+          >
+            <input
+              type="checkbox"
+              name={surface.name}
+              defaultChecked={surface.defaultOn}
+              className="mt-0.5 h-3.5 w-3.5 rounded border-neutral-300 text-blue-600 focus:ring-blue-600"
+            />
+            <span>
+              <span className="font-medium">{surface.label}</span>
+              <span className="mt-0.5 block text-neutral-500">
+                {surface.detail}
+              </span>
             </span>
-          </span>
-        </label>
-
-        <label className="mt-3 flex items-start gap-2.5 text-[13px] text-neutral-700">
-          <input
-            type="checkbox"
-            name="showOnKiosk"
-            className="mt-0.5 h-3.5 w-3.5 rounded border-neutral-300 text-blue-600 focus:ring-blue-600"
-          />
-          <span>
-            <span className="font-medium">Stämplingsskärmarna</span>
-            <span className="mt-0.5 block text-neutral-500">
-              Syns i verkstaden. Använd bara när stämplingen faktiskt påverkas —
-              ett meddelande som ingen där kan göra något åt skapar bara oro.
-            </span>
-          </span>
-        </label>
+          </label>
+        ))}
       </fieldset>
 
       <SubmitButton />

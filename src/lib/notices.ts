@@ -32,7 +32,14 @@ export interface Notice {
   endsAt: Date | null;
 }
 
-export type NoticeSurface = "admin" | "kiosk";
+export type NoticeSurface = "admin" | "kiosk" | "site";
+
+const SURFACE_FIELD: Record<NoticeSurface, "showInAdmin" | "showOnKiosk" | "showOnSite"> =
+  {
+    admin: "showInAdmin",
+    kiosk: "showOnKiosk",
+    site: "showOnSite",
+  };
 
 /**
  * Meddelanden som ska visas just nu på angiven yta.
@@ -50,7 +57,7 @@ export async function activeNotices(
       archivedAt: null,
       startsAt: { lte: now },
       OR: [{ endsAt: null }, { endsAt: { gte: now } }],
-      ...(surface === "kiosk" ? { showOnKiosk: true } : { showInAdmin: true }),
+      [SURFACE_FIELD[surface]]: true,
     },
     orderBy: { startsAt: "desc" },
     select: {
@@ -94,6 +101,7 @@ export async function createNotice(params: {
   endsAt: Date | null;
   showInAdmin: boolean;
   showOnKiosk: boolean;
+  showOnSite: boolean;
   createdByEmail: string;
 }) {
   const title = params.title.trim();
@@ -107,7 +115,7 @@ export async function createNotice(params: {
     throw new NoticeError("Skriv vad meddelandet gäller.");
   }
 
-  if (!params.showInAdmin && !params.showOnKiosk) {
+  if (!params.showInAdmin && !params.showOnKiosk && !params.showOnSite) {
     throw new NoticeError(
       "Välj minst en plats där meddelandet ska visas. Ett meddelande som inte " +
         "syns någonstans fyller ingen funktion."
@@ -137,6 +145,7 @@ export async function createNotice(params: {
       endsAt: params.endsAt,
       showInAdmin: params.showInAdmin,
       showOnKiosk: params.showOnKiosk,
+      showOnSite: params.showOnSite,
       createdByEmail: params.createdByEmail,
     },
   });
