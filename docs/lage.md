@@ -15,7 +15,7 @@ vad som faktiskt finns byggt.
 | Multi-tenant-lagret med tester | ✅ |
 | `CLAUDE.md` + README | ✅ |
 | Backup-skript | ⚠️ skrivet, offsite-mål ej satt |
-| HTTPS | ✅ via NPM mot `tikkr.terafalk.com`. Caddy planerad först i produktion |
+| HTTPS | ✅ via NPM mot `www.tikkr.se`. Caddy planerad först i produktion |
 | GitHub Actions → staging → SSH-deploy | ❌ ersatt av `git pull` + `docker compose up -d` |
 | Uptime-övervakning | ❌ nu möjlig, publik adress finns |
 
@@ -143,7 +143,7 @@ och används av båda, med skilda räknare så att den ena aldrig låser den and
 En full disk stoppar databasen från att skriva, vilket ser ut som att allt gått
 sönder långt ifrån där orsaken finns.
 
-**HTTPS** (2026-08-11). Via Nginx Proxy Manager mot `tikkr.terafalk.com`, med
+**HTTPS** (2026-08-11). Via Nginx Proxy Manager mot `www.tikkr.se`, med
 **Force SSL** — okrypterade anrop besvaras med `301` till HTTPS istället för att
 serveras. Stängde säkerhetskrav 6 och gjorde offline-funktionen komplett:
 service workern registreras inte över vanlig http, så kiosken klarade tidigare

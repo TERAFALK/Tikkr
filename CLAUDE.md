@@ -259,10 +259,11 @@ separat server som sätts upp senare, mot tikkr.se.
 |---|---|
 | Port 80/443 | 🔴 upptagna av **Nginx Proxy Manager** — rör dem inte |
 | Port 3000 | ✅ Tikkr, men bara `127.0.0.1` — all trafik går via proxyn |
-| Adress | ✅ `https://tikkr.terafalk.com` med Let's Encrypt-certifikat |
+| Adress | ✅ `https://www.tikkr.se` med Let's Encrypt-certifikat. **Det är adressen som gäller** — `tikkr.terafalk.com` var det tillfälliga labbnamnet |
 | Övrigt på servern | kör andra tjänster — kontrollera alltid innan portar tas |
 
-Domänen blir `portal.tikkr.se` i produktion. Ingenting i koden är knutet till en
+Systemet flyttar till `portal.tikkr.se` i produktion, medan `www.tikkr.se`
+förblir säljsidan. Ingenting i koden är knutet till en
 adress — kopplingslänkar och omdirigeringar byggs ur inkommande anrop — så ett
 byte är ett nytt proxy host plus omkopplade kioskskärmar, ingen kodändring.
 
