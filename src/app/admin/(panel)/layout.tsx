@@ -7,7 +7,9 @@ import {
   isStripeConfigured,
   yearlyAvailable,
 } from "@/lib/stripe";
+import { activeNotices } from "@/lib/notices";
 import AdminSidebar from "@/components/admin/AdminSidebar";
+import NoticeBanner from "@/components/ui/NoticeBanner";
 import SubscriptionLocked from "@/components/admin/SubscriptionLocked";
 
 /**
@@ -29,9 +31,10 @@ export default async function PanelLayout({
 }) {
   const session = await requireAdmin();
 
-  const [reviewCount, onboarding, company] = await Promise.all([
+  const [reviewCount, onboarding, notices, company] = await Promise.all([
     session.db.timeEntry.count({ where: { needsReview: true } }),
     getOnboardingState(session.db),
+    activeNotices("admin"),
     unsafeGlobalPrisma.company.findUnique({
       where: { id: session.companyId },
       select: {
@@ -73,6 +76,15 @@ export default async function PanelLayout({
         )}
 
         <main className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
+          {/* Driftmeddelanden ligger överst och över allt annat innehåll.
+              Ett pågående avbrott förklarar varför sidan under beter sig
+              konstigt, och den förklaringen kommer för sent längre ned. */}
+          {notices.length > 0 && (
+            <div className="mb-6">
+              <NoticeBanner notices={notices} />
+            </div>
+          )}
+
           {/* Vid låst prenumeration visas ingen adminsida alls. Inget kan
               då råka nås via en direktlänk, vilket hade varit fallet om vi
               istället gömt menyn och litat på att ingen gissar adresser. */}

@@ -20,12 +20,20 @@ export const LEGAL = [
   { href: "/personuppgiftsbitradesavtal", label: "Biträdesavtal" },
 ];
 
+/**
+ * Adresserna inleds med snedstreck.
+ *
+ * Ett ensamt "#pris" betyder "avsnittet pris på DEN HÄR sidan". Står man på
+ * villkorssidan finns inget sådant avsnitt, och länken leder till
+ * /villkor#pris där ingenting händer. Med "/#pris" går den alltid till
+ * startsidan först.
+ */
 const NAV = [
-  { href: "#sa-funkar-det", label: "Så fungerar det" },
-  { href: "#funktioner", label: "Funktioner" },
-  { href: "#underlag", label: "Underlag" },
-  { href: "#pris", label: "Pris" },
-  { href: "#fragor", label: "Frågor" },
+  { href: "/#sa-funkar-det", label: "Så fungerar det" },
+  { href: "/#funktioner", label: "Funktioner" },
+  { href: "/#underlag", label: "Underlag" },
+  { href: "/#pris", label: "Pris" },
+  { href: "/#fragor", label: "Frågor" },
 ];
 
 export function SiteHeader() {

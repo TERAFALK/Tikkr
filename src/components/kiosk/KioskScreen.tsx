@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { enqueue, flush, pending, type QueuedPunch } from "@/lib/offline-queue";
 import CompanyBadge from "@/components/ui/CompanyBadge";
 import { LogoMark } from "@/components/ui/Logo";
+import NoticeBanner from "@/components/ui/NoticeBanner";
 
 /**
  * KIOSKSKÄRMEN.
@@ -46,6 +47,14 @@ interface ActiveJob {
   momentName: string;
 }
 
+/** Driftmeddelande från plattformen. Kortad form — bannern behöver inte datum. */
+export interface KioskNotice {
+  id: string;
+  kind: "MAINTENANCE" | "INCIDENT" | "INFO";
+  title: string;
+  body: string;
+}
+
 interface Props {
   companyName: string;
   deviceName: string;
@@ -57,6 +66,8 @@ interface Props {
   subscriptionWarning: string | null;
   /** true om företaget laddat upp en egen logotyp. */
   hasLogo: boolean;
+  /** Driftmeddelanden märkta för stämplingsskärmarna. */
+  notices: KioskNotice[];
 }
 
 type View =
@@ -95,6 +106,7 @@ export default function KioskScreen({
   activeByEmployee,
   subscriptionWarning,
   hasLogo,
+  notices,
 }: Props) {
   const router = useRouter();
   const [view, setView] = useState<View>({ name: "employees" });
@@ -260,6 +272,11 @@ export default function KioskScreen({
           </span>
         </div>
       )}
+
+      {/* Driftmeddelanden ligger under prenumerationsvarningen men över
+          kvittensen. Den som stämplar ska se att något är på gång utan att
+          det tar plats från knapparna. */}
+      <NoticeBanner notices={notices} size="kiosk" />
 
       {receipt && <Banner tone="ok">{receipt}</Banner>}
       {error && (

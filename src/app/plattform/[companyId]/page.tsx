@@ -19,6 +19,7 @@ import {
 } from "@/components/ui";
 import { formatDate, formatDateTime } from "@/lib/format";
 import SubscriptionOverrideForm from "@/components/admin/SubscriptionOverrideForm";
+import PlatformShell from "@/components/platform/PlatformShell";
 import { monthlyRevenueFor } from "@/lib/platform-admin";
 import { getScreenPricing } from "@/lib/stripe";
 import { updateNote } from "./actions";
@@ -46,17 +47,15 @@ export default async function CompanyPage({
     : null;
 
   return (
-    <div className="min-h-screen bg-neutral-50">
-      <header className="border-b border-neutral-200 bg-white px-4 py-3 sm:px-6">
-        <div className="mx-auto flex max-w-7xl items-center gap-3">
-          <Link href="/plattform" className="text-[13px] font-medium text-blue-600">
-            ← Kundöversikt
-          </Link>
-          <span className="ml-auto text-[13px] text-neutral-400">{email}</span>
-        </div>
-      </header>
+    <PlatformShell email={email} current="/plattform">
+      <Link
+        href="/plattform"
+        className="text-[13px] font-medium text-blue-600 hover:underline"
+      >
+        ← Kundöversikt
+      </Link>
 
-      <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+      <div className="mt-4">
         <PageHeader
           title={company.name}
           description={`Upplagt ${formatDate(company.createdAt)} · tidszon ${company.timezone} · stänger glömda stämplingar ${company.autoCloseAt}`}
@@ -281,8 +280,8 @@ export default async function CompanyPage({
           åtgärder som kräver sådan åtkomst krävs en inbjudan som administratör
           i kundens arbetsyta, med en behörighet kunden själv kan återkalla.
         </Alert>
-      </main>
-    </div>
+      </div>
+    </PlatformShell>
   );
 }
 

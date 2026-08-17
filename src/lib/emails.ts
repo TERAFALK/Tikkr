@@ -280,6 +280,41 @@ export function adminInviteEmail(params: {
 }
 
 /**
+ * Driftinformation till kundernas administratörer.
+ *
+ * Texten skrivs för hand i plattformspanelen. Den läggs in styckvis och
+ * escapas, eftersom den passerar rakt in i HTML-versionen.
+ */
+export function broadcastEmail(params: {
+  to: string;
+  subject: string;
+  body: string;
+}): EmailMessage {
+  const paragraphs = params.body
+    .split(/\n{2,}/)
+    .map((block) => block.trim())
+    .filter(Boolean);
+
+  return compose({
+    to: params.to,
+    subject: params.subject,
+    lines: [params.body],
+    layout: {
+      preheader: params.subject,
+      heading: params.subject,
+      paragraphs: paragraphs.map((block) =>
+        // Enkla radbrytningar inom ett stycke behålls. Den som skriver ett
+        // driftmeddelande radbryter ofta en uppräkning för hand.
+        escape(block).replace(/\n/g, "<br>")
+      ),
+      afterword: [
+        "Du får det här mejlet som administratör i Tikkr. Svara gärna om något är oklart.",
+      ],
+    },
+  });
+}
+
+/**
  * Bekräftelse på att lösenordet ändrats.
  *
  * Skickas EFTER bytet, och är den enda signal en person får om någon annan

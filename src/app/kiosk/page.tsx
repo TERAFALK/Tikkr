@@ -2,6 +2,7 @@ import { getKioskSession } from "@/lib/kiosk-auth";
 import { unsafeGlobalPrisma } from "@/lib/db";
 import { forCompany } from "@/lib/tenant";
 import { evaluateAccess } from "@/lib/subscription";
+import { activeNotices } from "@/lib/notices";
 import KioskScreen from "@/components/kiosk/KioskScreen";
 
 // Kioskvyn. Hämtar allt skärmen behöver i ett svep och lämnar över till
@@ -48,7 +49,7 @@ export default async function KioskPage() {
     pastDueSince: company?.pastDueSince ?? null,
   });
 
-  const [employees, orders, moments, openEntries] = await Promise.all([
+  const [employees, orders, moments, openEntries, notices] = await Promise.all([
     db.employee.findMany({
       where: { active: true },
       orderBy: { name: "asc" },
@@ -73,6 +74,7 @@ export default async function KioskPage() {
         moment: { select: { name: true } },
       },
     }),
+    activeNotices("kiosk"),
   ]);
 
   const activeByEmployee = Object.fromEntries(
@@ -101,6 +103,14 @@ export default async function KioskPage() {
         access.level === "full" ? null : access.headline
       }
       hasLogo={Boolean(company?.logoSquareMimeType)}
+      // Driftmeddelanden riktade till verkstaden. Bara de som markerats för
+      // skärmarna — ett meddelande om rapporterna hör inte hemma på väggen.
+      notices={notices.map((notice) => ({
+        id: notice.id,
+        kind: notice.kind,
+        title: notice.title,
+        body: notice.body,
+      }))}
     />
   );
 }

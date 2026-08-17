@@ -305,6 +305,54 @@ model PlatformUser {
 ///
 /// Fältet heter targetCompanyId och inte companyId med flit: raden tillhör
 /// plattformen, inte kunden, och ska aldrig omfattas av det filtrerande lagret.
+/// Vad ett driftmeddelande gäller. Styr färg och rubrik, inget annat.
+enum NoticeKind {
+  /// Planerat underhåll, känt i förväg.
+  MAINTENANCE
+  /// Något är trasigt just nu.
+  INCIDENT
+  /// Övrig information, exempelvis en ny funktion.
+  INFO
+}
+
+/// Ett driftmeddelande som visas för alla kunder.
+///
+/// Gäller hela installationen och inte ett enskilt företag — därför inget
+/// company_id, och därför ligger den utanför företagsfiltreringen. Ett
+/// meddelande riktat till en enskild kund hör hemma i ett mejl eller i
+/// anteckningen om företaget, inte i en banner alla ser.
+///
+/// Tidsstyrd med flit: ett planerat underhåll läggs in i förväg och dyker upp
+/// av sig själv vid rätt tidpunkt. Ett meddelande som kräver att någon minns
+/// att slå på det klockan sju på morgonen kommer inte att visas.
+model SystemNotice {
+  id    String     @id @default(cuid())
+  kind  NoticeKind @default(MAINTENANCE)
+  title String
+  body  String
+
+  /// När meddelandet börjar visas.
+  startsAt DateTime @map("starts_at")
+
+  /// När det slutar visas. null betyder tills det arkiveras för hand.
+  endsAt DateTime? @map("ends_at")
+
+  /// Var det syns. Ett underhåll som bara rör rapporterna behöver inte stå på
+  /// väggen i verkstaden, och tvärtom.
+  showInAdmin Boolean @default(true) @map("show_in_admin")
+  showOnKiosk Boolean @default(false) @map("show_on_kiosk")
+
+  /// Satt när meddelandet tagits bort ur cirkulation. Raderas aldrig, så att
+  /// det går att se i efterhand vad kunderna faktiskt fick se.
+  archivedAt DateTime? @map("archived_at")
+
+  createdByEmail String   @map("created_by_email")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  @@index([archivedAt, startsAt])
+  @@map("system_notices")
+}
+
 model PlatformAuditLog {
   id              String   @id @default(cuid())
   actorEmail      String   @map("actor_email")
