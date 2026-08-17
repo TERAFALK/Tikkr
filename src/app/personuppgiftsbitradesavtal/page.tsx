@@ -5,7 +5,11 @@ import LegalPage, {
   List,
   type Section,
 } from "@/components/marketing/LegalPage";
-import { LEGAL_UPDATED, SUBPROCESSORS } from "@/lib/legal";
+import {
+  HOSTING_LOCATION,
+  LEGAL_UPDATED,
+  SUBPROCESSOR_NOTICE_DAYS,
+} from "@/lib/legal";
 
 export const metadata: Metadata = {
   title: "Personuppgiftsbiträdesavtal — Tikkr",
@@ -167,19 +171,26 @@ const sections: Section[] = [
       <>
         <p>
           Den ansvarige lämnar ett allmänt förhandsgodkännande till att biträdet
-          anlitar underbiträden. Följande anlitas vid avtalets ingående:
+          anlitar underbiträden. Underbiträden anlitas för drift av servrar, för
+          betalningshantering och för utskick av systemets e-post. Samtliga
+          behandlar uppgifter inom EU eller EES.
         </p>
-        <Definitions
-          rows={SUBPROCESSORS.map((item) => ({
-            term: item.name,
-            description: `${item.purpose} Behandling sker i ${item.location}.`,
-          }))}
-        />
         <p>
-          Biträdet informerar den ansvarige minst 30 dagar innan ett underbiträde
-          tillkommer eller byts ut. Den ansvarige kan invända mot ändringen inom
-          den tiden, och har vid invändning rätt att säga upp avtalet utan
-          kostnad för återstående period.
+          En aktuell förteckning över underbiträden, med namn, ändamål och
+          behandlingsort, lämnas på begäran till{" "}
+          <a
+            href="mailto:support@tikkr.se"
+            className="font-medium text-blue-600 hover:underline"
+          >
+            support@tikkr.se
+          </a>
+          .
+        </p>
+        <p>
+          Biträdet informerar den ansvarige minst {SUBPROCESSOR_NOTICE_DAYS}{" "}
+          dagar innan ett underbiträde tillkommer eller byts ut. Den ansvarige
+          kan invända mot ändringen inom den tiden, och har vid invändning rätt
+          att säga upp avtalet utan kostnad för återstående period.
         </p>
         <p>
           Biträdet ålägger varje underbiträde samma skyldigheter som följer av
@@ -194,9 +205,10 @@ const sections: Section[] = [
     heading: "Överföring till tredjeland",
     body: (
       <p>
-        Personuppgifter behandlas inom EU eller EES. Skulle överföring till
-        tredjeland bli aktuell sker den endast med stöd av ett beslut om
-        adekvat skyddsnivå eller av standardavtalsklausuler, och den ansvarige
+        Tjänsten och databasen driftas på servrar i {HOSTING_LOCATION}, och
+        personuppgifter behandlas inom EU eller EES. Skulle överföring till
+        tredjeland bli aktuell sker den endast med stöd av ett beslut om adekvat
+        skyddsnivå eller av standardavtalsklausuler, och den ansvarige
         informeras i förväg.
       </p>
     ),

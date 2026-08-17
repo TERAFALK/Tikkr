@@ -10,39 +10,28 @@
 /** Datumet som visas som "senast uppdaterad" i samtliga dokument. */
 export const LEGAL_UPDATED = "12 augusti 2026";
 
-export interface Subprocessor {
-  name: string;
-  /** Vad de gör för oss. Skrivs som en fullständig mening. */
-  purpose: string;
-  /** Var behandlingen sker. */
-  location: string;
-}
+/**
+ * Var tjänsten driftas.
+ *
+ * Står i klartext i både integritetspolicyn och biträdesavtalet, och MÅSTE
+ * stämma med var produktionsservern faktiskt står. Byts leverantör till en i
+ * ett annat land ska den här raden ändras samtidigt — ett påstående om
+ * datalagring som inte längre är sant är ett avtalsbrott, inte ett skrivfel.
+ */
+export const HOSTING_LOCATION = "Sverige";
 
 /**
  * Underbiträden.
  *
- * Ändras listan ska berörda kunder informeras i förväg — det står i
- * biträdesavtalet och är ett åtagande, inte en artighet.
+ * Namnen publiceras inte. Förteckningen lämnas i stället på begäran, vilket
+ * biträdesavtalet anger.
+ *
+ * Rätten att invända mot ett byte finns kvar — den är själva poängen med
+ * artikel 28, och den försvinner inte av att listan inte står på en webbsida.
+ * Åtagandet att informera i förväg gäller alltså fortfarande, och listan måste
+ * hållas aktuell någonstans för att kunna lämnas ut.
  */
-export const SUBPROCESSORS: Subprocessor[] = [
-  {
-    name: "Hetzner Online GmbH",
-    purpose: "Driftar servern där tjänsten och databasen körs.",
-    location: "Tyskland",
-  },
-  {
-    name: "Stripe Payments Europe, Ltd.",
-    purpose:
-      "Hanterar betalningar och prenumerationer. Behandlar kundens fakturauppgifter, inte uppgifter om anställda.",
-    location: "Irland",
-  },
-  {
-    name: "Microsoft Ireland Operations Ltd.",
-    purpose:
-      "Skickar systemets e-post, exempelvis återställning av lösenord och inbjudningar. Behandlar administratörers adresser, inte uppgifter om anställda.",
-    location: "EU",
-  },
-];
+export const SUBPROCESSOR_NOTICE_DAYS = 30;
 
 /** Bolaget bakom tjänsten. */
 export const PROVIDER = {

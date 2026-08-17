@@ -4,7 +4,7 @@ import LegalPage, {
   List,
   type Section,
 } from "@/components/marketing/LegalPage";
-import { LEGAL_UPDATED, SUBPROCESSORS } from "@/lib/legal";
+import { HOSTING_LOCATION, LEGAL_UPDATED } from "@/lib/legal";
 
 export const metadata: Metadata = {
   title: "Integritetspolicy — Tikkr",
@@ -174,20 +174,27 @@ const sections: Section[] = [
     ),
   },
   {
-    id: "underbitraden",
-    heading: "Vilka andra som är inblandade",
+    id: "var",
+    heading: "Var uppgifterna lagras",
     body: (
       <>
         <p>
-          För att kunna leverera tjänsten anlitas ett fåtal underleverantörer.
-          Samtliga behandlar uppgifter inom EU eller EES.
+          Tjänsten och databasen driftas på servrar i {HOSTING_LOCATION}, och
+          säkerhetskopiorna förvaras på en annan plats än driftservern.
         </p>
-        <Definitions
-          rows={SUBPROCESSORS.map((item) => ({
-            term: item.name,
-            description: `${item.purpose} Behandlas i ${item.location}.`,
-          }))}
-        />
+        <p>
+          För betalningar och för systemets e-postutskick anlitas
+          underleverantörer. Samtliga behandlar uppgifter inom EU eller EES, och
+          ingen av dem får tillgång till uppgifter om kundens anställda. En
+          aktuell förteckning över underleverantörerna lämnas på begäran till{" "}
+          <a
+            href="mailto:support@tikkr.se"
+            className="font-medium text-blue-600 hover:underline"
+          >
+            support@tikkr.se
+          </a>
+          .
+        </p>
         <p>
           Byts en underleverantör ut informeras berörda kunder i förväg, enligt
           personuppgiftsbiträdesavtalet.
