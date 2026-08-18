@@ -92,3 +92,61 @@ describe("tolkning av klockslag", () => {
     expect(() => parseTimeOfDay("")).toThrow();
   });
 });
+
+/**
+ * Nätterna då klockan ställs om.
+ *
+ * Sista söndagen i mars finns klockan 02:30 inte alls, och sista söndagen i
+ * oktober finns den två gånger. Ett företag som stänger glömda stämplingar
+ * mitt i natten träffar därför en tidpunkt som antingen saknas eller är
+ * tvetydig — och en uträkning som ger NaN eller hänger sig gör att INGEN kunds
+ * stämplingar stängs den natten.
+ *
+ * Testerna nedan kräver inte ett visst svar på vilken sekund som väljs. De
+ * kräver att svaret är en giltig tidpunkt som ligger framåt i tiden, vilket är
+ * det som avgör om schemajobbet fungerar.
+ */
+describe("tidsomställningen", () => {
+  const valid = (date: Date) =>
+    date instanceof Date && !Number.isNaN(date.getTime());
+
+  it("natten då en timme försvinner ger ett giltigt klockslag", () => {
+    // 2026 ställs klockan fram natten mot söndag 29 mars: 02:00 blir 03:00.
+    const before = new Date("2026-03-29T00:30:00Z");
+    const next = nextOccurrenceOf("02:30", before, SE);
+
+    expect(valid(next)).toBe(true);
+    expect(next.getTime()).toBeGreaterThan(before.getTime());
+  });
+
+  it("natten då en timme upprepas ger ett giltigt klockslag", () => {
+    // 2026 ställs klockan tillbaka natten mot söndag 25 oktober.
+    const before = new Date("2026-10-24T22:00:00Z");
+    const next = nextOccurrenceOf("02:30", before, SE);
+
+    expect(valid(next)).toBe(true);
+    expect(next.getTime()).toBeGreaterThan(before.getTime());
+  });
+
+  it("18:00 ligger rätt både dagen före och dagen efter omställningen", () => {
+    // Vintertid: 18:00 svensk tid är 17:00 UTC.
+    expect(
+      nextOccurrenceOf("18:00", new Date("2026-03-28T12:00:00Z"), SE).toISOString()
+    ).toBe("2026-03-28T17:00:00.000Z");
+
+    // Sommartid dagen efter: samma klockslag på väggen, en timme tidigare UTC.
+    expect(
+      nextOccurrenceOf("18:00", new Date("2026-03-29T12:00:00Z"), SE).toISOString()
+    ).toBe("2026-03-29T16:00:00.000Z");
+  });
+
+  it("klockslaget upprepas inte när omställningen passeras", () => {
+    // Varje anrop ska ge NÄSTA tillfälle. Två anrop i rad, det andra strax
+    // efter det första svaret, får aldrig ge samma tidpunkt igen — då hade
+    // schemajobbet stängt samma poster om och om igen den natten.
+    const first = nextOccurrenceOf("02:30", new Date("2026-10-24T22:00:00Z"), SE);
+    const second = nextOccurrenceOf("02:30", new Date(first.getTime() + 1000), SE);
+
+    expect(second.getTime()).toBeGreaterThan(first.getTime());
+  });
+});

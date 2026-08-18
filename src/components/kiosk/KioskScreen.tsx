@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { enqueue, flush, pending, type QueuedPunch } from "@/lib/offline-queue";
 import CompanyBadge from "@/components/ui/CompanyBadge";
@@ -97,6 +97,17 @@ const RECEIPT_MS = 2200;
 /** Hur länge ett halvfärdigt val får stå innan skärmen återgår av sig själv. */
 const IDLE_MS = 45_000;
 
+/**
+ * Hur ofta skärmen frågar servern vem som är instämplad.
+ *
+ * Fem sekunder är kort nog för att två skärmar ska kännas som en, och långt
+ * nog för att inte märkas: svaret innehåller bara de som arbetar just nu.
+ */
+const SYNC_MS = 5_000;
+
+/** Hur ofta listorna med anställda, ordrar och moment hämtas om. */
+const LIST_REFRESH_MS = 5 * 60_000;
+
 export default function KioskScreen({
   companyName,
   deviceName,
@@ -141,6 +152,14 @@ export default function KioskScreen({
   }, [receiptVisible, receipt]);
 
   const [waiting, setWaiting] = useState(0);
+
+  // Samma värde som ovan, läsbart utan att göra om funktionen varje gång det
+  // ändras. Synkningen behöver veta om kön är tom, men ska inte startas om var
+  // gång ett tryck läggs till.
+  const waitingRef = useRef(0);
+  useEffect(() => {
+    waitingRef.current = waiting;
+  }, [waiting]);
 
   /**
    * Tömmer kön och rapporterar läget.
@@ -212,6 +231,64 @@ export default function KioskScreen({
       clearInterval(timer);
     };
   }, [drain]);
+
+  /**
+   * Hämtar vem som är instämplad, från servern.
+   *
+   * Skärmarna delar läge: stämplar någon in vid porten ska den som står vid
+   * monteringen se det inom några sekunder, och kunna stämpla ut personen
+   * därifrån.
+   *
+   * Serverns bild tillämpas INTE när det ligger tryck kvar i kön. Då är den
+   * lokala bilden nyare — trycket har hänt men ännu inte nått fram — och att
+   * skriva över den skulle få namnet att blinka tillbaka till sitt gamla läge
+   * framför den som just tryckt.
+   */
+  const syncActive = useCallback(async () => {
+    if (waitingRef.current > 0) return;
+
+    try {
+      const response = await fetch("/api/kiosk/state", { cache: "no-store" });
+      if (!response.ok) return;
+
+      const data = (await response.json()) as {
+        active: Record<string, ActiveJob>;
+      };
+
+      setActive(data.active);
+    } catch {
+      // Nätet är nere. Skärmen fortsätter visa det den vet, och kön tar hand
+      // om det som trycks under tiden.
+    }
+  }, []);
+
+  // Hämtar med jämna mellanrum, och direkt när skärmen väcks eller nätet
+  // kommer tillbaka. Fem sekunder är kort nog för att kännas samtidigt och
+  // långt nog för att inte märkas på servern.
+  useEffect(() => {
+    void syncActive();
+
+    const timer = setInterval(() => void syncActive(), SYNC_MS);
+    const onWake = () => void syncActive();
+
+    document.addEventListener("visibilitychange", onWake);
+    window.addEventListener("online", onWake);
+    window.addEventListener("focus", onWake);
+
+    return () => {
+      clearInterval(timer);
+      document.removeEventListener("visibilitychange", onWake);
+      window.removeEventListener("online", onWake);
+      window.removeEventListener("focus", onWake);
+    };
+  }, [syncActive]);
+
+  // Listorna med anställda, ordrar och moment ändras sällan. De hämtas därför
+  // med en betydligt lugnare takt, genom att sidan laddas om i bakgrunden.
+  useEffect(() => {
+    const timer = setInterval(() => router.refresh(), LIST_REFRESH_MS);
+    return () => clearInterval(timer);
+  }, [router]);
 
   const punchIn = useCallback(
     (employee: Employee, order: Order, moment: Moment) => {
