@@ -6,6 +6,7 @@ import { enqueue, flush, pending, type QueuedPunch } from "@/lib/offline-queue";
 import CompanyBadge from "@/components/ui/CompanyBadge";
 import { LogoMark } from "@/components/ui/Logo";
 import NoticeBanner from "@/components/ui/NoticeBanner";
+import EmployeeAvatar from "@/components/ui/EmployeeAvatar";
 
 /**
  * KIOSKSKÄRMEN.
@@ -28,6 +29,8 @@ import NoticeBanner from "@/components/ui/NoticeBanner";
 interface Employee {
   id: string;
   name: string;
+  /** true när ett porträtt finns uppladdat. Bilden hämtas via sin adress. */
+  hasPhoto: boolean;
 }
 
 interface Order {
@@ -611,12 +614,24 @@ function EmployeeGrid({
                 : "border-neutral-200 bg-white active:bg-neutral-50"
             }`}
           >
-            <span
-              className={`text-xl font-semibold leading-tight sm:text-2xl ${
-                job ? "text-white" : "text-neutral-900"
-              }`}
-            >
-              {employee.name}
+            <span className="flex items-center gap-3">
+              {/* Porträttet gör att ögat hittar rätt knapp på formen i stället
+                  för att läsa alla namn. Skillnaden märks mest för den som är
+                  ny, och för den som har bråttom. */}
+              <EmployeeAvatar
+                employeeId={employee.id}
+                name={employee.name}
+                hasPhoto={employee.hasPhoto}
+                size={52}
+                onDark={Boolean(job)}
+              />
+              <span
+                className={`min-w-0 text-xl font-semibold leading-tight sm:text-2xl ${
+                  job ? "text-white" : "text-neutral-900"
+                }`}
+              >
+                {employee.name}
+              </span>
             </span>
 
             {job ? (

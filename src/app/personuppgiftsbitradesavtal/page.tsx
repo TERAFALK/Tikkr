@@ -100,7 +100,7 @@ const sections: Section[] = [
             {
               term: "Kategorier av uppgifter",
               description:
-                "Namn samt registrerad arbetstid med tidpunkt, kundorder, arbetsmoment, stämplingsskärm och IP-adress. För administratörer även e-postadress och krypterat lösenord.",
+                "Namn, frivilligt porträtt samt registrerad arbetstid med tidpunkt, kundorder, arbetsmoment, stämplingsskärm och IP-adress. För administratörer även e-postadress och krypterat lösenord.",
             },
           ]}
         />

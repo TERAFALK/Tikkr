@@ -14,6 +14,8 @@ import {
   Th,
   Tr,
 } from "@/components/ui";
+import EmployeeAvatar from "@/components/ui/EmployeeAvatar";
+import EmployeePhotoForm from "@/components/admin/EmployeePhotoForm";
 import { createEmployee, renameEmployee, toggleEmployee } from "./actions";
 
 export const dynamic = "force-dynamic";
@@ -27,6 +29,9 @@ export default async function EmployeesPage() {
       id: true,
       name: true,
       active: true,
+      // Bara om ett foto finns, aldrig sjalva bytena. En lista med tjugo
+      // portratt skulle annars bli flera megabyte i sidans svar.
+      photoMimeType: true,
       _count: { select: { timeEntries: true } },
     },
   });
@@ -80,7 +85,15 @@ export default async function EmployeesPage() {
               {employees.map((employee) => (
                 <Tr key={employee.id} dimmed={!employee.active}>
                   <Td>
-                    <span className="font-medium">{employee.name}</span>
+                    <span className="flex items-center gap-3">
+                      <EmployeeAvatar
+                        employeeId={employee.id}
+                        name={employee.name}
+                        hasPhoto={Boolean(employee.photoMimeType)}
+                        size={36}
+                      />
+                      <span className="font-medium">{employee.name}</span>
+                    </span>
                   </Td>
                   <Td>
                     {employee.active ? (
@@ -94,6 +107,19 @@ export default async function EmployeesPage() {
                   </Td>
                   <Td>
                     <div className="flex justify-end gap-2">
+                      <FormDialog
+                        trigger="Bild"
+                        triggerTone="ghost"
+                        title="Bild på stämplingsskärmen"
+                        description="Visas i namnrutnätet. Gör det snabbare att hitta rätt knapp, särskilt för den som är ny."
+                      >
+                        <EmployeePhotoForm
+                          employeeId={employee.id}
+                          name={employee.name}
+                          hasPhoto={Boolean(employee.photoMimeType)}
+                        />
+                      </FormDialog>
+
                       <FormDialog
                         trigger="Ändra"
                         triggerTone="ghost"

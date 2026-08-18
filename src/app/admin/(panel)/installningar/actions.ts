@@ -166,6 +166,13 @@ export async function anonymizeEmployee(formData: FormData) {
     data: {
       name: `Anonymiserad anställd (${employee.id.slice(-4)})`,
       active: false,
+
+      // Porträttet är en personuppgift och en av de mest identifierande som
+      // finns. Det raderas därför i samma steg som namnet — annars hade
+      // anonymiseringen lämnat kvar ett ansikte.
+      photoData: null,
+      photoMimeType: null,
+      photoUpdatedAt: new Date(),
     },
   });
 

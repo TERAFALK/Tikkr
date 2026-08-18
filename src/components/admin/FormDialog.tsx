@@ -30,8 +30,15 @@ export default function FormDialog({
   triggerTone?: "primary" | "secondary" | "danger" | "ghost";
   title: string;
   description?: string;
-  action: (formData: FormData) => void | Promise<void>;
-  submitLabel: string;
+  /**
+   * Åtgärden rutan skickar till.
+   *
+   * Utelämnas när innehållet sköter sina egna formulär — exempelvis en
+   * bilduppladdning, som skickar direkt när en fil valts. Rutan får då bara
+   * en stängknapp.
+   */
+  action?: (formData: FormData) => void | Promise<void>;
+  submitLabel?: string;
   submitTone?: "primary" | "secondary" | "danger" | "ghost";
   children: ReactNode;
 }) {
@@ -60,28 +67,43 @@ export default function FormDialog({
           )}
         </div>
 
-        <form
-          action={action}
-          // Rutan stängs när formuläret skickas. Serveråtgärden laddar om
-          // sidan med det nya innehållet, så den som väntar kvar i en öppen
-          // ruta skulle bara se sina egna gamla värden.
-          onSubmit={() => dialog.current?.close()}
-        >
-          <div className="space-y-4 px-5 py-5">{children}</div>
+        {action ? (
+          <form
+            action={action}
+            // Rutan stängs när formuläret skickas. Serveråtgärden laddar om
+            // sidan med det nya innehållet, så den som väntar kvar i en öppen
+            // ruta skulle bara se sina egna gamla värden.
+            onSubmit={() => dialog.current?.close()}
+          >
+            <div className="space-y-4 px-5 py-5">{children}</div>
 
-          <div className="flex justify-end gap-2 border-t border-neutral-200 bg-neutral-50 px-5 py-3">
-            <Button
-              type="button"
-              tone="secondary"
-              onClick={() => dialog.current?.close()}
-            >
-              Avbryt
-            </Button>
-            <Button type="submit" tone={submitTone}>
-              {submitLabel}
-            </Button>
-          </div>
-        </form>
+            <div className="flex justify-end gap-2 border-t border-neutral-200 bg-neutral-50 px-5 py-3">
+              <Button
+                type="button"
+                tone="secondary"
+                onClick={() => dialog.current?.close()}
+              >
+                Avbryt
+              </Button>
+              <Button type="submit" tone={submitTone}>
+                {submitLabel}
+              </Button>
+            </div>
+          </form>
+        ) : (
+          <>
+            <div className="space-y-4 px-5 py-5">{children}</div>
+            <div className="flex justify-end border-t border-neutral-200 bg-neutral-50 px-5 py-3">
+              <Button
+                type="button"
+                tone="secondary"
+                onClick={() => dialog.current?.close()}
+              >
+                Stäng
+              </Button>
+            </div>
+          </>
+        )}
       </dialog>
     </>
   );

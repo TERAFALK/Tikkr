@@ -53,7 +53,10 @@ export default async function KioskPage() {
     db.employee.findMany({
       where: { active: true },
       orderBy: { name: "asc" },
-      select: { id: true, name: true },
+      // photoMimeType i stallet for photoData: skarmen behover bara veta OM ett
+      // portratt finns. Bilderna hamtas var for sig och mellanlagras av
+      // webblasaren i stallet for att skickas med varje sidladdning.
+      select: { id: true, name: true, photoMimeType: true },
     }),
     db.order.findMany({
       where: { status: "OPEN" },
@@ -92,7 +95,11 @@ export default async function KioskPage() {
     <KioskScreen
       companyName={session.companyName}
       deviceName={session.deviceName}
-      employees={employees}
+      employees={employees.map((employee) => ({
+        id: employee.id,
+        name: employee.name,
+        hasPhoto: Boolean(employee.photoMimeType),
+      }))}
       orders={orders}
       moments={moments}
       activeByEmployee={activeByEmployee}

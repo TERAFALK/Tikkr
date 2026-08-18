@@ -124,6 +124,17 @@ model Employee {
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
+  /// Porträtt som visas på stämplingsskärmen.
+  ///
+  /// Ligger i databasen och inte som fil på disk, av samma skäl som
+  /// företagets logotyp: en säkerhetskopia av databasen ska innehålla allt.
+  /// En bild på en person är dessutom en personuppgift, och den ska följa med
+  /// när personen anonymiseras — vilket den gör automatiskt när den ligger på
+  /// samma rad.
+  photoData      Bytes?    @map("photo_data")
+  photoMimeType  String?   @map("photo_mime_type")
+  photoUpdatedAt DateTime? @map("photo_updated_at")
+
   company     Company     @relation(fields: [companyId], references: [id], onDelete: Cascade)
   timeEntries TimeEntry[]
 

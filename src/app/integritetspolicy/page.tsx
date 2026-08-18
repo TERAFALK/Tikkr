@@ -70,9 +70,15 @@ const sections: Section[] = [
           <strong className="font-medium text-neutral-900">
             Om en anställd hos kunden
           </strong>{" "}
-          lagras namnet och den tid som registrerats. Ingenting mer. Systemet
-          har inga fält för personnummer, adress, telefonnummer, anställningsform
-          eller lön, och kan därför inte innehålla sådant.
+          lagras namnet och den tid som registrerats, samt ett porträtt om
+          arbetsgivaren valt att lägga upp ett. Ingenting mer. Systemet har inga
+          fält för personnummer, adress, telefonnummer, anställningsform eller
+          lön, och kan därför inte innehålla sådant.
+        </p>
+        <p>
+          Porträttet är frivilligt och används enbart för att göra rätt knapp
+          lättare att hitta på stämplingsskärmen. Det raderas tillsammans med
+          namnet när en person anonymiseras.
         </p>
         <p>Varje registrerad stämpling innehåller:</p>
         <List
