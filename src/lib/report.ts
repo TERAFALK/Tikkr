@@ -133,7 +133,7 @@ export async function buildReport(
 type Entry = {
   clockInAt: Date;
   clockOutAt: Date | null;
-  employee: { id: string; name: string };
+  employee: { id: string; name: string; employeeNumber: string | null };
   order: { id: string; orderNumber: string; customerName: string | null };
   moment: { id: string; name: string };
 };

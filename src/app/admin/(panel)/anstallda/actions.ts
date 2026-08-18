@@ -90,6 +90,42 @@ function describeError(error: unknown): string {
   throw error;
 }
 
+
+/**
+ * Fälten som ska skrivas för bilden.
+ *
+ * Byggs som en egen, uttryckligt typad variabel i stället för som en villkorlig
+ * spridning direkt i data-objektet. En spridning av `villkor && { ... }` ger en
+ * uniontyp som Prismas mycket strikta indatatyper vägrar ta emot — samma sorts
+ * fel som gjorde att bygget stannade två gånger.
+ *
+ * Tomt objekt betyder "rör inte bilden".
+ */
+interface PhotoFields {
+  photoData?: Uint8Array<ArrayBuffer> | null;
+  photoMimeType?: string | null;
+  photoUpdatedAt?: Date;
+}
+
+function photoFields(
+  photo: { data: Uint8Array<ArrayBuffer>; mimeType: string } | undefined,
+  remove: boolean
+): PhotoFields {
+  if (photo) {
+    return {
+      photoData: photo.data,
+      photoMimeType: photo.mimeType,
+      photoUpdatedAt: new Date(),
+    };
+  }
+
+  if (remove) {
+    return { photoData: null, photoMimeType: null, photoUpdatedAt: new Date() };
+  }
+
+  return {};
+}
+
 export async function createEmployee(
   _previous: EmployeeState,
   formData: FormData
@@ -108,11 +144,7 @@ export async function createEmployee(
         name,
         companyId,
         employeeNumber: readNumber(formData),
-        ...(photo && {
-          photoData: photo.data,
-          photoMimeType: photo.mimeType,
-          photoUpdatedAt: new Date(),
-        }),
+        ...photoFields(photo, false),
       },
     });
   } catch (error) {
@@ -155,17 +187,7 @@ export async function updateEmployee(
       data: {
         name,
         employeeNumber: readNumber(formData),
-        ...(photo && {
-          photoData: photo.data,
-          photoMimeType: photo.mimeType,
-          photoUpdatedAt: new Date(),
-        }),
-        ...(!photo &&
-          removePhoto && {
-            photoData: null,
-            photoMimeType: null,
-            photoUpdatedAt: new Date(),
-          }),
+        ...photoFields(photo, removePhoto),
       },
     });
   } catch (error) {
