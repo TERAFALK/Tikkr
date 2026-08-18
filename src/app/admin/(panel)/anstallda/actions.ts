@@ -37,7 +37,7 @@ export interface EmployeeState {
 async function readPhoto(
   formData: FormData
 ): Promise<
-  { data: Buffer; mimeType: string } | undefined | { error: string }
+  { data: Uint8Array; mimeType: string } | undefined | { error: string }
 > {
   const file = formData.get("photo");
 
@@ -53,8 +53,11 @@ async function readPhoto(
     };
   }
 
+  // Uint8Array och inte Buffer: Prisma beskriver Bytes-fält som Uint8Array,
+  // och Buffer räknas inte som exakt samma typ i ett create-anrop. Skillnaden
+  // finns bara i typsystemet — innehållet är detsamma.
   return {
-    data: Buffer.from(await file.arrayBuffer()),
+    data: new Uint8Array(await file.arrayBuffer()),
     mimeType: file.type,
   };
 }

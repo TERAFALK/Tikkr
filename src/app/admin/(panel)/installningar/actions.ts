@@ -72,7 +72,9 @@ export async function uploadLogo(
     };
   }
 
-  const bytes = Buffer.from(await file.arrayBuffer());
+  // Uint8Array och inte Buffer: Prisma beskriver Bytes-fält som Uint8Array,
+  // och Buffer räknas inte som exakt samma typ. Innehållet är detsamma.
+  const bytes = new Uint8Array(await file.arrayBuffer());
 
   await unsafeGlobalPrisma.company.update({
     where: { id: companyId },
