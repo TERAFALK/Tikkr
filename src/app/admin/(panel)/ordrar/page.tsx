@@ -17,6 +17,7 @@ export default async function OrdersPage() {
       orderNumber: true,
       customerName: true,
       status: true,
+      budgetMinutes: true,
       timeEntries: { select: { clockInAt: true, clockOutAt: true } },
     },
   });
@@ -26,6 +27,7 @@ export default async function OrdersPage() {
     orderNumber: order.orderNumber,
     customerName: order.customerName,
     status: order.status,
+    budgetMinutes: order.budgetMinutes,
     entries: order.timeEntries.length,
     minutes: order.timeEntries.reduce(
       (total, entry) => total + minutesBetween(entry.clockInAt, entry.clockOutAt),
@@ -49,6 +51,12 @@ export default async function OrdersPage() {
         hint="Valfritt. Visas som rubrik på underlag som skickas vidare."
       >
         <Input name="customerName" placeholder="Volvo Lastvagnar" />
+      </Field>
+      <Field
+        label="Beräknad tid"
+        hint="Valfritt. Timmar, exempelvis 40 eller 7,5. Visas som en stapel mot upparbetad tid."
+      >
+        <Input name="budgetHours" inputMode="decimal" placeholder="40" />
       </Field>
     </FormDialog>
   );

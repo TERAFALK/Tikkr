@@ -48,6 +48,7 @@ const sections: { label: string; links: NavLink[] }[] = [
     links: [
       { href: "/admin", label: "Översikt", icon: IconOverview, exact: true },
       { href: "/admin/rapporter", label: "Rapporter", icon: IconReport },
+      { href: "/admin/vecka", label: "Veckovy", icon: IconClock },
       { href: "/admin/granskning", label: "Granskning", icon: IconReview, badge: true },
       { href: "/admin/stamplingar", label: "Stämplingar", icon: IconClock },
     ],

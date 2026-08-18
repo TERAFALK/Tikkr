@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import OrderActions from "./OrderActions";
+import BudgetBar from "./BudgetBar";
 import {
   Badge,
   Button,
@@ -32,6 +33,8 @@ export interface OrderRow {
   status: string;
   entries: number;
   minutes: number;
+  /** Beräknad tid i minuter, eller null när ingen angetts. */
+  budgetMinutes: number | null;
 }
 
 export default function OrdersTable({
@@ -141,6 +144,7 @@ export default function OrdersTable({
             <Th>Status</Th>
             <Th numeric>Stämplingar</Th>
             <Th numeric>Upparbetad tid</Th>
+            <Th>Mot beräknad tid</Th>
           </tr>
         </thead>
         <tbody>
@@ -185,6 +189,12 @@ export default function OrdersTable({
                   {order.entries}
                 </Td>
                 <Td numeric>{formatDuration(order.minutes)}</Td>
+                <Td>
+                  <BudgetBar
+                    budgetMinutes={order.budgetMinutes}
+                    usedMinutes={order.minutes}
+                  />
+                </Td>
               </Tr>
             );
           })}

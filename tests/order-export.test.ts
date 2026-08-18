@@ -158,3 +158,21 @@ describe("filnamn", () => {
     expect(slugify("2601")).toBe("2601");
   });
 });
+
+describe("beräknad tid följer med i underlaget", () => {
+  it("finns med när en angetts", async () => {
+    await unsafeGlobalPrisma.order.update({
+      where: { id: orderA },
+      data: { budgetMinutes: 40 * 60 },
+    });
+
+    const [order] = await getOrderExports(forCompany(companyId), [orderA]);
+
+    expect(order.budgetMinutes).toBe(40 * 60);
+  });
+
+  it("är null när ingen angetts", async () => {
+    const [order] = await getOrderExports(forCompany(companyId), [orderB]);
+    expect(order.budgetMinutes).toBeNull();
+  });
+});

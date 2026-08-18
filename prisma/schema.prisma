@@ -148,6 +148,17 @@ model Order {
   orderNumber  String      @map("order_number")
   customerName String?     @map("customer_name")
   status       OrderStatus @default(OPEN)
+
+  /// Beräknad tid för ordern, i minuter. Frivillig.
+  ///
+  /// Lagras i minuter och inte i timmar, av samma skäl som all annan tid i
+  /// systemet: 7,5 timmar går inte att spara exakt som decimaltal, och en
+  /// avrundning som upprepas hundra gånger blir en timme fel i en rapport.
+  ///
+  /// Systemet stoppar aldrig stämpling för att tiden överskrids. Ordern får
+  /// kosta mer än beräknat — det är information till den som fakturerar, inte
+  /// en spärr mot att arbeta.
+  budgetMinutes Int? @map("budget_minutes")
   createdAt    DateTime    @default(now()) @map("created_at")
   updatedAt    DateTime    @updatedAt @map("updated_at")
 

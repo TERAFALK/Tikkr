@@ -2,6 +2,7 @@
 
 import { useRef } from "react";
 import { Button, Field, Input } from "@/components/ui";
+import BudgetBar from "./BudgetBar";
 import { IconOrder, IconReport } from "@/components/ui/icons";
 
 /**
@@ -22,6 +23,8 @@ export default function OrderActions({
     customerName: string | null;
     status: string;
     entries: number;
+    minutes: number;
+    budgetMinutes: number | null;
   };
   updateAction: (formData: FormData) => void | Promise<void>;
   toggleAction: (formData: FormData) => void | Promise<void>;
@@ -55,6 +58,15 @@ export default function OrderActions({
             {order.customerName ?? "Ingen kund angiven"} · {order.entries}{" "}
             {order.entries === 1 ? "stämpling" : "stämplingar"}
           </p>
+
+          {order.budgetMinutes && (
+            <div className="mt-3">
+              <BudgetBar
+                budgetMinutes={order.budgetMinutes}
+                usedMinutes={order.minutes}
+              />
+            </div>
+          )}
         </div>
 
         <div className="p-2">
@@ -163,6 +175,21 @@ export default function OrderActions({
                 name="customerName"
                 defaultValue={order.customerName ?? ""}
                 placeholder="Valfritt"
+              />
+            </Field>
+            <Field
+              label="Beräknad tid"
+              hint="Timmar. Lämna tomt för ingen beräkning."
+            >
+              <Input
+                name="budgetHours"
+                inputMode="decimal"
+                defaultValue={
+                  order.budgetMinutes
+                    ? String(order.budgetMinutes / 60).replace(".", ",")
+                    : ""
+                }
+                placeholder="40"
               />
             </Field>
           </div>

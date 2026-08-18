@@ -218,7 +218,31 @@ function renderOrder(
     { width: 150, align: "right" }
   );
 
+  // Beräknad tid, när kunden angett en. Står direkt under totalen eftersom
+  // det är där jämförelsen görs.
+  if (order.budgetMinutes) {
+    const over = order.totalMinutes > order.budgetMinutes;
+    const share = Math.round((order.totalMinutes / order.budgetMinutes) * 100);
+
+    doc.font("Helvetica").fontSize(8).fillColor(over ? "#a16207" : "#525252");
+    doc.text(
+      `Beräknad tid ${toDecimalHours(order.budgetMinutes)
+        .toFixed(2)
+        .replace(".", ",")} timmar. Upparbetat ${share} procent.`,
+      MARGIN,
+      y + 4,
+      { width: CONTENT_WIDTH }
+    );
+
+    y += 14;
+  }
+
   y += 34;
+
+  // Diagrammet ligger efter summan och inte före tabellen. Den som öppnar
+  // underlaget vill se raderna och totalen först; fördelningen är det man
+  // tittar på när man redan vet vad ordern kostat.
+  y = drawMomentChart(doc, order, y);
 
   if (order.ungradedCount > 0 || order.ongoingCount > 0) {
     const notes: string[] = [];
@@ -246,4 +270,74 @@ function renderOrder(
     width: CONTENT_WIDTH,
     align: "center",
   });
+}
+
+/* --- Fördelning per arbetsmoment ---------------------------------------- */
+
+/**
+ * Staplar som visar hur tiden fördelats mellan arbetsmomenten.
+ *
+ * Ritas med rektanglar och inte med ett diagrambibliotek. En handfull värden
+ * behöver ingen ritmotor, och underlaget ska kunna skapas på en server utan
+ * grafikbibliotek installerade.
+ *
+ * Finns bara ett moment ritas ingenting. En ensam stapel som fyller hela
+ * bredden säger ingenting som inte redan står i totalsumman.
+ */
+function drawMomentChart(
+  doc: PDFKit.PDFDocument,
+  order: OrderExport,
+  startY: number
+): number {
+  const perMoment = new Map<string, number>();
+
+  for (const row of order.rows) {
+    perMoment.set(
+      row.momentName,
+      (perMoment.get(row.momentName) ?? 0) + row.minutes
+    );
+  }
+
+  if (perMoment.size < 2 || order.totalMinutes === 0) return startY;
+
+  const moments = [...perMoment.entries()].sort((a, b) => b[1] - a[1]);
+
+  let y = startY;
+
+  doc.font("Helvetica-Bold").fontSize(9).fillColor("#525252");
+  doc.text("Fördelning per arbetsmoment", MARGIN, y);
+  y += 16;
+
+  const LABEL_WIDTH = 130;
+  const VALUE_WIDTH = 90;
+  const BAR_WIDTH = CONTENT_WIDTH - LABEL_WIDTH - VALUE_WIDTH - 16;
+  const ROW_HEIGHT = 16;
+
+  const largest = moments[0][1];
+
+  for (const [name, minutes] of moments) {
+    doc.font("Helvetica").fontSize(9).fillColor("#404040");
+    doc.text(name, MARGIN, y + 2, { width: LABEL_WIDTH, ellipsis: true });
+
+    // Bakgrunden visar hela skalan, så att en kort stapel läses som "lite av
+    // totalen" i stället för som ett tomt fält.
+    doc.rect(MARGIN + LABEL_WIDTH, y + 3, BAR_WIDTH, 8).fill("#f5f5f5");
+
+    const width = Math.max(2, (minutes / largest) * BAR_WIDTH);
+    doc.rect(MARGIN + LABEL_WIDTH, y + 3, width, 8).fill("#2563eb");
+
+    const share = Math.round((minutes / order.totalMinutes) * 100);
+
+    doc.font("Helvetica").fontSize(9).fillColor("#525252");
+    doc.text(
+      `${toDecimalHours(minutes).toFixed(2).replace(".", ",")} tim · ${share} %`,
+      A4_WIDTH - MARGIN - VALUE_WIDTH,
+      y + 2,
+      { width: VALUE_WIDTH, align: "right" }
+    );
+
+    y += ROW_HEIGHT;
+  }
+
+  return y + 8;
 }

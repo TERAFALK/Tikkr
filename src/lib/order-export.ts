@@ -30,6 +30,8 @@ export interface OrderExport {
   orderNumber: string;
   customerName: string | null;
   status: string;
+  /** Beräknad tid i minuter, eller null. Visas i underlaget för jämförelse. */
+  budgetMinutes: number | null;
   rows: OrderExportRow[];
   totalMinutes: number;
   /** Poster där sluttiden är gissad av systemet och ännu inte granskad. */
@@ -54,6 +56,7 @@ export async function getOrderExports(
       orderNumber: true,
       customerName: true,
       status: true,
+      budgetMinutes: true,
       timeEntries: {
         orderBy: { clockInAt: "asc" },
         select: {
@@ -85,6 +88,7 @@ export async function getOrderExports(
       orderNumber: order.orderNumber,
       customerName: order.customerName,
       status: order.status,
+      budgetMinutes: order.budgetMinutes,
       rows,
       totalMinutes: rows.reduce((sum, row) => sum + row.minutes, 0),
       ungradedCount: rows.filter((row) => row.needsReview).length,
