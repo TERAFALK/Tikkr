@@ -37,7 +37,13 @@ export interface EmployeeState {
 async function readPhoto(
   formData: FormData
 ): Promise<
-  { data: Uint8Array; mimeType: string } | undefined | { error: string }
+  // Uint8Array<ArrayBuffer> och inte bara Uint8Array. Utan typargumentet
+  // antar TypeScript den bredare ArrayBufferLike, som rymmer SharedArrayBuffer
+  // — och Prismas Bytes-fält godtar inte den. Värdet är redan rätt; det var
+  // annoteringen som gjorde det bredare än det behövde vara.
+  | { data: Uint8Array<ArrayBuffer>; mimeType: string }
+  | undefined
+  | { error: string }
 > {
   const file = formData.get("photo");
 
