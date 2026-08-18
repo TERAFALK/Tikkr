@@ -1,5 +1,9 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { getKioskSession, touchDevice } from "@/lib/kiosk-auth";
+import {
+  getKioskSession,
+  refreshKioskCookie,
+  touchDevice,
+} from "@/lib/kiosk-auth";
 import { clockIn, clockOut, ClockError } from "@/lib/clock";
 
 // Tar emot en stämpling från kioskskärmen.
@@ -91,7 +95,7 @@ export async function POST(request: NextRequest) {
         ...context,
         employeeId: body.employeeId,
       });
-      await touchDevice(session.deviceId);
+      await Promise.all([touchDevice(session.deviceId), refreshKioskCookie()]);
       return NextResponse.json({ ok: true, closed });
     }
 
@@ -109,7 +113,7 @@ export async function POST(request: NextRequest) {
       momentId: body.momentId,
     });
 
-    await touchDevice(session.deviceId);
+    await Promise.all([touchDevice(session.deviceId), refreshKioskCookie()]);
     return NextResponse.json({ ok: true, ...result });
   } catch (error) {
     if (error instanceof ClockError) {

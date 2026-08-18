@@ -122,3 +122,22 @@ export async function createKioskDevice(companyId: string, name: string) {
 
   return { device, token };
 }
+
+/**
+ * Förlänger skärmens cookie.
+ *
+ * Giltighetstiden räknades tidigare från kopplingstillfället och förnyades
+ * aldrig. En skärm som suttit på väggen i ett år hade alltså plötsligt bett om
+ * att kopplas på nytt, mitt i ett arbetspass, utan att något var fel.
+ *
+ * Anropas vid varje stämpling. En skärm som används håller sig därmed kopplad
+ * hur länge som helst, medan en som stått oanvänd i över ett år får kopplas om
+ * — vilket är rimligt, eftersom ingen vet var den befinner sig då.
+ */
+export async function refreshKioskCookie(): Promise<void> {
+  const jar = await cookies();
+  const token = jar.get(KIOSK_COOKIE)?.value;
+  if (!token) return;
+
+  jar.set(KIOSK_COOKIE, token, kioskCookieOptions());
+}

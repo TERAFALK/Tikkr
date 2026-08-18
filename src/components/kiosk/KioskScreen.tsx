@@ -110,7 +110,11 @@ export default function KioskScreen({
 }: Props) {
   const router = useRouter();
   const [view, setView] = useState<View>({ name: "employees" });
+  // Kvittensen behåller sin text även när den tonas ut. Nollställdes texten
+  // samtidigt skulle rutan bli tom mitt i övergången, vilket ser ut som ett
+  // fel snarare än ett avslut.
   const [receipt, setReceipt] = useState<string | null>(null);
+  const [receiptVisible, setReceiptVisible] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   // Optimistisk bild av vem som är instämplad. Uppdateras direkt vid tryck och
@@ -131,10 +135,10 @@ export default function KioskScreen({
   }, [view, goHome]);
 
   useEffect(() => {
-    if (!receipt) return;
-    const timer = setTimeout(() => setReceipt(null), RECEIPT_MS);
+    if (!receiptVisible) return;
+    const timer = setTimeout(() => setReceiptVisible(false), RECEIPT_MS);
     return () => clearTimeout(timer);
-  }, [receipt]);
+  }, [receiptVisible, receipt]);
 
   const [waiting, setWaiting] = useState(0);
 
@@ -220,6 +224,7 @@ export default function KioskScreen({
         },
       }));
       setReceipt(`${employee.name} — ${order.orderNumber}, ${moment.name}`);
+      setReceiptVisible(true);
       goHome();
       void send({
         action: "in",
@@ -240,6 +245,7 @@ export default function KioskScreen({
         return next;
       });
       setReceipt(`${employee.name} — utstämplad`);
+      setReceiptVisible(true);
       goHome();
       void send({
         action: "out",
@@ -278,12 +284,19 @@ export default function KioskScreen({
           det tar plats från knapparna. */}
       <NoticeBanner notices={notices} size="kiosk" />
 
-      {receipt && <Banner tone="ok">{receipt}</Banner>}
-      {error && (
-        <Banner tone="error" onDismiss={() => setError(null)}>
-          {error}
-        </Banner>
-      )}
+      <ToastArea>
+        {receipt && (
+          <Toast tone="ok" visible={receiptVisible}>
+            {receipt}
+          </Toast>
+        )}
+
+        {error && (
+          <Toast tone="error" visible onDismiss={() => setError(null)}>
+            {error}
+          </Toast>
+        )}
+      </ToastArea>
 
       {/* Nyckeln byter när vyn byter, vilket startar om övergången. Utan den
           skulle innehållet bytas ut utan att något syntes hända. */}
@@ -429,29 +442,54 @@ function Header({
   );
 }
 
-function Banner({
+/**
+ * Kvittensen och felmeddelandet.
+ *
+ * SVÄVAR ÖVER innehållet i stället för att ligga i flödet. Låg de i flödet
+ * knuffades knappraden nedåt när de dök upp och hoppade tillbaka när de
+ * försvann — mitt framför den som just tryckt, och med risk att nästa tryck
+ * hamnar på fel knapp.
+ *
+ * De tonas dessutom in och ut. Ett element som bara försvinner uppfattas som
+ * ett fel i skärmen; ett som glider undan uppfattas som att något blev klart.
+ */
+function ToastArea({ children }: { children: React.ReactNode }) {
+  return (
+    <div
+      // aria-live gör att en skärmläsare läser upp kvittensen när den kommer.
+      aria-live="polite"
+      className="pointer-events-none fixed inset-x-0 top-4 z-40 flex flex-col items-center gap-2 px-4"
+    >
+      {children}
+    </div>
+  );
+}
+
+function Toast({
   tone,
+  visible,
   children,
   onDismiss,
 }: {
   tone: "ok" | "error";
+  visible: boolean;
   children: React.ReactNode;
   onDismiss?: () => void;
 }) {
   const styles =
-    tone === "ok"
-      ? "bg-emerald-600 text-white"
-      : "bg-amber-500 text-white";
+    tone === "ok" ? "bg-emerald-600 text-white" : "bg-amber-500 text-white";
 
   return (
     <div
-      className={`flex items-center justify-between gap-4 px-6 py-3.5 text-base font-semibold ${styles}`}
+      className={`pointer-events-auto flex max-w-2xl items-center gap-4 rounded-xl px-6 py-3.5 text-base font-semibold shadow-lg transition-all duration-300 ease-out motion-reduce:transition-none ${styles} ${
+        visible ? "translate-y-0 opacity-100" : "-translate-y-3 opacity-0"
+      }`}
     >
       <span>{children}</span>
       {onDismiss && (
         <button
           onClick={onDismiss}
-          className="rounded-lg bg-black/15 px-5 py-2.5 text-base"
+          className="shrink-0 rounded-lg bg-black/15 px-5 py-2.5 text-base"
         >
           Stäng
         </button>
