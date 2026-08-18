@@ -117,10 +117,25 @@ model Company {
 }
 
 model Employee {
+  /// Radens nyckel i databasen. En slumpad sträng som aldrig visas för någon.
+  ///
+  /// Namnet är AVSIKTLIGT inte unikt: två personer på samma företag kan heta
+  /// Anders Andersson, och att tvinga fram ett påhittat särskiljande namn vore
+  /// att lösa ett datorproblem med människors namn. Anställningsnumret nedan
+  /// finns för att kunna skilja dem åt på ett sätt kunden känner igen.
   id        String   @id @default(cuid())
   companyId String   @map("company_id")
   name      String
   active    Boolean  @default(true)
+
+  /// Kundens eget nummer på personen. Frivilligt.
+  ///
+  /// Visas ALDRIG på stämplingsskärmen. Den anställde trycker på sitt namn,
+  /// och ett nummer bredvid gör knappen svårare att läsa utan att hjälpa
+  /// någon. I panelen och i rapporterna står det däremot med, eftersom det är
+  /// där två personer med samma namn behöver hållas isär.
+  employeeNumber String? @map("employee_number")
+
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
@@ -138,6 +153,10 @@ model Employee {
   company     Company     @relation(fields: [companyId], references: [id], onDelete: Cascade)
   timeEntries TimeEntry[]
 
+  // Numret är unikt per företag, inte globalt. Två olika kunder ska kunna ha
+  // varsin anställd med nummer 1 utan att krocka. Flera personer utan nummer
+  // är tillåtet — Postgres räknar inte tomma värden som dubbletter.
+  @@unique([companyId, employeeNumber])
   @@index([companyId, active])
   @@map("employees")
 }

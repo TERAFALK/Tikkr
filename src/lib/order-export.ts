@@ -16,6 +16,7 @@ import { minutesBetween } from "./format";
 
 export interface OrderExportRow {
   employeeName: string;
+  employeeNumber: string | null;
   momentName: string;
   clockInAt: Date;
   clockOutAt: Date | null;
@@ -64,7 +65,7 @@ export async function getOrderExports(
           clockOutAt: true,
           needsReview: true,
           source: true,
-          employee: { select: { name: true } },
+          employee: { select: { name: true, employeeNumber: true } },
           moment: { select: { name: true } },
         },
       },
@@ -74,6 +75,7 @@ export async function getOrderExports(
   return orders.map((order) => {
     const rows: OrderExportRow[] = order.timeEntries.map((entry) => ({
       employeeName: entry.employee.name,
+      employeeNumber: entry.employee.employeeNumber,
       momentName: entry.moment.name,
       clockInAt: entry.clockInAt,
       clockOutAt: entry.clockOutAt,

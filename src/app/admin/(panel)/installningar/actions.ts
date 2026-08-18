@@ -167,6 +167,11 @@ export async function anonymizeEmployee(formData: FormData) {
       name: `Anonymiserad anställd (${employee.id.slice(-4)})`,
       active: false,
 
+      // Anställningsnumret pekar ut en person lika säkert som namnet — det är
+      // hela dess syfte. Det måste därför bort i samma steg, annars går
+      // personen att identifiera ur kundens eget register.
+      employeeNumber: null,
+
       // Porträttet är en personuppgift och en av de mest identifierande som
       // finns. Det raderas därför i samma steg som namnet — annars hade
       // anonymiseringen lämnat kvar ett ansikte.

@@ -1,22 +1,19 @@
 import { requireAdmin } from "@/lib/admin-session";
-import FormDialog from "@/components/admin/FormDialog";
+import EmployeeDialog from "@/components/admin/EmployeeDialog";
+import EmployeeAvatar from "@/components/ui/EmployeeAvatar";
 import {
   Badge,
   Button,
   Card,
   CardHeader,
   EmptyState,
-  Field,
-  Input,
   PageHeader,
   Table,
   Td,
   Th,
   Tr,
 } from "@/components/ui";
-import EmployeeAvatar from "@/components/ui/EmployeeAvatar";
-import EmployeePhotoForm from "@/components/admin/EmployeePhotoForm";
-import { createEmployee, renameEmployee, toggleEmployee } from "./actions";
+import { createEmployee, toggleEmployee, updateEmployee } from "./actions";
 
 export const dynamic = "force-dynamic";
 
@@ -29,25 +26,22 @@ export default async function EmployeesPage() {
       id: true,
       name: true,
       active: true,
-      // Bara om ett foto finns, aldrig sjalva bytena. En lista med tjugo
-      // portratt skulle annars bli flera megabyte i sidans svar.
+      employeeNumber: true,
+      // Bara OM ett foto finns, aldrig själva bytena. En lista med tjugo
+      // porträtt skulle annars bli flera megabyte i sidans svar.
       photoMimeType: true,
       _count: { select: { timeEntries: true } },
     },
   });
 
   const newEmployee = (
-    <FormDialog
+    <EmployeeDialog
       trigger="Ny anställd"
       title="Lägg till anställd"
       description="Namnet visas som knapp på stämplingsskärmen. Använd den form personen känns igen på."
       action={createEmployee}
       submitLabel="Lägg till"
-    >
-      <Field label="Namn">
-        <Input name="name" placeholder="Anna Andersson" required autoFocus />
-      </Field>
-    </FormDialog>
+    />
   );
 
   return (
@@ -74,6 +68,7 @@ export default async function EmployeesPage() {
             <thead>
               <tr>
                 <Th>Namn</Th>
+                <Th>Anställningsnummer</Th>
                 <Th>Status</Th>
                 <Th numeric>Stämplingar</Th>
                 <Th>
@@ -95,6 +90,11 @@ export default async function EmployeesPage() {
                       <span className="font-medium">{employee.name}</span>
                     </span>
                   </Td>
+                  <Td muted>
+                    {employee.employeeNumber ?? (
+                      <span className="text-neutral-300">—</span>
+                    )}
+                  </Td>
                   <Td>
                     {employee.active ? (
                       <Badge tone="active">Aktiv</Badge>
@@ -107,36 +107,20 @@ export default async function EmployeesPage() {
                   </Td>
                   <Td>
                     <div className="flex justify-end gap-2">
-                      <FormDialog
-                        trigger="Bild"
-                        triggerTone="ghost"
-                        title="Bild på stämplingsskärmen"
-                        description="Visas i namnrutnätet. Gör det snabbare att hitta rätt knapp, särskilt för den som är ny."
-                      >
-                        <EmployeePhotoForm
-                          employeeId={employee.id}
-                          name={employee.name}
-                          hasPhoto={Boolean(employee.photoMimeType)}
-                        />
-                      </FormDialog>
-
-                      <FormDialog
+                      <EmployeeDialog
                         trigger="Ändra"
                         triggerTone="ghost"
-                        title="Ändra namn"
-                        action={renameEmployee}
+                        title="Ändra anställd"
+                        description="Namn, anställningsnummer och bild."
+                        action={updateEmployee}
                         submitLabel="Spara"
-                      >
-                        <input type="hidden" name="id" value={employee.id} />
-                        <Field label="Namn">
-                          <Input
-                            name="name"
-                            defaultValue={employee.name}
-                            required
-                            autoFocus
-                          />
-                        </Field>
-                      </FormDialog>
+                        employee={{
+                          id: employee.id,
+                          name: employee.name,
+                          employeeNumber: employee.employeeNumber,
+                          hasPhoto: Boolean(employee.photoMimeType),
+                        }}
+                      />
 
                       <form action={toggleEmployee}>
                         <input type="hidden" name="id" value={employee.id} />

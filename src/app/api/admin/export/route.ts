@@ -43,6 +43,7 @@ export async function GET(request: NextRequest) {
   const details = workbook.addWorksheet("Stämplingar");
   details.columns = [
     { header: "Anställd", key: "employee", width: 24 },
+    { header: "Anst.nr", key: "employeeNumber", width: 10 },
     { header: "Ordernummer", key: "order", width: 16 },
     { header: "Kund", key: "customer", width: 26 },
     { header: "Arbetsmoment", key: "moment", width: 20 },
@@ -60,6 +61,7 @@ export async function GET(request: NextRequest) {
 
     details.addRow({
       employee: row.employeeName,
+      employeeNumber: row.employeeNumber ?? "",
       order: row.orderNumber,
       customer: row.customerName ?? "",
       moment: row.momentName,

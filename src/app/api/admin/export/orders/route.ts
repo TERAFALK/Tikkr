@@ -178,6 +178,7 @@ async function buildWorkbook(
 
     sheet.getRow(4).values = [
       "Anställd",
+      "Anst.nr",
       "Arbetsmoment",
       "Instämplad",
       "Utstämplad",
@@ -187,6 +188,7 @@ async function buildWorkbook(
 
     sheet.columns = [
       { width: 24 },
+      { width: 10 },
       { width: 20 },
       { width: 19 },
       { width: 19 },
@@ -202,6 +204,7 @@ async function buildWorkbook(
 
       sheet.addRow([
         row.employeeName,
+        row.employeeNumber ?? "",
         row.momentName,
         row.clockInAt,
         row.clockOutAt ?? "",

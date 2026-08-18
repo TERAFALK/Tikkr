@@ -9,25 +9,162 @@ import { requireAdmin } from "@/lib/admin-session";
 
 const PATH = "/admin/anstallda";
 
-export async function createEmployee(formData: FormData) {
+/** Vad ett porträtt får vara. Samma gränser som för logotyperna. */
+const PHOTO_TYPES = ["image/png", "image/jpeg", "image/webp"];
+const PHOTO_MAX_BYTES = 512 * 1024;
+
+export interface EmployeeState {
+  error?: string;
+  /**
+   * Tidpunkten då sparandet lyckades.
+   *
+   * Ett värde som ändras vid varje lyckad sparning, så att rutan kan stänga
+   * sig själv. En ren true-flagga hade inte gått: den ser likadan ut efter
+   * andra sparningen som efter första, och rutan hade då inte stängts igen.
+   */
+  savedAt?: number;
+}
+
+/**
+ * Läser bildfältet ur formuläret.
+ *
+ * Namn, nummer och bild ligger i SAMMA formulär, så att ett byte är en enda
+ * handling. Ett separat bildformulär hade betytt ett extra steg att glömma —
+ * och HTML tillåter inte formulär inuti formulär.
+ *
+ * Ger `undefined` när ingen fil valts, vilket betyder "rör inte bilden".
+ */
+async function readPhoto(
+  formData: FormData
+): Promise<
+  { data: Buffer; mimeType: string } | undefined | { error: string }
+> {
+  const file = formData.get("photo");
+
+  if (!(file instanceof File) || file.size === 0) return undefined;
+
+  if (!PHOTO_TYPES.includes(file.type)) {
+    return { error: "Bilden måste vara PNG, JPEG eller WebP." };
+  }
+
+  if (file.size > PHOTO_MAX_BYTES) {
+    return {
+      error: `Bilden är ${Math.round(file.size / 1024)} kB. Högsta storlek är 512 kB.`,
+    };
+  }
+
+  return {
+    data: Buffer.from(await file.arrayBuffer()),
+    mimeType: file.type,
+  };
+}
+
+/** Tomt fält betyder inget nummer, vilket är något annat än numret "0". */
+function readNumber(formData: FormData): string | null {
+  const value = String(formData.get("employeeNumber") ?? "").trim();
+  return value || null;
+}
+
+/**
+ * Översätter databasens krockfel till något en människa förstår.
+ *
+ * Prisma svarar med koden P2002 när ett unikt värde redan finns. Det enda
+ * unika på en anställd är anställningsnumret.
+ */
+function describeError(error: unknown): string {
+  const code = (error as { code?: string } | null)?.code;
+
+  if (code === "P2002") {
+    return "Anställningsnumret används redan av en annan person.";
+  }
+
+  throw error;
+}
+
+export async function createEmployee(
+  _previous: EmployeeState,
+  formData: FormData
+): Promise<EmployeeState> {
   const { db, companyId } = await requireAdmin();
 
   const name = String(formData.get("name") ?? "").trim();
-  if (!name) return;
+  if (!name) return { error: "Ange ett namn." };
 
-  await db.employee.create({ data: { name, companyId } });
+  const photo = await readPhoto(formData);
+  if (photo && "error" in photo) return { error: photo.error };
+
+  try {
+    await db.employee.create({
+      data: {
+        name,
+        companyId,
+        employeeNumber: readNumber(formData),
+        ...(photo && {
+          photoData: photo.data,
+          photoMimeType: photo.mimeType,
+          photoUpdatedAt: new Date(),
+        }),
+      },
+    });
+  } catch (error) {
+    return { error: describeError(error) };
+  }
+
   revalidatePath(PATH);
+  return { savedAt: Date.now() };
 }
 
-export async function renameEmployee(formData: FormData) {
+/**
+ * Ändrar namn, nummer och bild i ett svep.
+ *
+ * Bilden rörs bara när en ny fil valts, eller när rutan för att ta bort den
+ * kryssats i. Att spara utan att välja något ska inte radera porträttet.
+ */
+export async function updateEmployee(
+  _previous: EmployeeState,
+  formData: FormData
+): Promise<EmployeeState> {
   const { db } = await requireAdmin();
 
   const id = String(formData.get("id") ?? "");
   const name = String(formData.get("name") ?? "").trim();
-  if (!id || !name) return;
 
-  await db.employee.update({ where: { id }, data: { name } });
+  if (!id) return { error: "Okänd person." };
+  if (!name) return { error: "Ange ett namn." };
+
+  const photo = await readPhoto(formData);
+  if (photo && "error" in photo) return { error: photo.error };
+
+  const removePhoto = formData.get("removePhoto") === "on";
+
+  try {
+    // updateMany och inte update: id:t kommer från formuläret och får aldrig
+    // kunna peka på en annan kunds anställd. Företagsfiltret ser till att en
+    // träff utanför det egna företaget ger noll rader i stället för en ändring.
+    await db.employee.updateMany({
+      where: { id },
+      data: {
+        name,
+        employeeNumber: readNumber(formData),
+        ...(photo && {
+          photoData: photo.data,
+          photoMimeType: photo.mimeType,
+          photoUpdatedAt: new Date(),
+        }),
+        ...(!photo &&
+          removePhoto && {
+            photoData: null,
+            photoMimeType: null,
+            photoUpdatedAt: new Date(),
+          }),
+      },
+    });
+  } catch (error) {
+    return { error: describeError(error) };
+  }
+
   revalidatePath(PATH);
+  return { savedAt: Date.now() };
 }
 
 /**
@@ -47,77 +184,5 @@ export async function toggleEmployee(formData: FormData) {
   if (!id) return;
 
   await db.employee.update({ where: { id }, data: { active: !active } });
-  revalidatePath(PATH);
-}
-
-/** Vad ett porträtt får vara. Samma gränser som för logotyperna. */
-const PHOTO_TYPES = ["image/png", "image/jpeg", "image/webp"];
-const PHOTO_MAX_BYTES = 512 * 1024;
-
-export interface PhotoState {
-  error?: string;
-  ok?: string;
-}
-
-/**
- * Laddar upp ett porträtt.
- *
- * Bilden sparas som den är, utan omskalning. Skälet är att servern då slipper
- * ett bildbibliotek, och att gränsen på 512 kB ändå tvingar fram en rimlig
- * storlek — en telefonbild på fem megabyte avvisas med ett besked om vad som
- * gäller i stället för att tyst krympas till något suddigt.
- */
-export async function uploadEmployeePhoto(
-  _previous: PhotoState,
-  formData: FormData
-): Promise<PhotoState> {
-  const { db } = await requireAdmin();
-
-  const id = String(formData.get("id") ?? "");
-  const file = formData.get("photo");
-
-  if (!id) return { error: "Okänd person." };
-
-  if (!(file instanceof File) || file.size === 0) {
-    return { error: "Välj en bildfil." };
-  }
-
-  if (!PHOTO_TYPES.includes(file.type)) {
-    return { error: "Bilden måste vara PNG, JPEG eller WebP." };
-  }
-
-  if (file.size > PHOTO_MAX_BYTES) {
-    return {
-      error: `Bilden är ${Math.round(file.size / 1024)} kB. Högsta storlek är 512 kB.`,
-    };
-  }
-
-  // Går via företagsfiltret: ett id från formuläret får aldrig kunna peka på
-  // en annan kunds anställd.
-  await db.employee.updateMany({
-    where: { id },
-    data: {
-      photoData: Buffer.from(await file.arrayBuffer()),
-      photoMimeType: file.type,
-      photoUpdatedAt: new Date(),
-    },
-  });
-
-  revalidatePath(PATH);
-  return { ok: "Bilden är uppdaterad." };
-}
-
-/** Tar bort porträttet. Personen och den registrerade tiden rörs inte. */
-export async function removeEmployeePhoto(formData: FormData) {
-  const { db } = await requireAdmin();
-
-  const id = String(formData.get("id") ?? "");
-  if (!id) return;
-
-  await db.employee.updateMany({
-    where: { id },
-    data: { photoData: null, photoMimeType: null, photoUpdatedAt: new Date() },
-  });
-
   revalidatePath(PATH);
 }

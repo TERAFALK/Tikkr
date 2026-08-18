@@ -28,6 +28,8 @@ export interface ReportFilters {
 export interface ReportRow {
   id: string;
   employeeName: string;
+  /** Kundens eget nummer på personen, om ett angetts. */
+  employeeNumber: string | null;
   orderNumber: string;
   customerName: string | null;
   momentName: string;
@@ -81,7 +83,7 @@ export async function buildReport(
       clockOutAt: true,
       needsReview: true,
       source: true,
-      employee: { select: { id: true, name: true } },
+      employee: { select: { id: true, name: true, employeeNumber: true } },
       order: { select: { id: true, orderNumber: true, customerName: true } },
       moment: { select: { id: true, name: true } },
     },
@@ -90,6 +92,7 @@ export async function buildReport(
   const rows: ReportRow[] = entries.map((entry) => ({
     id: entry.id,
     employeeName: entry.employee.name,
+    employeeNumber: entry.employee.employeeNumber,
     orderNumber: entry.order.orderNumber,
     customerName: entry.order.customerName,
     momentName: entry.moment.name,
@@ -115,6 +118,10 @@ export async function buildReport(
     byEmployee: groupBy(entries, (entry) => ({
       key: entry.employee.id,
       label: entry.employee.name,
+      // Numret står som underrubrik i stället för i namnet. Två personer som
+      // heter lika går då att skilja åt, utan att numret trängs in i en
+      // rubrik där det stör för alla andra.
+      sublabel: entry.employee.employeeNumber ?? undefined,
     })),
     byMoment: groupBy(entries, (entry) => ({
       key: entry.moment.id,

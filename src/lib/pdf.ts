@@ -160,7 +160,12 @@ function renderOrder(
     doc.fillColor("#404040");
 
     const values = [
-      row.employeeName,
+      // Numret bakom namnet, inte i en egen kolumn. Underlaget går vidare
+      // till kundens kund, och en extra kolumn med interna nummer gör
+      // dokumentet bredare utan att säga dem något.
+      row.employeeNumber
+        ? `${row.employeeName} (${row.employeeNumber})`
+        : row.employeeName,
       row.momentName,
       formatDateTime(row.clockInAt, company.timezone),
       row.ongoing

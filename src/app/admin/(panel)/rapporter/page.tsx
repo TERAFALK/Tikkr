@@ -219,7 +219,14 @@ export default async function ReportsPage({
               <tbody>
                 {report.rows.map((row) => (
                   <Tr key={row.id}>
-                    <Td>{row.employeeName}</Td>
+                    <Td>
+                      {row.employeeName}
+                      {row.employeeNumber && (
+                        <span className="ml-2 text-neutral-400">
+                          {row.employeeNumber}
+                        </span>
+                      )}
+                    </Td>
                     <Td>
                       {row.orderNumber}
                       {row.customerName && (

@@ -28,6 +28,7 @@ export interface DayCell {
 export interface WeekRow {
   employeeId: string;
   employeeName: string;
+  employeeNumber: string | null;
   days: DayCell[];
   totalMinutes: number;
 }
@@ -91,7 +92,7 @@ export async function buildWeek(
     db.employee.findMany({
       where: { active: true },
       orderBy: { name: "asc" },
-      select: { id: true, name: true },
+      select: { id: true, name: true, employeeNumber: true },
     }),
     db.timeEntry.findMany({
       where: { clockInAt: { gte: from, lt: to } },
@@ -140,12 +141,13 @@ export async function buildWeek(
     if (entry.needsReview) week[index].needsReview = true;
   }
 
-  const names = new Map(employees.map((employee) => [employee.id, employee.name]));
+  const known = new Map(employees.map((employee) => [employee.id, employee]));
 
   const rows: WeekRow[] = [...byEmployee.entries()]
     .map(([employeeId, days]) => ({
       employeeId,
-      employeeName: names.get(employeeId) ?? "Tidigare anställd",
+      employeeName: known.get(employeeId)?.name ?? "Tidigare anställd",
+      employeeNumber: known.get(employeeId)?.employeeNumber ?? null,
       days,
       totalMinutes: days.reduce((total, day) => total + day.minutes, 0),
     }))

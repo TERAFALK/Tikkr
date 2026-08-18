@@ -114,7 +114,16 @@ export default async function WeekPage({
                         hasPhoto={hasPhoto.has(row.employeeId)}
                         size={28}
                       />
-                      <span className="font-medium">{row.employeeName}</span>
+                      <span className="min-w-0">
+                        <span className="block font-medium">
+                          {row.employeeName}
+                        </span>
+                        {row.employeeNumber && (
+                          <span className="block text-xs text-neutral-400">
+                            {row.employeeNumber}
+                          </span>
+                        )}
+                      </span>
                     </span>
                   </Td>
 
