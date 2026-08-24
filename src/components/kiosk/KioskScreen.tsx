@@ -161,6 +161,33 @@ export default function KioskScreen({
   // tappat nätet ser annars likadan ut som en som fungerar.
   const [lastSyncedAt, setLastSyncedAt] = useState<Date | null>(null);
 
+  /**
+   * Om kön ska SYNAS, vilket inte är samma sak som att den har innehåll.
+   *
+   * Varje tryck läggs först i kön och skickas sedan, så waiting går upp till
+   * ett och tillbaka till noll på några hundradelar. Bannern hann blinka förbi
+   * vid varje stämpling och såg ut som ett fel.
+   *
+   * Den visas därför först när något faktiskt fastnat — ett par sekunder utan
+   * att kön tömts. Då är den ett besked värt att läsa i stället för ett
+   * flimmer man lär sig ignorera.
+   */
+  const [stuck, setStuck] = useState(false);
+
+  useEffect(() => {
+    if (waiting === 0) {
+      setStuck(false);
+      return;
+    }
+
+    // Redan synlig: starta inte om fördröjningen bara för att ännu ett tryck
+    // lagts till en kö som redan står stilla.
+    if (stuck) return;
+
+    const timer = setTimeout(() => setStuck(true), 2000);
+    return () => clearTimeout(timer);
+  }, [waiting, stuck]);
+
   // Samma värde som waiting, läsbart utan att göra om funktionen varje gång det
   // ändras. Synkningen behöver veta om kön är tom, men ska inte startas om var
   // gång ett tryck läggs till.
@@ -349,6 +376,7 @@ export default function KioskScreen({
         deviceName={deviceName}
         view={view}
         waiting={waiting}
+        showQueue={stuck}
         hasLogo={hasLogo}
         lastSyncedAt={lastSyncedAt}
         onBack={goHome}
@@ -446,6 +474,7 @@ function Header({
   deviceName,
   view,
   waiting,
+  showQueue,
   hasLogo,
   lastSyncedAt,
   onBack,
@@ -454,6 +483,8 @@ function Header({
   deviceName: string;
   view: View;
   waiting: number;
+  /** true först när kön stått stilla en stund. Se stuck i KioskScreen. */
+  showQueue: boolean;
   hasLogo: boolean;
   lastSyncedAt: Date | null;
   onBack: () => void;
@@ -491,9 +522,10 @@ function Header({
       )}
 
       <div className="relative ml-auto flex items-center gap-3">
-        {/* Syns bara när något faktiskt väntar. En ständig statusikon skulle
-            bara bli tapet som ingen läser. */}
-        {waiting > 0 && (
+        {/* Syns bara när kön faktiskt fastnat, inte under de hundradelar ett
+            tryck är på väg iväg. En ständig statusikon skulle dessutom bara bli
+            tapet som ingen läser. */}
+        {showQueue && waiting > 0 && (
           <span className="rounded-lg bg-amber-50 px-3 py-2 text-center text-[13px] font-medium text-amber-700 ring-1 ring-inset ring-amber-200">
             {waiting} väntar
             <span className="block text-xs font-normal">

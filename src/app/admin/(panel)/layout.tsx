@@ -10,6 +10,7 @@ import {
 import { activeNotices } from "@/lib/notices";
 import AdminSidebar from "@/components/admin/AdminSidebar";
 import NoticeBanner from "@/components/ui/NoticeBanner";
+import ReloadOnDeploy from "@/components/ui/ReloadOnDeploy";
 import SubscriptionLocked from "@/components/admin/SubscriptionLocked";
 
 /**
@@ -55,6 +56,10 @@ export default async function PanelLayout({
 
   return (
     <div className="min-h-screen bg-neutral-50 lg:flex">
+      {/* Laddar om fliken efter en driftsättning. Utan den svarar knapparna i
+          en sida som stått öppen "Failed to find Server Action". */}
+      <ReloadOnDeploy />
+
       <AdminSidebar
         companyName={session.companyName}
         email={session.email}

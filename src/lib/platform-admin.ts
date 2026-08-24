@@ -241,8 +241,16 @@ export async function getCompanyDetail(companyId: string) {
 
   if (!company) return null;
 
-  const [admins, devices, note, counts, recentEntries, lastEntry, history] =
-    await Promise.all([
+  const [
+    admins,
+    devices,
+    note,
+    counts,
+    recentEntries,
+    lastEntry,
+    history,
+    historyTotal,
+  ] = await Promise.all([
       unsafeGlobalPrisma.adminUser.findMany({
         where: { companyId },
         orderBy: [{ role: "asc" }, { email: "asc" }],
@@ -276,10 +284,16 @@ export async function getCompanyDetail(companyId: string) {
         orderBy: { clockInAt: "desc" },
         select: { clockInAt: true },
       }),
+      // Bara de senaste på översiktssidan. Hela loggen har en egen vy — en
+      // lista som växer i all oändlighet längst ned på en sida gör att allt
+      // ovanför den blir svårare att hitta med tiden.
       unsafeGlobalPrisma.platformAuditLog.findMany({
         where: { targetCompanyId: companyId },
         orderBy: { createdAt: "desc" },
-        take: 20,
+        take: COMPANY_HISTORY_PREVIEW,
+      }),
+      unsafeGlobalPrisma.platformAuditLog.count({
+        where: { targetCompanyId: companyId },
       }),
     ]);
 
@@ -292,6 +306,7 @@ export async function getCompanyDetail(companyId: string) {
     devices,
     note,
     history,
+    historyTotal,
     stats: {
       employees,
       openOrders,
@@ -486,12 +501,79 @@ export async function saveNote(params: {
   });
 }
 
+/** Antal rader ur åtgärdsloggen som visas direkt på en översiktssida. */
+export const COMPANY_HISTORY_PREVIEW = 5;
+
 /** Senaste händelserna över alla företag. */
-export async function recentPlatformActivity(limit = 30) {
+export async function recentPlatformActivity(limit = 5) {
   return unsafeGlobalPrisma.platformAuditLog.findMany({
     orderBy: { createdAt: "desc" },
     take: limit,
   });
+}
+
+/**
+ * Id till namn för samtliga företag.
+ *
+ * Åtgärdsloggen sparar bara ett id, med flit — den ska överleva att företaget
+ * raderas. Namnen slås därför upp separat, och ett id utan träff är ett
+ * företag som inte finns längre.
+ */
+export async function companyNameById(): Promise<Map<string, string>> {
+  const rows = await unsafeGlobalPrisma.company.findMany({
+    select: { id: true, name: true },
+  });
+
+  return new Map(rows.map((row) => [row.id, row.name]));
+}
+
+export interface AuditPage {
+  rows: {
+    id: string;
+    actorEmail: string;
+    action: string;
+    detail: string | null;
+    targetCompanyId: string | null;
+    createdAt: Date;
+  }[];
+  total: number;
+  page: number;
+  pageCount: number;
+}
+
+/** Hur många rader ur loggen som visas per sida. */
+export const AUDIT_PER_PAGE = 50;
+
+/**
+ * Åtgärdsloggen, sidvis.
+ *
+ * Utan företag: hela installationens logg. Med företag: bara det företagets.
+ * Samma funktion för båda, eftersom det är samma rader lästa genom olika
+ * filter — två nästan likadana frågor hade glidit isär vid första ändringen.
+ *
+ * Sidnumret räknas om till ett giltigt intervall i stället för att avvisas. En
+ * adress som pekar förbi slutet ska visa sista sidan, inte ett felmeddelande.
+ */
+export async function auditLog(params: {
+  companyId?: string;
+  page?: number;
+}): Promise<AuditPage> {
+  const where = params.companyId
+    ? { targetCompanyId: params.companyId }
+    : undefined;
+
+  const total = await unsafeGlobalPrisma.platformAuditLog.count({ where });
+  const pageCount = Math.max(1, Math.ceil(total / AUDIT_PER_PAGE));
+  const page = Math.min(Math.max(1, params.page ?? 1), pageCount);
+
+  const rows = await unsafeGlobalPrisma.platformAuditLog.findMany({
+    where,
+    orderBy: { createdAt: "desc" },
+    skip: (page - 1) * AUDIT_PER_PAGE,
+    take: AUDIT_PER_PAGE,
+  });
+
+  return { rows, total, page, pageCount };
 }
 
 /**

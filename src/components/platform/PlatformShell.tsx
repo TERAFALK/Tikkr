@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { LogoMark } from "@/components/ui/Logo";
+import ReloadOnDeploy from "@/components/ui/ReloadOnDeploy";
 import { platformLogout } from "@/app/plattform/login/actions";
 
 /**
@@ -20,6 +21,8 @@ import { platformLogout } from "@/app/plattform/login/actions";
 const NAV = [
   { href: "/plattform", label: "Kunder", exact: true },
   { href: "/plattform/meddelanden", label: "Meddelanden" },
+  { href: "/plattform/utskick", label: "Utskick" },
+  { href: "/plattform/handelser", label: "Händelser" },
 ];
 
 function isActive(item: (typeof NAV)[number], current: string): boolean {
@@ -38,6 +41,10 @@ export default function PlatformShell({
 }) {
   return (
     <div className="min-h-screen bg-neutral-50">
+      {/* Laddar om fliken efter en driftsättning, så att knapparna inte
+          plötsligt svarar "Failed to find Server Action". */}
+      <ReloadOnDeploy />
+
       <header className="border-b border-neutral-200 bg-white">
         <div className="mx-auto flex max-w-7xl items-center gap-3 px-4 py-3 sm:px-6">
           <Link href="/plattform" className="flex items-center gap-2.5">

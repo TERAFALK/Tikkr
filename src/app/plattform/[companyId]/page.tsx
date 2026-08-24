@@ -8,6 +8,7 @@ import {
   Alert,
   Badge,
   Button,
+  ButtonLink,
   Card,
   CardHeader,
   PageHeader,
@@ -22,6 +23,7 @@ import SubscriptionOverrideForm from "@/components/admin/SubscriptionOverrideFor
 import PlatformShell from "@/components/platform/PlatformShell";
 import ManualLicenseForm from "@/components/platform/ManualLicenseForm";
 import DeleteCompanyForm from "@/components/platform/DeleteCompanyForm";
+import ActivityTable from "@/components/platform/ActivityTable";
 import { monthlyRevenueFor } from "@/lib/platform-admin";
 import { getScreenPricing } from "@/lib/stripe";
 import { updateNote } from "./actions";
@@ -39,7 +41,8 @@ export default async function CompanyPage({
   const detail = await getCompanyDetail(companyId);
   if (!detail) notFound();
 
-  const { company, admins, devices, note, history, stats } = detail;
+  const { company, admins, devices, note, history, historyTotal, stats } =
+    detail;
   const monthlyRevenue = monthlyRevenueFor(company, await getScreenPricing());
 
   const inactiveDays = stats.lastActivityAt
@@ -248,42 +251,29 @@ export default async function CompanyPage({
           )}
         </Card>
 
-        {/* Logg */}
+        {/* Logg. Bara de senaste raderna — resten har en egen sida, så att
+            den här inte växer med kundens ålder. */}
         <Card className="mt-6">
           <CardHeader
-            title="Vad som gjorts härifrån"
-            description="Åtgärder utförda från panelen."
+            title="Senaste åtgärderna"
+            description="Utförda från plattformspanelen."
+            action={
+              historyTotal > 0 ? (
+                <ButtonLink
+                  href={`/plattform/${company.id}/historik`}
+                  tone="secondary"
+                >
+                  Hela historiken ({historyTotal})
+                </ButtonLink>
+              ) : undefined
+            }
           />
           {history.length === 0 ? (
             <p className="p-5 text-[13px] text-neutral-500">
               Ingenting har ändrats för det här företaget.
             </p>
           ) : (
-            <Table>
-              <thead>
-                <tr>
-                  <Th>När</Th>
-                  <Th>Vem</Th>
-                  <Th>Vad</Th>
-                </tr>
-              </thead>
-              <tbody>
-                {history.map((row) => (
-                  <Tr key={row.id}>
-                    <Td muted>{formatDateTime(row.createdAt)}</Td>
-                    <Td muted>{row.actorEmail}</Td>
-                    <Td>
-                      {row.action}
-                      {row.detail && (
-                        <span className="mt-0.5 block text-neutral-500">
-                          {row.detail}
-                        </span>
-                      )}
-                    </Td>
-                  </Tr>
-                ))}
-              </tbody>
-            </Table>
+            <ActivityTable rows={history} />
           )}
         </Card>
 

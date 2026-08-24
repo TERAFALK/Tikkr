@@ -1,5 +1,6 @@
 import Link from "next/link";
 import {
+  companyNameById,
   listCompanies,
   recentPlatformActivity,
   requirePlatformAdmin,
@@ -10,6 +11,7 @@ import { isStripeConfigured } from "@/lib/stripe";
 import {
   Alert,
   Badge,
+  ButtonLink,
   Card,
   CardHeader,
   EmptyState,
@@ -23,6 +25,8 @@ import {
 import { formatDate, formatDateTime } from "@/lib/format";
 import PlatformShell from "@/components/platform/PlatformShell";
 import RevenueChart from "@/components/platform/RevenueChart";
+import ActivityTable from "@/components/platform/ActivityTable";
+import Pager from "@/components/platform/Pager";
 import {
   EndingTrialList,
   QuietCustomerList,
@@ -36,21 +40,27 @@ import {
 } from "@/lib/platform-health";
 import { monthlyRevenueHistory } from "@/lib/revenue-history";
 
+/** Antal företag per sida i listan. */
+const COMPANIES_PER_PAGE = 25;
+
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Plattform — Tikkr" };
 
 export default async function PlatformPage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string }>;
+  searchParams: Promise<{ q?: string; sida?: string }>;
 }) {
   const { email } = await requirePlatformAdmin();
-  const query = ((await searchParams).q ?? "").trim();
 
-  const [companies, activity, devices, trials, quiet, history, health] =
+  const search = await searchParams;
+  const query = (search.q ?? "").trim();
+
+  const [companies, activity, names, devices, trials, quiet, history, health] =
     await Promise.all([
       listCompanies(),
-      recentPlatformActivity(10),
+      recentPlatformActivity(),
+      companyNameById(),
       silentDevices(),
       endingTrials(),
       quietCustomers(),
@@ -72,6 +82,24 @@ export default async function PlatformPage({
         company.name.toLowerCase().includes(query.toLowerCase())
       )
     : companies;
+
+  // Sidbläddring. Företagen är redan hämtade — summeringarna ovanför räknas på
+  // samtliga och får inte ändra sig när man bläddrar — så det här är en
+  // uppdelning av en lista vi ändå har, inte en extra databasfråga.
+  const pageCount = Math.max(1, Math.ceil(matches.length / COMPANIES_PER_PAGE));
+  const page = Math.min(Math.max(1, Number(search.sida) || 1), pageCount);
+  const shown = matches.slice(
+    (page - 1) * COMPANIES_PER_PAGE,
+    page * COMPANIES_PER_PAGE
+  );
+
+  /** Bevarar sökningen när man bläddrar. */
+  const listHref = (next: number) => {
+    const params = new URLSearchParams();
+    if (query) params.set("q", query);
+    params.set("sida", String(next));
+    return `/plattform?${params}`;
+  };
 
   const kr = (value: number) => `${value.toLocaleString("sv-SE")} kr`;
 
@@ -174,7 +202,7 @@ export default async function PlatformPage({
                 </tr>
               </thead>
               <tbody>
-                {matches.map((company) => (
+                {shown.map((company) => (
                   <Tr key={company.id}>
                     <Td>
                       <Link
@@ -222,41 +250,32 @@ export default async function PlatformPage({
                 </Link>
               </p>
             )}
+
+            <Pager
+              page={page}
+              pageCount={pageCount}
+              total={matches.length}
+              unit={query ? "träffar" : "företag"}
+              hrefFor={listHref}
+            />
           </Card>
         )}
       </div>
 
+      {/* Bara de senaste. Hela loggen ligger under Händelser — den växte
+          annars i all oändlighet längst ned på den här sidan. */}
       {activity.length > 0 && (
         <Card className="mt-6">
           <CardHeader
             title="Senaste åtgärderna"
-            description="Åtgärder utförda från panelen."
+            description="Utförda från plattformspanelen."
+            action={
+              <ButtonLink href="/plattform/handelser" tone="secondary">
+                Alla händelser
+              </ButtonLink>
+            }
           />
-          <Table>
-            <thead>
-              <tr>
-                <Th>När</Th>
-                <Th>Vem</Th>
-                <Th>Vad</Th>
-              </tr>
-            </thead>
-            <tbody>
-              {activity.map((row) => (
-                <Tr key={row.id}>
-                  <Td muted>{formatDateTime(row.createdAt)}</Td>
-                  <Td muted>{row.actorEmail}</Td>
-                  <Td>
-                    {row.action}
-                    {row.detail && (
-                      <span className="mt-0.5 block text-neutral-500">
-                        {row.detail}
-                      </span>
-                    )}
-                  </Td>
-                </Tr>
-              ))}
-            </tbody>
-          </Table>
+          <ActivityTable rows={activity} companyNames={names} />
         </Card>
       )}
 

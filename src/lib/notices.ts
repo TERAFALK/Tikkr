@@ -74,15 +74,25 @@ export async function activeNotices(
 }
 
 /**
- * Allt som inte arkiverats, oavsett om det visas just nu.
+ * Meddelanden för plattformspanelens lista.
  *
- * Plattformspanelens vy. Kommande, pågående och avslutade i samma lista, så
- * att det går att se vad som ligger inlagt utan att räkna ut det ur datum.
+ * Arkiverade hämtas bara när de efterfrågas. De är underlag och inget man
+ * behöver se dagligen — låg de bland de aktiva växte listan för varje underhåll
+ * som någonsin utförts, och det som faktiskt visas för kunderna just nu blev
+ * svårare att få syn på.
  */
-export async function listNotices() {
+export async function listNotices({ archived = false } = {}) {
   return unsafeGlobalPrisma.systemNotice.findMany({
-    orderBy: [{ archivedAt: "asc" }, { startsAt: "desc" }],
-    take: 50,
+    where: archived ? { archivedAt: { not: null } } : { archivedAt: null },
+    orderBy: { startsAt: "desc" },
+    take: 100,
+  });
+}
+
+/** Antal arkiverade, för länken som leder till dem. */
+export async function archivedNoticeCount(): Promise<number> {
+  return unsafeGlobalPrisma.systemNotice.count({
+    where: { archivedAt: { not: null } },
   });
 }
 

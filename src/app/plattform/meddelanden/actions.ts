@@ -17,6 +17,9 @@ import { unsafeGlobalPrisma } from "@/lib/db";
 
 const PATH = "/plattform/meddelanden";
 
+/** Utskicken har en egen vy sedan de skildes från driftmeddelandena. */
+const BROADCAST_PATH = "/plattform/utskick";
+
 export interface NoticeFormState {
   error?: string;
   ok?: string;
@@ -128,7 +131,7 @@ export async function broadcast(
       actorEmail: email,
     });
 
-    revalidatePath(PATH);
+    revalidatePath(BROADCAST_PATH);
 
     if (result.failed.length > 0) {
       return {
