@@ -8,23 +8,49 @@ import { unsafeGlobalPrisma } from "@/lib/db";
  * är därför bara försvarbar tillsammans med tre begränsningar: fem minuters
  * livslängd, engångsanvändning och ett tak på antalet gissningar.
  *
- * De två första prövas här. Taket prövas i login-throttle.test.ts, eftersom
- * det är samma spärr som inloggningarna använder.
+ * Alla tre prövas här. Spärren mot gissningar är samma modul som
+ * inloggningarna använder — vad den gör i sig står i login-throttle.test.ts,
+ * medan det som prövas här är att kopplingen faktiskt är kopplad till den.
  *
- * next/headers ersätts: modulen hör hemma i ett inkommande anrop. Ingen av
- * funktionerna nedan rör cookies — de tar och ger värden, och det är
- * anropande kod i webbservern som lägger token i en cookie.
+ * next/headers och next/cache ersätts: båda hör hemma i ett inkommande anrop.
+ * Cookie-burken nedan är en riktig liten attrapp och inte bara en tyst
+ * placeholder — serveråtgärden ska bevisligen lägga token i en cookie, och det
+ * går bara att pröva om någon skriver ned vad den satte.
  */
-vi.mock("next/headers", () => ({
-  cookies: async () => {
-    throw new Error("Testerna ska inte röra cookies.");
-  },
+
+/** Vad kioskens cookie innehåller just nu, som pairDevice lämnat den. */
+const jar = new Map<string, { value: string; options: Record<string, unknown> }>();
+
+/** Avsändarens adress. Ändras per test för att skilja två uppringare åt. */
+let callerIp = "198.51.100.1";
+
+vi.mock("next/cache", () => ({
+  revalidatePath: () => {},
 }));
 
+vi.mock("next/headers", () => ({
+  cookies: async () => ({
+    get: (name: string) => {
+      const row = jar.get(name);
+      return row ? { name, value: row.value } : undefined;
+    },
+    set: (name: string, value: string, options: Record<string, unknown>) => {
+      jar.set(name, { value, options });
+    },
+    delete: (name: string) => {
+      jar.delete(name);
+    },
+  }),
+  headers: async () => new Map([["x-forwarded-for", callerIp]]),
+}));
+
+import { pairDevice } from "@/app/kiosk/actions";
+import { __resetThrottle } from "@/lib/login-throttle";
 import {
   createKioskDevice,
   deviceState,
   hashToken,
+  KIOSK_COOKIE,
   PAIRING_CODE_MINUTES,
   redeemPairingCode,
   resolveDeviceToken,
@@ -35,6 +61,10 @@ import {
 let companyId: string;
 
 beforeEach(async () => {
+  jar.clear();
+  __resetThrottle();
+  callerIp = `198.51.100.${Math.ceil(Math.random() * 250)}`;
+
   const company = await unsafeGlobalPrisma.company.create({
     data: { name: `Kopplingstest ${Math.random().toString(36).slice(2, 8)}` },
   });
@@ -223,5 +253,130 @@ describe("läget räknas fram ur databasen", () => {
         pairingExpiresAt: new Date(Date.now() + 60_000),
       })
     ).toBe("kopplad");
+  });
+});
+
+/**
+ * SPÄRREN MOT ATT GISSA SIG TILL EN KOD.
+ *
+ * Prövas mot serveråtgärden och inte mot spärrmodulen, eftersom det som kan gå
+ * fel är att någon glömmer anropa den. En kod på sex siffror utan tak är en
+ * miljon kombinationer som ett skript betar av på minuter, och den som lyckas
+ * kopplar en egen skärm till ett främmande företags anställda.
+ *
+ * Det avgörande beviset är det sista testet: när låsningen slagit till avvisas
+ * även den RÄTTA koden. En spärr som släpper igenom rätt svar räknar bara
+ * misslyckanden och stoppar ingen som håller på tills det lyckas.
+ */
+describe("tak på antalet gissningar", () => {
+  it("rätt kod kopplar och lägger token i en cookie som skriptet inte når", async () => {
+    const { device, pairing } = await createKioskDevice(companyId, "Verkstaden");
+
+    const form = new FormData();
+    form.set("code", pairing.code);
+
+    const result = await pairDevice({}, form);
+    expect(result.pairedAs).toBe("Verkstaden");
+    expect(result.error).toBeUndefined();
+
+    const cookie = jar.get(KIOSK_COOKIE);
+    expect(cookie).toBeDefined();
+
+    // httpOnly är det som gör att ett skript på sidan inte kan läsa ut token
+    // och bära den vidare.
+    expect(cookie?.options.httpOnly).toBe(true);
+
+    const session = await resolveDeviceToken(cookie!.value);
+    expect(session?.deviceId).toBe(device.id);
+  });
+
+  it("en kod som inte är sex siffror avvisas utan att röra skärmen", async () => {
+    const { device, pairing } = await createKioskDevice(companyId, "Entrén");
+
+    const form = new FormData();
+    form.set("code", "123");
+
+    expect((await pairDevice({}, form)).error).toBeTruthy();
+    expect(jar.has(KIOSK_COOKIE)).toBe(false);
+
+    // Skärmens egen kod är orörd och fungerar fortfarande.
+    const row = await unsafeGlobalPrisma.kioskDevice.findUniqueOrThrow({
+      where: { id: device.id },
+    });
+    expect(row.pairingCodeHash).toBe(hashToken(pairing.code));
+  });
+
+  it("femte felgissningen låser, och därefter avvisas även rätt kod", async () => {
+    const { pairing } = await createKioskDevice(companyId, "Monteringen");
+
+    // Fem gissningar som alla är fel. Att träffa rätt på måfå här är en risk
+    // på en miljon per försök, och koden skapas om i varje test.
+    for (let attempt = 0; attempt < 5; attempt += 1) {
+      const guess = new FormData();
+      guess.set("code", String(100000 + attempt));
+
+      expect((await pairDevice({}, guess)).error).toBeTruthy();
+    }
+
+    // Den rätta koden lever fortfarande och skärmen är fortfarande väntande.
+    // Det enda som ändrats är att avsändaren är utelåst.
+    const form = new FormData();
+    form.set("code", pairing.code);
+
+    const result = await pairDevice({}, form);
+    expect(result.pairedAs).toBeUndefined();
+    expect(result.error).toContain("För många försök");
+    expect(jar.has(KIOSK_COOKIE)).toBe(false);
+
+    // Koden är inte förbrukad — den som har rätt att koppla skärmen kan göra
+    // det från en annan enhet, eller när låsningen släppt.
+    expect(await redeemPairingCode(pairing.code)).not.toBeNull();
+  });
+
+  it("låsningen träffar bara den som gissat", async () => {
+    const { pairing } = await createKioskDevice(companyId, "Svetsen");
+
+    for (let attempt = 0; attempt < 5; attempt += 1) {
+      const guess = new FormData();
+      guess.set("code", String(200000 + attempt));
+      await pairDevice({}, guess);
+    }
+
+    // En verkstad delar ofta en utgående adress, men gissningarna kommer
+    // någon annanstans ifrån. Den som står vid skärmen ska inte straffas.
+    callerIp = "203.0.113.7";
+
+    const form = new FormData();
+    form.set("code", pairing.code);
+
+    expect((await pairDevice({}, form)).pairedAs).toBe("Svetsen");
+  });
+
+  it("en lyckad koppling nollställer räknaren", async () => {
+    const first = await createKioskDevice(companyId, "Skärm ett");
+
+    // Fyra felslag — en person som läser fel i motljus, inte ett skript.
+    for (let attempt = 0; attempt < 4; attempt += 1) {
+      const guess = new FormData();
+      guess.set("code", String(300000 + attempt));
+      await pairDevice({}, guess);
+    }
+
+    const form = new FormData();
+    form.set("code", first.pairing.code);
+    expect((await pairDevice({}, form)).pairedAs).toBe("Skärm ett");
+
+    // Nästa skärm sätts upp från samma enhet direkt efteråt. Hade räknaren
+    // stått kvar hade ett enda felslag räckt för att låsa ute installatören
+    // mitt i arbetet.
+    const second = await createKioskDevice(companyId, "Skärm två");
+
+    const stray = new FormData();
+    stray.set("code", "400000");
+    expect((await pairDevice({}, stray)).error).toBeTruthy();
+
+    const next = new FormData();
+    next.set("code", second.pairing.code);
+    expect((await pairDevice({}, next)).pairedAs).toBe("Skärm två");
   });
 });
