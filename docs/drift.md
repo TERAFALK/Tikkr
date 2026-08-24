@@ -226,7 +226,7 @@ SPF, DKIM och DMARC måste vara satta för `tikkr.se`, annars hamnar
       kundportal
 - [ ] Repot satt till **privat** på GitHub
 - [ ] Adminlösenordet från testdatan (`tikkr123`) borttaget eller bytt
-- [ ] Testskärmens fasta token (`demo-labb-token-…`) återkallad under Skärmar
+- [ ] Testskärmen från seed-datan (fast kopplingskod `123456`) raderad under Skärmar
 - [ ] `./scripts/status.sh` utan röda punkter
 
 ---

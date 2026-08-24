@@ -7,6 +7,7 @@ import CompanyBadge from "@/components/ui/CompanyBadge";
 import { LogoMark } from "@/components/ui/Logo";
 import NoticeBanner from "@/components/ui/NoticeBanner";
 import EmployeeAvatar from "@/components/ui/EmployeeAvatar";
+import KioskSettings from "./KioskSettings";
 
 /**
  * KIOSKSKÄRMEN.
@@ -156,7 +157,11 @@ export default function KioskScreen({
 
   const [waiting, setWaiting] = useState(0);
 
-  // Samma värde som ovan, läsbart utan att göra om funktionen varje gång det
+  // Tidpunkten då servern senast svarade. Visas i kugghjulet — en skärm som
+  // tappat nätet ser annars likadan ut som en som fungerar.
+  const [lastSyncedAt, setLastSyncedAt] = useState<Date | null>(null);
+
+  // Samma värde som waiting, läsbart utan att göra om funktionen varje gång det
   // ändras. Synkningen behöver veta om kön är tom, men ska inte startas om var
   // gång ett tryck läggs till.
   const waitingRef = useRef(0);
@@ -259,6 +264,7 @@ export default function KioskScreen({
       };
 
       setActive(data.active);
+      setLastSyncedAt(new Date());
     } catch {
       // Nätet är nere. Skärmen fortsätter visa det den vet, och kön tar hand
       // om det som trycks under tiden.
@@ -344,6 +350,7 @@ export default function KioskScreen({
         view={view}
         waiting={waiting}
         hasLogo={hasLogo}
+        lastSyncedAt={lastSyncedAt}
         onBack={goHome}
       />
 
@@ -440,6 +447,7 @@ function Header({
   view,
   waiting,
   hasLogo,
+  lastSyncedAt,
   onBack,
 }: {
   companyName: string;
@@ -447,6 +455,7 @@ function Header({
   view: View;
   waiting: number;
   hasLogo: boolean;
+  lastSyncedAt: Date | null;
   onBack: () => void;
 }) {
   // Samma företagsmärke som i adminpanelen, så att det syns att det hänger
@@ -510,12 +519,25 @@ function Header({
         {/* Tikkr-märket, nedtonat. Skärmen hänger på kundens vägg och är
             deras — men märket ska gå att se från andra sidan verkstaden. */}
         {view.name === "employees" && (
-          <span className="absolute right-4 hidden items-center gap-2 opacity-55 sm:right-6 sm:flex">
-            <LogoMark size={24} />
-            <span className="text-[13px] font-semibold text-neutral-500">
-              Tikkr
+          <div className="absolute right-3 flex items-center gap-3 sm:right-4">
+            {/* Ordmärket får vika på en liten skärm. Kugghjulet får det inte —
+                det är enda vägen ut ur ett låst kiosk-läge. */}
+            <span className="hidden items-center gap-2 opacity-55 sm:flex">
+              <LogoMark size={24} />
+              <span className="text-[13px] font-semibold text-neutral-500">
+                Tikkr
+              </span>
             </span>
-          </span>
+
+            {/* Kugghjulet sitter längst ut, dämpat. Den som letar efter det
+                hittar det; den som stämplar rör det aldrig. */}
+            <KioskSettings
+              deviceName={deviceName}
+              companyName={companyName}
+              waiting={waiting}
+              lastSyncedAt={lastSyncedAt}
+            />
+          </div>
         )}
       </div>
     </header>

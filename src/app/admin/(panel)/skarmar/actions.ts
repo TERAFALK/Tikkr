@@ -2,20 +2,31 @@
 
 import { revalidatePath } from "next/cache";
 import { requireAdmin } from "@/lib/admin-session";
-import { createKioskDevice } from "@/lib/kiosk-auth";
+import { createKioskDevice, startPairing } from "@/lib/kiosk-auth";
 import { assertLicenseAvailable, LicenseError } from "@/lib/licenses";
 
 const PATH = "/admin/skarmar";
 
+export interface PairingFormState {
+  error?: string;
+  /** Koden att läsa upp för den som står vid skärmen. */
+  code?: string;
+  /** När koden slutar gälla, som ISO-sträng. */
+  expiresAt?: string;
+  deviceName?: string;
+}
+
 /**
- * Skapar en ny kioskskärm.
+ * Skapar en ny stämplingsskärm.
  *
- * Token lämnas tillbaka EN gång och sparas aldrig i klartext. Den skickas via
- * adressfältet till samma sida, som visar kopplingslänken och sedan glömmer
- * den. Tappas den bort skapas en ny skärm — det finns ingen väg att få fram
- * token igen, och det är avsiktligt.
+ * Skärmen finns i listan direkt, i läget "väntar på koppling", och får en
+ * sexsiffrig kod som gäller i fem minuter. Koden läses upp för den som står
+ * vid skärmen — ingen behöver kopiera en länk.
  */
-export async function addDevice(formData: FormData) {
+export async function addDevice(
+  _previous: PairingFormState,
+  formData: FormData
+): Promise<PairingFormState> {
   const { companyId } = await requireAdmin();
 
   const name = String(formData.get("name") ?? "").trim();
@@ -30,52 +41,59 @@ export async function addDevice(formData: FormData) {
     throw error;
   }
 
-  const { token } = await createKioskDevice(companyId, name);
+  const { device, pairing } = await createKioskDevice(companyId, name);
 
   revalidatePath(PATH);
-  return { token };
+
+  return {
+    code: pairing.code,
+    expiresAt: pairing.expiresAt.toISOString(),
+    deviceName: device.name,
+  };
 }
 
 /**
- * Återkallar eller återaktiverar en skärm.
+ * Ger en befintlig skärm en ny kod.
  *
- * En återkallad skärm slutar fungera omedelbart, utan att någon behöver röra
- * själva skärmen. Det är åtgärden om en surfplatta blir stulen eller en
- * kopplingslänk kommer på avvägar.
- *
- * Att återkalla frigör en licens. Att återaktivera kräver att det finns en
- * ledig — annars skulle man kunna kringgå antalet genom att växla fram och
- * tillbaka.
+ * Ersätter det gamla återkalla-och-skapa-ny. Den gamla token nollas, så en
+ * borttappad surfplatta slutar fungera i samma stund — men skärmens namn,
+ * historik och licens är kvar. Det är samma skärm på samma vägg, bara på en ny
+ * enhet.
  */
-export async function toggleDevice(formData: FormData) {
-  const { db, companyId } = await requireAdmin();
+export async function repairDevice(
+  _previous: PairingFormState,
+  formData: FormData
+): Promise<PairingFormState> {
+  const { db } = await requireAdmin();
 
   const id = String(formData.get("id") ?? "");
-  const active = formData.get("active") === "true";
-  if (!id) return;
+  if (!id) return { error: "Okänd skärm." };
 
-  if (active === false) {
-    try {
-      await assertLicenseAvailable(companyId);
-    } catch (error) {
-      if (error instanceof LicenseError) return;
-      throw error;
-    }
-  }
+  // Går genom företagsfiltret: ett id ur ett formulär får aldrig kunna peka på
+  // en annan kunds skärm.
+  const device = await db.kioskDevice.findFirst({ where: { id } });
+  if (!device) return { error: "Okänd skärm." };
 
-  await db.kioskDevice.update({ where: { id }, data: { active: !active } });
+  const pairing = await startPairing(device.id);
+
   revalidatePath(PATH);
+
+  return {
+    code: pairing.code,
+    expiresAt: pairing.expiresAt.toISOString(),
+    deviceName: device.name,
+  };
 }
 
 /**
- * Raderar en återkallad skärm.
+ * Raderar en skärm.
  *
- * Bara återkallade går att radera. En aktiv skärm står och används av någon —
- * att den försvinner mitt i ett arbetspass vore ett fel, inte en städning.
+ * Går nu oavsett läge, eftersom återkalla-steget är borta. Stämplingar som
+ * gjorts på skärmen finns kvar med sin tid, men tappar noteringen om vilken
+ * skärm de kom från. Det är den enda förlusten, och den står i bekräftelsen så
+ * att ingen blir överraskad.
  *
- * Stämplingar som gjorts på skärmen finns kvar med sin tid, men tappar
- * noteringen om vilken skärm de kom från. Det är den enda förlusten, och den
- * står i bekräftelsen så att ingen blir överraskad.
+ * Att radera frigör licensen.
  */
 export async function deleteDevice(formData: FormData) {
   const { db } = await requireAdmin();
@@ -83,9 +101,6 @@ export async function deleteDevice(formData: FormData) {
   const id = String(formData.get("id") ?? "");
   if (!id) return;
 
-  const device = await db.kioskDevice.findFirst({ where: { id } });
-  if (!device || device.active) return;
-
-  await db.kioskDevice.delete({ where: { id } });
+  await db.kioskDevice.deleteMany({ where: { id } });
   revalidatePath(PATH);
 }

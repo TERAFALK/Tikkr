@@ -35,7 +35,7 @@ export async function getOnboardingState(
     db.employee.count({ where: { active: true } }),
     db.workMoment.count({ where: { active: true } }),
     db.order.count({ where: { status: "OPEN" } }),
-    db.kioskDevice.count({ where: { active: true } }),
+    db.kioskDevice.count(),
   ]);
 
   // Ordningen speglar beroendena: utan anställda finns ingen att stämpla,
@@ -70,7 +70,7 @@ export async function getOnboardingState(
       key: "device",
       title: "Koppla en stämplingsskärm",
       description:
-        "Skapa skärmen och öppna dess kopplingslänk en gång på den enhet som ska användas för stämpling.",
+        "Lägg upp skärmen och knappa in dess kopplingskod på den enhet som ska användas för stämpling.",
       href: "/admin/skarmar",
       done: devices > 0,
     },

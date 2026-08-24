@@ -18,13 +18,12 @@ import {
 
 let companyId: string;
 
-async function addDevice(active = true) {
+async function addDevice() {
   return unsafeGlobalPrisma.kioskDevice.create({
     data: {
       companyId,
       name: `Skärm ${Math.random().toString(36).slice(2, 8)}`,
       tokenHash: Math.random().toString(36).slice(2),
-      active,
     },
   });
 }
@@ -67,22 +66,32 @@ describe("provperioden", () => {
   });
 });
 
-describe("återkallade skärmar räknas inte", () => {
-  it("en återkallad skärm frigör sin licens", async () => {
+describe("en skärm upptar sin licens tills den raderas", () => {
+  it("radering frigör licensen", async () => {
     const first = await addDevice();
     await addDevice();
 
     expect((await getLicenseState(companyId)).available).toBe(0);
 
-    await unsafeGlobalPrisma.kioskDevice.update({
-      where: { id: first.id },
-      data: { active: false },
-    });
+    await unsafeGlobalPrisma.kioskDevice.delete({ where: { id: first.id } });
 
     const state = await getLicenseState(companyId);
     expect(state.used).toBe(1);
     expect(state.available).toBe(1);
     await expect(assertLicenseAvailable(companyId)).resolves.toBeUndefined();
+  });
+
+  it("en skärm som väntar på sin kod räknas ändå", async () => {
+    // Det är kunden som bestämt att skärmen ska finnas. Att den ännu inte
+    // knappat in sin kod gör den inte gratis — annars skulle en installation
+    // kunna byggas ut obegränsat genom att aldrig koppla färdigt.
+    await unsafeGlobalPrisma.kioskDevice.create({
+      data: { companyId, name: "Väntar på kod" },
+    });
+
+    const state = await getLicenseState(companyId);
+    expect(state.used).toBe(1);
+    expect(state.available).toBe(1);
   });
 });
 
@@ -104,7 +113,7 @@ describe("ändra antalet licenser", () => {
     expect(state.total).toBe(1);
   });
 
-  it("färre licenser än aktiva skärmar stänger ingen skärm", async () => {
+  it("färre licenser än upplagda skärmar stänger ingen skärm", async () => {
     await setLicenseCount(companyId, 3);
     const first = await addDevice();
     await addDevice();
@@ -124,12 +133,13 @@ describe("ändra antalet licenser", () => {
       LicenseError
     );
 
-    // Skärmarna är kvar och fungerar.
+    // Skärmarna är kvar och fungerar. En token som finns kvar är just det som
+    // gör att skärmen fortsätter stämpla.
     const device = await unsafeGlobalPrisma.kioskDevice.findUnique({
       where: { id: first.id },
-      select: { active: true },
+      select: { tokenHash: true },
     });
-    expect(device?.active).toBe(true);
+    expect(device?.tokenHash).toBe(first.tokenHash);
   });
 });
 

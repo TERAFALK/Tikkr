@@ -251,7 +251,7 @@ export async function getCompanyDetail(companyId: string) {
       unsafeGlobalPrisma.kioskDevice.findMany({
         where: { companyId },
         orderBy: { name: "asc" },
-        select: { id: true, name: true, active: true, lastSeenAt: true },
+        select: { id: true, name: true, tokenHash: true, lastSeenAt: true },
       }),
       unsafeGlobalPrisma.platformNote.findUnique({
         where: { targetCompanyId: companyId },
@@ -492,4 +492,97 @@ export async function recentPlatformActivity(limit = 30) {
     orderBy: { createdAt: "desc" },
     take: limit,
   });
+}
+
+/**
+ * RADERAR ETT KUNDFÖRETAG.
+ *
+ * Den enda åtgärden i hela systemet som förstör data utan att gå att ångra.
+ * Tre spärrar, och samtliga är där av ett skäl:
+ *
+ * 1. **Aktiv prenumeration hos Stripe stoppar raderingen.** Att radera en kund
+ *    man fortsätter fakturera är ett fel som upptäcks först på nästa
+ *    kontoutdrag — av kunden, inte av oss.
+ * 2. **Företagsnamnet måste skrivas.** En bekräftelseruta klickas bort;
+ *    ett namn måste läsas först.
+ * 3. **En anledning krävs**, och hamnar i åtgärdsloggen.
+ *
+ * Anställda, ordrar, moment, stämplingar, administratörer, inbjudningar och
+ * skärmar följer med genom databasens egna raderingsregler. Anteckningen har
+ * ingen sådan koppling och tas bort uttryckligen.
+ *
+ * Åtgärdsloggen överlever, eftersom den avsiktligt saknar koppling till
+ * företaget. Raden blir den enda kvarvarande uppgiften om att kunden funnits,
+ * och skriver därför ut både namnet och vad som fanns.
+ */
+export async function deleteCompany(params: {
+  actorEmail: string;
+  companyId: string;
+  confirmName: string;
+  reason: string;
+}) {
+  const company = await unsafeGlobalPrisma.company.findUnique({
+    where: { id: params.companyId },
+    select: {
+      name: true,
+      stripeSubscriptionId: true,
+      _count: {
+        select: { employees: true, timeEntries: true, adminUsers: true },
+      },
+    },
+  });
+
+  if (!company) throw new PlatformActionError("Företaget finns inte.");
+
+  if (company.stripeSubscriptionId) {
+    throw new PlatformActionError(
+      "Företaget har en aktiv prenumeration hos Stripe. Avsluta den där först " +
+        "— annars fortsätter faktureringen mot en kund som inte längre finns."
+    );
+  }
+
+  if (params.confirmName.trim() !== company.name) {
+    throw new PlatformActionError(
+      `Skriv företagets namn exakt: ${company.name}`
+    );
+  }
+
+  if (!params.reason.trim()) {
+    throw new PlatformActionError("Ange en anledning till raderingen.");
+  }
+
+  const summary =
+    `${company._count.employees} anställda, ` +
+    `${company._count.timeEntries} stämplingar, ` +
+    `${company._count.adminUsers} administratörer`;
+
+  // Loggas FÖRE raderingen. Skulle något gå fel mitt i finns ändå en notering
+  // om att försöket gjordes, och av vem.
+  await record({
+    actorEmail: params.actorEmail,
+    action: "Raderade kundföretag",
+    detail: `"${company.name}" (${summary}). ${params.reason}`.trim(),
+  });
+
+  // Ordningen är inte godtycklig. Stämplingarna hänger på ordrar och moment med
+  // onDelete: Restrict — spärren som hindrar att fakturaunderlag tappar sin
+  // order vid en vanlig radering. Den spärren gäller även när raderingen kommer
+  // uppifrån: databasen vägrar ta bort ordern så länge en stämpling pekar på
+  // den. Stämplingarna måste därför bort först, och sedan får företagets egen
+  // radering kaskadera resten.
+  //
+  // Allt i en transaktion. Ett halvraderat företag — administratörer kvar men
+  // stämplingarna borta — vore värre än både att radera och att låta bli.
+  await unsafeGlobalPrisma.$transaction([
+    unsafeGlobalPrisma.timeEntry.deleteMany({
+      where: { companyId: params.companyId },
+    }),
+    // Anteckningen saknar koppling till företaget i databasen, med flit, så att
+    // den aldrig kan följa med i en fråga kunden själv gör. Priset är att den
+    // inte heller följer med i kaskaden.
+    unsafeGlobalPrisma.platformNote.deleteMany({
+      where: { targetCompanyId: params.companyId },
+    }),
+    unsafeGlobalPrisma.company.delete({ where: { id: params.companyId } }),
+  ]);
 }

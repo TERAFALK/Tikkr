@@ -57,7 +57,7 @@ export async function POST(request: NextRequest) {
   const session = await getKioskSession();
   if (!session) {
     return NextResponse.json(
-      { error: "Skärmen är inte kopplad. Öppna kopplingslänken igen." },
+      { error: "Skärmen är inte kopplad. Hämta en ny kod i adminpanelen." },
       { status: 401 }
     );
   }

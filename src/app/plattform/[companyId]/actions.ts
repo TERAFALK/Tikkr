@@ -1,7 +1,9 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import {
+  deleteCompany,
   PlatformActionError,
   requirePlatformAdmin,
   saveNote,
@@ -116,4 +118,42 @@ export async function updateNote(formData: FormData) {
   });
 
   revalidatePath(`/plattform/${companyId}`);
+}
+
+export interface DeleteCompanyState {
+  error?: string;
+}
+
+/**
+ * Raderar kundföretaget.
+ *
+ * Omdirigerar till kundöversikten när det gått igenom — sidan vi står på finns
+ * då inte längre, och att lämna kvar besökaren där vore att visa en tom sida
+ * med företagets namn i rubriken.
+ */
+export async function removeCompany(
+  _previous: DeleteCompanyState,
+  formData: FormData
+): Promise<DeleteCompanyState> {
+  const { email } = await requirePlatformAdmin();
+
+  const companyId = String(formData.get("companyId") ?? "");
+  if (!companyId) return { error: "Okänt företag." };
+
+  try {
+    await deleteCompany({
+      actorEmail: email,
+      companyId,
+      confirmName: String(formData.get("confirmName") ?? ""),
+      reason: String(formData.get("reason") ?? ""),
+    });
+  } catch (error) {
+    if (error instanceof PlatformActionError) return { error: error.message };
+    throw error;
+  }
+
+  revalidatePath("/plattform");
+
+  // Ligger utanför try-blocket: redirect() avbryter genom att kasta.
+  redirect("/plattform");
 }

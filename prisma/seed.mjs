@@ -15,11 +15,16 @@ import bcrypt from "bcryptjs";
 const prisma = new PrismaClient();
 
 /**
- * Fast token för testskärmen, så att kopplingslänken är densamma varje gång
- * du kör seed. ENDAST FÖR LABB — i skarp drift skapas varje skärm med en
- * slumpad token via adminpanelen (Fas 2).
+ * Fast kopplingskod för testskärmen, så att den är densamma varje gång du kör
+ * seed. Koden gäller i hundra år i stället för fem minuter.
+ *
+ * ENDAST FÖR LABB. En förutsägbar kod med obegränsad livslängd är precis det
+ * som gör kortkoden osäker, och den står på listan över spärrar innan skarp
+ * drift i docs/drift.md. I produktion skapas varje kod slumpad och kortlivad
+ * via adminpanelen.
  */
-const DEMO_KIOSK_TOKEN = "demo-labb-token-anvand-aldrig-i-skarp-drift";
+const DEMO_PAIRING_CODE = "123456";
+const DEMO_DEVICE_ID = "demo-kiosk-device";
 
 async function main() {
   const demo = await prisma.company.upsert({
@@ -71,15 +76,29 @@ async function main() {
     },
   });
 
-  // Testskärm för demoföretaget. Token sparas som fingeravtryck, precis som
-  // en riktig skärm — bara att den här är förutsägbar så du kan testa.
+  // Testskärm för demoföretaget, i väntande läge med en fast kod. Koden
+  // sparas som fingeravtryck, precis som en riktig — bara att den här är
+  // förutsägbar så att du kan koppla om testskärmen hur många gånger som helst.
+  const codeHash = createHash("sha256").update(DEMO_PAIRING_CODE).digest("hex");
+  const farFuture = new Date("2126-01-01T00:00:00Z");
+
+  // Fast id i stället för upslag på kodens fingeravtryck. Koden förbrukas när
+  // skärmen kopplas, och en upsert på fingeravtrycket hade då skapat en ny
+  // skärm vid varje omkörning tills licenserna tog slut.
   await prisma.kioskDevice.upsert({
-    where: { tokenHash: createHash("sha256").update(DEMO_KIOSK_TOKEN).digest("hex") },
-    update: { active: true },
+    where: { id: DEMO_DEVICE_ID },
+    update: {
+      companyId: demo.id,
+      tokenHash: null,
+      pairingCodeHash: codeHash,
+      pairingExpiresAt: farFuture,
+    },
     create: {
+      id: DEMO_DEVICE_ID,
       companyId: demo.id,
       name: "Verkstaden (testskärm)",
-      tokenHash: createHash("sha256").update(DEMO_KIOSK_TOKEN).digest("hex"),
+      pairingCodeHash: codeHash,
+      pairingExpiresAt: farFuture,
     },
   });
 
@@ -113,8 +132,8 @@ async function main() {
     `  Totalt: ${counts.anstallda} anställda, ${counts.ordrar} ordrar, ${counts.moment} moment`
   );
   console.log("");
-  console.log("Koppla testskärmen genom att öppna denna adress EN gång:");
-  console.log(`  /kiosk/koppla/${DEMO_KIOSK_TOKEN}`);
+  console.log("Koppla testskärmen: öppna /kiosk och knappa in koden");
+  console.log(`  ${DEMO_PAIRING_CODE}`);
   console.log("");
   console.log("Logga in i adminpanelen på /admin/login:");
   console.log(`  ${adminEmail} / tikkr123`);

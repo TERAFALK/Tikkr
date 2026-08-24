@@ -29,7 +29,7 @@ export class LicenseError extends Error {
 export interface LicenseState {
   /** Antal skärmar företaget får ha aktiva. */
   total: number;
-  /** Antal aktiva skärmar just nu. */
+  /** Antal upplagda skärmar just nu. */
   used: number;
   /** Hur många som går att skapa till. */
   available: number;
@@ -41,7 +41,10 @@ export async function getLicenseState(companyId: string): Promise<LicenseState> 
       where: { id: companyId },
       select: { screenLicenses: true },
     }),
-    forCompany(companyId).kioskDevice.count({ where: { active: true } }),
+    // Alla upplagda skärmar, inte bara de som hunnit kopplas. En skärm som
+    // ligger i listan och väntar på sin kod upptar en licens — det är kunden
+    // som bestämt att den ska finnas, och licensen frigörs när den raderas.
+    forCompany(companyId).kioskDevice.count(),
   ]);
 
   const total = company?.screenLicenses ?? TRIAL_LICENSES;
@@ -62,7 +65,7 @@ export async function assertLicenseAvailable(companyId: string): Promise<void> {
 
   throw new LicenseError(
     `Samtliga ${state.total} licenser används. Utöka antalet under ` +
-      `Inställningar → Prenumeration, eller återkalla en skärm ni inte ` +
+      `Inställningar → Prenumeration, eller radera en skärm ni inte ` +
       `längre använder.`
   );
 }

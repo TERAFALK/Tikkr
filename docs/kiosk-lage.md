@@ -6,17 +6,30 @@ Så här går en skärm från kartong till färdig stämpelklocka.
 
 ## 1. Koppla skärmen
 
-Administratören skapar skärmen i adminpanelen och får en **kopplingslänk**.
-Öppna den **en gång** i skärmens webbläsare. Den skickar vidare till
-stämplingsvyn, och adressen i länken försvinner ur adressfältet.
+Administratören lägger upp skärmen i adminpanelen under **Stämplingsskärmar**
+och får en **sexsiffrig kod**.
 
-Efter det behöver ingen logga in. Skärmen kommer ihåg vilket företag den
-tillhör tills någon återkallar den.
+På skärmen som ska användas:
 
-> **Länken är nyckeln till företagets stämpling.** Skicka den inte i grupp-chatt
-> och skriv inte ut den på en lapp vid skärmen. Har den kommit på avvägar:
-> återkalla skärmen i adminpanelen och skapa en ny. Den gamla slutar fungera
-> omedelbart.
+1. Surfa till `portal.tikkr.se/kiosk`
+2. Knappa in koden
+3. Skärmen visar sitt namn och går vidare till stämplingsvyn
+
+Koden gäller i **fem minuter**, kopplar **en enda** skärm och är förbrukad i
+samma stund den använts. Har den gått ut skapas en ny med **Koppla om** i
+panelen.
+
+Efter kopplingen behöver ingen logga in. Skärmen kommer ihåg vilket företag den
+tillhör tills någon kopplar om eller raderar den.
+
+> **Har enheten bytts ut, tömts eller kommit bort:** tryck **Koppla om** i
+> adminpanelen. Den gamla enheten slutar fungera omedelbart, medan skärmens
+> namn, historik och licens är kvar.
+
+Skärmen kan också kopplas loss på plats: tryck **kugghjulet** uppe i hörnet och
+välj **Koppla loss skärmen**. Samma ruta visar skärmens namn, hur många
+stämplingar som väntar i kön och när den senast nådde servern — det som behövs
+vid ett supportsamtal.
 
 ---
 

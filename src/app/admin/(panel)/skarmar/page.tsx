@@ -1,15 +1,15 @@
 import Link from "next/link";
-import { headers } from "next/headers";
 import { requireAdmin } from "@/lib/admin-session";
-import NewDeviceForm from "@/components/admin/NewDeviceForm";
+import PairingCodeDialog from "@/components/admin/PairingCodeDialog";
 import ConfirmButton from "@/components/admin/ConfirmButton";
 import {
   Alert,
   Badge,
-  Button,
   Card,
   CardHeader,
   EmptyState,
+  Field,
+  Input,
   PageHeader,
   Table,
   Td,
@@ -18,7 +18,8 @@ import {
 } from "@/components/ui";
 import { formatDateTime } from "@/lib/format";
 import { getLicenseState } from "@/lib/licenses";
-import { deleteDevice, toggleDevice } from "./actions";
+import { deviceState } from "@/lib/kiosk-auth";
+import { addDevice, deleteDevice, repairDevice } from "./actions";
 
 export const dynamic = "force-dynamic";
 
@@ -27,43 +28,57 @@ export default async function DevicesPage() {
   const licenses = await getLicenseState(companyId);
 
   const devices = await db.kioskDevice.findMany({
-    orderBy: [{ active: "desc" }, { name: "asc" }],
+    orderBy: { name: "asc" },
     select: {
       id: true,
       name: true,
-      active: true,
+      tokenHash: true,
+      pairingExpiresAt: true,
       lastSeenAt: true,
       createdAt: true,
       _count: { select: { timeEntries: true } },
     },
   });
 
-  // Adressen byggs ur anropet istället för att gissas, så kopplingslänken
-  // pekar rätt oavsett om panelen nås via IP, testdomän eller tikkr.se.
-  const headerList = await headers();
-  const host = headerList.get("x-forwarded-host") ?? headerList.get("host") ?? "";
-  const proto = headerList.get("x-forwarded-proto") ?? "http";
-  const baseUrl = `${proto}://${host}`;
+  const newDevice = (
+    <PairingCodeDialog
+      trigger="Ny skärm"
+      title="Lägg till skärm"
+      description="Ange ett namn som beskriver var skärmen är placerad. Kopplingskoden visas direkt."
+      action={addDevice}
+      submitLabel="Skapa kod"
+      disabled={licenses.available <= 0}
+    >
+      <Field
+        label="Namn"
+        hint={
+          licenses.available === 1
+            ? "En ledig licens återstår."
+            : `${licenses.available} lediga licenser återstår.`
+        }
+      >
+        <Input name="name" placeholder="Verkstaden, entrén, monteringen…" required autoFocus />
+      </Field>
+    </PairingCodeDialog>
+  );
 
   return (
     <>
       <PageHeader
         title="Stämplingsskärmar"
-        description={`${licenses.used} av ${licenses.total} licenser används. En licens ger en stämplingsskärm, som kopplas en gång med en egen länk och därefter inte kräver någon inloggning.`}
-        action={
-          <NewDeviceForm baseUrl={baseUrl} available={licenses.available} />
-        }
+        description={`${devices.length} av ${licenses.total} licenser används. En skärm kopplas med en sexsiffrig kod och kräver därefter ingen inloggning.`}
+        action={newDevice}
       />
 
-      {/* Antalet licenser kan sänkas hos betaltjänsten utan att vi kan hindra
-          det. Skärmarna stängs inte av — stämplingen fortsätter, och kunden
-          får själv peka ut vilken skärm som ska bort. */}
-      {licenses.used > licenses.total ? (
+      {/* Antalet licenser kan sänkas hos betaltjänsten under antalet upplagda
+          skärmar. Ingen skärm slutar fungera för det — vilken som ska bort är
+          kundens beslut, inte vårt. */}
+      {devices.length > licenses.total ? (
         <Alert tone="warning">
-          {licenses.used} skärmar är kopplade men ni har {licenses.total}{" "}
-          {licenses.total === 1 ? "licens" : "licenser"}. Återkalla{" "}
-          {licenses.used - licenses.total}{" "}
-          {licenses.used - licenses.total === 1 ? "skärm" : "skärmar"} nedan,
+          {devices.length} skärmar är upplagda men ni har {licenses.total}{" "}
+          {licenses.total === 1 ? "licens" : "licenser"}. Radera{" "}
+          {devices.length - licenses.total}{" "}
+          {devices.length - licenses.total === 1 ? "skärm" : "skärmar"} nedan,
           eller utöka antalet licenser under{" "}
           <Link
             href="/admin/installningar/prenumeration"
@@ -83,7 +98,7 @@ export default async function DevicesPage() {
             >
               Inställningar → Prenumeration
             </Link>
-            , alternativt återkallas en skärm som inte längre används.
+            , alternativt raderas en skärm som inte längre används.
           </Alert>
         )
       )}
@@ -91,16 +106,14 @@ export default async function DevicesPage() {
       {devices.length === 0 ? (
         <EmptyState
           title="Inga skärmar upplagda"
-          description="Skapa en skärm och öppna dess kopplingslänk på den enhet som ska användas för stämpling."
-          action={
-          <NewDeviceForm baseUrl={baseUrl} available={licenses.available} />
-        }
+          description="Skapa en skärm och knappa in koden på den enhet som ska användas för stämpling."
+          action={newDevice}
         />
       ) : (
         <Card>
           <CardHeader
             title={`${devices.length} ${devices.length === 1 ? "skärm" : "skärmar"}`}
-            description="Aktiva visas först. En återkallad skärm slutar fungera omedelbart."
+            description="Koppla om ger en ny kod och stänger ute den gamla enheten. Historiken följer med."
           />
           <Table>
             <thead>
@@ -115,49 +128,60 @@ export default async function DevicesPage() {
               </tr>
             </thead>
             <tbody>
-              {devices.map((device) => (
-                <Tr key={device.id} dimmed={!device.active}>
-                  <Td>
-                    <span className="font-medium">{device.name}</span>
-                    <span className="mt-0.5 block text-xs text-neutral-400">
-                      Upplagd {formatDateTime(device.createdAt)}
-                    </span>
-                  </Td>
-                  <Td>
-                    {device.active ? (
-                      <Badge tone="active">Aktiv</Badge>
-                    ) : (
-                      <Badge tone="muted">Återkallad</Badge>
-                    )}
-                  </Td>
-                  <Td muted>
-                    {device.lastSeenAt
-                      ? formatDateTime(device.lastSeenAt)
-                      : "Aldrig kopplad"}
-                  </Td>
-                  <Td numeric muted>
-                    {device._count.timeEntries}
-                  </Td>
-                  <Td>
-                    <div className="flex justify-end gap-2">
-                      <form action={toggleDevice}>
-                        <input type="hidden" name="id" value={device.id} />
-                        <input
-                          type="hidden"
-                          name="active"
-                          value={String(device.active)}
-                        />
-                        <Button
-                          type="submit"
-                          tone={device.active ? "danger" : "secondary"}
-                        >
-                          {device.active ? "Återkalla" : "Återaktivera"}
-                        </Button>
-                      </form>
+              {devices.map((device) => {
+                const state = deviceState(device);
 
-                      {/* Bara återkallade går att radera. En aktiv skärm står
-                          och används av någon just nu. */}
-                      {!device.active && (
+                return (
+                  <Tr key={device.id} dimmed={state !== "kopplad"}>
+                    <Td>
+                      <span className="font-medium">{device.name}</span>
+                      <span className="mt-0.5 block text-xs text-neutral-400">
+                        Upplagd {formatDateTime(device.createdAt)}
+                      </span>
+                    </Td>
+
+                    <Td>
+                      {state === "kopplad" && (
+                        <Badge tone="active">Kopplad</Badge>
+                      )}
+                      {state === "väntar" && <Badge>Väntar på kod</Badge>}
+                      {state === "utgången" && (
+                        <Badge tone="warning">Ej kopplad</Badge>
+                      )}
+                    </Td>
+
+                    <Td muted>
+                      {device.lastSeenAt
+                        ? formatDateTime(device.lastSeenAt)
+                        : "Aldrig"}
+                    </Td>
+
+                    <Td numeric muted>
+                      {device._count.timeEntries}
+                    </Td>
+
+                    <Td>
+                      <div className="flex justify-end gap-2">
+                        <PairingCodeDialog
+                          trigger={state === "kopplad" ? "Koppla om" : "Ny kod"}
+                          triggerTone="secondary"
+                          title={`Ny kod för ${device.name}`}
+                          description={
+                            state === "kopplad"
+                              ? "Den nuvarande enheten slutar fungera i samma stund. Skärmens namn, historik och licens är kvar."
+                              : "Skapar en ny kod. Den föregående slutar gälla."
+                          }
+                          action={repairDevice}
+                          submitLabel="Skapa kod"
+                        >
+                          <input type="hidden" name="id" value={device.id} />
+                          <p className="text-[13px] leading-relaxed text-neutral-600">
+                            {state === "kopplad"
+                              ? "Använd detta när enheten bytts ut, tömts eller kommit bort."
+                              : "Den tidigare koden gäller inte längre."}
+                          </p>
+                        </PairingCodeDialog>
+
                         <form action={deleteDevice}>
                           <input type="hidden" name="id" value={device.id} />
                           <ConfirmButton
@@ -165,18 +189,18 @@ export default async function DevicesPage() {
                             tone="ghost"
                             question={
                               device._count.timeEntries > 0
-                                ? `Radera skärmen ${device.name}? De ${device._count.timeEntries} stämplingar som gjorts på den finns kvar med sin tid, men tappar noteringen om vilken skärm de kom från.`
-                                : `Radera skärmen ${device.name}?`
+                                ? `Radera skärmen ${device.name}? De ${device._count.timeEntries} stämplingar som gjorts på den finns kvar med sin tid, men tappar noteringen om vilken skärm de kom från. Licensen frigörs.`
+                                : `Radera skärmen ${device.name}? Licensen frigörs.`
                             }
                           >
                             Radera
                           </ConfirmButton>
                         </form>
-                      )}
-                    </div>
-                  </Td>
-                </Tr>
-              ))}
+                      </div>
+                    </Td>
+                  </Tr>
+                );
+              })}
             </tbody>
           </Table>
         </Card>

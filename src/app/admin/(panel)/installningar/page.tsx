@@ -24,7 +24,7 @@ export default async function CompanySettingsPage() {
     }),
     db.employee.count({ where: { active: true } }),
     db.order.count({ where: { status: "OPEN" } }),
-    db.kioskDevice.count({ where: { active: true } }),
+    db.kioskDevice.count({ where: { tokenHash: { not: null } } }),
   ]);
 
   if (!company) return null;
@@ -81,7 +81,7 @@ export default async function CompanySettingsPage() {
           <Row label="Upplagt" value={formatDate(company.createdAt)} />
           <Row label="Aktiva anställda" value={String(employees)} />
           <Row label="Öppna ordrar" value={String(orders)} />
-          <Row label="Aktiva skärmar" value={String(devices)} />
+          <Row label="Kopplade skärmar" value={String(devices)} />
           <Row
             label="Prenumeration"
             value={

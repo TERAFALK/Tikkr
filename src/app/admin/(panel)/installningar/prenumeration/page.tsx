@@ -121,13 +121,13 @@ export default async function SubscriptionPage({
             </Alert>
           )}
 
-          {/* Antalet kan sänkas hos betaltjänsten under antalet aktiva
+          {/* Antalet kan sänkas hos betaltjänsten under antalet upplagda
               skärmar. Vi stänger ingen skärm av oss själva — vilken som ska
               bort är kundens beslut, inte vårt. */}
           {overview.used > overview.screens && (
             <Alert tone="warning">
-              {overview.used} skärmar är kopplade men ni har {overview.screens}{" "}
-              {overview.screens === 1 ? "licens" : "licenser"}. Återkalla de
+              {overview.used} skärmar är upplagda men ni har {overview.screens}{" "}
+              {overview.screens === 1 ? "licens" : "licenser"}. Radera de
               skärmar ni inte längre använder under Stämplingsskärmar, eller
               utöka antalet licenser igen. Skärmarna fortsätter fungera under
               tiden.

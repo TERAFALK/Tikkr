@@ -4,6 +4,7 @@ import { forCompany } from "@/lib/tenant";
 import { evaluateAccess } from "@/lib/subscription";
 import { activeNotices } from "@/lib/notices";
 import KioskScreen from "@/components/kiosk/KioskScreen";
+import PairingForm from "@/components/kiosk/PairingForm";
 
 // Kioskvyn. Hämtar allt skärmen behöver i ett svep och lämnar över till
 // komponenten som sköter tryckningarna.
@@ -15,21 +16,9 @@ export const dynamic = "force-dynamic";
 export default async function KioskPage() {
   const session = await getKioskSession();
 
-  if (!session) {
-    return (
-      <main className="flex min-h-screen items-center justify-center bg-neutral-50 p-8">
-        <div className="max-w-md rounded-xl border border-neutral-200 bg-white p-8 text-center">
-          <h1 className="text-2xl font-semibold text-neutral-900">
-            Skärmen är inte kopplad
-          </h1>
-          <p className="mt-3 text-[15px] leading-relaxed text-neutral-500">
-            Öppna kopplingslänken från administratören en gång på den här
-            enheten. Därefter krävs ingen ytterligare åtgärd.
-          </p>
-        </div>
-      </main>
-    );
-  }
+  // Utan cookie visas kodfältet i stället för stämplingsvyn. Det är hela
+  // uppsättningen: skriv in sex siffror en gång, sedan aldrig mer.
+  if (!session) return <PairingForm />;
 
   const db = forCompany(session.companyId);
 

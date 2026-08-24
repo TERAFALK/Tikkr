@@ -50,7 +50,9 @@ export async function silentDevices(): Promise<SilentDevice[]> {
 
   const rows = await unsafeGlobalPrisma.kioskDevice.findMany({
     where: {
-      active: true,
+      // Bara kopplade skärmar. En som väntar på sin kod har aldrig hört av
+      // sig och ska inte ligga i listan över tysta.
+      tokenHash: { not: null },
       lastSeenAt: { not: null, lt: cutoff },
     },
     orderBy: { lastSeenAt: "asc" },

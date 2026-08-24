@@ -35,13 +35,15 @@ function ago(ms: number): Date {
   return new Date(Date.now() - ms);
 }
 
-async function addDevice(data: { lastSeenAt: Date | null; active?: boolean }) {
+async function addDevice(data: { lastSeenAt: Date | null; paired?: boolean }) {
   return unsafeGlobalPrisma.kioskDevice.create({
     data: {
       companyId,
       name: `Skärm ${Math.random().toString(36).slice(2, 8)}`,
-      tokenHash: Math.random().toString(36).slice(2),
-      active: data.active ?? true,
+      // En kopplad skärm har en token. En som väntar på sin kod har ingen —
+      // det är hela skillnaden mellan lägena numera.
+      tokenHash:
+        data.paired === false ? null : Math.random().toString(36).slice(2),
       lastSeenAt: data.lastSeenAt,
     },
   });
@@ -91,10 +93,12 @@ describe("skärmar som slutat höra av sig", () => {
     expect(list.map((row) => row.id)).not.toContain(device.id);
   });
 
-  it("en återkallad skärm kommer inte med", async () => {
+  it("en skärm som väntar på sin kod kommer inte med", async () => {
+    // Den har aldrig varit kopplad och kan därför inte ha slutat höra av sig.
+    // Att den ligger i kundens lista är inget driftproblem.
     const device = await addDevice({
       lastSeenAt: ago(5 * DAY),
-      active: false,
+      paired: false,
     });
 
     const list = await silentDevices();

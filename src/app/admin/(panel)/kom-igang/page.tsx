@@ -179,7 +179,7 @@ export default async function OnboardingPage() {
       <StepCard
         number={4}
         title="Koppla en stämplingsskärm"
-        description="Skapa skärmen och öppna dess kopplingslänk en gång på den enhet som ska användas för stämpling. Därefter krävs ingen inloggning."
+        description="Lägg upp skärmen och knappa in dess sexsiffriga kod på den enhet som ska användas för stämpling. Därefter krävs ingen inloggning."
         done={state.steps[3].done}
         last
       >

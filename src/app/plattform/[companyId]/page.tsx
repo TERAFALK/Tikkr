@@ -21,6 +21,7 @@ import { formatDate, formatDateTime } from "@/lib/format";
 import SubscriptionOverrideForm from "@/components/admin/SubscriptionOverrideForm";
 import PlatformShell from "@/components/platform/PlatformShell";
 import ManualLicenseForm from "@/components/platform/ManualLicenseForm";
+import DeleteCompanyForm from "@/components/platform/DeleteCompanyForm";
 import { monthlyRevenueFor } from "@/lib/platform-admin";
 import { getScreenPricing } from "@/lib/stripe";
 import { updateNote } from "./actions";
@@ -136,7 +137,7 @@ export default async function CompanyPage({
               <ManualLicenseForm
                 companyId={company.id}
                 current={company.screenLicenses}
-                used={devices.filter((device) => device.active).length}
+                used={devices.length}
                 managedByStripe={Boolean(company.stripeSubscriptionId)}
               />
             </div>
@@ -226,13 +227,13 @@ export default async function CompanyPage({
               </thead>
               <tbody>
                 {devices.map((device) => (
-                  <Tr key={device.id} dimmed={!device.active}>
+                  <Tr key={device.id} dimmed={!device.tokenHash}>
                     <Td>{device.name}</Td>
                     <Td>
-                      {device.active ? (
-                        <Badge tone="active">Aktiv</Badge>
+                      {device.tokenHash ? (
+                        <Badge tone="active">Kopplad</Badge>
                       ) : (
-                        <Badge tone="muted">Återkallad</Badge>
+                        <Badge tone="muted">Ej kopplad</Badge>
                       )}
                     </Td>
                     <Td muted>
@@ -291,6 +292,15 @@ export default async function CompanyPage({
           registrerade tider — är inte åtkomligt härifrån. Sådan åtkomst kräver
           en inbjudan som administratör i kundens arbetsyta.
         </Alert>
+        {/* Raderingen ligger sist och avskild. Den ska gå att hitta av den
+            som söker den, och aldrig råkas ut för av den som skummar. */}
+        <div className="mt-10 border-t border-neutral-200 pt-6">
+          <DeleteCompanyForm
+            companyId={company.id}
+            companyName={company.name}
+            managedByStripe={Boolean(company.stripeSubscriptionId)}
+          />
+        </div>
       </div>
     </PlatformShell>
   );

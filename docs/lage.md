@@ -1,6 +1,6 @@
 # Läget mot originalplanen
 
-Uppdaterad 2026-08-12. Jämförelse mellan uppdraget som beskrevs från början och
+Uppdaterad 2026-08-24. Jämförelse mellan uppdraget som beskrevs från början och
 vad som faktiskt finns byggt.
 
 ---
@@ -23,7 +23,7 @@ vad som faktiskt finns byggt.
 
 | Planerat | Läge |
 |---|---|
-| Engångslänk med device-token | ✅ token hashas, flyttas till cookie |
+| Engångslänk med device-token | ✅ ersatt av sexsiffrig engångskod; token hashas och lever i skärmens cookie |
 | Namnrutnät, ett tryck, order, moment | ✅ |
 | Automatisk utstämpling vid jobbyte | ✅ med tester |
 | Offline-kö | ✅ med tester |
@@ -112,6 +112,36 @@ utskick förrän den bekräftats. Stängs enklast när utskicken är på plats.
 
 ## Löst sedan förra genomgången
 
+**Koppling med sexsiffrig engångskod** (2026-08-24). Kopplingslänken är borta.
+En skärm läggs upp i panelen och får en kod som gäller i fem minuter, kopplar
+en enda skärm och förbrukas vid användning. Den som sätter upp skärmen surfar
+till `/kiosk` och knappar in koden — tidigare krävdes att samma person hade
+adminpanelen öppen på en annan enhet för att kunna kopiera en länk med
+trettiotvå slumpade byte i.
+
+Sex siffror är en miljon kombinationer och är försvarbart först tillsammans med
+kort livslängd, engångsanvändning och ett tak på antalet gissningar. Taket är
+samma spärr som inloggningarna använder, räknad per avsändande adress.
+
+Samtidigt försvann `active` ur `KioskDevice`. Läget räknas nu fram: kopplad om
+token finns, väntande om en giltig kod finns, annars utgången. **Koppla om**
+ersätter återkalla — den gamla enheten stängs ute i samma stund medan skärmens
+namn, historik och licens är kvar. En skärm upptar sin licens tills den
+raderas.
+
+**Kugghjul på stämplingsskärmen** (2026-08-24). Visar skärmens namn, företag,
+hur många tryck som väntar i kön och när servern senast svarade — det som
+behöver frågas vid ett supportsamtal. Därtill en omladdningsknapp, som i
+kiosk-läge annars saknas helt, och **Koppla loss** bakom en bekräftelse.
+Frånkopplingen nollar token på servern och inte bara cookien.
+
+**Radering av kundföretag** (2026-08-24). Ny åtgärd längst ned på företagets
+sida i plattformspanelen, spärrad så länge en prenumeration finns hos Stripe.
+Företagsnamnet skrivs för hand och en anledning krävs. Stämplingarna raderas
+före företaget, eftersom ordrar och moment har `onDelete: Restrict` — annars
+kunde databasen vägra mitt i. Åtgärdsloggen står kvar och är den enda
+kvarvarande uppgiften om att kunden funnits.
+
 **Rättsliga sidor** (2026-08-12). Integritetspolicy, användarvillkor och
 personuppgiftsbiträdesavtal finns publicerade och länkade i foten, vid
 registreringen och från dataskyddssidan i panelen. Biträdesavtalet krävs enligt
@@ -154,7 +184,7 @@ porten bara är öppen inifrån servern, och proxyn omdirigerar http till https.
 
 Att omdirigeringen behövdes var inte kosmetik. Cookies är märkta `Secure` i
 produktionsläge, och webbläsaren vägrar spara dem över okrypterad anslutning —
-en kioskskärm som öppnat kopplingslänken på `http://` hade fått "inte kopplad"
+en kioskskärm som kopplats över `http://` hade fått "inte kopplad"
 hur många gånger den än försökte, utan att något felmeddelande förklarade varför.
 
 **Kort request-timeout** på stämplingar, åtta sekunder. En långsam server kan
