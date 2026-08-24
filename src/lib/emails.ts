@@ -48,7 +48,7 @@ const FONT =
 /** Står sist i textversionen. HTML-versionen har samma sak i sin fot. */
 const SIGNATURE_TEXT = [
   "—",
-  "Tikkr — tidregistrering per order",
+  "Tikkr · tidregistrering per order",
   "En tjänst från TERAFALK AB",
 ].join("\n");
 
@@ -109,7 +109,7 @@ function render(layout: Layout): string {
         </table>
 
         <p style="margin:0 0 6px;font-family:${FONT};font-size:12px;color:${COLORS.muted};">
-          Fungerar inte knappen — kopiera adressen:
+          Fungerar inte knappen, kopiera adressen:
         </p>
         <p style="margin:0 0 18px;padding:10px 12px;background-color:${COLORS.linkBox};border:1px solid ${COLORS.border};border-radius:6px;font-family:${FONT};font-size:12px;line-height:1.5;color:${COLORS.body};word-break:break-all;">
           ${escape(layout.button.href)}
@@ -156,7 +156,7 @@ ${(layout.afterword ?? []).map((text) => paragraph(text, true)).join("")}
 
           <tr>
             <td style="padding:20px 4px 0;font-family:${FONT};font-size:12px;line-height:1.6;color:${COLORS.muted};">
-              Tikkr — tidregistrering per order och arbetsmoment<br>
+              Tikkr · tidregistrering per order och arbetsmoment<br>
               En tjänst från TERAFALK AB
             </td>
           </tr>
@@ -323,7 +323,7 @@ export function broadcastEmail(params: {
  */
 export function passwordChangedEmail(params: { to: string }): EmailMessage {
   const warning =
-    "Var det inte du som gjorde det — svara på det här mejlet omgående, så " +
+    "Var det inte du som gjorde det, svara på det här mejlet omgående, så " +
     "hjälper vi dig att säkra kontot.";
 
   return compose({

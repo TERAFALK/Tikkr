@@ -35,11 +35,11 @@ export async function generateMetadata(): Promise<Metadata> {
   const pricing = await getScreenPricing();
 
   return {
-    title: "Tikkr — tidregistrering per order för verkstad",
+    title: "Tikkr · Tidregistrering per order för verkstad",
     description:
       "Stämplingssystem för touchskärm. Personalen registrerar tid på rätt " +
-      "order och arbetsmoment med ett tryck, och underlaget per order laddas " +
-      "ned som PDF eller Excel med er egen logotyp. " +
+      "order och arbetsmoment med ett tryck. Underlag per order laddas ned " +
+      "som PDF eller Excel med er logotyp. " +
       `${pricing.month.toLocaleString("sv-SE")} kr per stämplingsskärm och månad.`,
 
     // Talar om vilken adress som är den riktiga. Utan den kan tikkr.se och
@@ -53,7 +53,7 @@ export async function generateMetadata(): Promise<Metadata> {
         locale: "sv_SE",
         url: base,
         siteName: "Tikkr",
-        title: "Tikkr — tidregistrering per order för verkstad",
+        title: "Tikkr · Tidregistrering per order för verkstad",
         description:
           "Tidregistrering per order och arbetsmoment, direkt i verkstaden.",
       },

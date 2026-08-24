@@ -21,7 +21,7 @@ import {
 export const revalidate = 60;
 
 export const metadata: Metadata = {
-  title: "Personuppgiftsbiträdesavtal — Tikkr",
+  title: "Personuppgiftsbiträdesavtal · Tikkr",
   description:
     "Biträdesavtal enligt artikel 28 i dataskyddsförordningen mellan kundföretaget och TERAFALK AB.",
 };

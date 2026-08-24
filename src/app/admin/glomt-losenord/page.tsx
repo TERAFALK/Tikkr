@@ -5,7 +5,7 @@ import AuthShell from "@/components/ui/AuthShell";
 // Ligger utanför admin-mappens layout, som kräver inloggning. Den som glömt
 // sitt lösenord är per definition inte inloggad.
 
-export const metadata = { title: "Glömt lösenord — Tikkr" };
+export const metadata = { title: "Glömt lösenord · Tikkr" };
 
 export default function ForgotPasswordPage() {
   return (

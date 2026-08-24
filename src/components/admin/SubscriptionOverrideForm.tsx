@@ -55,7 +55,7 @@ export default function SubscriptionOverrideForm({
 
       <Field
         label="Anledning"
-        hint="Sparas i loggen tillsammans med ändringen och vem som gjorde den."
+        hint="Sparas i loggen med ändringen och vem som gjorde den."
       >
         <Input
           name="reason"

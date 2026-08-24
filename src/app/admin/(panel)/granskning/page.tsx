@@ -46,19 +46,19 @@ export default async function ReviewPage() {
     <>
       <PageHeader
         title="Granskning"
-        description={`Poster där ingen stämplade ut. Systemet har stängt dem ${company?.autoCloseAt ?? "18:00"} och gissat sluttiden — rätta den innan du fakturerar.`}
+        description={`Poster där ingen stämplade ut. Systemet stängde dem ${company?.autoCloseAt ?? "18:00"} med beräknad sluttid. Rätta innan fakturering.`}
       />
 
       {entries.length === 0 ? (
         <EmptyState
           title="Inget att granska"
-          description="Samtliga stämplingar har en registrerad utstämpling. Poster visas här när utstämpling saknas vid dagens slut."
+          description="Samtliga stämplingar har en utstämpling."
         />
       ) : (
         <Card>
           <CardHeader
             title={`${entries.length} ${entries.length === 1 ? "post" : "poster"} att gå igenom`}
-            description="Ange korrekt sluttid om den är känd, i annat fall godkänn den beräknade tiden. Båda alternativen markerar posten som granskad."
+            description="Ange rätt sluttid, eller godkänn den beräknade."
           />
           <Table>
             <thead>

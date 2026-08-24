@@ -34,7 +34,7 @@ export default async function CompanySettingsPage() {
       <Card>
         <CardHeader
           title="Företagsuppgifter"
-          description="Företagsnamnet visas på stämplingsskärmarna och i exporterade underlag."
+          description="Visas på stämplingsskärmarna och i underlagen."
         />
         <form action={saveCompany} className="max-w-md space-y-4 p-5">
           <Field label="Företagsnamn">
@@ -47,7 +47,7 @@ export default async function CompanySettingsPage() {
       <Card>
         <CardHeader
           title="Märke"
-          description="Kvadratisk bild som visas i panelen och på stämplingsskärmen. Bilden fyller hela ytan."
+          description="Kvadratisk bild för panelen och stämplingsskärmen."
         />
         <LogoUpload
           variant="square"
@@ -59,7 +59,7 @@ export default async function CompanySettingsPage() {
       <Card>
         <CardHeader
           title="Logotyp för utskrifter"
-          description="Placeras överst på underlag som skickas till era kunder. En bred bild med företagsnamnet rekommenderas."
+          description="Bred bild, placeras överst på underlagen till era kunder."
         />
         <LogoUpload
           variant="wide"

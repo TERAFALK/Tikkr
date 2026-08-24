@@ -2,7 +2,7 @@ import Link from "next/link";
 import SignupForm from "@/components/admin/SignupForm";
 import AuthShell from "@/components/ui/AuthShell";
 
-export const metadata = { title: "Kom igång — Tikkr" };
+export const metadata = { title: "Kom igång · Tikkr" };
 
 export default function SignupPage() {
   return (

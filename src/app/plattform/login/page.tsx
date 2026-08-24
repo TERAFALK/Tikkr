@@ -7,7 +7,7 @@ import AuthShell from "@/components/ui/AuthShell";
 // rapporter — det är en annan sorts konto, inte ett konto med mer behörighet.
 
 export const dynamic = "force-dynamic";
-export const metadata = { title: "Plattform — Tikkr" };
+export const metadata = { title: "Plattform · Tikkr" };
 
 export default function PlatformLoginPage() {
   return (

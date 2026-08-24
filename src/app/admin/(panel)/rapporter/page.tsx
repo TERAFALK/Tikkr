@@ -76,7 +76,7 @@ export default async function ReportsPage({
     <>
       <PageHeader
         title="Rapporter"
-        description="Underlaget för fakturering. Filtrera fram det du behöver och exportera till Excel."
+        description="Underlaget för fakturering. Filtrera och exportera."
         action={
           report.rows.length > 0 ? (
             <ButtonLink href={exportHref}>Exportera till Excel</ButtonLink>
@@ -129,7 +129,7 @@ export default async function ReportsPage({
               {orders.map((order) => (
                 <option key={order.id} value={order.id}>
                   {order.orderNumber}
-                  {order.customerName ? ` — ${order.customerName}` : ""}
+                  {order.customerName ? `, ${order.customerName}` : ""}
                 </option>
               ))}
             </Select>
@@ -332,7 +332,7 @@ function Summary({ title, groups }: { title: string; groups: ReportGroup[] }) {
         ))}
         {groups.length > 8 && (
           <li className="pt-1 text-sm text-neutral-500">
-            och {groups.length - 8} till — finns med i Excel-exporten
+            och {groups.length - 8} till. Samtliga finns i Excel-exporten
           </li>
         )}
       </ul>

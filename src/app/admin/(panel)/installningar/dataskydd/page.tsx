@@ -27,7 +27,7 @@ export default async function DataProtectionPage() {
       <Card>
         <CardHeader
           title="Lämna ut en persons uppgifter"
-          description="GDPR ger en anställd rätt att få ut all registrerad information om sig själv."
+          description="En anställd har rätt att få ut allt som registrerats om denne."
         />
         <div className="space-y-4 p-5 text-[13px] text-neutral-600">
           <p>
@@ -49,7 +49,7 @@ export default async function DataProtectionPage() {
         <div className="space-y-5 p-5">
           <Alert tone="warning">
             <strong className="block">
-              Personen tas bort som namn — den registrerade tiden finns kvar.
+              Personen tas bort som namn. Den registrerade tiden finns kvar.
             </strong>
             Tiden är underlag för fakturor, och fakturaunderlag måste enligt
             bokföringslagen sparas i sju år. De två kraven krockar, och

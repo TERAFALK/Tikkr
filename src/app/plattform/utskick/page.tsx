@@ -6,7 +6,7 @@ import BroadcastForm from "@/components/platform/BroadcastForm";
 import { Alert, Card, CardHeader, PageHeader } from "@/components/ui";
 
 export const dynamic = "force-dynamic";
-export const metadata = { title: "Utskick — Tikkr Plattform" };
+export const metadata = { title: "Utskick · Tikkr" };
 
 /**
  * MASSUTSKICK TILL ADMINISTRATÖRER.

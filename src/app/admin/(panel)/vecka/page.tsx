@@ -58,7 +58,7 @@ export default async function WeekPage({
     <>
       <PageHeader
         title="Veckovy"
-        description="Registrerad tid per person och dag. Avvikelser syns som mönster."
+        description="Registrerad tid per person och dag."
         action={
           <div className="flex items-center gap-1">
             <NavLink href={`/admin/vecka?v=${shift(-7)}`} label="Föregående" />

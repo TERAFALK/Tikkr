@@ -9,7 +9,6 @@ import {
 import { emailIsConfigured } from "@/lib/email";
 import { isStripeConfigured } from "@/lib/stripe";
 import {
-  Alert,
   Badge,
   ButtonLink,
   Card,
@@ -44,7 +43,7 @@ import { monthlyRevenueHistory } from "@/lib/revenue-history";
 const COMPANIES_PER_PAGE = 25;
 
 export const dynamic = "force-dynamic";
-export const metadata = { title: "Plattform — Tikkr" };
+export const metadata = { title: "Plattform · Tikkr" };
 
 export default async function PlatformPage({
   searchParams,
@@ -107,13 +106,8 @@ export default async function PlatformPage({
     <PlatformShell email={email} current="/plattform">
       <PageHeader
         title="Kundöversikt"
-        description="Alla företag som använder den här installationen."
+        description="Företag på den här installationen."
       />
-
-      <Alert tone="info">
-        Panelen visar aggregerade uppgifter. Kundernas innehåll — namn på
-        anställda, ordrar och registrerade tider — är inte åtkomligt härifrån.
-      </Alert>
 
       <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <Stat
@@ -141,8 +135,8 @@ export default async function PlatformPage({
       </div>
 
       <p className="mt-3 text-xs text-neutral-500">
-        Belopp exklusive moms och före betaltjänstens avgifter. {usedLast30} av{" "}
-        {companies.length} företag har registrerat tid de senaste 30 dagarna.
+        Belopp exklusive moms. {usedLast30} av {companies.length} företag har
+        registrerat tid senaste 30 dagarna.
       </p>
 
       <div className="mt-6">
@@ -314,7 +308,7 @@ export default async function PlatformPage({
             value={
               emailIsConfigured()
                 ? "Konfigurerat"
-                : "Avstängt — mejl skrivs bara i loggen"
+                : "Avstängt. Mejl skrivs bara i loggen"
             }
           />
           <Row
@@ -322,7 +316,7 @@ export default async function PlatformPage({
             value={
               stripeReady
                 ? "Stripe är kopplat"
-                : "Stripe är inte kopplat — status sätts för hand"
+                : "Inte kopplat. Status sätts för hand"
             }
           />
         </dl>

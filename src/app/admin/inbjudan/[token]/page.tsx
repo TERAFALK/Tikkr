@@ -7,7 +7,7 @@ import AuthShell from "@/components/ui/AuthShell";
 // definition inget konto än.
 
 export const dynamic = "force-dynamic";
-export const metadata = { title: "Inbjudan — Tikkr" };
+export const metadata = { title: "Inbjudan · Tikkr" };
 
 export default async function InvitePage({
   params,
@@ -33,7 +33,7 @@ export default async function InvitePage({
       >
         <p className="text-[13px] leading-relaxed text-neutral-600">
           Be den som bjöd in dig att skapa en ny länk. En inbjudan gäller i sju
-          dagar och kan bara användas en gång — det är därför den slutat
+          dagar och kan bara användas en gång, vilket är skälet till att den slutat
           fungera, inte för att något är trasigt.
         </p>
       </AuthShell>

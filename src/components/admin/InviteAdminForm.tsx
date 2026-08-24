@@ -60,7 +60,7 @@ export default function InviteAdminForm({ baseUrl }: { baseUrl: string }) {
               <>
                 <strong>Inbjudan är skickad till {state.email}.</strong>{" "}
                 Personen väljer sitt eget lösenord när länken öppnas. Länken
-                nedan är samma som i mejlet och visas bara nu — den kan skickas
+                nedan är samma som i mejlet och visas bara nu. Den kan skickas
                 på annat sätt om mejlet inte kommer fram.
               </>
             ) : (

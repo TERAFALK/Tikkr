@@ -4,7 +4,7 @@ import AuthShell from "@/components/ui/AuthShell";
 
 // Ligger utanför admin-mappens layout, eftersom den layouten kräver inloggning.
 
-export const metadata = { title: "Logga in — Tikkr" };
+export const metadata = { title: "Logga in · Tikkr" };
 
 export default function LoginPage() {
   return (

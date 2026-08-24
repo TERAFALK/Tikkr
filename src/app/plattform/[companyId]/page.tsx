@@ -94,7 +94,7 @@ export default async function CompanyPage({
           <Card>
             <CardHeader
               title="Prenumeration"
-              description="Manuell status används för fakturakunder och förlängda provperioder."
+              description="Manuell status för fakturakunder och förlängda provperioder."
             />
             <div className="space-y-4 p-5">
               <dl className="divide-y divide-neutral-100 text-[13px]">
@@ -149,8 +149,8 @@ export default async function CompanyPage({
           {/* Anteckning */}
           <Card>
             <CardHeader
-              title="Intern anteckning"
-              description="Interna noteringar. Visas inte för kunden."
+              title="Anteckning"
+              description="Visas inte för kunden."
             />
             <form action={updateNote} className="space-y-3 p-5">
               <input type="hidden" name="companyId" value={company.id} />
@@ -158,7 +158,7 @@ export default async function CompanyPage({
                 name="body"
                 rows={6}
                 defaultValue={note?.body ?? ""}
-                placeholder="Kontaktperson, avtalsdetaljer, supportärenden…"
+                placeholder="Kontaktperson, avtal, supportärenden"
                 className="block w-full rounded-md border-0 bg-white px-2.5 py-1.5 text-[13px] text-neutral-900 ring-1 ring-inset ring-neutral-200 placeholder:text-neutral-400 focus:ring-2 focus:ring-inset focus:ring-blue-600"
               />
               {note && (
@@ -178,7 +178,7 @@ export default async function CompanyPage({
         <Card className="mt-6">
           <CardHeader
             title="Administratörer"
-            description="Konton med åtkomst till kundens arbetsyta."
+            description="Konton med åtkomst till arbetsytan."
           />
           <Table>
             <thead>
@@ -213,11 +213,11 @@ export default async function CompanyPage({
         <Card className="mt-6">
           <CardHeader
             title="Stämplingsskärmar"
-            description="Kopplade skärmar och senaste kontakt."
+            description="Status och senaste kontakt."
           />
           {devices.length === 0 ? (
             <p className="p-5 text-[13px] text-neutral-500">
-              Ingen skärm upplagd. Kunden kan alltså inte stämpla än.
+              Ingen skärm upplagd. Kunden kan inte stämpla än.
             </p>
           ) : (
             <Table>
@@ -277,11 +277,6 @@ export default async function CompanyPage({
           )}
         </Card>
 
-        <Alert tone="info">
-          Innehållet i kundens data — namn på anställda, ordernummer och
-          registrerade tider — är inte åtkomligt härifrån. Sådan åtkomst kräver
-          en inbjudan som administratör i kundens arbetsyta.
-        </Alert>
         {/* Raderingen ligger sist och avskild. Den ska gå att hitta av den
             som söker den, och aldrig råkas ut för av den som skummar. */}
         <div className="mt-10 border-t border-neutral-200 pt-6">

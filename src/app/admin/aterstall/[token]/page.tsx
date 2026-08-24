@@ -7,7 +7,7 @@ import AuthShell from "@/components/ui/AuthShell";
 // definition inte in med lösenord.
 
 export const dynamic = "force-dynamic";
-export const metadata = { title: "Nytt lösenord — Tikkr" };
+export const metadata = { title: "Nytt lösenord · Tikkr" };
 
 export default async function ResetPasswordPage({
   params,

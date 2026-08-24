@@ -16,7 +16,7 @@ import { HOSTING_LOCATION, LEGAL_UPDATED } from "@/lib/legal";
 export const revalidate = 60;
 
 export const metadata: Metadata = {
-  title: "Integritetspolicy — Tikkr",
+  title: "Integritetspolicy · Tikkr",
   description:
     "Hur TERAFALK AB behandlar personuppgifter i tidregistreringstjänsten Tikkr.",
 };
@@ -151,7 +151,7 @@ const sections: Section[] = [
         <p>
           Registrerad tid som ingår i ett fakturaunderlag omfattas av
           bokföringslagens krav på arkivering i sju år. Det kravet kan inte
-          avtalas bort, och gäller även när en enskild anställd begär radering —
+          avtalas bort, och gäller även när en enskild anställd begär radering.
           se nästa avsnitt.
         </p>
       </>
@@ -176,13 +176,13 @@ const sections: Section[] = [
           <strong className="font-medium text-neutral-900">Radering.</strong>{" "}
           Systemet anonymiserar personen: namnet tas bort permanent, medan den
           registrerade tiden finns kvar utan koppling till någon namngiven
-          individ. Anledningen är att två krav krockar — rätten att bli glömd
+          individ. Anledningen är att två krav krockar: rätten att bli glömd
           och skyldigheten att bevara räkenskapsinformation. Anonymisering
           uppfyller båda, eftersom tiden fortfarande går att fakturera men inte
           längre utgör en personuppgift.
         </p>
         <p>
-          Åtgärden går inte att ångra, och den utförs av kundens administratör —
+          Åtgärden går inte att ångra, och den utförs av kundens administratör.
           inte av oss.
         </p>
       </>
@@ -291,7 +291,7 @@ export default function PrivacyPolicyPage() {
         <p>
           Tikkr registrerar arbetstid per kundorder. Den här policyn beskriver
           vilka personuppgifter som behandlas i tjänsten, varför, hur länge och
-          av vem — skriven utifrån vad systemet faktiskt lagrar.
+          av vem, skriven utifrån vad systemet faktiskt lagrar.
         </p>
       }
       sections={sections}

@@ -109,7 +109,7 @@ export function OrderPickMockup({ className = "" }: { className?: string }) {
 
       <div className="bg-neutral-50 p-3">
         <p className="mb-2 text-[11px] font-semibold text-neutral-900">
-          Anna Andersson — välj order
+          Anna Andersson: välj order
         </p>
 
         <div className="grid grid-cols-2 gap-2">

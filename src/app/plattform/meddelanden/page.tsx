@@ -9,7 +9,7 @@ import { formatDateTime } from "@/lib/format";
 import { removeNotice } from "./actions";
 
 export const dynamic = "force-dynamic";
-export const metadata = { title: "Meddelanden — Tikkr Plattform" };
+export const metadata = { title: "Meddelanden · Tikkr" };
 
 const KIND_LABEL: Record<string, string> = {
   MAINTENANCE: "Underhåll",

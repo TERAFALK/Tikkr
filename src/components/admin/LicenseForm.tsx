@@ -70,7 +70,7 @@ export default function LicenseForm({
           <>
             {" "}
             Sänks antalet under {used} behöver skärmar raderas under
-            Stämplingsskärmar — stämplingen fortsätter fungera under tiden.
+            Stämplingsskärmar. Stämplingen fortsätter fungera under tiden.
           </>
         )}
       </p>

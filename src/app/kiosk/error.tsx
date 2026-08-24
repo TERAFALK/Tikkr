@@ -62,7 +62,7 @@ export default function KioskError({
         </button>
 
         <p className="mt-6 text-sm text-neutral-400">
-          Står detta kvar i mer än några minuter — kontakta er administratör.
+          Står detta kvar i mer än några minuter, kontakta er administratör.
         </p>
       </div>
     </main>

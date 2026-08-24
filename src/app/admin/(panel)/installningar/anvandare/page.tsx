@@ -47,7 +47,7 @@ export default async function AdminUsersPage() {
       <Card>
         <CardHeader
           title="Administratörer"
-          description="Ägare kan bjuda in och ta bort konton. Administratörer har tillgång till verksamheten men inte till kontohantering."
+          description="Ägare kan bjuda in och ta bort konton. Administratörer kan inte."
         />
         <Table>
           <thead>

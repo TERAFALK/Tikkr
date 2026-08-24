@@ -162,7 +162,7 @@ export default function EmployeeDialog({
 
             <Field
               label="Anställningsnummer"
-              hint="Valfritt. Syns i panelen och i rapporterna, aldrig på stämplingsskärmen."
+              hint="Valfritt. Syns aldrig på stämplingsskärmen."
             >
               <Input
                 name="employeeNumber"

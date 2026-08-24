@@ -57,7 +57,7 @@ export default async function TimeSettingsPage() {
           <form action={saveTimeSettings} className="max-w-md space-y-4">
             <Field
               label="Stäng glömda stämplingar klockan"
-              hint="Anges som HH:MM. Vid skiftarbete rekommenderas ett klockslag då ingen normalt arbetar, exempelvis 02:00."
+              hint="HH:MM. Vid skiftarbete, välj en tid då ingen arbetar."
             >
               <Input
                 name="autoCloseAt"
@@ -70,7 +70,7 @@ export default async function TimeSettingsPage() {
 
             <Field
               label="Tidszon"
-              hint="Avgör hur klockslaget tolkas. Fel tidszon medför en timmes avvikelse vid övergång mellan sommar- och vintertid."
+              hint="Avgör hur klockslaget tolkas vid sommar- och vintertid."
             >
               <Select name="timezone" defaultValue={company.timezone}>
                 {TIMEZONES.map((zone) => (

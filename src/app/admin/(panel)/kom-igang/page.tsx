@@ -61,13 +61,13 @@ export default async function OnboardingPage() {
       <StepCard
         number={1}
         title="Lägg upp anställda"
-        description="Namnen visas som knappar på stämplingsskärmen. Använd den form personerna känns igen på."
+        description="Visas som knappar på stämplingsskärmen."
         done={state.steps[0].done}
       >
         <form action={addEmployees} className="space-y-3">
           <Field
             label="Ett namn per rad"
-            hint="En befintlig lista kan klistras in direkt. Dubbletter hoppas över."
+            hint="En lista kan klistras in. Dubbletter hoppas över."
           >
             <textarea
               name="names"
@@ -92,7 +92,7 @@ export default async function OnboardingPage() {
       <StepCard
         number={2}
         title="Lägg upp arbetsmoment"
-        description="Den typ av arbete tiden avser. En kort lista ger överskådliga val på skärmen och läsbara rapporter."
+        description="Den typ av arbete tiden avser. Håll listan kort."
         done={state.steps[1].done}
       >
         <form action={addMoments} className="space-y-4">
@@ -145,7 +145,7 @@ export default async function OnboardingPage() {
       <StepCard
         number={3}
         title="Lägg upp minst en order"
-        description="All registrerad tid hör till en kundorder. Minst en öppen order krävs för att kunna stämpla in."
+        description="Minst en öppen order krävs för att kunna stämpla in."
         done={state.steps[2].done}
       >
         <form action={addOrder} className="flex flex-wrap items-end gap-3">
@@ -179,7 +179,7 @@ export default async function OnboardingPage() {
       <StepCard
         number={4}
         title="Koppla en stämplingsskärm"
-        description="Lägg upp skärmen och knappa in dess sexsiffriga kod på den enhet som ska användas för stämpling. Därefter krävs ingen inloggning."
+        description="Lägg upp skärmen och knappa in koden på enheten. Därefter krävs ingen inloggning."
         done={state.steps[3].done}
         last
       >

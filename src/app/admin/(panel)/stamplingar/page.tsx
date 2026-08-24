@@ -93,7 +93,7 @@ export default async function EntriesPage({
   const orderOptions = orders.map((order) => ({
     id: order.id,
     label: order.customerName
-      ? `${order.orderNumber} — ${order.customerName}`
+      ? `${order.orderNumber}, ${order.customerName}`
       : order.orderNumber,
   }));
   const momentOptions = moments.map((moment) => ({
@@ -105,7 +105,7 @@ export default async function EntriesPage({
     <>
       <PageHeader
         title="Stämplingar"
-        description="Samtliga registrerade tider. Här kompletteras tid som inte blivit stämplad och felaktiga poster rättas."
+        description="Samtliga registrerade tider. Här rättas och kompletteras de."
         action={
           <NewEntryDialog
             employees={employeeOptions}
@@ -149,7 +149,7 @@ export default async function EntriesPage({
       {entries.length === 0 ? (
         <EmptyState
           title="Inga stämplingar i perioden"
-          description="Utöka datumintervallet, eller lägg till en stämpling om tid saknas."
+          description="Utöka datumintervallet, eller lägg till en stämpling."
         />
       ) : (
         <Card>
@@ -228,8 +228,8 @@ export default async function EntriesPage({
                           <FormDialog
                             trigger="Ändra"
                             triggerTone="ghost"
-                            title={`Ändra stämpling — ${entry.employee.name}`}
-                            description="Ändringen markeras som manuell och skiljs därmed från registrerade stämplingar."
+                            title={`Ändra stämpling: ${entry.employee.name}`}
+                            description="Ändringen markeras som manuell."
                             action={editEntry}
                             submitLabel="Spara"
                           >

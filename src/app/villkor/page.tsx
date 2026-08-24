@@ -13,7 +13,7 @@ import { LEGAL_UPDATED } from "@/lib/legal";
 export const revalidate = 60;
 
 export const metadata: Metadata = {
-  title: "Användarvillkor — Tikkr",
+  title: "Användarvillkor · Tikkr",
   description:
     "Villkoren för att använda tidregistreringstjänsten Tikkr, från TERAFALK AB.",
 };
@@ -109,7 +109,7 @@ const sections: Section[] = [
           Tidregistreringen fortsätter att fungera, och all tid som registreras
           under låsningen finns tillgänglig när abonnemanget återupptas. Skälet
           är att arbetstid som inte registreras när arbetet utförs inte går att
-          rekonstruera i efterhand — och den tiden är kundens underlag mot sin
+          rekonstruera i efterhand, och den tiden är kundens underlag mot sin
           egen kund.
         </p>
       </>
@@ -124,7 +124,7 @@ const sections: Section[] = [
           items={[
             "Att uppgifterna som registreras är riktiga. Vi kontrollerar inte innehållet och ansvarar inte för felaktigt registrerad tid.",
             "Att informera sina anställda om att arbetstid registreras, och att ha rättslig grund för behandlingen.",
-            "Att stämplingsskärmarna placeras på arbetsplatsen. Skärmen identifieras av en nyckel i enheten och inte av den som trycker — modellen förutsätter att skärmen står fysiskt skyddad, precis som en stämpelklocka.",
+            "Att stämplingsskärmarna placeras på arbetsplatsen. Skärmen identifieras av en nyckel i enheten och inte av den som trycker. Modellen förutsätter att skärmen står fysiskt skyddad, precis som en stämpelklocka.",
             "Att hålla inloggningsuppgifter hemliga och återkalla konton som inte längre ska ha åtkomst.",
             "Att lägga upp minst två administratörer, så att arbetsytan inte blir otillgänglig om ett konto går förlorat.",
           ]}

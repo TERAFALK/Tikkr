@@ -336,7 +336,7 @@ export default function KioskScreen({
           momentName: moment.name,
         },
       }));
-      setReceipt(`${employee.name} — ${order.orderNumber}, ${moment.name}`);
+      setReceipt(`${employee.name}: ${order.orderNumber}, ${moment.name}`);
       setReceiptVisible(true);
       goHome();
       void send({
@@ -357,7 +357,7 @@ export default function KioskScreen({
         delete next[employee.id];
         return next;
       });
-      setReceipt(`${employee.name} — utstämplad`);
+      setReceipt(`${employee.name} utstämplad`);
       setReceiptVisible(true);
       goHome();
       void send({
@@ -441,7 +441,7 @@ export default function KioskScreen({
 
         {view.name === "order" && (
           <Chooser
-            title={`${view.employee.name} — välj order`}
+            title={`${view.employee.name}: välj order`}
             empty="Inga öppna ordrar. Kontakta administratören."
             items={orders.map((order) => ({
               key: order.id,
@@ -455,7 +455,7 @@ export default function KioskScreen({
 
         {view.name === "moment" && (
           <Chooser
-            title={`Order ${view.order.orderNumber} — välj arbetsmoment`}
+            title={`Order ${view.order.orderNumber}: välj arbetsmoment`}
             empty="Inga arbetsmoment upplagda. Kontakta administratören."
             items={moments.map((moment) => ({
               key: moment.id,

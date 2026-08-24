@@ -56,14 +56,14 @@ export default async function SubscriptionPage({
     <div className="space-y-6">
       {params.klart === "1" && (
         <Alert tone="info">
-          Betalningen behandlas. Statusen uppdateras inom kort — ladda om sidan
+          Betalningen behandlas. Statusen uppdateras inom kort. Ladda om sidan
           om den inte ändrats.
         </Alert>
       )}
 
       {params.uppdaterad === "1" && (
         <Alert tone="info">
-          Ändringen är godkänd. Antalet licenser uppdateras inom kort — ladda
+          Ändringen är godkänd. Antalet licenser uppdateras inom kort. Ladda
           om sidan om det inte ändrats.
         </Alert>
       )}
@@ -122,8 +122,8 @@ export default async function SubscriptionPage({
           )}
 
           {/* Antalet kan sänkas hos betaltjänsten under antalet upplagda
-              skärmar. Vi stänger ingen skärm av oss själva — vilken som ska
-              bort är kundens beslut, inte vårt. */}
+              skärmar. Vi stänger ingen skärm av oss själva; vilken som ska bort
+              är kundens beslut. */}
           {overview.used > overview.screens && (
             <Alert tone="warning">
               {overview.used} skärmar är upplagda men ni har {overview.screens}{" "}

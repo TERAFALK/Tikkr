@@ -54,14 +54,14 @@ export default function DeleteCompanyForm({
       {managedByStripe ? (
         <Alert tone="warning">
           Företaget har en aktiv prenumeration hos Stripe. Avsluta den där
-          först — annars fortsätter faktureringen mot en kund som inte längre
+          först, annars fortsätter faktureringen mot en kund som inte längre
           finns.
         </Alert>
       ) : (
         <Alert tone="warning">
-          Samtliga anställda, ordrar, arbetsmoment, stämplingar,
-          administratörer och skärmar raderas. Detta går inte att ångra, och
-          det finns ingen återläsning utöver nattens säkerhetskopia.
+          Anställda, ordrar, arbetsmoment, stämplingar, administratörer och
+          skärmar raderas. Åtgärden går inte att ångra. Enda återläsningen är
+          nattens säkerhetskopia.
         </Alert>
       )}
 
@@ -69,7 +69,7 @@ export default function DeleteCompanyForm({
         <Input name="confirmName" autoComplete="off" required />
       </Field>
 
-      <Field label="Anledning" hint="Sparas i åtgärdsloggen, som finns kvar.">
+      <Field label="Anledning" hint="Sparas i åtgärdsloggen.">
         <Input
           name="reason"
           placeholder="Avslutat kundförhållande, begärd radering"

@@ -73,7 +73,7 @@ export default function BroadcastForm({
           rows={7}
           required
           placeholder={
-            "Hej,\n\nTikkr är otillgängligt mellan 02:00 och 04:00 natten mot söndag den 17 augusti.\n\nStämplingsskärmarna påverkas inte — tid som registreras under underhållet finns kvar som vanligt."
+            "Hej,\n\nTikkr är otillgängligt mellan 02:00 och 04:00 natten mot söndag den 17 augusti.\n\nStämplingsskärmarna påverkas inte. Tid som registreras under underhållet finns kvar som vanligt."
           }
           className="block w-full rounded-md border-0 bg-white px-2.5 py-1.5 text-[13px] leading-relaxed text-neutral-900 ring-1 ring-inset ring-neutral-200 placeholder:text-neutral-400 focus:ring-2 focus:ring-inset focus:ring-blue-600"
         />

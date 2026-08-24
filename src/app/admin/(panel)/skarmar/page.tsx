@@ -44,7 +44,7 @@ export default async function DevicesPage() {
     <PairingCodeDialog
       trigger="Ny skärm"
       title="Lägg till skärm"
-      description="Ange ett namn som beskriver var skärmen är placerad. Kopplingskoden visas direkt."
+      description="Namnge skärmen efter var den sitter. Koden visas direkt."
       action={addDevice}
       submitLabel="Skapa kod"
       disabled={licenses.available <= 0}
@@ -57,7 +57,7 @@ export default async function DevicesPage() {
             : `${licenses.available} lediga licenser återstår.`
         }
       >
-        <Input name="name" placeholder="Verkstaden, entrén, monteringen…" required autoFocus />
+        <Input name="name" placeholder="Verkstaden, entrén, monteringen" required autoFocus />
       </Field>
     </PairingCodeDialog>
   );
@@ -66,13 +66,13 @@ export default async function DevicesPage() {
     <>
       <PageHeader
         title="Stämplingsskärmar"
-        description={`${devices.length} av ${licenses.total} licenser används. En skärm kopplas med en sexsiffrig kod och kräver därefter ingen inloggning.`}
+        description={`${devices.length} av ${licenses.total} licenser används. En skärm kopplas med en sexsiffrig kod.`}
         action={newDevice}
       />
 
       {/* Antalet licenser kan sänkas hos betaltjänsten under antalet upplagda
-          skärmar. Ingen skärm slutar fungera för det — vilken som ska bort är
-          kundens beslut, inte vårt. */}
+          skärmar. Ingen skärm slutar fungera för det; vilken som ska bort är
+          kundens beslut. */}
       {devices.length > licenses.total ? (
         <Alert tone="warning">
           {devices.length} skärmar är upplagda men ni har {licenses.total}{" "}
@@ -106,14 +106,14 @@ export default async function DevicesPage() {
       {devices.length === 0 ? (
         <EmptyState
           title="Inga skärmar upplagda"
-          description="Skapa en skärm och knappa in koden på den enhet som ska användas för stämpling."
+          description="Skapa en skärm och knappa in koden på enheten."
           action={newDevice}
         />
       ) : (
         <Card>
           <CardHeader
             title={`${devices.length} ${devices.length === 1 ? "skärm" : "skärmar"}`}
-            description="Koppla om ger en ny kod och stänger ute den gamla enheten. Historiken följer med."
+            description="Koppla om ger en ny kod och stänger ute den gamla enheten."
           />
           <Table>
             <thead>

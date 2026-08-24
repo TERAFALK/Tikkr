@@ -9,7 +9,7 @@ import Pager from "@/components/platform/Pager";
 import { Card, CardHeader, EmptyState, PageHeader } from "@/components/ui";
 
 export const dynamic = "force-dynamic";
-export const metadata = { title: "Händelser — Tikkr Plattform" };
+export const metadata = { title: "Händelser · Tikkr" };
 
 /**
  * ALLT SOM GJORTS FRÅN PANELEN.
@@ -38,19 +38,19 @@ export default async function ActivityPage({
     <PlatformShell email={email} current="/plattform/handelser">
       <PageHeader
         title="Händelser"
-        description="Åtgärder utförda från plattformspanelen, senaste först."
+        description="Utförda från plattformspanelen, senaste först."
       />
 
       {log.total === 0 ? (
         <EmptyState
           title="Inga registrerade åtgärder"
-          description="Statusändringar, licensändringar och raderingar visas här."
+          description="Statusändringar, licenser och raderingar visas här."
         />
       ) : (
         <Card>
           <CardHeader
             title={`${log.total.toLocaleString("sv-SE")} åtgärder`}
-            description="Loggen står kvar även när ett företag raderats."
+            description="Står kvar även när ett företag raderats."
           />
           <ActivityTable rows={log.rows} companyNames={names} />
           <Pager

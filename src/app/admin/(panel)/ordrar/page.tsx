@@ -39,7 +39,7 @@ export default async function OrdersPage() {
     <FormDialog
       trigger="Ny order"
       title="Lägg till order"
-      description="Öppna ordrar är valbara på stämplingsskärmen. All registrerad tid hör till en order."
+      description="Öppna ordrar är valbara på stämplingsskärmen."
       action={createOrder}
       submitLabel="Lägg till"
     >
@@ -54,7 +54,7 @@ export default async function OrdersPage() {
       </Field>
       <Field
         label="Beräknad tid"
-        hint="Valfritt. Timmar, exempelvis 40 eller 7,5. Visas som en stapel mot upparbetad tid."
+        hint="Valfritt. Timmar, exempelvis 40 eller 7,5."
       >
         <Input name="budgetHours" inputMode="decimal" placeholder="40" />
       </Field>
@@ -65,14 +65,14 @@ export default async function OrdersPage() {
     <>
       <PageHeader
         title="Ordrar"
-        description="Välj ett ordernummer för underlag och ändringar. Även stängda ordrar är tillgängliga, exempelvis för jämförelse med tidigare arbeten."
+        description="Välj ett ordernummer för underlag och ändringar. Även stängda ordrar."
         action={newOrder}
       />
 
       {rows.length === 0 ? (
         <EmptyState
           title="Inga ordrar upplagda"
-          description="Minst en öppen order krävs för att kunna stämpla in, eftersom all tid hör till en order."
+          description="Minst en öppen order krävs för att kunna stämpla in."
           action={newOrder}
         />
       ) : (
