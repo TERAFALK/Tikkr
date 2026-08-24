@@ -10,6 +10,25 @@ body {
 }
 
 /*
+  Reservera plats för rullningslisten, alltid.
+
+  Utan detta försvinner listen i samma stund som innehållet blir kortare än
+  skärmen, och sidan blir då cirka femton pixlar bredare. Allt flyttar sig i
+  sidled samtidigt.
+
+  På stämplingsskärmen märks det som att KNAPPARNA HOPPAR när man trycker: ett
+  tryck byter vy, den nya vyn är kortare än namnrutnätet, listen försvinner och
+  hela rutnätet glider åt sidan. Samma sak när någon stämplar in — kortet blir
+  högre av tidsrutan, listen kommer tillbaka, och allt hoppar igen.
+
+  Det är alltså inte knappen som rör sig utan ytan under den, vilket är varför
+  det inte gick att åtgärda i knappens egen animation.
+*/
+html {
+  scrollbar-gutter: stable;
+}
+
+/*
   Dialogrutor centreras av webbläsaren genom "margin: auto". Tailwinds
   återställning nollar marginaler på alla element, så centreringen försvann
   och rutorna hamnade uppe till vänster. Här får de tillbaka den.
