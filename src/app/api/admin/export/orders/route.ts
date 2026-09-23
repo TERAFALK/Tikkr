@@ -131,7 +131,7 @@ async function buildWorkbook(
       { header: "Order", key: "order", width: 16 },
       { header: "Kund", key: "customer", width: 28 },
       { header: "Stämplingar", key: "entries", width: 14 },
-      { header: "Timmar", key: "hours", width: 12 },
+      { header: "Timmar (decimal)", key: "hours", width: 16 },
     ];
 
     for (const order of orders) {
@@ -182,18 +182,18 @@ async function buildWorkbook(
       "Arbetsmoment",
       "Instämplad",
       "Utstämplad",
-      "Timmar",
+      "Timmar (decimal)",
       "Anmärkning",
     ];
 
     sheet.columns = [
-      { width: 24 },
-      { width: 10 },
-      { width: 20 },
-      { width: 19 },
-      { width: 19 },
-      { width: 10 },
-      { width: 26 },
+      { width: 24 }, // A Anställd
+      { width: 10 }, // B Anst.nr
+      { width: 20 }, // C Arbetsmoment
+      { width: 19 }, // D Instämplad
+      { width: 19 }, // E Utstämplad
+      { width: 16 }, // F Timmar (decimal)
+      { width: 26 }, // G Anmärkning
     ];
 
     for (const row of order.rows) {
@@ -215,20 +215,24 @@ async function buildWorkbook(
 
     const lastRow = sheet.rowCount;
     if (lastRow > 4) {
+      // Kolumnerna är A Anställd, B Anst.nr, C Arbetsmoment, D Instämplad,
+      // E Utstämplad, F Timmar, G Anmärkning. Summan hör till F — en tom
+      // plats för lite här gav tidigare en summa av utstämplingstiderna.
       const total = sheet.addRow([
         "TOTALT",
         "",
         "",
         "",
-        { formula: `SUM(E5:E${lastRow})` },
+        "",
+        { formula: `SUM(F5:F${lastRow})` },
         "",
       ]);
       total.font = { bold: true };
     }
 
-    sheet.getColumn(3).numFmt = "yyyy-mm-dd hh:mm";
-    sheet.getColumn(4).numFmt = "yyyy-mm-dd hh:mm";
-    sheet.getColumn(5).numFmt = "0.00";
+    sheet.getColumn(4).numFmt = "yyyy-mm-dd hh:mm"; // D Instämplad
+    sheet.getColumn(5).numFmt = "yyyy-mm-dd hh:mm"; // E Utstämplad
+    sheet.getColumn(6).numFmt = "0.00";             // F Timmar
 
     const header = sheet.getRow(4);
     header.font = { bold: true, color: { argb: "FFFFFFFF" } };

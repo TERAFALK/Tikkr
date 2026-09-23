@@ -68,3 +68,18 @@ export function minutesBetween(from: Date, to: Date | null): number {
   const end = to ?? new Date();
   return Math.max(0, (end.getTime() - from.getTime()) / 60000);
 }
+
+/**
+ * Decimaltimmar som text: "1,99".
+ *
+ * Idiomet `toDecimalHours(m).toFixed(2).replace(".", ",")` fanns på tio ställen
+ * i PDF- och Excel-koden. Samlat här så att en ändring av antalet decimaler
+ * slår igenom överallt på en gång.
+ *
+ * Används DÄR KRONOR RÄKNAS, som underlag till en multiplikation: "1,98 h ×
+ * 850 kr". För en tidkolumn som en människa ska läsa används `formatDuration`
+ * — "1,99" läses annars lätt som klockslaget 1:99, vilket inte finns.
+ */
+export function formatDecimalHours(minutes: number): string {
+  return toDecimalHours(minutes).toFixed(2).replace(".", ",");
+}

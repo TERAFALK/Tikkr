@@ -49,7 +49,7 @@ export async function GET(request: NextRequest) {
     { header: "Arbetsmoment", key: "moment", width: 20 },
     { header: "Instämplad", key: "in", width: 20 },
     { header: "Utstämplad", key: "out", width: 20 },
-    { header: "Timmar", key: "hours", width: 12 },
+    { header: "Timmar (decimal)", key: "hours", width: 16 },
     { header: "Anmärkning", key: "note", width: 28 },
   ];
 
@@ -82,7 +82,7 @@ export async function GET(request: NextRequest) {
   if (lastRow > 1) {
     const total = details.addRow({
       moment: "TOTALT",
-      hours: { formula: `SUM(G2:G${lastRow})` },
+      hours: { formula: `SUM(H2:H${lastRow})` },
     });
     total.font = { bold: true };
     total.getCell("hours").numFmt = "0.00";
@@ -90,7 +90,7 @@ export async function GET(request: NextRequest) {
 
   styleHeader(details);
   details.views = [{ state: "frozen", ySplit: 1 }];
-  details.autoFilter = { from: "A1", to: `H${Math.max(1, lastRow)}` };
+  details.autoFilter = { from: "A1", to: `I${Math.max(1, lastRow)}` };
 
   /* --- Flik 2–4: sammanställningar ---------------------------------------- */
 
@@ -136,7 +136,7 @@ function addSummarySheet(
       ? [{ header: "Kund", key: "sublabel", width: 26 }]
       : []),
     { header: "Stämplingar", key: "entries", width: 14 },
-    { header: "Timmar", key: "hours", width: 12 },
+    { header: "Timmar (decimal)", key: "hours", width: 16 },
   ];
 
   for (const group of groups) {

@@ -20,7 +20,7 @@ import {
   Th,
   Tr,
 } from "@/components/ui";
-import { formatDateTime, formatDuration, toDecimalHours } from "@/lib/format";
+import { formatDateTime, formatDuration, formatDecimalHours } from "@/lib/format";
 
 export const dynamic = "force-dynamic";
 
@@ -170,7 +170,7 @@ export default async function ReportsPage({
         <Stat
           label="Total tid"
           value={formatDuration(report.totalMinutes)}
-          hint={`${toDecimalHours(report.totalMinutes)} timmar att fakturera`}
+          hint={`${formatDecimalHours(report.totalMinutes)} timmar att fakturera`}
         />
         <Stat label="Stämplingar" value={report.rows.length} />
         <Stat

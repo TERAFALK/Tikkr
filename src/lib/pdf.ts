@@ -1,6 +1,6 @@
 import PDFDocument from "pdfkit";
 import type { OrderExport } from "./order-export";
-import { formatDate, formatDateTime, toDecimalHours } from "./format";
+import { formatDate, formatDateTime, formatDuration } from "./format";
 
 /**
  * UNDERLAG SOM PDF.
@@ -14,6 +14,18 @@ import { formatDate, formatDateTime, toDecimalHours } from "./format";
  *
  * En order per sida. Skickar man tio ordrar blir det ett dokument med tio
  * sidor istället för tio filer — enklare att bifoga, och enklare att skriva ut.
+ *
+ * INGA BELOPP HÄR. Dokumentet innehåller tid, aldrig kronor — varken
+ * självkostnad, påslag eller pris. Det är det som gör att det går att skicka
+ * vidare utan att någon först behöver läsa igenom det. Kalkylen med belopp är
+ * ett eget dokument (src/lib/calc-pdf.ts) med en egen knapp, just för att de
+ * två aldrig ska kunna förväxlas. Bygg inte in ett beloppsläge här.
+ *
+ * Tid skrivs som "1 tim 59 min", inte som "1,99". Decimaltimmar är rätt
+ * matematik men fel för ett öga: mottagaren läser 1,99 som klockslag och
+ * undrar var minut 99 kom ifrån. Decimaltimmar finns kvar i Excel-exporten,
+ * där de behövs för att kunna räknas med, och i kalkylen där de multipliceras
+ * med ett timpris.
  */
 
 const A4_WIDTH = 595.28;
@@ -27,11 +39,14 @@ export interface PdfCompany {
 }
 
 const COLUMNS = [
-  { key: "employee", label: "Anställd", width: 130, align: "left" as const },
-  { key: "moment", label: "Arbetsmoment", width: 110, align: "left" as const },
+  { key: "employee", label: "Anställd", width: 120, align: "left" as const },
+  { key: "moment", label: "Arbetsmoment", width: 105, align: "left" as const },
   { key: "in", label: "Instämplad", width: 95, align: "left" as const },
   { key: "out", label: "Utstämplad", width: 95, align: "left" as const },
-  { key: "hours", label: "Timmar", width: 65, align: "right" as const },
+  // Bredare än de andra fick vara: "12 tim 30 min" är en längre text än
+  // "12,50" och kolumnen har lineBreak: false, så för smalt hade klippt bort
+  // minuterna utan att synas.
+  { key: "hours", label: "Tid", width: 80, align: "right" as const },
 ];
 
 export function buildOrderPdf(
@@ -171,7 +186,7 @@ function renderOrder(
       row.ongoing
         ? "pågår"
         : formatDateTime(row.clockOutAt!, company.timezone),
-      toDecimalHours(row.minutes).toFixed(2).replace(".", ","),
+      formatDuration(row.minutes),
     ];
 
     x = MARGIN + 8;
@@ -217,7 +232,7 @@ function renderOrder(
   doc.font("Helvetica-Bold").fontSize(10).fillColor("#0a0a0a");
   doc.text("TOTALT", MARGIN + 8, y + 8, { width: 200 });
   doc.text(
-    `${toDecimalHours(order.totalMinutes).toFixed(2).replace(".", ",")} timmar`,
+    formatDuration(order.totalMinutes),
     A4_WIDTH - MARGIN - 158,
     y + 8,
     { width: 150, align: "right" }
@@ -231,9 +246,7 @@ function renderOrder(
 
     doc.font("Helvetica").fontSize(8).fillColor(over ? "#a16207" : "#525252");
     doc.text(
-      `Beräknad tid ${toDecimalHours(order.budgetMinutes)
-        .toFixed(2)
-        .replace(".", ",")} timmar. Upparbetat ${share} procent.`,
+      `Beräknad tid ${formatDuration(order.budgetMinutes)}. Upparbetat ${share} procent.`,
       MARGIN,
       y + 4,
       { width: CONTENT_WIDTH }
@@ -314,7 +327,7 @@ function drawMomentChart(
   y += 16;
 
   const LABEL_WIDTH = 130;
-  const VALUE_WIDTH = 90;
+  const VALUE_WIDTH = 110;
   const BAR_WIDTH = CONTENT_WIDTH - LABEL_WIDTH - VALUE_WIDTH - 16;
   const ROW_HEIGHT = 16;
 
@@ -335,7 +348,7 @@ function drawMomentChart(
 
     doc.font("Helvetica").fontSize(9).fillColor("#525252");
     doc.text(
-      `${toDecimalHours(minutes).toFixed(2).replace(".", ",")} tim · ${share} %`,
+      `${formatDuration(minutes)} · ${share} %`,
       A4_WIDTH - MARGIN - VALUE_WIDTH,
       y + 2,
       { width: VALUE_WIDTH, align: "right" }

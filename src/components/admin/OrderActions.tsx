@@ -1,7 +1,10 @@
 "use client";
 
-import { useRef } from "react";
-import { Button, Field, Input } from "@/components/ui";
+import { useActionState, useEffect, useRef } from "react";
+import { useFormStatus } from "react-dom";
+import type { OrderToggleState } from "@/app/admin/(panel)/ordrar/actions";
+import { Alert, Button, Field, Input } from "@/components/ui";
+import { formatDuration, minutesBetween } from "@/lib/format";
 import BudgetBar from "./BudgetBar";
 import { IconOrder, IconReport } from "@/components/ui/icons";
 
@@ -27,13 +30,40 @@ export default function OrderActions({
     budgetMinutes: number | null;
   };
   updateAction: (formData: FormData) => void | Promise<void>;
-  toggleAction: (formData: FormData) => void | Promise<void>;
+  toggleAction: (
+    state: OrderToggleState,
+    formData: FormData
+  ) => Promise<OrderToggleState>;
 }) {
   const menu = useRef<HTMLDialogElement>(null);
   const edit = useRef<HTMLDialogElement>(null);
+  // Inte "confirm": det namnet är webbläsarens egen dialogfunktion, och att
+  // skugga den i en fil full av rutor är att be om förvirring.
+  const closeConfirm = useRef<HTMLDialogElement>(null);
 
   const isOpen = order.status === "OPEN";
   const exportBase = `/api/admin/export/orders?order=${order.id}`;
+
+  const [toggleState, submitToggle] = useActionState<OrderToggleState, FormData>(
+    toggleAction,
+    {}
+  );
+
+  const blockers = toggleState.blockers ?? [];
+
+  // Kom det tillbaka instämplade har ingenting ändrats — då är det en fråga,
+  // och frågan ska synas. Gick stängningen igenom stängs rutan igen.
+  useEffect(() => {
+    // showModal kastar på en ruta som redan är öppen. Kan inte inträffa i
+    // dagens flöde, men en oväntad omrendering ska inte kunna fälla sidan.
+    if (blockers.length > 0 && !closeConfirm.current?.open) {
+      closeConfirm.current?.showModal();
+    }
+  }, [toggleState, blockers.length]);
+
+  useEffect(() => {
+    if (toggleState.savedAt) closeConfirm.current?.close();
+  }, [toggleState.savedAt]);
 
   return (
     <>
@@ -114,7 +144,7 @@ export default function OrderActions({
             </span>
           </button>
 
-          <form action={toggleAction} onSubmit={() => menu.current?.close()}>
+          <form action={submitToggle} onSubmit={() => menu.current?.close()}>
             <input type="hidden" name="id" value={order.id} />
             <input type="hidden" name="status" value={order.status} />
             <button
@@ -206,7 +236,83 @@ export default function OrderActions({
           </div>
         </form>
       </dialog>
+
+      {/* Avsluta en order som någon står instämplad på.
+          Rutan öppnas först efter att servern svarat, eftersom det är servern
+          som vet vem som är inne — en lista som skärmen gissat sig till hade
+          kunnat vara några minuter gammal, och det är just precision som
+          behövs för att våga trycka på knappen. */}
+      <dialog
+        ref={closeConfirm}
+        className="w-[min(28rem,calc(100vw-2rem))] rounded-xl border border-neutral-200 bg-white p-0 shadow-xl backdrop:bg-neutral-900/40"
+      >
+        <div className="border-b border-neutral-200 px-5 py-4">
+          <h2 className="text-sm font-semibold text-neutral-900">
+            Avsluta order {order.orderNumber}?
+          </h2>
+          <p className="mt-1 text-[13px] leading-relaxed text-neutral-500">
+            {blockers.length === 1
+              ? "En person är instämplad på ordern just nu."
+              : `${blockers.length} personer är instämplade på ordern just nu.`}{" "}
+            Avslutar du den stämplas de ut, och tiden flaggas för granskning så
+            att du kan rätta den innan fakturering.
+          </p>
+        </div>
+
+        <ul className="divide-y divide-neutral-100 px-5 py-2">
+          {blockers.map((blocker) => (
+            <li
+              key={`${blocker.employeeName}-${blocker.since}`}
+              className="flex items-baseline justify-between gap-3 py-2"
+            >
+              <span className="text-[13px] font-medium text-neutral-900">
+                {blocker.employeeName}
+              </span>
+              <span className="text-xs text-neutral-500">
+                {/* Förfluten tid i stället för klockslag: skärmen känner inte
+                    till företagets tidszon, och "sedan 3 tim" går inte att
+                    läsa fel oavsett var servern står. */}
+                instämplad för{" "}
+                {formatDuration(minutesBetween(new Date(blocker.since), null))}{" "}
+                sedan
+              </span>
+            </li>
+          ))}
+        </ul>
+
+        {toggleState.error && (
+          <div className="px-5 pb-2">
+            <Alert>{toggleState.error}</Alert>
+          </div>
+        )}
+
+        <div className="flex justify-end gap-2 border-t border-neutral-200 bg-neutral-50 px-5 py-3">
+          <Button
+            type="button"
+            tone="secondary"
+            onClick={() => closeConfirm.current?.close()}
+          >
+            Avbryt
+          </Button>
+          <form action={submitToggle}>
+            <input type="hidden" name="id" value={order.id} />
+            <input type="hidden" name="status" value="OPEN" />
+            <input type="hidden" name="force" value="1" />
+            <ConfirmCloseButton />
+          </form>
+        </div>
+      </dialog>
     </>
+  );
+}
+
+function ConfirmCloseButton() {
+  const { pending } = useFormStatus();
+
+  return (
+    <Button type="submit" disabled={pending}>
+      {pending ? "Avslutar…" : "Stämpla ut alla och avsluta"}
+    </Button>
   );
 }
 

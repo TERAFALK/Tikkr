@@ -8,6 +8,8 @@ import {
   autoCloseForgottenEntries,
   createManualEntry,
   updateEntryManually,
+  closeOrder,
+  openEntriesOnOrder,
   ClockError,
 } from "@/lib/clock";
 
@@ -578,5 +580,147 @@ describe("glömd utstämpling stängs vid klockslaget och flaggas", () => {
     });
     expect(entry?.needsReview).toBe(false);
     expect(entry?.clockOutAt?.toISOString()).toBe("2026-08-05T12:00:00.000Z");
+  });
+});
+
+describe("avsluta en order med pågående stämplingar", () => {
+  let order: string;
+  let counter = 0;
+
+  beforeEach(async () => {
+    // Egen order per test. closeOrder ändrar status, och en delad order hade
+    // gjort testerna beroende av i vilken ordning de råkar köras.
+    counter += 1;
+    order = (
+      await unsafeGlobalPrisma.order.create({
+        data: {
+          companyId,
+          orderNumber: `9${String(counter).padStart(3, "0")}`,
+          customerName: "Kund C",
+        },
+      })
+    ).id;
+  });
+
+  it("listar dem som står instämplade innan något ändras", async () => {
+    await clockIn(companyId, {
+      employeeId: anna,
+      orderId: order,
+      momentId: svetsning,
+      at: new Date("2026-08-05T06:00:00Z"),
+    });
+
+    const blockers = await openEntriesOnOrder(companyId, order);
+
+    expect(blockers).toHaveLength(1);
+    expect(blockers[0].employeeName).toBe("Anna Andersson");
+    expect(blockers[0].clockInAt.toISOString()).toBe("2026-08-05T06:00:00.000Z");
+
+    // Att fråga får inte ändra något.
+    const fresh = await unsafeGlobalPrisma.order.findUnique({
+      where: { id: order },
+    });
+    expect(fresh?.status).toBe("OPEN");
+  });
+
+  it("ger en tom lista när ingen är instämplad", async () => {
+    expect(await openEntriesOnOrder(companyId, order)).toHaveLength(0);
+  });
+
+  it("stänger ordern utan att röra någon tid när ingen är inne", async () => {
+    const result = await closeOrder(companyId, order, {
+      byEmail: "chef@example.com",
+    });
+
+    expect(result.clockedOut).toBe(0);
+
+    const fresh = await unsafeGlobalPrisma.order.findUnique({
+      where: { id: order },
+    });
+    expect(fresh?.status).toBe("CLOSED");
+  });
+
+  it("stämplar ut dem som står kvar och flaggar tiden för granskning", async () => {
+    await clockIn(companyId, {
+      employeeId: anna,
+      orderId: order,
+      momentId: svetsning,
+      at: new Date("2026-08-05T06:00:00Z"),
+    });
+
+    const result = await closeOrder(companyId, order, {
+      byEmail: "chef@example.com",
+      at: new Date("2026-08-05T14:00:00Z"),
+    });
+
+    expect(result.clockedOut).toBe(1);
+
+    const entry = await unsafeGlobalPrisma.timeEntry.findFirst({
+      where: { companyId, orderId: order },
+    });
+
+    expect(entry?.clockOutAt?.toISOString()).toBe("2026-08-05T14:00:00.000Z");
+    expect(entry?.needsReview).toBe(true);
+    expect(entry?.reviewNote).toContain("chef@example.com");
+    // source beskriver hur posten SKAPADES, inte hur den stängdes.
+    expect(entry?.source).toBe("KIOSK");
+  });
+
+  it("rör inte pågående stämplingar på andra ordrar", async () => {
+    await clockIn(companyId, {
+      employeeId: anna,
+      orderId: orderA,
+      momentId: svetsning,
+      at: new Date("2026-08-05T06:00:00Z"),
+    });
+
+    await closeOrder(companyId, order, { byEmail: "chef@example.com" });
+
+    const annas = await getOpenEntry(forCompany(companyId), anna);
+    expect(annas?.orderId).toBe(orderA);
+    expect(annas?.clockOutAt).toBeNull();
+  });
+
+  it("lämnar aldrig en post som slutar före den börjat", async () => {
+    // En skärm med fel klocka kan ha stämplat in på en tidpunkt som ligger
+    // framåt i tiden. Utstämplingen får då inte hamna före instämplingen.
+    await clockIn(companyId, {
+      employeeId: anna,
+      orderId: order,
+      momentId: svetsning,
+      at: new Date("2026-08-05T10:00:00Z"),
+    });
+
+    await closeOrder(companyId, order, {
+      byEmail: "chef@example.com",
+      at: new Date("2026-08-05T08:00:00Z"),
+    });
+
+    const entry = await unsafeGlobalPrisma.timeEntry.findFirst({
+      where: { companyId, orderId: order },
+    });
+
+    expect(entry?.clockOutAt?.toISOString()).toBe("2026-08-05T10:00:00.000Z");
+    expect(entry!.clockOutAt!.getTime()).toBeGreaterThanOrEqual(
+      entry!.clockInAt.getTime()
+    );
+  });
+
+  it("en avslutad order går inte att stämpla på igen", async () => {
+    await closeOrder(companyId, order, { byEmail: "chef@example.com" });
+
+    await expect(
+      clockIn(companyId, {
+        employeeId: anna,
+        orderId: order,
+        momentId: svetsning,
+      })
+    ).rejects.toThrow(ClockError);
+  });
+
+  it("vägrar en order som inte finns", async () => {
+    await expect(
+      closeOrder(companyId, "finns-inte", { byEmail: "chef@example.com" })
+    ).rejects.toThrow(ClockError);
   });
 });

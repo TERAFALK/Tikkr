@@ -41,8 +41,10 @@ export async function GET() {
     select: {
       employeeId: true,
       clockInAt: true,
-      order: { select: { orderNumber: true } },
-      moment: { select: { name: true } },
+      // Id:na behövs för att skärmen ska kunna bygga ett "senast"-förslag
+      // direkt vid utstämpling, utan att först vänta på en omladdning.
+      order: { select: { id: true, orderNumber: true } },
+      moment: { select: { id: true, name: true } },
     },
   });
 
@@ -51,7 +53,9 @@ export async function GET() {
       entry.employeeId,
       {
         since: entry.clockInAt.toISOString(),
+        orderId: entry.order.id,
         orderNumber: entry.order.orderNumber,
+        momentId: entry.moment.id,
         momentName: entry.moment.name,
       },
     ])

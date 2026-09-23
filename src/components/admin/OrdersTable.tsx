@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import type { OrderToggleState } from "@/app/admin/(panel)/ordrar/actions";
 import OrderActions from "./OrderActions";
 import BudgetBar from "./BudgetBar";
 import {
@@ -44,7 +45,10 @@ export default function OrdersTable({
 }: {
   orders: OrderRow[];
   updateAction: (formData: FormData) => void | Promise<void>;
-  toggleAction: (formData: FormData) => void | Promise<void>;
+  toggleAction: (
+    state: OrderToggleState,
+    formData: FormData
+  ) => Promise<OrderToggleState>;
 }) {
   const [selecting, setSelecting] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());

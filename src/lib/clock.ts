@@ -233,6 +233,112 @@ export async function autoCloseForgottenEntries(
   return closed;
 }
 
+/* --- Avsluta en order ---------------------------------------------------- */
+
+export interface OpenEntryOnOrder {
+  entryId: string;
+  employeeName: string;
+  clockInAt: Date;
+}
+
+/**
+ * Vilka som står instämplade på en order just nu.
+ *
+ * Används innan en order stängs. Stänger man en order med pågående stämplingar
+ * på sig blir de hängande: kiosken vägrar nya instämplingar på en stängd order,
+ * men den redan öppna posten fortsätter räknas upp tills den automatiska
+ * utstämplingen tar den på kvällen. Tiden hamnar då på en avslutad order utan
+ * att någon vet om det, vilket är ett fakturafel.
+ */
+export async function openEntriesOnOrder(
+  companyId: string,
+  orderId: string
+): Promise<OpenEntryOnOrder[]> {
+  const db = forCompany(companyId);
+
+  const open = await db.timeEntry.findMany({
+    where: { orderId, clockOutAt: null },
+    orderBy: { clockInAt: "asc" },
+    select: {
+      id: true,
+      clockInAt: true,
+      employee: { select: { name: true } },
+    },
+  });
+
+  return open.map((entry) => ({
+    entryId: entry.id,
+    employeeName: entry.employee.name,
+    clockInAt: entry.clockInAt,
+  }));
+}
+
+/**
+ * Stänger en order och stämplar ut dem som står kvar på den.
+ *
+ * Posterna flaggas för granskning. Systemet vet inte när arbetet faktiskt
+ * slutade — det vet bara att ordern avslutades — och ska därför inte låtsas
+ * att tiden är färdig att fakturera. Samma hållning som vid automatisk
+ * utstämpling: gissa hellre öppet än tyst.
+ *
+ * `source` rörs inte. Det fältet beskriver hur posten SKAPADES, inte hur den
+ * stängdes.
+ *
+ * Allt sker i en transaktion. Skulle ordern stängas utan att utstämplingarna
+ * gick igenom vore läget värre än innan: en stängd order med pågående tid som
+ * ingen längre kan stämpla ut från i kiosken.
+ */
+export async function closeOrder(
+  companyId: string,
+  orderId: string,
+  options: { byEmail: string; at?: Date }
+): Promise<{ clockedOut: number }> {
+  const at = options.at ?? new Date();
+  const db = forCompany(companyId);
+
+  const order = await db.order.findFirst({
+    where: { id: orderId },
+    select: { orderNumber: true },
+  });
+
+  if (!order) throw new ClockError("Okänd order.");
+
+  return db.$transaction(async (tx) => {
+    const open = await tx.timeEntry.findMany({
+      where: { orderId, clockOutAt: null },
+      select: { id: true, clockInAt: true },
+    });
+
+    for (const entry of open) {
+      // En stämpling som börjar efter "nu" kan inte stängas på "nu" — det
+      // hade gett en post med negativ längd. Inträffar när en skärm har fel
+      // klocka; se klockskev-kontrollen i api/kiosk/punch. Då stängs posten
+      // på sin egen starttid, alltså noll minuter, och granskningen får
+      // avgöra vad som egentligen hände.
+      const clockOutAt = entry.clockInAt > at ? entry.clockInAt : at;
+
+      await tx.timeEntry.update({
+        where: { id: entry.id },
+        data: {
+          clockOutAt,
+          needsReview: true,
+          reviewNote:
+            `Utstämplad när order ${order.orderNumber} avslutades av ` +
+            `${options.byEmail}. Systemet vet inte när arbetet faktiskt ` +
+            `slutade — kontrollera tiden innan fakturering.`,
+        },
+      });
+    }
+
+    await tx.order.update({
+      where: { id: orderId },
+      data: { status: "CLOSED" },
+    });
+
+    return { clockedOut: open.length };
+  });
+}
+
 export interface ManualEntryInput {
   employeeId: string;
   orderId: string;

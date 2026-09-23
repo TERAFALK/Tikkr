@@ -25,6 +25,12 @@ import KioskSettings from "./KioskSettings";
  * 2. Nästa person ska mötas av rätt vy. Skärmen går därför tillbaka till
  *    namnlistan av sig själv efter en stund, så att ingen råkar stämpla i
  *    någon annans halvfärdiga val.
+ *
+ * 3. Det vanligaste ska vara kortast. Nästan varje instämpling gäller samma
+ *    jobb som förra gången — efter en fikarast, eller nästa morgon. Den som
+ *    stämplat ut möts därför av en färdig "Fortsätt"-knapp i stället för att
+ *    behöva leta upp samma order och samma moment igen. Två tryck i stället
+ *    för tre, och listorna finns kvar för den som faktiskt ska byta.
  */
 
 interface Employee {
@@ -47,7 +53,26 @@ interface Moment {
 
 interface ActiveJob {
   since: string;
+  orderId: string;
   orderNumber: string;
+  momentId: string;
+  momentName: string;
+}
+
+/**
+ * Det senast avslutade jobbet, per anställd.
+ *
+ * Finns för att en fikarast inte ska kosta tre tryck. Den som stämplat ut och
+ * kommer tillbaka möts av samma jobb som en färdig knapp — och samma sak gäller
+ * nästa morgon, eftersom det är precis samma fall.
+ *
+ * Bara jobb som fortfarande GÅR att stämpla på hamnar här; se filtreringen i
+ * src/app/kiosk/page.tsx.
+ */
+interface RecentJob {
+  orderId: string;
+  orderNumber: string;
+  momentId: string;
   momentName: string;
 }
 
@@ -66,6 +91,8 @@ interface Props {
   orders: Order[];
   moments: Moment[];
   activeByEmployee: Record<string, ActiveJob>;
+  /** Senast avslutade jobb per anställd. Underlaget för "Fortsätt". */
+  recentByEmployee: Record<string, RecentJob>;
   /** Text om prenumerationen, eller null. Stoppar aldrig stämplingen. */
   subscriptionWarning: string | null;
   /** true om företaget laddat upp en egen logotyp. */
@@ -119,6 +146,7 @@ export default function KioskScreen({
   orders,
   moments,
   activeByEmployee,
+  recentByEmployee,
   subscriptionWarning,
   hasLogo,
   notices,
@@ -136,6 +164,15 @@ export default function KioskScreen({
   // ersätts av serverns bild när sidan hämtats om.
   const [active, setActive] = useState(activeByEmployee);
   useEffect(() => setActive(activeByEmployee), [activeByEmployee]);
+
+  // Senaste jobb hämtas bara vid omladdning av sidan, inte i femsekunders-
+  // pollningen. Det ändras ju först när någon stämplar ut, och den skärm som
+  // gjorde det uppdaterar sin egen bild direkt nedan. Att en annan skärm visar
+  // ett något äldre "Senast" i några minuter gör ingen skada — trycker man på
+  // det ändå kontrollerar servern ordern på vanligt sätt. Svaret från
+  // /api/kiosk/state ska förbli så litet som det är.
+  const [recent, setRecent] = useState(recentByEmployee);
+  useEffect(() => setRecent(recentByEmployee), [recentByEmployee]);
 
   const goHome = useCallback(() => {
     setView({ name: "employees" });
@@ -326,13 +363,22 @@ export default function KioskScreen({
     return () => clearInterval(timer);
   }, [router]);
 
+  // Tar emot det minsta som behövs i stället för hela Order/Moment. Både
+  // listornas poster och ett sparat "senast"-jobb passar då in utan att något
+  // måste hittas på för fält som inte används här.
   const punchIn = useCallback(
-    (employee: Employee, order: Order, moment: Moment) => {
+    (
+      employee: Employee,
+      order: { id: string; orderNumber: string },
+      moment: { id: string; name: string }
+    ) => {
       setActive((current) => ({
         ...current,
         [employee.id]: {
           since: new Date().toISOString(),
+          orderId: order.id,
           orderNumber: order.orderNumber,
+          momentId: moment.id,
           momentName: moment.name,
         },
       }));
@@ -352,6 +398,22 @@ export default function KioskScreen({
 
   const punchOut = useCallback(
     (employee: Employee) => {
+      // Jobbet hen lämnar blir förslaget nästa gång hen kommer fram. Måste
+      // läsas före utstämplingen — efteråt finns det inte kvar någonstans på
+      // skärmen, och nästa omladdning kan dröja fem minuter.
+      const left = active[employee.id];
+      if (left) {
+        setRecent((current) => ({
+          ...current,
+          [employee.id]: {
+            orderId: left.orderId,
+            orderNumber: left.orderNumber,
+            momentId: left.momentId,
+            momentName: left.momentName,
+          },
+        }));
+      }
+
       setActive((current) => {
         const next = { ...current };
         delete next[employee.id];
@@ -366,7 +428,7 @@ export default function KioskScreen({
         label: `${employee.name}, utstämpling`,
       });
     },
-    [goHome, send]
+    [active, goHome, send]
   );
 
   return (
@@ -420,9 +482,10 @@ export default function KioskScreen({
           <EmployeeGrid
             employees={employees}
             active={active}
+            recent={recent}
             onPick={(employee) =>
               setView(
-                active[employee.id]
+                active[employee.id] || recent[employee.id]
                   ? { name: "action", employee }
                   : { name: "order", employee }
               )
@@ -434,8 +497,18 @@ export default function KioskScreen({
           <ActionChoice
             employee={view.employee}
             job={active[view.employee.id]}
+            recent={recent[view.employee.id]}
             onClockOut={() => punchOut(view.employee)}
             onSwitch={() => setView({ name: "order", employee: view.employee })}
+            onResume={() => {
+              const last = recent[view.employee.id];
+              if (!last) return;
+              punchIn(
+                view.employee,
+                { id: last.orderId, orderNumber: last.orderNumber },
+                { id: last.momentId, name: last.momentName }
+              );
+            }}
           />
         )}
 
@@ -635,10 +708,12 @@ function Toast({
 function EmployeeGrid({
   employees,
   active,
+  recent,
   onPick,
 }: {
   employees: Employee[];
   active: Record<string, ActiveJob>;
+  recent: Record<string, RecentJob>;
   onPick: (employee: Employee) => void;
 }) {
   if (employees.length === 0) {
@@ -649,6 +724,7 @@ function EmployeeGrid({
     <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 lg:grid-cols-4">
       {employees.map((employee) => {
         const job = active[employee.id];
+        const last = recent[employee.id];
 
         return (
           <button
@@ -698,6 +774,13 @@ function EmployeeGrid({
                   {job.orderNumber} · {job.momentName}
                 </span>
               </span>
+            ) : last ? (
+              // Vad som står här är skillnaden mellan tre tryck och ett. Den
+              // som ser sitt jobb redan på namnknappen vet att genvägen finns
+              // innan hen ens tryckt.
+              <span className="mt-3 block truncate text-sm text-neutral-500">
+                Senast: {last.orderNumber} · {last.momentName}
+              </span>
             ) : (
               <span className="mt-3 block text-sm text-neutral-400">
                 Ej instämplad
@@ -713,13 +796,17 @@ function EmployeeGrid({
 function ActionChoice({
   employee,
   job,
+  recent,
   onClockOut,
   onSwitch,
+  onResume,
 }: {
   employee: Employee;
   job?: ActiveJob;
+  recent?: RecentJob;
   onClockOut: () => void;
   onSwitch: () => void;
+  onResume: () => void;
 }) {
   return (
     <div className="mx-auto max-w-2xl">
@@ -742,21 +829,62 @@ function ActionChoice({
       {/* Samma två knapptyper som i panelen — blå för handlingen man oftast
           är här för, vit med linje för alternativet — bara i kioskstorlek. */}
       <div className="mt-3 grid gap-3 sm:grid-cols-2">
-        <button
-          onClick={onClockOut}
-          className="kiosk-press min-h-32 rounded-xl bg-blue-600 p-6 text-2xl font-semibold text-white active:bg-blue-700"
-        >
-          Stämpla ut
-        </button>
-        <button
-          onClick={onSwitch}
-          className="kiosk-press min-h-32 rounded-xl border border-neutral-200 bg-white p-6 text-2xl font-semibold text-neutral-900 active:bg-neutral-50"
-        >
-          Byt jobb
-          <span className="mt-1.5 block text-base font-normal text-neutral-500">
-            Nuvarande jobb stämplas ut automatiskt
-          </span>
-        </button>
+        {job && (
+          <>
+            <button
+              onClick={onClockOut}
+              className="kiosk-press min-h-32 rounded-xl bg-blue-600 p-6 text-2xl font-semibold text-white active:bg-blue-700"
+            >
+              Stämpla ut
+            </button>
+            <button
+              onClick={onSwitch}
+              className="kiosk-press min-h-32 rounded-xl border border-neutral-200 bg-white p-6 text-2xl font-semibold text-neutral-900 active:bg-neutral-50"
+            >
+              Byt jobb
+              <span className="mt-1.5 block text-base font-normal text-neutral-500">
+                Nuvarande jobb stämplas ut automatiskt
+              </span>
+            </button>
+          </>
+        )}
+
+        {/* Utstämplad, men med ett jobb att återuppta. Fortsätt ligger på
+            samma plats som Stämpla ut gör när man är inne — den handling man
+            kom hit för står alltid till vänster, så handen lär sig var den
+            ska. Jobbet står på knappen och inte i rutan ovanför: det man ska
+            trycka på ska också vara det man läser. */}
+        {!job && recent && (
+          <>
+            <button
+              onClick={onResume}
+              className="kiosk-press min-h-32 rounded-xl bg-blue-600 p-6 text-2xl font-semibold text-white active:bg-blue-700"
+            >
+              Fortsätt
+              <span className="mt-1.5 block truncate text-base font-normal text-white/80">
+                {recent.orderNumber} · {recent.momentName}
+              </span>
+            </button>
+            <button
+              onClick={onSwitch}
+              className="kiosk-press min-h-32 rounded-xl border border-neutral-200 bg-white p-6 text-2xl font-semibold text-neutral-900 active:bg-neutral-50"
+            >
+              Välj annat jobb
+            </button>
+          </>
+        )}
+
+        {/* Varken pågående eller senaste jobb. Kan inträffa om ordern hunnit
+            stängas medan någon stod kvar i vyn. Skärmen ska leda vidare, inte
+            visa en tom ruta man måste backa ur. */}
+        {!job && !recent && (
+          <button
+            onClick={onSwitch}
+            className="kiosk-press min-h-32 rounded-xl bg-blue-600 p-6 text-2xl font-semibold text-white active:bg-blue-700 sm:col-span-2"
+          >
+            Välj jobb
+          </button>
+        )}
       </div>
     </div>
   );
