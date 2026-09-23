@@ -188,9 +188,20 @@ export default function KioskScreen({
   const [recent, setRecent] = useState(recentByEmployee);
   useEffect(() => setRecent(recentByEmployee), [recentByEmployee]);
 
+  /**
+   * Jobbet man håller på att byta FRÅN, medan man väljer det nya.
+   *
+   * Utstämplingen sker först när det nya jobbet startats — se punchIn. Skedde
+   * den redan vid trycket på "Byt jobb" blev den som ångrade sig utstämplad
+   * utan att ha börjat något nytt, och den timmen är borta.
+   */
+  const [replacing, setReplacing] = useState<ActiveJob | null>(null);
+
   const goHome = useCallback(() => {
     setView({ name: "employees" });
     setError(null);
+    // Avbrutet byte. Ingenting har hänt, och ingenting ska hända.
+    setReplacing(null);
   }, []);
 
   // Skärmen återgår själv om någon lämnar den mitt i ett val.
@@ -438,11 +449,16 @@ export default function KioskScreen({
       order: { id: string; orderNumber: string },
       moment: { id: string; name: string }
     ) => {
+      // Byter man från ett annat moment stämplas det ut NU, när det nya
+      // faktiskt börjat. Är det samma moment sköter servern stängningen.
+      const left =
+        replacing && replacing.momentId !== moment.id ? replacing : null;
       // Ett jobb på samma moment ersätts — maskinen kan bara köra ett i taget,
       // och servern stänger det gamla. Jobb på andra moment står kvar.
       setActive((current) => {
         const others = (current[employee.id] ?? []).filter(
-          (entry) => entry.momentId !== moment.id
+          (entry) =>
+            entry.momentId !== moment.id && entry.momentId !== left?.momentId
         );
 
         return {
@@ -459,9 +475,32 @@ export default function KioskScreen({
           ],
         };
       });
+      if (left) {
+        // Jobbet man lämnade blir förslaget nästa gång hen kommer fram.
+        setRecent((current) => ({
+          ...current,
+          [employee.id]: {
+            orderId: left.orderId,
+            orderNumber: left.orderNumber,
+            momentId: left.momentId,
+            momentName: left.momentName,
+          },
+        }));
+      }
+
       setReceipt(`${employee.name}: ${order.orderNumber}, ${moment.name}`);
       setReceiptVisible(true);
       goHome();
+
+      if (left) {
+        void send({
+          action: "out",
+          employeeId: employee.id,
+          momentId: left.momentId,
+          label: `${employee.name}, utstämpling från ${left.momentName}`,
+        });
+      }
+
       void send({
         action: "in",
         employeeId: employee.id,
@@ -470,7 +509,7 @@ export default function KioskScreen({
         label: `${employee.name}, order ${order.orderNumber}`,
       });
     },
-    [goHome, send]
+    [goHome, replacing, send]
   );
 
   /**
@@ -479,17 +518,9 @@ export default function KioskScreen({
    * Jobbet skickas med i stället för att slås upp: personen kan ha flera
    * igång, och skärmen vet vilket knappen satt på. Momentet följer med till
    * servern — utan det måste den gissa, och en gissning flaggas.
-   *
-   * `andThen` styr vart skärmen går. "chooseJob" är knappen Byt jobb: stäng
-   * det här och välj ett nytt, vilket är en utstämpling plus en instämpling
-   * och inte längre något servern gör åt en av sig själv.
    */
   const punchOut = useCallback(
-    (
-      employee: Employee,
-      job: ActiveJob,
-      andThen: "home" | "chooseJob" = "home"
-    ) => {
+    (employee: Employee, job: ActiveJob) => {
       // Jobbet hen lämnar blir förslaget nästa gång hen kommer fram.
       setRecent((current) => ({
         ...current,
@@ -517,8 +548,7 @@ export default function KioskScreen({
       setReceipt(`${employee.name} utstämplad från ${job.momentName}`);
       setReceiptVisible(true);
 
-      if (andThen === "home") goHome();
-      else setView({ name: "order", employee });
+      goHome();
 
       void send({
         action: "out",
@@ -643,7 +673,12 @@ export default function KioskScreen({
             jobs={active[view.employee.id] ?? []}
             recent={recent[view.employee.id]}
             onClockOut={(job) => punchOut(view.employee, job)}
-            onSwitchFrom={(job) => punchOut(view.employee, job, "chooseJob")}
+            // Stämplar INTE ut här. Bara ihågkommet vilket jobb som ska
+            // lämnas, så att den som ångrar sig står kvar på sitt jobb.
+            onSwitchFrom={(job) => {
+              setReplacing(job);
+              setView({ name: "order", employee: view.employee });
+            }}
             onClockOutAll={(jobs) => punchOutAll(view.employee, jobs)}
             onAdd={() => setView({ name: "order", employee: view.employee })}
             onResume={() => {
@@ -660,7 +695,11 @@ export default function KioskScreen({
 
         {view.name === "order" && (
           <Chooser
-            title={`${view.employee.name}: välj order`}
+            title={
+              replacing
+                ? `${view.employee.name}: byter från ${replacing.momentName}`
+                : `${view.employee.name}: välj order`
+            }
             empty="Inga öppna ordrar. Kontakta administratören."
             action={
               <button
@@ -1022,9 +1061,11 @@ function EmployeeGrid({
  *
  *  - STÄMPLA UT gäller ETT jobb. Med två maskiner igång måste man kunna
  *    avsluta den ena och låta den andra gå vidare.
- *  - BYT JOBB stämplar ut det här och går till ordervalet. Förr gjorde servern
- *    utstämplingen av sig själv vid nästa instämpling; nu gör den det bara på
- *    samma maskin, så bytet måste sägas ut.
+ *  - BYT JOBB går till ordervalet och stämplar ut det gamla FÖRST NÄR DET NYA
+ *    STARTAT. Förr gjorde servern utstämplingen av sig själv vid nästa
+ *    instämpling; nu gör den det bara på samma maskin, så bytet måste sägas
+ *    ut. Men det får inte ske vid tryckningen: den som ångrar sig och backar
+ *    ur skulle då stå utstämplad utan att ha börjat något nytt.
  *  - LÄGG TILL JOBB går till ordervalet UTAN att stämpla ut. Det är fallet
  *    "jag startar fräsen också".
  *
@@ -1117,7 +1158,7 @@ function ActionChoice({
             >
               Byt jobb
               <span className="mt-1.5 block text-base font-normal text-neutral-500">
-                Nuvarande jobb stämplas ut
+                Stämplas ut när det nya startar
               </span>
             </button>
             <button
