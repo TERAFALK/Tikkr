@@ -264,7 +264,10 @@ describe("offline-kön skapar inga dubbletter", () => {
     expect(started.source).toBe("KIOSK_OFFLINE_SYNC");
   });
 
-  it("en stämpling som ligger före pågående jobb avvisas", async () => {
+  it("en stämpling före ett pågående jobb på SAMMA maskin avvisas", async () => {
+    // Kön levererar tryck sorterade på tidpunkt. Kommer ett som börjar före
+    // det som redan pågår på maskinen har något gått fel i ordningen, och en
+    // maskin kan ändå inte köra två jobb samtidigt.
     await clockIn(companyId, {
       employeeId: anna,
       orderId: orderA,
@@ -276,10 +279,34 @@ describe("offline-kön skapar inga dubbletter", () => {
       clockIn(companyId, {
         employeeId: anna,
         orderId: orderB,
-        momentId: montering,
+        momentId: svetsning,
         at: new Date("2026-08-05T08:00:00Z"),
       })
     ).rejects.toThrow(ClockError);
+  });
+
+  it("en försenad stämpling på en ANNAN maskin går igenom", async () => {
+    // Kontrollen ovan gäller per maskin. Att fräsen startade innan svetsen är
+    // inget fel — det är två maskiner, och den som kör båda hann trycka i den
+    // ordningen. Att avvisa hade dessutom kostat arbetstid: kön plockar bort
+    // ett tryck som avvisas.
+    await clockIn(companyId, {
+      employeeId: anna,
+      orderId: orderA,
+      momentId: svetsning,
+      at: new Date("2026-08-05T10:00:00Z"),
+    });
+
+    const { started, autoClosed } = await clockIn(companyId, {
+      employeeId: anna,
+      orderId: orderB,
+      momentId: montering,
+      at: new Date("2026-08-05T08:00:00Z"),
+    });
+
+    expect(autoClosed).toBeNull();
+    expect(started.clockInAt.toISOString()).toBe("2026-08-05T08:00:00.000Z");
+    expect(await getOpenEntries(forCompany(companyId), anna)).toHaveLength(2);
   });
 });
 
