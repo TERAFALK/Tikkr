@@ -32,6 +32,8 @@ interface SearchParams {
   momentId?: string;
   /** "ORDER" (standard), "INDIRECT" eller "ALL". */
   kind?: string;
+  /** "detalj" (standard) eller "person". */
+  visning?: string;
 }
 
 export default async function ReportsPage({
@@ -76,6 +78,9 @@ export default async function ReportsPage({
         : "ORDER",
   });
 
+  // "detalj" är standard: den som öppnar en rapport vill oftast se raderna.
+  const view = params.visning === "person" ? "person" : "detalj";
+
   const exportHref = `/api/admin/export?${new URLSearchParams(
     Object.entries(params).filter(([, value]) => value) as [string, string][]
   ).toString()}`;
@@ -87,7 +92,12 @@ export default async function ReportsPage({
         description="Underlaget för fakturering. Filtrera och exportera."
         action={
           report.rows.length > 0 ? (
-            <ButtonLink href={exportHref}>Exportera till Excel</ButtonLink>
+            <div className="flex gap-2">
+              <ButtonLink href={`${exportHref}&format=pdf`} tone="secondary">
+                PDF
+              </ButtonLink>
+              <ButtonLink href={exportHref}>Excel</ButtonLink>
+            </div>
           ) : undefined
         }
       />
@@ -151,6 +161,16 @@ export default async function ReportsPage({
                   {employee.name}
                 </option>
               ))}
+            </Select>
+          </Field>
+
+          <Field
+            label="Visning"
+            hint="Samma siffror, två sätt att läsa dem. Följer med till PDF och Excel."
+          >
+            <Select name="visning" defaultValue={params.visning ?? "detalj"}>
+              <option value="detalj">Varje stämpling</option>
+              <option value="person">Summerat per anställd</option>
             </Select>
           </Field>
 
@@ -222,6 +242,41 @@ export default async function ReportsPage({
             )}
           </div>
 
+          {view === "person" ? (
+            <Card>
+              <CardHeader
+                title="Summerat per anställd"
+                description={`${report.byEmployee.length} personer i perioden.`}
+              />
+              <Table>
+                <thead>
+                  <tr>
+                    <Th>Anställd</Th>
+                    <Th numeric>Stämplingar</Th>
+                    <Th numeric>Tid (tim:min)</Th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {report.byEmployee.map((group) => (
+                    <Tr key={group.key}>
+                      <Td>
+                        <span className="font-medium">{group.label}</span>
+                        {group.sublabel && (
+                          <span className="ml-2 text-neutral-400">
+                            {group.sublabel}
+                          </span>
+                        )}
+                      </Td>
+                      <Td numeric muted>
+                        {group.entries}
+                      </Td>
+                      <Td numeric>{formatDuration(group.minutes)}</Td>
+                    </Tr>
+                  ))}
+                </tbody>
+              </Table>
+            </Card>
+          ) : (
           <Card>
             <CardHeader
               title="Alla stämplingar"
@@ -286,6 +341,7 @@ export default async function ReportsPage({
               </tbody>
             </Table>
           </Card>
+          )}
         </>
       )}
     </>

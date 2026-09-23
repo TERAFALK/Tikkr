@@ -3,6 +3,9 @@ import ExcelJS from "exceljs";
 import { requireAdmin } from "@/lib/admin-session";
 import { buildReport, type ReportGroup } from "@/lib/report";
 import { formatDate, toDecimalHours } from "@/lib/format";
+import { unsafeGlobalPrisma } from "@/lib/db";
+import { buildReportPdf, type ReportView } from "@/lib/report-pdf";
+import type { ReportResult } from "@/lib/report";
 
 /**
  * Excel-export av en rapport.
@@ -20,7 +23,7 @@ import { formatDate, toDecimalHours } from "@/lib/format";
 export const runtime = "nodejs";
 
 export async function GET(request: NextRequest) {
-  const { db, companyName } = await requireAdmin();
+  const { db, companyId, companyName } = await requireAdmin();
   const params = request.nextUrl.searchParams;
 
   const from = params.get("from");
@@ -42,6 +45,12 @@ export async function GET(request: NextRequest) {
           ? "ALL"
           : "ORDER",
   });
+
+  const view = params.get("visning") === "person" ? "person" : "detalj";
+
+  if (params.get("format") === "pdf") {
+    return reportAsPdf(companyId, companyName, report, params, view);
+  }
 
   const workbook = new ExcelJS.Workbook();
   workbook.creator = "Tikkr";
@@ -195,4 +204,80 @@ function slug(value: string): string {
     .replace(/ö/g, "o")
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-|-$/g, "");
+}
+
+/**
+ * Rapporten som PDF.
+ *
+ * Excel finns för den som ska räkna vidare, PDF för den som ska läsa och
+ * skriva ut. Filtren skrivs ut i klartext på pappret — en rapport utan sina
+ * villkor är en siffra utan fråga, och den som hittar utskriften om ett halvår
+ * ska veta vad den visar.
+ */
+async function reportAsPdf(
+  companyId: string,
+  companyName: string,
+  report: ReportResult,
+  params: URLSearchParams,
+  view: ReportView
+) {
+  const company = await unsafeGlobalPrisma.company.findUnique({
+    where: { id: companyId },
+    select: { timezone: true, logoWideData: true, logoWideMimeType: true },
+  });
+
+  const timeZone = company?.timezone ?? "Europe/Stockholm";
+
+  const from = params.get("from");
+  const to = params.get("to");
+
+  const filterLines = [
+    from || to
+      ? `Period ${from ?? "start"} – ${to ?? "idag"}`
+      : "Hela perioden",
+    params.get("kind") === "INDIRECT"
+      ? "Inproduktiv tid"
+      : params.get("kind") === "ALL"
+        ? "Fakturerbar och inproduktiv tid"
+        : "Fakturerbar tid",
+    view === "person" ? "Summerat per anställd" : "Varje stämpling",
+  ];
+
+  try {
+    const pdf = await buildReportPdf(
+      {
+        name: companyName,
+        timezone: timeZone,
+        logo:
+          company?.logoWideData && company.logoWideMimeType
+            ? {
+                data: Buffer.from(company.logoWideData),
+                mimeType: company.logoWideMimeType,
+              }
+            : null,
+      },
+      report,
+      { filterLines, view }
+    );
+
+    const period = from && to ? `${from}_${to}` : formatDate(new Date(), timeZone);
+
+    return new NextResponse(new Uint8Array(pdf), {
+      headers: {
+        "content-type": "application/pdf",
+        "content-disposition": `attachment; filename="tikkr-rapport-${period}.pdf"`,
+        "cache-control": "no-store",
+      },
+    });
+  } catch (error) {
+    console.error("Rapport-PDF kunde inte skapas", error);
+
+    return NextResponse.json(
+      {
+        error:
+          "PDF:en kunde inte skapas. Felet står i serverloggen. Excel-exporten fungerar under tiden.",
+      },
+      { status: 500 }
+    );
+  }
 }

@@ -164,7 +164,7 @@ gemensamt lager** i Prisma som alltid filtrerar på inloggad användares
 4. **Anomali-varningar** (senare fas, ej MVP-kritiskt) — flagga t.ex. ett jobb
    som pågått orimligt länge, eller en person med fler parallella jobb än hen
    rimligen hinner sköta. Däremot INTE "instämplad på två ställen samtidigt" —
-   det är numera ett giltigt läge, se regel 3 nedan.
+   det är numera ett giltigt läge, se regel 2 i § 3.
 5. **Fysisk säkerhet är en förutsättning** — modellen bygger på att skärmen
    sitter på arbetsplatsen, precis som en fysisk stämpelklocka. Var transparent
    om detta mot kunden.
