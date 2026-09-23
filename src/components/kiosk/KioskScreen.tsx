@@ -13,10 +13,11 @@ import KioskSettings from "./KioskSettings";
 /**
  * KIOSKSKÄRMEN.
  *
- * Fyra vyer: namn → in/ut → order → moment. Ett tryck i taget, ingen PIN,
+ * Fem vyer: namn → in/ut → order → moment, plus en knappsats för den som
+ * hellre slår in ordernumret än letar i listan. Ett tryck i taget, ingen PIN,
  * ingen bekräftelseruta.
  *
- * Två saker styr utformningen:
+ * Tre saker styr utformningen:
  *
  * 1. Det ska kännas omedelbart. Skärmen uppdaterar sig själv i samma sekund
  *    som någon trycker och skickar till servern i bakgrunden. Att stå och
@@ -106,7 +107,11 @@ type View =
   | { name: "employees" }
   | { name: "action"; employee: Employee }
   | { name: "order"; employee: Employee }
+  | { name: "orderNumber"; employee: Employee }
   | { name: "moment"; employee: Employee; order: Order };
+
+/** Hur många siffror ett ordernummer får vara innan knappsatsen slutar ta emot. */
+const MAX_ORDER_DIGITS = 10;
 
 /**
  * Ett unikt id för varje tryck, så att en omsändning inte blir en dubblett.
@@ -517,6 +522,16 @@ export default function KioskScreen({
           <Chooser
             title={`${view.employee.name}: välj order`}
             empty="Inga öppna ordrar. Kontakta administratören."
+            action={
+              <button
+                onClick={() =>
+                  setView({ name: "orderNumber", employee: view.employee })
+                }
+                className="kiosk-press shrink-0 rounded-xl border border-neutral-200 bg-white px-5 py-4 text-base font-semibold text-neutral-900 active:bg-neutral-50 sm:text-lg"
+              >
+                Slå in ordernummer
+              </button>
+            }
             items={orders.map((order) => ({
               key: order.id,
               primary: order.orderNumber,
@@ -524,6 +539,19 @@ export default function KioskScreen({
               onPick: () =>
                 setView({ name: "moment", employee: view.employee, order }),
             }))}
+          />
+        )}
+
+        {view.name === "orderNumber" && (
+          <OrderNumberPad
+            employee={view.employee}
+            orders={orders}
+            onPick={(order) =>
+              setView({ name: "moment", employee: view.employee, order })
+            }
+            onBrowse={() =>
+              setView({ name: "order", employee: view.employee })
+            }
           />
         )}
 
@@ -568,9 +596,11 @@ function Header({
   const step =
     view.name === "order"
       ? { current: 2, label: "Välj order" }
-      : view.name === "moment"
-        ? { current: 3, label: "Välj arbetsmoment" }
-        : null;
+      : view.name === "orderNumber"
+        ? { current: 2, label: "Slå in ordernummer" }
+        : view.name === "moment"
+          ? { current: 3, label: "Välj arbetsmoment" }
+          : null;
 
   return (
     // Fast höjd. Avbryt-knappen är högre än resten av innehållet, och utan en
@@ -891,10 +921,167 @@ function ActionChoice({
   );
 }
 
+/**
+ * ORDERNUMMER PÅ KNAPPSATS.
+ *
+ * Med hundra öppna ordrar är en lista fel verktyg. Den som har numret på sin
+ * ritning ska kunna slå in det direkt.
+ *
+ * Det bekräftas inte med ett anonymt "enter" utan med en knapp som bär KUNDENS
+ * NAMN. Man bekräftar inte ett nummer — man bekräftar vilken kund man arbetar
+ * mot, och ett femsiffrigt tal som råkar finnas hos fel kund är inget man
+ * upptäcker genom att läsa siffrorna en gång till.
+ *
+ * Uppslaget sker mot listan skärmen redan har i minnet. Ingen fråga till
+ * servern, alltså inget som slutar fungera när nätet gör det — och svaret
+ * kommer medan fingret fortfarande är kvar på knappen.
+ *
+ * Egen knappsats i stället för ett textfält: en verkstadsskärm i kioskläge har
+ * sällan något tangentbord att fälla upp, och den som har handskar på sig
+ * behöver stora ytor.
+ */
+function OrderNumberPad({
+  employee,
+  orders,
+  onPick,
+  onBrowse,
+}: {
+  employee: Employee;
+  orders: Order[];
+  onPick: (order: Order) => void;
+  onBrowse: () => void;
+}) {
+  const [typed, setTyped] = useState("");
+
+  const match = useMemo(
+    () => orders.find((order) => order.orderNumber === typed) ?? null,
+    [orders, typed]
+  );
+
+  function press(digit: string) {
+    setTyped((current) =>
+      current.length >= MAX_ORDER_DIGITS ? current : current + digit
+    );
+  }
+
+  return (
+    <div className="mx-auto max-w-xl">
+      <h2 className="mb-4 text-xl font-semibold text-neutral-900 sm:text-2xl">
+        {employee.name}: slå in ordernummer
+      </h2>
+
+      {/* Fast höjd på både ruta och besked. Utan den hoppar knappsatsen nedåt
+          i samma stund som första siffran trycks in. */}
+      <div className="flex h-24 items-center justify-center rounded-xl border-2 border-neutral-200 bg-white">
+        <span className="text-4xl font-semibold tabular-nums tracking-[0.2em] text-neutral-900">
+          {typed || <span className="text-neutral-300">—</span>}
+        </span>
+      </div>
+
+      <div className="flex h-12 items-center justify-center">
+        {match ? (
+          <span className="text-lg font-semibold text-emerald-700">
+            {match.customerName ?? "Kund saknas på ordern"}
+          </span>
+        ) : typed ? (
+          <span className="text-lg font-medium text-amber-700">
+            Okänt ordernummer
+          </span>
+        ) : (
+          <span className="text-base text-neutral-400">
+            Numret står på ritningen eller följesedeln
+          </span>
+        )}
+      </div>
+
+      <div className="grid grid-cols-3 gap-3">
+        {["1", "2", "3", "4", "5", "6", "7", "8", "9"].map((digit) => (
+          <button
+            key={digit}
+            onClick={() => press(digit)}
+            className="kiosk-press min-h-20 rounded-xl border border-neutral-200 bg-white text-3xl font-semibold text-neutral-900 active:bg-neutral-50"
+          >
+            {digit}
+          </button>
+        ))}
+
+        {/* Ritad pil och inte tecknet ⌫: det saknas i en del fonter och blir
+            då en tom fyrkant, vilket är sista knappen man vill gissa sig
+            till mitt i en inmatning. */}
+        <button
+          onClick={() => setTyped((current) => current.slice(0, -1))}
+          aria-label="Ta bort sista siffran"
+          className="kiosk-press flex min-h-20 items-center justify-center rounded-xl border border-neutral-200 bg-white text-neutral-500 active:bg-neutral-50"
+        >
+          <svg
+            viewBox="0 0 24 24"
+            className="h-8 w-8"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth={2}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+          >
+            <path d="M20 6H9l-5 6 5 6h11z" />
+            <path d="m15 10-4 4m0-4 4 4" />
+          </svg>
+        </button>
+        <button
+          onClick={() => press("0")}
+          className="kiosk-press min-h-20 rounded-xl border border-neutral-200 bg-white text-3xl font-semibold text-neutral-900 active:bg-neutral-50"
+        >
+          0
+        </button>
+        <button
+          onClick={() => setTyped("")}
+          className="kiosk-press min-h-20 rounded-xl border border-neutral-200 bg-white text-lg font-semibold text-neutral-500 active:bg-neutral-50"
+        >
+          Rensa
+        </button>
+      </div>
+
+      {/* Knappen bär kundens namn. Det är hela poängen: den som trycker
+          bekräftar vilken kund arbetet ska faktureras, inte en sifferrad. */}
+      <button
+        onClick={() => match && onPick(match)}
+        disabled={!match}
+        className="kiosk-press mt-3 min-h-24 w-full rounded-xl bg-blue-600 p-5 text-2xl font-semibold text-white active:bg-blue-700 disabled:bg-neutral-200 disabled:text-neutral-400"
+      >
+        {!match ? (
+          "Slå in ett ordernummer"
+        ) : match.customerName ? (
+          <>
+            {match.customerName}
+            <span className="mt-1 block text-base font-normal text-white/80">
+              order {match.orderNumber}
+            </span>
+          </>
+        ) : (
+          <>
+            Order {match.orderNumber}
+            <span className="mt-1 block text-base font-normal text-white/80">
+              ingen kund angiven
+            </span>
+          </>
+        )}
+      </button>
+
+      <button
+        onClick={onBrowse}
+        className="kiosk-press mt-3 min-h-16 w-full rounded-xl border border-neutral-200 bg-white text-lg font-semibold text-neutral-900 active:bg-neutral-50"
+      >
+        Visa öppna ordrar i stället
+      </button>
+    </div>
+  );
+}
+
 function Chooser({
   title,
   empty,
   items,
+  action,
 }: {
   title: string;
   empty: string;
@@ -904,12 +1091,17 @@ function Chooser({
     secondary?: string;
     onPick: () => void;
   }[];
+  /** Valfri knapp bredvid rubriken, t.ex. vägen till knappsatsen. */
+  action?: React.ReactNode;
 }) {
   return (
     <div>
-      <h2 className="mb-4 text-xl font-semibold text-neutral-900 sm:text-2xl">
-        {title}
-      </h2>
+      <div className="mb-4 flex items-center justify-between gap-4">
+        <h2 className="text-xl font-semibold text-neutral-900 sm:text-2xl">
+          {title}
+        </h2>
+        {action}
+      </div>
 
       {items.length === 0 ? (
         <Empty>{empty}</Empty>
