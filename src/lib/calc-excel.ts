@@ -9,17 +9,18 @@ import { toDecimalHours } from "./format";
  * använder, rad för rad, och det är hela poängen: de ska känna igen pappret
  * och slippa lära om.
  *
- * I deras ark fylls raden "Från system Andersson" i för hand med orderns
- * maskintidskostnad, hämtad ur en utskriven rapport. Det är den enda raden
- * Tikkr kan veta något om, och det är precis den de bad om att slippa skriva.
- * Material, ytbehandling, frakter och kundpris lämnas tomma — dem vet bara de.
+ * I deras ark fylls tidskostnaden i för hand, avskriven ur en utskriven
+ * rapport ur det gamla stämplingssystemet. Det är den enda raden Tikkr kan
+ * veta något om, och precis den de bad om att slippa skriva. Material,
+ * ytbehandling, frakter och kundpris lämnas tomma — dem vet bara de.
  *
  * Summorna skrivs som FORMLER och inte som färdiga tal. Ett ark där man fyller
  * i materialkostnaden och ingenting räknas om är ett dött papper.
  *
- * Rubriken "Från system Andersson" behålls ordagrant fastän siffran nu kommer
- * härifrån. Det är vad de känner igen raden på. Dagen de slutar med System
- * Andersson är det en textsträng att ändra, inte en struktur.
+ * Raden heter "Tid och maskin" och INTE vad den hette i deras ark. Där bär den
+ * namnet på det system de lämnar, och att Tikkr skulle skriva ut en konkurrents
+ * namn på kundens interna underlag vore befängt — särskilt när siffran numera
+ * kommer härifrån. Rubriken beskriver vad raden är, inte var den kom ifrån.
  */
 
 /** Radnummer, så att formlerna och cellerna inte glider isär. */
@@ -31,7 +32,7 @@ const ROW = {
   material: 6,
   surface: 7,
   freight: 8,
-  fromTimeSystem: 9,
+  workTime: 9,
   hours: 10,
   cost: 13,
   profit: 15,
@@ -152,13 +153,11 @@ function renderSheet(
   });
 
   // Den enda raden Tikkr kan fylla i, och skälet till att arket finns.
-  costRow(
-    ROW.fromTimeSystem,
-    "Från system Andersson:",
-    order.totalCostOre / 100
-  );
-  bold(`A${ROW.fromTimeSystem}`);
-  bold(`E${ROW.fromTimeSystem}`);
+  // Beloppet är arbetsmomentens timkostnad gånger nedlagd tid, alltså både
+  // maskinen och arbetet vid den.
+  costRow(ROW.workTime, "Tid och maskin:", order.totalCostOre / 100);
+  bold(`A${ROW.workTime}`);
+  bold(`E${ROW.workTime}`);
 
   set(`E${ROW.hours}`, toDecimalHours(order.totalMinutes)).numFmt = "0.00";
   set(`F${ROW.hours}`, "timmar");
@@ -168,7 +167,7 @@ function renderSheet(
   set(`D${ROW.cost}`, `Kostnad ${companyName}`);
   bold(`D${ROW.cost}`);
   set(`E${ROW.cost}`, {
-    formula: `SUM(E${ROW.material}:E${ROW.fromTimeSystem})`,
+    formula: `SUM(E${ROW.material}:E${ROW.workTime})`,
   }).numFmt = MONEY;
 
   // Kundpriset fylls i när ordern har ett avtalat fast pris. Är den löpande
