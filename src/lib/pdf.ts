@@ -22,11 +22,12 @@ import { drawBarChart } from "./pdf-chart";
  * ett eget dokument (src/lib/calc-pdf.ts) med en egen knapp, just för att de
  * två aldrig ska kunna förväxlas. Bygg inte in ett beloppsläge här.
  *
- * Tid skrivs som "1 tim 59 min", inte som "1,99". Decimaltimmar är rätt
- * matematik men fel för ett öga: mottagaren läser 1,99 som klockslag och
- * undrar var minut 99 kom ifrån. Decimaltimmar finns kvar i Excel-exporten,
- * där de behövs för att kunna räknas med, och i kalkylen där de multipliceras
- * med ett timpris.
+ * Tid skrivs som "1:59", inte som "1,99". Decimaltimmar är rätt matematik men
+ * fel för ett öga: mottagaren läser 1,99 som klockslag och undrar var minut 99
+ * kom ifrån. Enheten står i kolumnrubriken så att "1:59" inte i sin tur läses
+ * som ett klockslag. Decimaltimmar finns kvar i Excel-exporten, där de behövs
+ * för att kunna räknas med, och i kalkylen där de multipliceras med ett
+ * timpris.
  */
 
 const A4_WIDTH = 595.28;
@@ -44,10 +45,10 @@ const COLUMNS = [
   { key: "moment", label: "Arbetsmoment", width: 105, align: "left" as const },
   { key: "in", label: "Instämplad", width: 95, align: "left" as const },
   { key: "out", label: "Utstämplad", width: 95, align: "left" as const },
-  // Bredare än de andra fick vara: "12 tim 30 min" är en längre text än
-  // "12,50" och kolumnen har lineBreak: false, så för smalt hade klippt bort
-  // minuterna utan att synas.
-  { key: "hours", label: "Tid", width: 80, align: "right" as const },
+  // Bredden styrs av RUBRIKEN, inte av värdena: "312:45" är kort, men
+  // "Tid (tim:min)" behöver sina punkter. Kolumnen har lineBreak: false, så
+  // för smalt hade klippt texten utan att det syntes.
+  { key: "hours", label: "Tid (tim:min)", width: 80, align: "right" as const },
 ];
 
 export function buildOrderPdf(

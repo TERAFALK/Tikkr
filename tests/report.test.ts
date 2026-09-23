@@ -230,10 +230,27 @@ describe("omräkning till fakturerbara timmar", () => {
     expect(toDecimalHours(0)).toBe(0);
   });
 
-  it("minuter blir läsbar text", () => {
-    expect(formatDuration(120)).toBe("2 tim");
-    expect(formatDuration(90)).toBe("1 tim 30 min");
-    expect(formatDuration(45)).toBe("45 min");
-    expect(formatDuration(0)).toBe("0 min");
+  it("minuter blir timmar och minuter", () => {
+    expect(formatDuration(120)).toBe("2:00");
+    expect(formatDuration(90)).toBe("1:30");
+    expect(formatDuration(45)).toBe("0:45");
+    expect(formatDuration(0)).toBe("0:00");
+  });
+
+  it("fyller alltid minutdelen till två siffror", () => {
+    // "7:5" skulle läsas som sju och en halv timme.
+    expect(formatDuration(425)).toBe("7:05");
+    expect(formatDuration(3002)).toBe("50:02");
+  });
+
+  it("låter timdelen växa fritt", () => {
+    // En order kan ha hundratals timmar på sig. Ingen modulo 24 här.
+    expect(formatDuration(60 * 312 + 45)).toBe("312:45");
+  });
+
+  it("avrundar till hela minuter", () => {
+    // minutesBetween ger decimaltal; avrundningen sker först här.
+    expect(formatDuration(89.6)).toBe("1:30");
+    expect(formatDuration(0.4)).toBe("0:00");
   });
 });

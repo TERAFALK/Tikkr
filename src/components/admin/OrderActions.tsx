@@ -32,6 +32,7 @@ export default function OrderActions({
     minutes: number;
     budgetMinutes: number | null;
     markupPercent: number | null;
+    fixedPriceOre: number | null;
   };
   updateAction: (
     state: OrderFormState,
@@ -258,7 +259,7 @@ export default function OrderActions({
             </Field>
             <Field
               label="Påslag"
-              hint="Faktor, t.ex. 1,4. Lämna tomt för företagets standard."
+              hint="Faktor, t.ex. 1,4. Lämna tomt för företagets standard. Används inte när ett fast pris är satt."
             >
               <Input
                 name="markup"
@@ -269,6 +270,21 @@ export default function OrderActions({
                     : (order.markupPercent / 100).toFixed(2).replace(".", ",")
                 }
                 placeholder="1,4"
+              />
+            </Field>
+            <Field
+              label="Fast kundpris"
+              hint="Kronor för hela ordern. Ifyllt visar kalkylen det som pris och räknar vinsten mot självkostnaden. Tomt betyder löpande räkning."
+            >
+              <Input
+                name="fixedPrice"
+                inputMode="decimal"
+                defaultValue={
+                  order.fixedPriceOre === null
+                    ? ""
+                    : (order.fixedPriceOre / 100).toFixed(2).replace(".", ",")
+                }
+                placeholder="7350"
               />
             </Field>
           </div>
@@ -319,11 +335,10 @@ export default function OrderActions({
               </span>
               <span className="text-xs text-neutral-500">
                 {/* Förfluten tid i stället för klockslag: skärmen känner inte
-                    till företagets tidszon, och "sedan 3 tim" går inte att
+                    till företagets tidszon, och en varaktighet går inte att
                     läsa fel oavsett var servern står. */}
-                instämplad för{" "}
-                {formatDuration(minutesBetween(new Date(blocker.since), null))}{" "}
-                sedan
+                pågått{" "}
+                {formatDuration(minutesBetween(new Date(blocker.since), null))}
               </span>
             </li>
           ))}

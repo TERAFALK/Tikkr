@@ -43,19 +43,28 @@ export function formatTime(value: Date, timeZone = DEFAULT_TIME_ZONE): string {
 }
 
 /**
- * Minuter som "7 tim 30 min".
+ * Minuter som "7:30" — timmar och minuter.
  *
- * Läsbart format för skärm. För Excel exporteras istället decimaltimmar, som
- * går att räkna med.
+ * Samma format som kundernas befintliga efterkalkyler skriver, vilket är
+ * skälet till att det valdes: "50:02" betyder femtio timmar och två minuter
+ * för den som läst den rapporten i tio år.
+ *
+ * Timdelen har ingen övre gräns och ingen utfyllnad — en order kan ha 312
+ * timmar på sig. Minutdelen fylls alltid till två siffror, annars läses "7:5"
+ * som sju och en halv timme.
+ *
+ * Där formatet kan förväxlas med ett klockslag skrivs enheten ut i
+ * kolumnrubriken: "Tid (tim:min)".
+ *
+ * För Excel exporteras i stället decimaltimmar — se formatDecimalHours — som
+ * går att summera. Det är två olika behov och de ska inte blandas ihop.
  */
 export function formatDuration(minutes: number): string {
   const rounded = Math.max(0, Math.round(minutes));
   const hours = Math.floor(rounded / 60);
   const rest = rounded % 60;
 
-  if (hours === 0) return `${rest} min`;
-  if (rest === 0) return `${hours} tim`;
-  return `${hours} tim ${rest} min`;
+  return `${hours}:${String(rest).padStart(2, "0")}`;
 }
 
 /** Decimaltimmar med två decimaler — formatet fakturaunderlag räknas i. */

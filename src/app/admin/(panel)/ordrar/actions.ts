@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { requireAdmin } from "@/lib/admin-session";
 import { ClockError, closeOrder, openEntriesOnOrder } from "@/lib/clock";
-import { parseMarkupPercent } from "@/lib/money";
+import { parseMarkupPercent, parseOre } from "@/lib/money";
 
 const PATH = "/admin/ordrar";
 
@@ -83,6 +83,19 @@ export async function updateOrder(
     };
   }
 
+  // Tomt betyder löpande räkning. Bara ett ifyllt men obegripligt belopp är
+  // ett fel — ett fast pris som tyst blev noll vore värre än ett felmeddelande.
+  const rawPrice = String(formData.get("fixedPrice") ?? "").trim();
+  const fixedPriceOre = rawPrice === "" ? null : parseOre(rawPrice);
+
+  if (rawPrice !== "" && fixedPriceOre === null) {
+    return {
+      error:
+        "Skriv det fasta priset som ett belopp i kronor, till exempel 7350 " +
+        "eller 7350,50. Lämna tomt för löpande räkning.",
+    };
+  }
+
   // updateMany och inte update: id:t kommer från formuläret och får aldrig
   // kunna peka på en annan kunds order.
   await db.order.updateMany({
@@ -92,6 +105,7 @@ export async function updateOrder(
       customerName: customerName || null,
       budgetMinutes: parseHours(formData.get("budgetHours")),
       markupPercent,
+      fixedPriceOre,
     },
   });
 

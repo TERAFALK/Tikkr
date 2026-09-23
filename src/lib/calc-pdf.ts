@@ -33,7 +33,7 @@ export interface CalcCompany {
 
 const COLUMNS = [
   { label: "Arbetsmoment", width: 175, align: "left" as const },
-  { label: "Tid", width: 100, align: "right" as const },
+  { label: "Tid (tim:min)", width: 100, align: "right" as const },
   { label: "Timkostnad", width: 110, align: "right" as const },
   { label: "Kostnad", width: 110, align: "right" as const },
 ];
@@ -186,26 +186,53 @@ function renderCalc(
 
   y += 10;
 
-  y = drawSumLine(doc, y, "Total tid", formatDuration(order.totalMinutes));
-  y = drawSumLine(doc, y, "Total kostnad", formatCurrency(order.totalCostOre));
   y = drawSumLine(
     doc,
     y,
-    `Påslag ${formatMarkup(order.markupPercent)}${
-      order.markupFromOrder ? " (satt på ordern)" : ""
-    }`,
-    formatCurrency(order.priceOre - order.totalCostOre)
+    "Total tid (tim:min)",
+    formatDuration(order.totalMinutes)
   );
+  y = drawSumLine(doc, y, "Total kostnad", formatCurrency(order.totalCostOre));
+
+  // Påslaget visas bara när det är påslaget som ger priset. På en
+  // fastprisorder är det inte påslaget som bestämt något, och att visa det
+  // hade sett ut som en uträkning som inte stämmer.
+  if (!order.priceIsFixed) {
+    y = drawSumLine(
+      doc,
+      y,
+      `Påslag ${formatMarkup(order.markupPercent)}${
+        order.markupFromOrder ? " (satt på ordern)" : ""
+      }`,
+      formatCurrency(order.profitOre)
+    );
+  }
 
   y += 4;
   doc.rect(MARGIN, y, CONTENT_WIDTH, 30).fill("#0a0a0a");
   doc.font("Helvetica-Bold").fontSize(12).fillColor("#ffffff");
-  doc.text("PRIS", MARGIN + 8, y + 9, { width: 200 });
+  doc.text(order.priceIsFixed ? "KUNDPRIS (FAST)" : "PRIS", MARGIN + 8, y + 9, {
+    width: 240,
+  });
   doc.text(formatCurrency(order.priceOre), A4_WIDTH - MARGIN - 218, y + 9, {
     width: 210,
     align: "right",
   });
-  y += 42;
+  y += 38;
+
+  // Vinsten står under priset och bara på fastprisordrar. På en löpande order
+  // är vinsten per definition påslaget, och att upprepa samma tal med ett
+  // annat namn får ett papper att se ut som om det säger mer än det gör.
+  if (order.priceIsFixed) {
+    y = drawSumLine(doc, y, "Vinst i kronor", formatCurrency(order.profitOre));
+    y = drawSumLine(
+      doc,
+      y,
+      "Vinst i procent av självkostnad",
+      order.profitPercent === null ? "—" : `${order.profitPercent} %`
+    );
+    y += 6;
+  }
 
   /* --- Anmärkningar -------------------------------------------------------- */
 
@@ -213,8 +240,9 @@ function renderCalc(
 
   if (order.minutesWithoutRate > 0) {
     notes.push(
-      `${formatDuration(order.minutesWithoutRate)} saknar timkostnad och ingår ` +
-        `inte i summan, som därför är lägre än den verkliga kostnaden. ` +
+      `${formatDuration(order.minutesWithoutRate)} (tim:min) saknar timkostnad ` +
+        `och ingår inte i summan, som därför är lägre än den verkliga ` +
+        `kostnaden. ` +
         `Fyll i timkostnad på arbetsmomentet — nya stämplingar får den då ` +
         `automatiskt, medan redan registrerad tid behåller sitt gamla underlag`
     );

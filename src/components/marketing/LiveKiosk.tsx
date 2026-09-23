@@ -38,8 +38,9 @@ const SEQUENCE = [1, 3, 0, 5, 2, 4];
 function formatMinutes(total: number): string {
   const hours = Math.floor(total / 60);
   const rest = total % 60;
-  if (hours === 0) return `${rest} min`;
-  return `${hours} tim ${String(rest).padStart(2, "0")} min`;
+  // Samma format som produkten visar, se formatDuration i src/lib/format.ts.
+  // Säljsidan får inte visa något kunden sedan inte känner igen.
+  return `${hours}:${String(rest).padStart(2, "0")}`;
 }
 
 export default function LiveKiosk({ className = "" }: { className?: string }) {

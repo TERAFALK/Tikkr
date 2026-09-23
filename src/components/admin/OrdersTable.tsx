@@ -41,6 +41,8 @@ export interface OrderRow {
   budgetMinutes: number | null;
   /** Orderns eget påslag i procent, eller null för företagets standard. */
   markupPercent: number | null;
+  /** Avtalat fast pris i ören, eller null för löpande räkning. */
+  fixedPriceOre: number | null;
 }
 
 export default function OrdersTable({
@@ -155,7 +157,7 @@ export default function OrdersTable({
             <Th>Kund</Th>
             <Th>Status</Th>
             <Th numeric>Stämplingar</Th>
-            <Th numeric>Upparbetad tid</Th>
+            <Th numeric>Upparbetad tid (tim:min)</Th>
             <Th>Mot beräknad tid</Th>
           </tr>
         </thead>

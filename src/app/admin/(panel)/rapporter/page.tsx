@@ -213,7 +213,7 @@ export default async function ReportsPage({
                   <Th>Moment</Th>
                   <Th>In</Th>
                   <Th>Ut</Th>
-                  <Th numeric>Tid</Th>
+                  <Th numeric>Tid (tim:min)</Th>
                 </tr>
               </thead>
               <tbody>

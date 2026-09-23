@@ -67,7 +67,7 @@ function KioskHeader({ children }: { children?: React.ReactNode }) {
  * bilderna visar samma verkstad från olika håll.
  */
 const NAMES = [
-  { name: "Anna Andersson", job: "2601 · Svetsning", elapsed: "2 tim 15 min" },
+  { name: "Anna Andersson", job: "2601 · Svetsning", elapsed: "2:15" },
   { name: "Björn Bergqvist", job: null, elapsed: null },
   { name: "Carina Cederlund", job: "2603 · Montering", elapsed: "48 min" },
   { name: "David Dahl", job: null, elapsed: null },
@@ -195,8 +195,8 @@ export function RunningMockup({ className = "" }: { className?: string }) {
 /* -------------------------------------------------------------------------- */
 
 const ROWS = [
-  { name: "Anna Andersson", order: "2601", customer: "Volvo Lastvagnar", time: "2 tim 15 min" },
-  { name: "Erik Ek", order: "2601", customer: "Volvo Lastvagnar", time: "5 tim 02 min" },
+  { name: "Anna Andersson", order: "2601", customer: "Volvo Lastvagnar", time: "2:15" },
+  { name: "Erik Ek", order: "2601", customer: "Volvo Lastvagnar", time: "5:02" },
   { name: "Carina Cederlund", order: "2603", customer: "Atlas Copco", time: "48 min" },
 ];
 
@@ -239,7 +239,7 @@ export function AdminMockup({ className = "" }: { className?: string }) {
         <div className="min-w-0 flex-1 bg-neutral-50 p-3">
           <div className="mb-3 grid grid-cols-3 gap-2">
             <Stat label="Arbetar nu" value="3" tone="emerald" />
-            <Stat label="Idag" value="18,5 tim" />
+            <Stat label="Idag" value="18:30" />
             <Stat label="Att granska" value="1" tone="amber" />
           </div>
 
@@ -307,9 +307,9 @@ function Stat({
 /* -------------------------------------------------------------------------- */
 
 const REPORT = [
-  { order: "2601", customer: "Volvo Lastvagnar", hours: "42,25", share: 100 },
-  { order: "2603", customer: "Atlas Copco", hours: "28,00", share: 66 },
-  { order: "2604", customer: "Sandvik Coromant", hours: "14,25", share: 34 },
+  { order: "2601", customer: "Volvo Lastvagnar", hours: "42:15", share: 100 },
+  { order: "2603", customer: "Atlas Copco", hours: "28:00", share: 66 },
+  { order: "2604", customer: "Sandvik Coromant", hours: "14:15", share: 34 },
 ];
 
 /** Summeringen per order — svaret på vad som ska faktureras. */
@@ -340,7 +340,7 @@ export function ReportMockup({ className = "" }: { className?: string }) {
                 Tid per order
               </span>
               <span className="text-[10px] font-semibold tabular-nums text-neutral-900">
-                84,50 tim
+                84:30
               </span>
             </div>
 
@@ -413,7 +413,7 @@ export function ReviewMockup({ className = "" }: { className?: string }) {
                 2601 · Lackering
               </span>
               <span className="ml-auto rounded bg-amber-50 px-1.5 py-0.5 text-[10px] font-medium tabular-nums text-amber-700 ring-1 ring-inset ring-amber-200">
-                9 tim 48 min
+                9:48
               </span>
             </div>
 

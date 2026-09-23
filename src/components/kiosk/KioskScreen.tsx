@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { enqueue, flush, pending, type QueuedPunch } from "@/lib/offline-queue";
+import { formatDuration } from "@/lib/format";
 import CompanyBadge from "@/components/ui/CompanyBadge";
 import { LogoMark } from "@/components/ui/Logo";
 import NoticeBanner from "@/components/ui/NoticeBanner";
@@ -954,12 +955,10 @@ function Elapsed({ since }: { since: string }) {
     return () => clearInterval(timer);
   }, []);
 
+  // Samma formatering som resten av systemet. Hade den här komponenten haft
+  // en egen skulle kiosken och panelen visa samma tid olika, och då börjar
+  // man tvivla på siffrorna.
   const minutes = Math.max(0, Math.floor((now - start) / 60_000));
-  const hours = Math.floor(minutes / 60);
 
-  return (
-    <span>
-      {hours > 0 ? `${hours} tim ${minutes % 60} min` : `${minutes} min`}
-    </span>
-  );
+  return <span>{formatDuration(minutes)}</span>;
 }

@@ -65,7 +65,7 @@ export default async function ReviewPage() {
               <tr>
                 <Th>Anställd och jobb</Th>
                 <Th>Instämplad</Th>
-                <Th numeric>Gissad tid</Th>
+                <Th numeric>Gissad tid (tim:min)</Th>
                 <Th>Rätta sluttid</Th>
               </tr>
             </thead>

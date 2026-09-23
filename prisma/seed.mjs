@@ -60,7 +60,13 @@ async function main() {
       orders: {
         create: [
           { orderNumber: "2601", customerName: "Volvo Lastvagnar" },
-          { orderNumber: "2602", customerName: "Sandvik Coromant" },
+          // Fastprisorder, så kalkylen har något att räkna vinst på.
+          // 7 350 kr, samma siffra som i kundens eget kalkylark.
+          {
+            orderNumber: "2602",
+            customerName: "Sandvik Coromant",
+            fixedPriceOre: 735000,
+          },
           { orderNumber: "2603", customerName: "Atlas Copco" },
         ],
       },

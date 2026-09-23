@@ -189,7 +189,19 @@ model Order {
   /// en spärr mot att arbeta.
   budgetMinutes Int? @map("budget_minutes")
 
+  /// Fast pris mot kund för hela ordern, i ÖREN. Frivilligt.
+  ///
+  /// Ifyllt betyder fastprisorder: kalkylen visar det här som PRIS och räknar
+  /// vinsten mot självkostnaden, i stället för att räkna upp kostnaden med
+  /// påslaget. Tomt betyder löpande räkning, och då gäller påslaget.
+  ///
+  /// Skälet till att båda finns: kunden har bägge sorternas affärer, och en
+  /// fastprisorder där systemet räknar fram ett "pris" ur ett påslag visar en
+  /// siffra ingen har kommit överens om.
+  fixedPriceOre Int? @map("fixed_price_ore")
+
   /// Påslag för just den här ordern, i procent. Åsidosätter företagets.
+  /// Används inte när fixedPriceOre är satt — då finns priset redan.
   ///
   /// Tomt betyder att företagets standard gäller, vilket är det normala.
   /// Finns för den order där kunden förhandlat — annars hade man fått ändra

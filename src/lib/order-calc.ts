@@ -46,7 +46,21 @@ export interface OrderCalc {
   markupPercent: number;
   /** true när påslaget kommer från ordern och inte från företagets standard. */
   markupFromOrder: boolean;
+  /**
+   * Priset mot kund. Orderns fasta pris när ett sådant finns, annars
+   * självkostnaden uppräknad med påslaget.
+   */
   priceOre: number;
+  /** true när priset är ett avtalat fast pris och inte framräknat. */
+  priceIsFixed: boolean;
+  /** Pris minus självkostnad. Kan vara negativt — en order kan gå med förlust. */
+  profitOre: number;
+  /**
+   * Vinsten som andel av SJÄLVKOSTNADEN, i procent — samma räkning som
+   * kundens eget kalkylark gör. Null när kostnaden är noll, för då finns
+   * ingen nämnare och "oändlig marginal" är inget att skriva på ett papper.
+   */
+  profitPercent: number | null;
   ongoingCount: number;
   ungradedCount: number;
   firstEntryAt: Date | null;
@@ -68,6 +82,7 @@ export async function getOrderCalcs(
       orderNumber: true,
       customerName: true,
       markupPercent: true,
+      fixedPriceOre: true,
       timeEntries: {
         orderBy: { clockInAt: "asc" },
         select: {
@@ -136,6 +151,13 @@ export async function getOrderCalcs(
 
     const markupPercent = order.markupPercent ?? companyMarkupPercent;
 
+    // Ett avtalat pris går före ett framräknat. Har man kommit överens om
+    // 7 350 kr är det priset, oavsett vad påslaget skulle ha gett.
+    const priceIsFixed = order.fixedPriceOre !== null;
+    const priceOre =
+      order.fixedPriceOre ?? applyMarkup(totalCostOre, markupPercent);
+    const profitOre = priceOre - totalCostOre;
+
     return {
       orderId: order.id,
       orderNumber: order.orderNumber,
@@ -146,7 +168,11 @@ export async function getOrderCalcs(
       minutesWithoutRate,
       markupPercent,
       markupFromOrder: order.markupPercent !== null,
-      priceOre: applyMarkup(totalCostOre, markupPercent),
+      priceOre,
+      priceIsFixed,
+      profitOre,
+      profitPercent:
+        totalCostOre > 0 ? Math.round((profitOre / totalCostOre) * 100) : null,
       ongoingCount,
       ungradedCount,
       firstEntryAt: order.timeEntries[0]?.clockInAt ?? null,

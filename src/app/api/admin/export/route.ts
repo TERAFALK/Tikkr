@@ -9,7 +9,7 @@ import { formatDate, toDecimalHours } from "@/lib/format";
  *
  * Filen är fakturaunderlag och ska gå att arbeta vidare i, inte bara titta på.
  * Därför:
- *  - tid som DECIMALTIMMAR i egna celler, inte text som "7 tim 30 min".
+ *  - tid som DECIMALTIMMAR i egna celler, inte text som "7:30".
  *    Excel kan summera 7,5 men inte en mening.
  *  - riktiga datum- och tidsceller, så sortering och filtrering fungerar
  *  - en flik per sammanställning, plus en med alla rader

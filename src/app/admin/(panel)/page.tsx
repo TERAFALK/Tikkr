@@ -144,7 +144,7 @@ export default async function OverviewPage() {
                 <Th>Order</Th>
                 <Th>Arbetsmoment</Th>
                 <Th>Sedan</Th>
-                <Th numeric>Tid</Th>
+                <Th numeric>Tid (tim:min)</Th>
               </tr>
             </thead>
             <tbody>

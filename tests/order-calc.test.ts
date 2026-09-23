@@ -75,7 +75,7 @@ beforeEach(async () => {
   });
   await unsafeGlobalPrisma.order.update({
     where: { id: order },
-    data: { markupPercent: null },
+    data: { markupPercent: null, fixedPriceOre: null },
   });
 });
 
@@ -230,6 +230,75 @@ describe("en prishöjning rör aldrig redan registrerad tid", () => {
       .map((row) => row.costRateOre ?? 0)
       .sort((a, b) => a - b);
     expect(rates).toEqual([18000, 20000]);
+  });
+});
+
+describe("fast pris och vinst", () => {
+  it("ett fast pris går före påslaget", async () => {
+    await unsafeGlobalPrisma.order.update({
+      where: { id: order },
+      data: { fixedPriceOre: 735000 },
+    });
+    await work(order, svetsning, 60);
+
+    const calc = await calcFor(order);
+
+    expect(calc.priceIsFixed).toBe(true);
+    expect(calc.priceOre).toBe(735000);
+    // Inte 25 200, som påslaget hade gett.
+    expect(calc.priceOre).not.toBe(25200);
+  });
+
+  it("räknar vinsten mot självkostnaden, som kundens eget ark", async () => {
+    await unsafeGlobalPrisma.order.update({
+      where: { id: order },
+      data: { fixedPriceOre: 735000 },
+    });
+    await work(order, svetsning, 60);
+
+    const calc = await calcFor(order);
+
+    expect(calc.totalCostOre).toBe(18000);
+    expect(calc.profitOre).toBe(717000);
+    expect(calc.profitPercent).toBe(3983);
+  });
+
+  it("visar förlust som ett negativt tal", async () => {
+    await unsafeGlobalPrisma.order.update({
+      where: { id: order },
+      data: { fixedPriceOre: 10000 },
+    });
+    await work(order, svetsning, 60);
+
+    const calc = await calcFor(order);
+
+    expect(calc.profitOre).toBe(-8000);
+    expect(calc.profitPercent).toBe(-44);
+  });
+
+  it("utan fast pris kommer priset från påslaget", async () => {
+    await work(order, svetsning, 60);
+
+    const calc = await calcFor(order);
+
+    expect(calc.priceIsFixed).toBe(false);
+    expect(calc.priceOre).toBe(25200);
+    expect(calc.profitOre).toBe(7200);
+  });
+
+  it("ger ingen vinstprocent när kostnaden är noll", async () => {
+    await unsafeGlobalPrisma.order.update({
+      where: { id: order },
+      data: { fixedPriceOre: 500000 },
+    });
+    await work(order, utanKostnad, 60);
+
+    const calc = await calcFor(order);
+
+    // Ingen nämnare att dela med. "Oändlig marginal" är inget att skriva
+    // på ett papper.
+    expect(calc.totalCostOre).toBe(0);
+    expect(calc.profitPercent).toBeNull();
   });
 });
 
