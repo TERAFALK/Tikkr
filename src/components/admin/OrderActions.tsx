@@ -147,9 +147,16 @@ export default function OrderActions({
               förväxlas med underlaget som skickas till kunden. */}
           <MenuLink
             href={`${exportBase}&format=kalkyl`}
-            icon={<IconReport />}
-            title="Ladda ner efterkalkyl"
+            icon={<IconOrder />}
+            title="Efterkalkyl som PDF"
             description="Alla stämplingar, kostnad och pris — skicka inte till kunden"
+            onPick={() => menu.current?.close()}
+          />
+          <MenuLink
+            href={`${exportBase}&format=kalkyl-excel`}
+            icon={<IconReport />}
+            title="Efterkalkyl som Excel"
+            description="Ert eget ark med tidskostnaden ifylld, resten att komplettera"
             onPick={() => menu.current?.close()}
           />
 

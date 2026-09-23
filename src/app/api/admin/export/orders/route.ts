@@ -6,6 +6,7 @@ import { getOrderExports, slugify, type OrderExport } from "@/lib/order-export";
 import { getOrderCalcs } from "@/lib/order-calc";
 import { buildOrderPdf, type PdfCompany } from "@/lib/pdf";
 import { buildOrderCalcPdf } from "@/lib/calc-pdf";
+import { buildOrderCalcWorkbook } from "@/lib/calc-excel";
 import { formatDate, toDecimalHours } from "@/lib/format";
 
 /**
@@ -34,7 +35,13 @@ export async function GET(request: NextRequest) {
 
   const requested = params.get("format");
   const format =
-    requested === "excel" ? "excel" : requested === "kalkyl" ? "kalkyl" : "pdf";
+    requested === "excel"
+      ? "excel"
+      : requested === "kalkyl"
+        ? "kalkyl"
+        : requested === "kalkyl-excel"
+          ? "kalkyl-excel"
+          : "pdf";
   const orderIds = params.getAll("order").filter(Boolean);
 
   if (orderIds.length === 0) {
@@ -66,7 +73,7 @@ export async function GET(request: NextRequest) {
 
   /* --- Kalkyl: eget spår hela vägen --------------------------------------- */
 
-  if (format === "kalkyl") {
+  if (format === "kalkyl" || format === "kalkyl-excel") {
     const calcs = await getOrderCalcs(
       db,
       orderIds,
@@ -86,6 +93,20 @@ export async function GET(request: NextRequest) {
       calcs.length === 1
         ? `efterkalkyl-${slugify(calcs[0].orderNumber)}`
         : `efterkalkyler-${slugify(companyName)}-${formatDate(new Date(), timeZone)}`;
+
+    if (format === "kalkyl-excel") {
+      const workbook = buildOrderCalcWorkbook(companyName, calcs);
+      const buffer = await workbook.xlsx.writeBuffer();
+
+      return new NextResponse(buffer as ArrayBuffer, {
+        headers: {
+          "content-type":
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+          "content-disposition": `attachment; filename="${calcBase}.xlsx"`,
+          "cache-control": "no-store",
+        },
+      });
+    }
 
     try {
       const pdf = await buildOrderCalcPdf(
