@@ -1,11 +1,11 @@
 import PDFDocument from "pdfkit";
-import type { OrderCalc } from "./order-calc";
-import { formatDate, formatDuration } from "./format";
+import type { OrderCalc, OrderCalcGroup } from "./order-calc";
+import { formatDate, formatDuration, formatTime } from "./format";
 import { formatCurrency, formatMarkup } from "./money";
 import { drawBarChart } from "./pdf-chart";
 
 /**
- * KALKYL SOM PDF — INTERNT UNDERLAG.
+ * EFTERKALKYL SOM PDF — INTERNT UNDERLAG.
  *
  * Det här dokumentet innehåller självkostnad, påslag och marginal. Det ska
  * ALDRIG skickas till kundens kund. Tidsunderlaget i pdf.ts är dokumentet som
@@ -15,15 +15,24 @@ import { drawBarChart } from "./pdf-chart";
  * dokument med ett läge. Ett läge är något man kan glömma att slå av. Två
  * knappar kräver att man trycker på fel.
  *
- * Utseendet skiljer sig med flit: ett svart band överst där det står vad
- * dokumentet är. Den som håller pappret i handen ska se skillnaden på en meter
- * utan att läsa rubriken.
+ * Innehållet följer den efterkalkyl kunden läser idag: varje stämpling på egen
+ * rad, grupperad per arbetsmoment, delsumma per grupp och en total sist.
+ * Formgivningen gör det inte — den är Tikkrs, med ett svart band överst som
+ * säger vad man håller i. Den som har pappret i handen ska se skillnaden mot
+ * tidsunderlaget på en meter utan att läsa rubriken.
+ *
+ * Kolumnen "Resurs" som finns i deras nuvarande rapport utgår. Där är den
+ * alltid identisk med operationen, och två kolumner med samma innehåll är
+ * brus.
  */
 
 const A4_WIDTH = 595.28;
 const MARGIN = 50;
 const CONTENT_WIDTH = A4_WIDTH - MARGIN * 2;
 const FOOTER_Y = 800;
+
+/** Y-läge där en rad inte längre får plats och sidan måste brytas. */
+const PAGE_BREAK_Y = 720;
 
 export interface CalcCompany {
   name: string;
@@ -32,10 +41,12 @@ export interface CalcCompany {
 }
 
 const COLUMNS = [
-  { label: "Arbetsmoment", width: 175, align: "left" as const },
-  { label: "Tid (tim:min)", width: 100, align: "right" as const },
-  { label: "Timkostnad", width: 110, align: "right" as const },
-  { label: "Kostnad", width: 110, align: "right" as const },
+  { label: "Anställd", width: 145, align: "left" as const },
+  { label: "Datum", width: 80, align: "left" as const },
+  { label: "Start", width: 52, align: "left" as const },
+  { label: "Stopp", width: 52, align: "left" as const },
+  { label: "Tid (tim:min)", width: 78, align: "right" as const },
+  { label: "Kostnad", width: 88, align: "right" as const },
 ];
 
 export function buildOrderCalcPdf(
@@ -47,7 +58,9 @@ export function buildOrderCalcPdf(
     margin: MARGIN,
     info: {
       Title:
-        orders.length === 1 ? `Kalkyl order ${orders[0].orderNumber}` : "Kalkyl",
+        orders.length === 1
+          ? `Efterkalkyl order ${orders[0].orderNumber}`
+          : "Efterkalkyl",
       Author: company.name,
     },
   });
@@ -109,7 +122,7 @@ function renderCalc(
   y = doc.y + 14;
 
   doc.font("Helvetica-Bold").fontSize(20).fillColor("#0a0a0a");
-  doc.text(`Kalkyl order ${order.orderNumber}`, MARGIN, y);
+  doc.text(`Efterkalkyl order ${order.orderNumber}`, MARGIN, y);
   y = doc.y + 2;
 
   if (order.customerName) {
@@ -127,59 +140,32 @@ function renderCalc(
 
   doc.font("Helvetica").fontSize(9).fillColor("#737373");
   doc.text(
-    `Period: ${period}   ·   Kalkyl skapad ${formatDate(new Date(), company.timezone)}`,
+    `Period: ${period}   ·   ${order.entryCount} ${
+      order.entryCount === 1 ? "stämpling" : "stämplingar"
+    }   ·   Kalkyl skapad ${formatDate(new Date(), company.timezone)}`,
     MARGIN,
     y
   );
 
   y = doc.y + 16;
 
-  /* --- Tabell -------------------------------------------------------------- */
+  /* --- Tabell, en grupp per arbetsmoment ---------------------------------- */
 
   y = drawTableHead(doc, y);
-  doc.font("Helvetica").fontSize(9);
 
-  for (const row of order.rows) {
-    if (y > 700) {
-      doc.addPage();
-      y = drawTableHead(doc, MARGIN);
-      doc.font("Helvetica").fontSize(9);
-    }
+  for (const group of order.groups) {
+    y = drawGroup(doc, company, group, y);
+  }
 
-    const values = [
-      row.momentName,
-      formatDuration(row.minutes),
-      row.costRateOre === null ? "—" : `${formatCurrency(row.costRateOre)}/tim`,
-      row.costOre === null ? "saknas" : formatCurrency(row.costOre),
-    ];
-
-    let x = MARGIN + 8;
-    values.forEach((value, index) => {
-      // Raden utan timkostnad markeras i gult. Den är inte ett fel, men den är
-      // ett hål i summan, och det ska synas på raden och inte bara i en
-      // anmärkning längst ner som ögat hoppar över.
-      doc.fillColor(
-        row.costRateOre === null && index >= 2 ? "#a16207" : "#404040"
-      );
-      doc.text(value, x, y + 6, {
-        width: COLUMNS[index].width - 12,
-        align: COLUMNS[index].align,
-        lineBreak: false,
-      });
-      x += COLUMNS[index].width;
-    });
-
-    y += 20;
-    doc
-      .moveTo(MARGIN, y)
-      .lineTo(A4_WIDTH - MARGIN, y)
-      .strokeColor("#e5e5e5")
-      .stroke();
+  if (order.groups.length === 0) {
+    doc.font("Helvetica").fontSize(9).fillColor("#737373");
+    doc.text("Ingen registrerad tid på ordern.", MARGIN + 8, y + 8);
+    y += 26;
   }
 
   /* --- Summering ----------------------------------------------------------- */
 
-  if (y > 640) {
+  if (y > 620) {
     doc.addPage();
     y = MARGIN;
   }
@@ -189,14 +175,19 @@ function renderCalc(
   y = drawSumLine(
     doc,
     y,
-    "Total tid (tim:min)",
+    "Total operationstid (tim:min)",
     formatDuration(order.totalMinutes)
   );
-  y = drawSumLine(doc, y, "Total kostnad", formatCurrency(order.totalCostOre));
+  y = drawSumLine(
+    doc,
+    y,
+    "Total operationskostnad",
+    formatCurrency(order.totalCostOre)
+  );
 
   // Påslaget visas bara när det är påslaget som ger priset. På en
-  // fastprisorder är det inte påslaget som bestämt något, och att visa det
-  // hade sett ut som en uträkning som inte stämmer.
+  // fastprisorder har det inte bestämt något, och att visa det hade sett ut
+  // som en uträkning som inte stämmer.
   if (!order.priceIsFixed) {
     y = drawSumLine(
       doc,
@@ -221,8 +212,8 @@ function renderCalc(
   y += 38;
 
   // Vinsten står under priset och bara på fastprisordrar. På en löpande order
-  // är vinsten per definition påslaget, och att upprepa samma tal med ett
-  // annat namn får ett papper att se ut som om det säger mer än det gör.
+  // är vinsten per definition påslaget, och samma tal två gånger får ett
+  // papper att se ut som om det säger mer än det gör.
   if (order.priceIsFixed) {
     y = drawSumLine(doc, y, "Vinst i kronor", formatCurrency(order.profitOre));
     y = drawSumLine(
@@ -242,9 +233,9 @@ function renderCalc(
     notes.push(
       `${formatDuration(order.minutesWithoutRate)} (tim:min) saknar timkostnad ` +
         `och ingår inte i summan, som därför är lägre än den verkliga ` +
-        `kostnaden. ` +
-        `Fyll i timkostnad på arbetsmomentet — nya stämplingar får den då ` +
-        `automatiskt, medan redan registrerad tid behåller sitt gamla underlag`
+        `kostnaden. Fyll i timkostnad på arbetsmomentet — nya stämplingar får ` +
+        `den då automatiskt, medan redan registrerad tid behåller sitt gamla ` +
+        `underlag`
     );
   }
 
@@ -274,18 +265,18 @@ function renderCalc(
 
   /* --- Fördelning ---------------------------------------------------------- */
 
-  const withCost = order.rows.filter((row) => row.costOre !== null);
-
   if (order.totalCostOre > 0) {
     drawBarChart(doc, {
       title: "Kostnad per arbetsmoment",
-      items: withCost.map((row) => ({
-        label: row.momentName,
-        value: row.costOre ?? 0,
-        valueText: `${formatCurrency(row.costOre ?? 0)} · ${Math.round(
-          ((row.costOre ?? 0) / order.totalCostOre) * 100
-        )} %`,
-      })),
+      items: order.groups
+        .filter((group) => group.costOre > 0)
+        .map((group) => ({
+          label: group.momentName,
+          value: group.costOre,
+          valueText: `${formatCurrency(group.costOre)} · ${Math.round(
+            (group.costOre / order.totalCostOre) * 100
+          )} %`,
+        })),
       startY: y,
       marginLeft: MARGIN,
       contentWidth: CONTENT_WIDTH,
@@ -309,6 +300,8 @@ function renderCalc(
   );
 }
 
+/* --- Ritverktyg ----------------------------------------------------------- */
+
 function drawTableHead(doc: PDFKit.PDFDocument, y: number): number {
   doc.rect(MARGIN, y, CONTENT_WIDTH, 22).fill("#0a0a0a");
   doc.font("Helvetica-Bold").fontSize(9).fillColor("#ffffff");
@@ -318,11 +311,115 @@ function drawTableHead(doc: PDFKit.PDFDocument, y: number): number {
     doc.text(column.label, x, y + 7, {
       width: column.width - 12,
       align: column.align,
+      lineBreak: false,
     });
     x += column.width;
   }
 
   return y + 22;
+}
+
+/**
+ * Ett arbetsmoment: namnet, sina stämplingar och en delsumma.
+ *
+ * Gruppnamnet står på egen rad i stället för i en kolumn som upprepas på varje
+ * rad. Med tretton svetsningar i följd sparar det tretton upprepningar av
+ * ordet, och blicken hittar gränsen mellan grupperna utan att leta.
+ */
+function drawGroup(
+  doc: PDFKit.PDFDocument,
+  company: CalcCompany,
+  group: OrderCalcGroup,
+  startY: number
+): number {
+  let y = startY;
+
+  // Rubriken får inte bli ensam kvar längst ner på en sida.
+  if (y + 40 > PAGE_BREAK_Y) {
+    doc.addPage();
+    y = drawTableHead(doc, MARGIN);
+  }
+
+  y += 8;
+  doc.font("Helvetica-Bold").fontSize(10).fillColor("#0a0a0a");
+  doc.text(group.momentName, MARGIN + 8, y, { width: 300 });
+  y += 16;
+
+  for (const entry of group.entries) {
+    if (y + 20 > PAGE_BREAK_Y) {
+      doc.addPage();
+      y = drawTableHead(doc, MARGIN) + 8;
+    }
+
+    const values = [
+      entry.employeeNumber
+        ? `${entry.employeeName} (${entry.employeeNumber})`
+        : entry.employeeName,
+      formatDate(entry.clockInAt, company.timezone),
+      formatTime(entry.clockInAt, company.timezone),
+      entry.ongoing ? "pågår" : formatTime(entry.clockOutAt!, company.timezone),
+      formatDuration(entry.minutes),
+      entry.costOre === null ? "saknas" : formatCurrency(entry.costOre),
+    ];
+
+    let x = MARGIN + 8;
+    values.forEach((value, index) => {
+      // Raden utan timkostnad markeras i gult. Den är inte ett fel, men den är
+      // ett hål i summan, och det ska synas på raden och inte bara i en
+      // anmärkning längst ner som ögat hoppar över.
+      doc.font("Helvetica").fontSize(9);
+      doc.fillColor(
+        entry.costOre === null && index === 5 ? "#a16207" : "#404040"
+      );
+      doc.text(value, x, y + 5, {
+        width: COLUMNS[index].width - 12,
+        align: COLUMNS[index].align,
+        lineBreak: false,
+      });
+      x += COLUMNS[index].width;
+    });
+
+    y += 18;
+    doc
+      .moveTo(MARGIN, y)
+      .lineTo(A4_WIDTH - MARGIN, y)
+      .strokeColor("#f0f0f0")
+      .stroke();
+  }
+
+  /* Delsumma för gruppen. */
+
+  if (y + 24 > PAGE_BREAK_Y) {
+    doc.addPage();
+    y = drawTableHead(doc, MARGIN);
+  }
+
+  doc.rect(MARGIN, y, CONTENT_WIDTH, 20).fill("#f5f5f5");
+  doc.font("Helvetica-Bold").fontSize(9).fillColor("#0a0a0a");
+  doc.text(`Totalt för ${group.momentName}`, MARGIN + 8, y + 6, { width: 260 });
+
+  // Delsummans tid och kostnad ska stå rakt under sina kolumner, inte
+  // ungefär där. Bredderna adderas i stället för att skrivas av för hand —
+  // ändras en kolumn följer summan med.
+  const timeX =
+    MARGIN +
+    8 +
+    COLUMNS[0].width +
+    COLUMNS[1].width +
+    COLUMNS[2].width +
+    COLUMNS[3].width;
+  doc.text(formatDuration(group.minutes), timeX, y + 6, {
+    width: COLUMNS[4].width - 12,
+    align: "right",
+    lineBreak: false,
+  });
+  doc.text(formatCurrency(group.costOre), timeX + COLUMNS[4].width, y + 6, {
+    width: COLUMNS[5].width - 12,
+    align: "right",
+    lineBreak: false,
+  });
+
+  return y + 24;
 }
 
 /** En rad i summeringen: etikett till vänster, belopp till höger. */

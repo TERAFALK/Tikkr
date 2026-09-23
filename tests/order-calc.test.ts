@@ -110,10 +110,12 @@ describe("kostnad per order", () => {
 
     expect(calc.totalMinutes).toBe(60);
     expect(calc.totalCostOre).toBe(18000);
-    expect(calc.rows).toHaveLength(1);
-    expect(calc.rows[0].momentName).toBe("Svetsning");
-    expect(calc.rows[0].costRateOre).toBe(18000);
-    expect(calc.rows[0].costOre).toBe(18000);
+    expect(calc.groups).toHaveLength(1);
+    expect(calc.groups[0].momentName).toBe("Svetsning");
+    expect(calc.groups[0].costOre).toBe(18000);
+    expect(calc.groups[0].entries).toHaveLength(1);
+    expect(calc.groups[0].entries[0].costRateOre).toBe(18000);
+    expect(calc.groups[0].entries[0].employeeName).toBe("Anna Andersson");
   });
 
   it("räknar delar av en timme", async () => {
@@ -129,9 +131,11 @@ describe("kostnad per order", () => {
 
     const calc = await calcFor(order);
 
-    expect(calc.rows).toHaveLength(1);
-    expect(calc.rows[0].minutes).toBe(90);
-    expect(calc.rows[0].costOre).toBe(27000);
+    // En grupp, men två rader i den. Varje stämpling ska gå att se.
+    expect(calc.groups).toHaveLength(1);
+    expect(calc.groups[0].entries).toHaveLength(2);
+    expect(calc.groups[0].minutes).toBe(90);
+    expect(calc.groups[0].costOre).toBe(27000);
   });
 
   it("håller isär olika arbetsmoment", async () => {
@@ -140,10 +144,10 @@ describe("kostnad per order", () => {
 
     const calc = await calcFor(order);
 
-    expect(calc.rows).toHaveLength(2);
+    expect(calc.groups).toHaveLength(2);
     expect(calc.totalCostOre).toBe(30000);
     // Dyrast först — den som läser en kalkyl vill veta vad som kostade mest.
-    expect(calc.rows[0].momentName).toBe("Svetsning");
+    expect(calc.groups[0].momentName).toBe("Svetsning");
   });
 
   it("räknar inte med andra ordrars tid", async () => {
@@ -203,7 +207,7 @@ describe("en prishöjning rör aldrig redan registrerad tid", () => {
 
     const calc = await calcFor(order);
 
-    expect(calc.rows[0].costRateOre).toBe(18000);
+    expect(calc.groups[0].entries[0].costRateOre).toBe(18000);
     expect(calc.totalCostOre).toBe(18000);
   });
 
@@ -219,17 +223,83 @@ describe("en prishöjning rör aldrig redan registrerad tid", () => {
 
     const calc = await calcFor(order);
 
-    // Samma moment, två priser — alltså två rader. Att slå ihop dem hade
-    // krävt ett pris som ingen av stämplingarna faktiskt hade.
-    expect(calc.rows).toHaveLength(2);
+    // Ett moment, två stämplingar till olika pris. Varje rad bär sitt eget
+    // pris — att slå ihop dem hade krävt ett pris som ingen av dem hade.
+    expect(calc.groups).toHaveLength(1);
+    expect(calc.groups[0].entries).toHaveLength(2);
     expect(calc.totalCostOre).toBe(38000);
+    expect(calc.groups[0].costOre).toBe(38000);
 
     // Uttrycklig jämförelse: Array.sort utan den sorterar som text, och
     // "18000" < "20000" råkar stämma bara så länge talen är lika långa.
-    const rates = calc.rows
-      .map((row) => row.costRateOre ?? 0)
+    const rates = calc.groups[0].entries
+      .map((entry) => entry.costRateOre ?? 0)
       .sort((a, b) => a - b);
     expect(rates).toEqual([18000, 20000]);
+  });
+});
+
+describe("detaljraderna", () => {
+  it("bär det som ska stå på en rad i efterkalkylen", async () => {
+    await work(order, svetsning, 102, "2026-09-08T13:00:00Z");
+
+    const entry = (await calcFor(order)).groups[0].entries[0];
+
+    expect(entry.employeeName).toBe("Anna Andersson");
+    expect(entry.minutes).toBe(102);
+    expect(entry.costRateOre).toBe(18000);
+    expect(entry.costOre).toBe(30600);
+    expect(entry.ongoing).toBe(false);
+    expect(entry.clockOutAt).not.toBeNull();
+  });
+
+  it("listar stämplingarna i tidsordning inom gruppen", async () => {
+    await work(order, svetsning, 60, "2026-09-08T06:00:00Z");
+    await work(order, svetsning, 60, "2026-09-08T10:00:00Z");
+    await work(order, svetsning, 60, "2026-09-08T14:00:00Z");
+
+    const entries = (await calcFor(order)).groups[0].entries;
+
+    expect(entries).toHaveLength(3);
+    expect(entries[0].clockInAt.getTime()).toBeLessThan(
+      entries[1].clockInAt.getTime()
+    );
+    expect(entries[1].clockInAt.getTime()).toBeLessThan(
+      entries[2].clockInAt.getTime()
+    );
+  });
+
+  it("sätter grupperna dyrast först", async () => {
+    // Montering kostar mindre per timme men får mer tid — det är kronorna
+    // som ska styra ordningen, inte timmarna.
+    await work(order, svetsning, 60, "2026-09-08T06:00:00Z");
+    await work(order, montering, 120, "2026-09-08T08:00:00Z");
+
+    const groups = (await calcFor(order)).groups;
+
+    expect(groups[0].momentName).toBe("Montering");
+    expect(groups[0].costOre).toBe(24000);
+    expect(groups[1].momentName).toBe("Svetsning");
+    expect(groups[1].costOre).toBe(18000);
+  });
+
+  it("räknar antalet stämplingar på ordern", async () => {
+    await work(order, svetsning, 60, "2026-09-08T06:00:00Z");
+    await work(order, montering, 60, "2026-09-08T08:00:00Z");
+
+    expect((await calcFor(order)).entryCount).toBe(2);
+  });
+
+  it("delsumman per grupp är summan av dess rader", async () => {
+    await work(order, svetsning, 43, "2026-09-08T06:00:00Z");
+    await work(order, svetsning, 17, "2026-09-08T08:00:00Z");
+
+    const group = (await calcFor(order)).groups[0];
+    const sum = group.entries.reduce((total, e) => total + (e.costOre ?? 0), 0);
+
+    // Avrundning sker per rad, precis som i kundens nuvarande rapport.
+    // Delsumman måste därför vara summan av de avrundade raderna.
+    expect(group.costOre).toBe(sum);
   });
 });
 
@@ -313,9 +383,12 @@ describe("tid utan timkostnad", () => {
     expect(calc.totalCostOre).toBe(18000);
     expect(calc.minutesWithoutRate).toBe(120);
 
-    const saknar = calc.rows.find((row) => row.costRateOre === null);
-    expect(saknar?.momentName).toBe("Kvalitetskontroll");
-    expect(saknar?.costOre).toBeNull();
+    const saknar = calc.groups.find(
+      (group) => group.momentName === "Kvalitetskontroll"
+    );
+    expect(saknar?.costOre).toBe(0);
+    expect(saknar?.minutesWithoutRate).toBe(120);
+    expect(saknar?.entries[0].costOre).toBeNull();
   });
 
   it("ger noll i kostnad när ingen tid har någon timkostnad", async () => {

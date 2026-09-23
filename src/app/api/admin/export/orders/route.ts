@@ -84,8 +84,8 @@ export async function GET(request: NextRequest) {
     // annat "order-1001.pdf" är precis den förväxling som inte får ske här.
     const calcBase =
       calcs.length === 1
-        ? `kalkyl-${slugify(calcs[0].orderNumber)}`
-        : `kalkyler-${slugify(companyName)}-${formatDate(new Date(), timeZone)}`;
+        ? `efterkalkyl-${slugify(calcs[0].orderNumber)}`
+        : `efterkalkyler-${slugify(companyName)}-${formatDate(new Date(), timeZone)}`;
 
     try {
       const pdf = await buildOrderCalcPdf(
@@ -101,12 +101,12 @@ export async function GET(request: NextRequest) {
         },
       });
     } catch (error) {
-      console.error("Kalkylen kunde inte skapas", error);
+      console.error("Efterkalkylen kunde inte skapas", error);
 
       return NextResponse.json(
         {
           error:
-            "Kalkylen kunde inte skapas. Felet står i serverloggen.",
+            "Efterkalkylen kunde inte skapas. Felet står i serverloggen.",
         },
         { status: 500 }
       );

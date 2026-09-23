@@ -148,8 +148,8 @@ export default function OrderActions({
           <MenuLink
             href={`${exportBase}&format=kalkyl`}
             icon={<IconReport />}
-            title="Ladda ner kalkyl"
-            description="Kostnad, påslag och pris — skicka inte till kunden"
+            title="Ladda ner efterkalkyl"
+            description="Alla stämplingar, kostnad och pris — skicka inte till kunden"
             onPick={() => menu.current?.close()}
           />
 

@@ -3,7 +3,7 @@ import { minutesBetween } from "./format";
 import { applyMarkup, costForMinutes } from "./money";
 
 /**
- * KALKYL PER ORDER — vad jobbet kostat, och vad det ska ge.
+ * EFTERKALKYL PER ORDER — vad jobbet kostat, och vad det ska ge.
  *
  * Skild från order-export.ts med flit, trots att frågorna liknar varandra.
  * Det här är ett INTERNT underlag med självkostnad och marginal; det andra är
@@ -15,27 +15,47 @@ import { applyMarkup, costForMinutes } from "./money";
  * rader som liknar varandra. Det är ett lågt pris för att ett misstag ska
  * kräva att någon skriver om en import i stället för att glömma ett filter.
  *
- * Raderna grupperas per arbetsmoment OCH timkostnad. Normalt blir det en rad
- * per moment. Har kostnaden höjts mitt under ordern blir det två — vilket är
- * det ärliga svaret, eftersom stämplingarna faktiskt kostade olika mycket.
+ * Formen följer den efterkalkyl kunden läser idag: varje stämpling på egen rad,
+ * grupperad per arbetsmoment, med en delsumma per grupp och en total sist.
+ * Grupperna kommer dyrast först — den som öppnar en efterkalkyl vill veta vad
+ * som kostade mest, inte i vilken ordning momenten råkar heta något.
  */
 
-export interface OrderCalcRow {
-  momentName: string;
+/** En enskild stämpling, som den står på sin rad i kalkylen. */
+export interface OrderCalcEntry {
+  employeeName: string;
+  employeeNumber: string | null;
+  clockInAt: Date;
+  clockOutAt: Date | null;
   minutes: number;
   /** Timkostnaden som gällde vid stämplingen. null när ingen var angiven. */
   costRateOre: number | null;
   /** Radens kostnad, eller null när timkostnad saknas. */
   costOre: number | null;
+  ongoing: boolean;
+  needsReview: boolean;
+  manual: boolean;
+}
+
+/** Ett arbetsmoment med sina stämplingar och sin delsumma. */
+export interface OrderCalcGroup {
+  momentId: string;
+  momentName: string;
+  entries: OrderCalcEntry[];
+  minutes: number;
+  /** Summan av de rader som HAR en timkostnad. */
+  costOre: number;
+  /** Tid i gruppen som saknar timkostnad och därför inte ingår i costOre. */
+  minutesWithoutRate: number;
 }
 
 export interface OrderCalc {
   orderId: string;
   orderNumber: string;
   customerName: string | null;
-  rows: OrderCalcRow[];
+  groups: OrderCalcGroup[];
+  entryCount: number;
   totalMinutes: number;
-  /** Summan av de rader som HAR en timkostnad. */
   totalCostOre: number;
   /**
    * Tid utan angiven timkostnad. Är den större än noll är kalkylen
@@ -89,7 +109,9 @@ export async function getOrderCalcs(
           clockInAt: true,
           clockOutAt: true,
           needsReview: true,
+          source: true,
           costRateOre: true,
+          employee: { select: { name: true, employeeNumber: true } },
           moment: { select: { id: true, name: true } },
         },
       },
@@ -97,10 +119,7 @@ export async function getOrderCalcs(
   });
 
   return orders.map((order) => {
-    // Nyckeln bär både momentet och kostnaden. Två stämplingar på samma
-    // moment till olika timpris ska inte slås ihop till en rad med ett pris
-    // som ingen av dem hade.
-    const groups = new Map<string, OrderCalcRow>();
+    const groups = new Map<string, OrderCalcGroup>();
 
     let totalMinutes = 0;
     let totalCostOre = 0;
@@ -110,44 +129,52 @@ export async function getOrderCalcs(
 
     for (const entry of order.timeEntries) {
       const minutes = minutesBetween(entry.clockInAt, entry.clockOutAt);
+
+      // Kostnaden räknas per rad, precis som i den rapport kunden läser idag.
+      // Det gör att en enskild rad går att kontrollräkna för hand — vilket är
+      // vad man gör när en siffra ser fel ut.
+      const costOre =
+        entry.costRateOre === null
+          ? null
+          : costForMinutes(minutes, entry.costRateOre);
+
       totalMinutes += minutes;
+      if (costOre === null) minutesWithoutRate += minutes;
+      else totalCostOre += costOre;
 
       if (entry.clockOutAt === null) ongoingCount += 1;
       if (entry.needsReview) ungradedCount += 1;
 
-      const rate = entry.costRateOre;
-      if (rate === null) minutesWithoutRate += minutes;
+      const group = groups.get(entry.moment.id) ?? {
+        momentId: entry.moment.id,
+        momentName: entry.moment.name,
+        entries: [],
+        minutes: 0,
+        costOre: 0,
+        minutesWithoutRate: 0,
+      };
 
-      const key = `${entry.moment.id}|${rate ?? "saknas"}`;
-      const existing = groups.get(key);
+      group.entries.push({
+        employeeName: entry.employee.name,
+        employeeNumber: entry.employee.employeeNumber,
+        clockInAt: entry.clockInAt,
+        clockOutAt: entry.clockOutAt,
+        minutes,
+        costRateOre: entry.costRateOre,
+        costOre,
+        ongoing: entry.clockOutAt === null,
+        needsReview: entry.needsReview,
+        manual: entry.source === "ADMIN_MANUAL",
+      });
 
-      if (existing) {
-        existing.minutes += minutes;
-      } else {
-        groups.set(key, {
-          momentName: entry.moment.name,
-          minutes,
-          costRateOre: rate,
-          costOre: null,
-        });
-      }
+      group.minutes += minutes;
+      if (costOre === null) group.minutesWithoutRate += minutes;
+      else group.costOre += costOre;
+
+      groups.set(entry.moment.id, group);
     }
 
-    // Kostnaden räknas ut EN gång per grupp, på gruppens hela tid. Hade varje
-    // stämpling avrundats för sig och summerats skulle ören försvinna för
-    // varje rad, och totalen inte stämma med det kunden räknar för hand.
-    const rows = [...groups.values()].map((row) => {
-      if (row.costRateOre === null) return row;
-
-      const costOre = costForMinutes(row.minutes, row.costRateOre);
-      totalCostOre += costOre;
-
-      return { ...row, costOre };
-    });
-
-    // Dyrast först. Den som läser en kalkyl vill veta vad som kostade mest,
-    // inte i vilken ordning momenten råkar heta något.
-    rows.sort((a, b) => (b.costOre ?? -1) - (a.costOre ?? -1));
+    const sorted = [...groups.values()].sort((a, b) => b.costOre - a.costOre);
 
     const markupPercent = order.markupPercent ?? companyMarkupPercent;
 
@@ -162,7 +189,8 @@ export async function getOrderCalcs(
       orderId: order.id,
       orderNumber: order.orderNumber,
       customerName: order.customerName,
-      rows,
+      groups: sorted,
+      entryCount: order.timeEntries.length,
       totalMinutes,
       totalCostOre,
       minutesWithoutRate,
