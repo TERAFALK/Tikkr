@@ -92,7 +92,7 @@ export async function clockIn(
     }
   }
 
-  await assertBelongsToCompany(db, input);
+  const { momentCostRateOre } = await assertBelongsToCompany(db, input);
 
   return db.$transaction(async (tx) => {
     const open = await tx.timeEntry.findFirst({
@@ -130,6 +130,9 @@ export async function clockIn(
         orderId: input.orderId,
         momentId: input.momentId,
         clockInAt: at,
+        // Kopian av momentets timkostnad. Se schemat: en senare prishöjning
+        // får inte ändra en kalkyl som redan tagits ut och fakturerats.
+        costRateOre: momentCostRateOre,
         source: input.fromOfflineQueue ? "KIOSK_OFFLINE_SYNC" : "KIOSK",
         kioskDeviceId: input.kioskDeviceId ?? null,
         sourceIp: input.sourceIp ?? null,
@@ -366,7 +369,9 @@ export async function createManualEntry(
 ): Promise<TimeEntry> {
   const db = forCompany(companyId);
 
-  await assertBelongsToCompany(db, input, { historical: true });
+  const { momentCostRateOre } = await assertBelongsToCompany(db, input, {
+    historical: true,
+  });
   assertSaneInterval(input.clockInAt, input.clockOutAt);
   await assertNoOverlap(db, input.employeeId, input.clockInAt, input.clockOutAt);
 
@@ -378,6 +383,10 @@ export async function createManualEntry(
       momentId: input.momentId,
       clockInAt: input.clockInAt,
       clockOutAt: input.clockOutAt,
+      // Momentets timkostnad som den är NU. En tid som skrivs in i efterhand
+      // saknar egen historia — det enda systemet vet är vad momentet kostar
+      // idag, och att gissa något annat vore att hitta på.
+      costRateOre: momentCostRateOre,
       source: "ADMIN_MANUAL",
       needsReview: false,
       reviewNote: `Inlagd för hand av ${input.byEmail}.`,
@@ -393,7 +402,9 @@ export async function updateEntryManually(
 ): Promise<TimeEntry> {
   const db = forCompany(companyId);
 
-  await assertBelongsToCompany(db, input, { historical: true });
+  const { momentCostRateOre } = await assertBelongsToCompany(db, input, {
+    historical: true,
+  });
   assertSaneInterval(input.clockInAt, input.clockOutAt);
   await assertNoOverlap(
     db,
@@ -411,6 +422,10 @@ export async function updateEntryManually(
       momentId: input.momentId,
       clockInAt: input.clockInAt,
       clockOutAt: input.clockOutAt,
+      // Följer med momentet. Flyttas posten till ett annat arbetsmoment ska
+      // den också kosta det momentets timpris — annars hade kalkylen visat
+      // svetsning till måleripris.
+      costRateOre: momentCostRateOre,
       source: "ADMIN_MANUAL",
       needsReview: false,
       reviewNote: `Ändrad för hand av ${input.byEmail}.`,
@@ -490,7 +505,7 @@ async function assertBelongsToCompany(
   db: CompanyDb,
   input: { employeeId: string; orderId: string; momentId: string },
   options: { historical?: boolean } = {}
-) {
+): Promise<{ momentCostRateOre: number | null }> {
   const [employee, order, moment] = await Promise.all([
     db.employee.findFirst({ where: { id: input.employeeId } }),
     db.order.findFirst({ where: { id: input.orderId } }),
@@ -501,11 +516,17 @@ async function assertBelongsToCompany(
   if (!order) throw new ClockError("Okänd order.");
   if (!moment) throw new ClockError("Okänt arbetsmoment.");
 
-  if (options.historical) return;
+  // Momentet är redan hämtat, så timkostnaden följer med gratis. Den läses
+  // här och inte vid skrivningen, för att slippa en fråga till.
+  const result = { momentCostRateOre: moment.costRateOre };
+
+  if (options.historical) return result;
 
   if (!employee.active) throw new ClockError("Den anställde är inte aktiv.");
   if (order.status === "CLOSED") throw new ClockError("Ordern är stängd.");
   if (!moment.active) throw new ClockError("Arbetsmomentet är inte aktivt.");
+
+  return result;
 }
 
 /** Prismas felkod för brott mot en unik-regel. */

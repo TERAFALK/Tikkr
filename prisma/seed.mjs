@@ -34,6 +34,8 @@ async function main() {
       id: "demo-company",
       name: "Demo Mekaniska AB",
       subscriptionStatus: "ACTIVE",
+      // 1,4 — samma påslag som pilotkunden räknar med i sitt kalkylark.
+      markupPercent: 140,
       employees: {
         create: [
           { name: "Anna Andersson" },
@@ -43,11 +45,15 @@ async function main() {
         ],
       },
       workMoments: {
+        // Timkostnader i ören. Maskintunga moment kostar mer per timme än
+        // montering, så kalkylen visar något som går att känna igen.
         create: [
-          { name: "Svetsning" },
-          { name: "Fräsning" },
-          { name: "Montering" },
-          { name: "Lackering" },
+          { name: "Svetsning", costRateOre: 18000 },
+          { name: "Fräsning", costRateOre: 24500 },
+          { name: "Montering", costRateOre: 12000 },
+          { name: "Lackering", costRateOre: 16500 },
+          // Lämnad utan kostnad med flit: visar hur kalkylen flaggar tid som
+          // saknar underlag i stället för att räkna den som noll.
           { name: "Kvalitetskontroll" },
         ],
       },
@@ -70,7 +76,12 @@ async function main() {
       name: "Grannens Verkstad AB",
       subscriptionStatus: "TRIALING",
       employees: { create: [{ name: "Erik Ek" }, { name: "Frida Falk" }] },
-      workMoments: { create: [{ name: "Svarvning" }, { name: "Slipning" }] },
+      workMoments: {
+        create: [
+          { name: "Svarvning", costRateOre: 21000 },
+          { name: "Slipning", costRateOre: 14000 },
+        ],
+      },
       // Samma ordernummer som demoföretaget — helt tillåtet, de ska inte krocka.
       orders: { create: [{ orderNumber: "2601", customerName: "Egen kund" }] },
     },

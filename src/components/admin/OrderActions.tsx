@@ -2,7 +2,10 @@
 
 import { useActionState, useEffect, useRef } from "react";
 import { useFormStatus } from "react-dom";
-import type { OrderToggleState } from "@/app/admin/(panel)/ordrar/actions";
+import type {
+  OrderFormState,
+  OrderToggleState,
+} from "@/app/admin/(panel)/ordrar/actions";
 import { Alert, Button, Field, Input } from "@/components/ui";
 import { formatDuration, minutesBetween } from "@/lib/format";
 import BudgetBar from "./BudgetBar";
@@ -28,8 +31,12 @@ export default function OrderActions({
     entries: number;
     minutes: number;
     budgetMinutes: number | null;
+    markupPercent: number | null;
   };
-  updateAction: (formData: FormData) => void | Promise<void>;
+  updateAction: (
+    state: OrderFormState,
+    formData: FormData
+  ) => Promise<OrderFormState>;
   toggleAction: (
     state: OrderToggleState,
     formData: FormData
@@ -48,6 +55,17 @@ export default function OrderActions({
     toggleAction,
     {}
   );
+
+  const [editState, submitEdit] = useActionState<OrderFormState, FormData>(
+    updateAction,
+    {}
+  );
+
+  // Rutan stängs bara när sparandet gick igenom. Ett avvisat påslag ska stå
+  // kvar med sitt felmeddelande, inte försvinna och lämna kvar det gamla.
+  useEffect(() => {
+    if (editState.savedAt) edit.current?.close();
+  }, [editState.savedAt]);
 
   const blockers = toggleState.blockers ?? [];
 
@@ -116,6 +134,21 @@ export default function OrderActions({
             icon={<IconReport />}
             title="Ladda ner Excel"
             description="Samma innehåll, att räkna vidare på"
+            onPick={() => menu.current?.close()}
+          />
+
+          <p className="px-3 pb-1 pt-3 text-[11px] font-semibold uppercase tracking-wider text-neutral-400">
+            Internt
+          </p>
+
+          {/* Egen rubrik och egen knapp, inte ett kryss i rutan ovanför.
+              Kalkylen innehåller självkostnad och marginal och får aldrig
+              förväxlas med underlaget som skickas till kunden. */}
+          <MenuLink
+            href={`${exportBase}&format=kalkyl`}
+            icon={<IconReport />}
+            title="Ladda ner kalkyl"
+            description="Kostnad, påslag och pris — skicka inte till kunden"
             onPick={() => menu.current?.close()}
           />
 
@@ -190,8 +223,9 @@ export default function OrderActions({
           </h2>
         </div>
 
-        <form action={updateAction} onSubmit={() => edit.current?.close()}>
+        <form action={submitEdit}>
           <div className="space-y-4 px-5 py-5">
+            {editState.error && <Alert>{editState.error}</Alert>}
             <input type="hidden" name="id" value={order.id} />
             <Field label="Ordernummer">
               <Input
@@ -222,6 +256,21 @@ export default function OrderActions({
                 placeholder="40"
               />
             </Field>
+            <Field
+              label="Påslag"
+              hint="Faktor, t.ex. 1,4. Lämna tomt för företagets standard."
+            >
+              <Input
+                name="markup"
+                inputMode="decimal"
+                defaultValue={
+                  order.markupPercent === null
+                    ? ""
+                    : (order.markupPercent / 100).toFixed(2).replace(".", ",")
+                }
+                placeholder="1,4"
+              />
+            </Field>
           </div>
 
           <div className="flex justify-end gap-2 border-t border-neutral-200 bg-neutral-50 px-5 py-3">
@@ -232,7 +281,7 @@ export default function OrderActions({
             >
               Avbryt
             </Button>
-            <Button type="submit">Spara</Button>
+            <SaveOrderButton />
           </div>
         </form>
       </dialog>
@@ -303,6 +352,16 @@ export default function OrderActions({
         </div>
       </dialog>
     </>
+  );
+}
+
+function SaveOrderButton() {
+  const { pending } = useFormStatus();
+
+  return (
+    <Button type="submit" disabled={pending}>
+      {pending ? "Sparar…" : "Spara"}
+    </Button>
   );
 }
 

@@ -3,7 +3,9 @@ import ExcelJS from "exceljs";
 import { requireAdmin } from "@/lib/admin-session";
 import { unsafeGlobalPrisma } from "@/lib/db";
 import { getOrderExports, slugify, type OrderExport } from "@/lib/order-export";
+import { getOrderCalcs } from "@/lib/order-calc";
 import { buildOrderPdf, type PdfCompany } from "@/lib/pdf";
+import { buildOrderCalcPdf } from "@/lib/calc-pdf";
 import { formatDate, toDecimalHours } from "@/lib/format";
 
 /**
@@ -15,7 +17,12 @@ import { formatDate, toDecimalHours } from "@/lib/format";
  * Excel är samma innehåll men att räkna vidare på: en flik per order plus en
  * sammanställning först.
  *
- * Flera ordrar ger EN fil i båda fallen. Tio separata filer skulle bli tio
+ * Kalkyl är något annat: ett INTERNT underlag med självkostnad, påslag och
+ * pris. Det har egen datahämtning (order-calc.ts) och egen ritning
+ * (calc-pdf.ts), och delar inte en rad med de två andra. Se toppkommentaren i
+ * calc-pdf.ts för varför de hålls isär.
+ *
+ * Flera ordrar ger EN fil i samtliga fall. Tio separata filer skulle bli tio
  * bilagor att hålla reda på, och en PDF med tio sidor skrivs ut i ett svep.
  */
 
@@ -25,15 +32,88 @@ export async function GET(request: NextRequest) {
   const { db, companyId, companyName } = await requireAdmin();
   const params = request.nextUrl.searchParams;
 
-  const format = params.get("format") === "excel" ? "excel" : "pdf";
+  const requested = params.get("format");
+  const format =
+    requested === "excel" ? "excel" : requested === "kalkyl" ? "kalkyl" : "pdf";
   const orderIds = params.getAll("order").filter(Boolean);
 
   if (orderIds.length === 0) {
-    return NextResponse.json(
-      { error: "Ingen order vald." },
-      { status: 400 }
-    );
+    return NextResponse.json({ error: "Ingen order vald." }, { status: 400 });
   }
+
+  const company = await unsafeGlobalPrisma.company.findUnique({
+    where: { id: companyId },
+    select: {
+      timezone: true,
+      // Standardpåslaget. Ordern kan ha ett eget som gäller före detta.
+      markupPercent: true,
+      // Bara den breda används på utskrifter. Märket i panelen är fyrkantigt
+      // och skulle bli en klump i ett brevhuvud.
+      logoWideData: true,
+      logoWideMimeType: true,
+    },
+  });
+
+  const timeZone = company?.timezone ?? "Europe/Stockholm";
+
+  const logo =
+    company?.logoWideData && company.logoWideMimeType
+      ? {
+          data: Buffer.from(company.logoWideData),
+          mimeType: company.logoWideMimeType,
+        }
+      : null;
+
+  /* --- Kalkyl: eget spår hela vägen --------------------------------------- */
+
+  if (format === "kalkyl") {
+    const calcs = await getOrderCalcs(
+      db,
+      orderIds,
+      company?.markupPercent ?? 100
+    );
+
+    if (calcs.length === 0) {
+      return NextResponse.json(
+        { error: "Hittade ingen order." },
+        { status: 404 }
+      );
+    }
+
+    // Filnamnet säger vad filen är. Ett "order-1001.pdf" i mappen bredvid ett
+    // annat "order-1001.pdf" är precis den förväxling som inte får ske här.
+    const calcBase =
+      calcs.length === 1
+        ? `kalkyl-${slugify(calcs[0].orderNumber)}`
+        : `kalkyler-${slugify(companyName)}-${formatDate(new Date(), timeZone)}`;
+
+    try {
+      const pdf = await buildOrderCalcPdf(
+        { name: companyName, timezone: timeZone, logo },
+        calcs
+      );
+
+      return new NextResponse(new Uint8Array(pdf), {
+        headers: {
+          "content-type": "application/pdf",
+          "content-disposition": `attachment; filename="${calcBase}.pdf"`,
+          "cache-control": "no-store",
+        },
+      });
+    } catch (error) {
+      console.error("Kalkylen kunde inte skapas", error);
+
+      return NextResponse.json(
+        {
+          error:
+            "Kalkylen kunde inte skapas. Felet står i serverloggen.",
+        },
+        { status: 500 }
+      );
+    }
+  }
+
+  /* --- Tidsunderlag: PDF eller Excel -------------------------------------- */
 
   // Både öppna och stängda ordrar går att exportera. En färdig order är ofta
   // den man vill titta på — "hur lång tid tog ett liknande jobb förra gången"
@@ -43,19 +123,6 @@ export async function GET(request: NextRequest) {
   if (orders.length === 0) {
     return NextResponse.json({ error: "Hittade ingen order." }, { status: 404 });
   }
-
-  const company = await unsafeGlobalPrisma.company.findUnique({
-    where: { id: companyId },
-    select: {
-      timezone: true,
-      // Bara den breda används på utskrifter. Märket i panelen är fyrkantigt
-      // och skulle bli en klump i ett brevhuvud.
-      logoWideData: true,
-      logoWideMimeType: true,
-    },
-  });
-
-  const timeZone = company?.timezone ?? "Europe/Stockholm";
 
   const fileBase =
     orders.length === 1
@@ -79,13 +146,7 @@ export async function GET(request: NextRequest) {
   const pdfCompany: PdfCompany = {
     name: companyName,
     timezone: timeZone,
-    logo:
-      company?.logoWideData && company.logoWideMimeType
-        ? {
-            data: Buffer.from(company.logoWideData),
-            mimeType: company.logoWideMimeType,
-          }
-        : null,
+    logo,
   };
 
   try {

@@ -1,7 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import type { OrderToggleState } from "@/app/admin/(panel)/ordrar/actions";
+import type {
+  OrderFormState,
+  OrderToggleState,
+} from "@/app/admin/(panel)/ordrar/actions";
 import OrderActions from "./OrderActions";
 import BudgetBar from "./BudgetBar";
 import {
@@ -36,6 +39,8 @@ export interface OrderRow {
   minutes: number;
   /** Beräknad tid i minuter, eller null när ingen angetts. */
   budgetMinutes: number | null;
+  /** Orderns eget påslag i procent, eller null för företagets standard. */
+  markupPercent: number | null;
 }
 
 export default function OrdersTable({
@@ -44,7 +49,10 @@ export default function OrdersTable({
   toggleAction,
 }: {
   orders: OrderRow[];
-  updateAction: (formData: FormData) => void | Promise<void>;
+  updateAction: (
+    state: OrderFormState,
+    formData: FormData
+  ) => Promise<OrderFormState>;
   toggleAction: (
     state: OrderToggleState,
     formData: FormData

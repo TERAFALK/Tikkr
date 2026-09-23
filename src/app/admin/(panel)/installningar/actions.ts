@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { requireAdmin } from "@/lib/admin-session";
 import { unsafeGlobalPrisma } from "@/lib/db";
+import { parseMarkupPercent } from "@/lib/money";
 import { parseTimeOfDay } from "@/lib/time-zone";
 
 /**
@@ -24,6 +25,49 @@ export async function saveCompany(formData: FormData) {
 
   revalidatePath("/admin/installningar");
   revalidatePath("/admin");
+}
+
+export interface MarkupState {
+  error?: string;
+  ok?: string;
+}
+
+/**
+ * Sparar företagets standardpåslag i kalkylen.
+ *
+ * Fältet tar en FAKTOR ("1,4"), inte procent, eftersom det är så kunden redan
+ * räknar i sitt kalkylark. Tomt fält betyder inget påslag alls — kalkylen
+ * visar då ren självkostnad, vilket är ett rimligt läge för den som bara vill
+ * veta vad ett jobb kostat.
+ *
+ * Ett felaktigt värde sparas inte tyst. Ett påslag som blir fyrtio gånger för
+ * högt syns inte på en siffra i en ruta, men det syns på en faktura.
+ */
+export async function saveMarkup(
+  _previous: MarkupState,
+  formData: FormData
+): Promise<MarkupState> {
+  const { companyId } = await requireAdmin();
+
+  const raw = String(formData.get("markup") ?? "").trim();
+  const percent = raw === "" ? 100 : parseMarkupPercent(raw);
+
+  if (percent === null) {
+    return {
+      error:
+        "Skriv påslaget som en faktor mellan 1 och 10, till exempel 1,4 för " +
+        "fyrtio procents påslag. Lämna tomt för inget påslag.",
+    };
+  }
+
+  await unsafeGlobalPrisma.company.update({
+    where: { id: companyId },
+    data: { markupPercent: percent },
+  });
+
+  revalidatePath("/admin/installningar");
+
+  return { ok: "Påslaget sparat." };
 }
 
 /** Bildformat som fungerar både på skärm och i PDF. */

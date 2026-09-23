@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { requireAdmin } from "@/lib/admin-session";
 import { ClockError, closeOrder, openEntriesOnOrder } from "@/lib/clock";
+import { parseMarkupPercent } from "@/lib/money";
 
 const PATH = "/admin/ordrar";
 
@@ -44,24 +45,58 @@ export async function createOrder(formData: FormData) {
   revalidatePath(PATH);
 }
 
-export async function updateOrder(formData: FormData) {
+export interface OrderFormState {
+  error?: string;
+  /** Sattes senast sparandet gick igenom. Stänger rutan i gränssnittet. */
+  savedAt?: number;
+}
+
+/**
+ * Ändrar en orders uppgifter.
+ *
+ * Svarar med ett tillstånd i stället för att bara köra, eftersom påslaget kan
+ * avvisas. Ett påslag som skrivits som "40" när man menade "1,4" ska inte
+ * sparas tyst — felet syns först på en faktura, och då är det för sent.
+ */
+export async function updateOrder(
+  _previous: OrderFormState,
+  formData: FormData
+): Promise<OrderFormState> {
   const { db } = await requireAdmin();
 
   const id = String(formData.get("id") ?? "");
   const orderNumber = String(formData.get("orderNumber") ?? "").trim();
   const customerName = String(formData.get("customerName") ?? "").trim();
-  if (!id || !orderNumber) return;
+  if (!id) return { error: "Ingen order angiven." };
+  if (!orderNumber) return { error: "Ange ett ordernummer." };
 
-  await db.order.update({
+  // Tomt fält betyder "företagets standardpåslag gäller", vilket är det
+  // normala. Bara ett ifyllt men obegripligt värde är ett fel.
+  const rawMarkup = String(formData.get("markup") ?? "").trim();
+  const markupPercent = rawMarkup === "" ? null : parseMarkupPercent(rawMarkup);
+
+  if (rawMarkup !== "" && markupPercent === null) {
+    return {
+      error:
+        "Skriv påslaget som en faktor mellan 1 och 10, till exempel 1,4 för " +
+        "fyrtio procents påslag. Lämna tomt för företagets standard.",
+    };
+  }
+
+  // updateMany och inte update: id:t kommer från formuläret och får aldrig
+  // kunna peka på en annan kunds order.
+  await db.order.updateMany({
     where: { id },
     data: {
       orderNumber,
       customerName: customerName || null,
       budgetMinutes: parseHours(formData.get("budgetHours")),
+      markupPercent,
     },
   });
 
   revalidatePath(PATH);
+  return { savedAt: Date.now() };
 }
 
 export interface OrderToggleState {

@@ -1,9 +1,10 @@
 import { requireAdmin } from "@/lib/admin-session";
 import { unsafeGlobalPrisma } from "@/lib/db";
 import LogoUpload from "@/components/admin/LogoUpload";
+import MarkupForm from "@/components/admin/MarkupForm";
 import { Button, ButtonLink, Card, CardHeader, Field, Input } from "@/components/ui";
 import { formatDate } from "@/lib/format";
-import { saveCompany } from "./actions";
+import { saveCompany, saveMarkup } from "./actions";
 
 export const dynamic = "force-dynamic";
 
@@ -17,6 +18,7 @@ export default async function CompanySettingsPage() {
         name: true,
         createdAt: true,
         subscriptionStatus: true,
+        markupPercent: true,
         logoSquareMimeType: true,
         logoWideMimeType: true,
         logoUpdatedAt: true,
@@ -42,6 +44,14 @@ export default async function CompanySettingsPage() {
           </Field>
           <Button type="submit">Spara</Button>
         </form>
+      </Card>
+
+      <Card>
+        <CardHeader
+          title="Kalkyl"
+          description="Påslaget som används när kostnad räknas om till pris. Timkostnaden sätts per arbetsmoment."
+        />
+        <MarkupForm action={saveMarkup} markupPercent={company.markupPercent} />
       </Card>
 
       <Card>

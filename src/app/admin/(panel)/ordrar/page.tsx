@@ -18,6 +18,7 @@ export default async function OrdersPage() {
       customerName: true,
       status: true,
       budgetMinutes: true,
+      markupPercent: true,
       timeEntries: { select: { clockInAt: true, clockOutAt: true } },
     },
   });
@@ -28,6 +29,7 @@ export default async function OrdersPage() {
     customerName: order.customerName,
     status: order.status,
     budgetMinutes: order.budgetMinutes,
+    markupPercent: order.markupPercent,
     entries: order.timeEntries.length,
     minutes: order.timeEntries.reduce(
       (total, entry) => total + minutesBetween(entry.clockInAt, entry.clockOutAt),

@@ -14,7 +14,13 @@ import {
   Th,
   Tr,
 } from "@/components/ui";
+import { formatCurrency } from "@/lib/money";
 import { createMoment, renameMoment, toggleMoment } from "./actions";
+
+/** Hjälptexten är densamma i båda rutorna, så den står på ett ställe. */
+const COST_HINT =
+  "Kronor per timme, företagets kostnad. Lämna tomt om du inte använder kalkylen. " +
+  "En ändring gäller bara tid som registreras framöver.";
 
 export const dynamic = "force-dynamic";
 
@@ -27,6 +33,7 @@ export default async function MomentsPage() {
       id: true,
       name: true,
       active: true,
+      costRateOre: true,
       _count: { select: { timeEntries: true } },
     },
   });
@@ -41,6 +48,9 @@ export default async function MomentsPage() {
     >
       <Field label="Namn">
         <Input name="name" placeholder="Svetsning" required autoFocus />
+      </Field>
+      <Field label="Timkostnad" hint={COST_HINT}>
+        <Input name="costRate" inputMode="decimal" placeholder="180" />
       </Field>
     </FormDialog>
   );
@@ -69,6 +79,7 @@ export default async function MomentsPage() {
             <thead>
               <tr>
                 <Th>Namn</Th>
+                <Th numeric>Timkostnad</Th>
                 <Th>Status</Th>
                 <Th numeric>Stämplingar</Th>
                 <Th>
@@ -81,6 +92,11 @@ export default async function MomentsPage() {
                 <Tr key={moment.id} dimmed={!moment.active}>
                   <Td>
                     <span className="font-medium">{moment.name}</span>
+                  </Td>
+                  <Td numeric muted={moment.costRateOre === null}>
+                    {moment.costRateOre === null
+                      ? "—"
+                      : `${formatCurrency(moment.costRateOre)}/tim`}
                   </Td>
                   <Td>
                     {moment.active ? (
@@ -108,6 +124,21 @@ export default async function MomentsPage() {
                             defaultValue={moment.name}
                             required
                             autoFocus
+                          />
+                        </Field>
+                        <Field label="Timkostnad" hint={COST_HINT}>
+                          <Input
+                            name="costRate"
+                            inputMode="decimal"
+                            placeholder="180"
+                            defaultValue={
+                              moment.costRateOre === null
+                                ? ""
+                                : String(moment.costRateOre / 100).replace(
+                                    ".",
+                                    ","
+                                  )
+                            }
                           />
                         </Field>
                       </FormDialog>

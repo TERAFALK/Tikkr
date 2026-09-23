@@ -87,6 +87,16 @@ model Company {
   /// mellan sommar och vinter.
   timezone String @default("Europe/Stockholm")
 
+  /// Påslag på självkostnaden i kalkylen, i PROCENT. 140 betyder ×1,40.
+  ///
+  /// Heltalsprocent och inte en faktor med decimaler, eftersom 1,4 inte går
+  /// att lagra exakt — och ett påslag som råkar bli 1,3999 ger ören i diff
+  /// mot det kunden räknat för hand.
+  ///
+  /// Standard 100, alltså inget påslag alls. Ett företag som inte fyllt i
+  /// något ska få se sin kostnad, inte ett pris systemet hittat på.
+  markupPercent Int @default(100) @map("markup_percent")
+
   /// Kundens logotyper. Två stycken, för att en logotyp sällan fungerar på
   /// båda ställena: märket i ett hörn vill vara fyrkantigt och fylla sin ruta,
   /// medan det på ett dokument vill vara brett med namnet utskrivet.
@@ -178,6 +188,14 @@ model Order {
   /// kosta mer än beräknat — det är information till den som fakturerar, inte
   /// en spärr mot att arbeta.
   budgetMinutes Int? @map("budget_minutes")
+
+  /// Påslag för just den här ordern, i procent. Åsidosätter företagets.
+  ///
+  /// Tomt betyder att företagets standard gäller, vilket är det normala.
+  /// Finns för den order där kunden förhandlat — annars hade man fått ändra
+  /// företagets påslag fram och tillbaka och råkat fakturera fel på allt
+  /// annat under tiden.
+  markupPercent Int? @map("markup_percent")
   createdAt    DateTime    @default(now()) @map("created_at")
   updatedAt    DateTime    @updatedAt @map("updated_at")
 
@@ -192,10 +210,25 @@ model Order {
 }
 
 model WorkMoment {
-  id        String   @id @default(cuid())
-  companyId String   @map("company_id")
+  id        String  @id @default(cuid())
+  companyId String  @map("company_id")
   name      String
-  active    Boolean  @default(true)
+  active    Boolean @default(true)
+
+  /// Vad en timme av det här momentet kostar företaget, i ÖREN. Frivillig.
+  ///
+  /// Ören och inte kronor, av samma skäl som tid lagras i minuter: 182,50 kr
+  /// går inte att spara exakt som decimaltal, och avrundningen blir synlig så
+  /// fort hundra rader summeras.
+  ///
+  /// Kostnad, inte pris. Vad kunden ska betala räknas fram genom påslaget på
+  /// företaget eller ordern — se Company.markupPercent.
+  ///
+  /// Tomt betyder att kostnaden inte är angiven, vilket är något annat än noll
+  /// kronor. Kalkylen räknar då raden som noll OCH säger att underlag saknas,
+  /// i stället för att tyst visa en för låg summa.
+  costRateOre Int? @map("cost_rate_ore")
+
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
@@ -221,6 +254,17 @@ model TimeEntry {
   clockOutAt DateTime? @map("clock_out_at")
 
   source TimeEntrySource @default(KIOSK)
+
+  /// Momentets timkostnad i ören, som den var NÄR STÄMPLINGEN GJORDES.
+  ///
+  /// En kopia, inte en uppslagning. Höjer företaget Svetsning från 180 till
+  /// 200 kr ska en kalkyl som redan tagits ut och fakturerats se likadan ut
+  /// om ett år — annars stämmer underlaget inte längre med fakturan som
+  /// skickades. Nya stämplingar får det nya priset.
+  ///
+  /// Tomt på poster som registrerades innan momentet fått någon kostnad.
+  /// Kalkylen redovisar dem som saknat underlag i stället för som noll.
+  costRateOre Int? @map("cost_rate_ore")
 
   /// Sätts när systemet gissat sig till en utstämpling, t.ex. vid det
   /// automatiska klockslaget. Admin får en lista att gå igenom och rätta.
