@@ -92,7 +92,13 @@ async function work(
   startIso = "2026-08-05T06:00:00Z"
 ) {
   const start = new Date(startIso);
-  await clockIn(companyId, { employeeId: anna, orderId, momentId, at: start });
+  await clockIn(companyId, {
+    kind: "ORDER",
+    employeeId: anna,
+    orderId,
+    momentId,
+    at: start,
+  });
   await clockOut(companyId, {
     employeeId: anna,
     at: new Date(start.getTime() + minutes * 60_000),
@@ -405,6 +411,7 @@ describe("tid utan timkostnad", () => {
 describe("pågående och ogranskad tid räknas men flaggas", () => {
   it("räknar en pågående stämpling och rapporterar den", async () => {
     await clockIn(companyId, {
+      kind: "ORDER",
       employeeId: anna,
       orderId: order,
       momentId: svetsning,

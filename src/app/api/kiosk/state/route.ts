@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { getKioskSession } from "@/lib/kiosk-auth";
 import { forCompany } from "@/lib/tenant";
+import { describeEntry } from "@/lib/entry-label";
+import type { KioskActiveJob } from "@/components/kiosk/KioskScreen";
 
 /**
  * VEM SOM ÄR INSTÄMPLAD JUST NU.
@@ -24,19 +26,6 @@ import { forCompany } from "@/lib/tenant";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-/**
- * Ett pågående jobb, i den form skärmen vill ha det.
- *
- * Speglar ActiveJob i src/components/kiosk/KioskScreen.tsx. De två hålls ihop
- * för hand — svaret går över nätet och kan inte dela typ med mottagaren.
- */
-interface ActiveJob {
-  since: string;
-  orderId: string;
-  orderNumber: string;
-  momentId: string;
-  momentName: string;
-}
 
 export async function GET() {
   const session = await getKioskSession();
@@ -61,23 +50,46 @@ export async function GET() {
       clockInAt: true,
       // Id:na behövs för att skärmen ska kunna bygga ett "senast"-förslag
       // direkt vid utstämpling, utan att först vänta på en omladdning.
+      kind: true,
       order: { select: { id: true, orderNumber: true } },
       moment: { select: { id: true, name: true } },
+      indirectMoment: { select: { id: true, name: true } },
     },
   });
 
   // En LISTA per person. Att en operatör kör två maskiner samtidigt är numera
   // ett giltigt läge, och Object.fromEntries hade behållit den sista posten
   // tyst — skärmen hade då visat ett jobb som pågick och dolt det andra.
-  const active: Record<string, ActiveJob[]> = {};
+  const active: Record<string, KioskActiveJob[]> = {};
 
   for (const entry of open) {
+    // En post utan sina fält ska inte kunna finnas — clock.ts vaktar det —
+    // men en trasig rad ska tappas tyst i stället för att fälla skärmen.
+    const choice =
+      entry.kind === "INDIRECT"
+        ? entry.indirectMoment
+          ? ({
+              kind: "INDIRECT",
+              indirectMoment: entry.indirectMoment,
+            } as const)
+          : null
+        : entry.order && entry.moment
+          ? ({
+              kind: "ORDER",
+              order: {
+                id: entry.order.id,
+                orderNumber: entry.order.orderNumber,
+              },
+              moment: entry.moment,
+            } as const)
+          : null;
+
+    if (!choice) continue;
+
     (active[entry.employeeId] ??= []).push({
       since: entry.clockInAt.toISOString(),
-      orderId: entry.order.id,
-      orderNumber: entry.order.orderNumber,
-      momentId: entry.moment.id,
-      momentName: entry.moment.name,
+      label: describeEntry(entry).text,
+      choice,
     });
   }
 

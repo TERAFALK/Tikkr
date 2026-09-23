@@ -59,6 +59,11 @@ const sections: { label: string; links: NavLink[] }[] = [
       { href: "/admin/ordrar", label: "Ordrar", icon: IconOrder },
       { href: "/admin/anstallda", label: "Anställda", icon: IconPeople },
       { href: "/admin/moment", label: "Arbetsmoment", icon: IconMoment },
+      {
+        href: "/admin/inproduktivt",
+        label: "Inproduktiv tid",
+        icon: IconMoment,
+      },
       { href: "/admin/skarmar", label: "Skärmar", icon: IconDevice },
     ],
   },

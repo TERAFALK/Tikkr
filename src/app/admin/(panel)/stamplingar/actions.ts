@@ -61,6 +61,11 @@ export async function addEntry(
 
   try {
     await createManualEntry(companyId, {
+      // Adminpanelen lägger bara in ORDERTID för hand. Inproduktiv tid som
+      // glömts stämplas hellre in på skärmen än skrivs in i efterhand — den
+      // ska ändå inte faktureras, och en inskriven städtimme är ingen som
+      // saknar den.
+      kind: "ORDER",
       employeeId: input.employeeId,
       orderId: input.orderId,
       momentId: input.momentId,
@@ -89,6 +94,7 @@ export async function editEntry(formData: FormData) {
 
   try {
     await updateEntryManually(companyId, id, {
+      kind: "ORDER",
       employeeId: input.employeeId,
       orderId: input.orderId,
       momentId: input.momentId,

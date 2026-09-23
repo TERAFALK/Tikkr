@@ -39,8 +39,10 @@ export default async function OverviewPage() {
         employeeId: true,
         clockInAt: true,
         employee: { select: { name: true } },
+        kind: true,
         order: { select: { orderNumber: true, customerName: true } },
         moment: { select: { name: true } },
+        indirectMoment: { select: { name: true } },
       },
     }),
     db.timeEntry.findMany({
@@ -168,14 +170,18 @@ export default async function OverviewPage() {
                     <span className="font-medium">{entry.employee.name}</span>
                   </Td>
                   <Td>
-                    {entry.order.orderNumber}
-                    {entry.order.customerName && (
+                    {entry.order?.orderNumber ?? (
+                      <Badge tone="muted">Inproduktiv</Badge>
+                    )}
+                    {entry.order?.customerName && (
                       <span className="ml-2 text-neutral-500">
                         {entry.order.customerName}
                       </span>
                     )}
                   </Td>
-                  <Td muted>{entry.moment.name}</Td>
+                  <Td muted>
+                    {entry.moment?.name ?? entry.indirectMoment?.name ?? "—"}
+                  </Td>
                   <Td muted>{formatTime(entry.clockInAt)}</Td>
                   <Td numeric>
                     <Badge tone="active">

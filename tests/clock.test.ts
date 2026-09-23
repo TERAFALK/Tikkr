@@ -32,6 +32,7 @@ let orderB: string;
 let stangdOrder: string;
 let svetsning: string;
 let montering: string;
+let stadning: string;
 
 beforeAll(async () => {
   const company = await unsafeGlobalPrisma.company.create({
@@ -80,6 +81,12 @@ beforeAll(async () => {
       data: { companyId, name: "Montering" },
     })
   ).id;
+
+  stadning = (
+    await unsafeGlobalPrisma.indirectMoment.create({
+      data: { companyId, name: "Städning" },
+    })
+  ).id;
 });
 
 beforeEach(async () => {
@@ -95,6 +102,7 @@ afterAll(async () => {
 describe("stämpla in", () => {
   it("skapar en pågående stämpling", async () => {
     const { started, autoClosed } = await clockIn(companyId, {
+      kind: "ORDER",
       employeeId: anna,
       orderId: orderA,
       momentId: svetsning,
@@ -109,6 +117,7 @@ describe("stämpla in", () => {
 
   it("sparar kiosk och IP för audit-loggen", async () => {
     const { started } = await clockIn(companyId, {
+      kind: "ORDER",
       employeeId: anna,
       orderId: orderA,
       momentId: svetsning,
@@ -125,6 +134,7 @@ describe("automatisk utstämpling vid byte av jobb på samma maskin", () => {
     const lunch = new Date("2026-08-05T10:00:00Z");
 
     await clockIn(companyId, {
+      kind: "ORDER",
       employeeId: anna,
       orderId: orderA,
       momentId: svetsning,
@@ -133,6 +143,7 @@ describe("automatisk utstämpling vid byte av jobb på samma maskin", () => {
 
     // Samma moment, ny order: maskinen byter jobb.
     const { started, autoClosed } = await clockIn(companyId, {
+      kind: "ORDER",
       employeeId: anna,
       orderId: orderB,
       momentId: svetsning,
@@ -176,11 +187,13 @@ describe("automatisk utstämpling vid byte av jobb på samma maskin", () => {
     });
 
     await clockIn(companyId, {
+      kind: "ORDER",
       employeeId: bosse.id,
       orderId: orderA,
       momentId: svetsning,
     });
     await clockIn(companyId, {
+      kind: "ORDER",
       employeeId: anna,
       orderId: orderB,
       momentId: svetsning,
@@ -200,6 +213,7 @@ describe("stämpla ut", () => {
     const slut = new Date("2026-08-05T14:00:00Z");
 
     await clockIn(companyId, {
+      kind: "ORDER",
       employeeId: anna,
       orderId: orderA,
       momentId: svetsning,
@@ -218,6 +232,7 @@ describe("stämpla ut", () => {
 
   it("dubbeltryck på utstämpling ger inget fel", async () => {
     await clockIn(companyId, {
+      kind: "ORDER",
       employeeId: anna,
       orderId: orderA,
       momentId: svetsning,
@@ -255,6 +270,7 @@ describe("offline-kön skapar inga dubbletter", () => {
 
   it("stämplingar från kön märks ut i audit-loggen", async () => {
     const { started } = await clockIn(companyId, {
+      kind: "ORDER",
       employeeId: anna,
       orderId: orderA,
       momentId: svetsning,
@@ -269,6 +285,7 @@ describe("offline-kön skapar inga dubbletter", () => {
     // det som redan pågår på maskinen har något gått fel i ordningen, och en
     // maskin kan ändå inte köra två jobb samtidigt.
     await clockIn(companyId, {
+      kind: "ORDER",
       employeeId: anna,
       orderId: orderA,
       momentId: svetsning,
@@ -277,6 +294,7 @@ describe("offline-kön skapar inga dubbletter", () => {
 
     await expect(
       clockIn(companyId, {
+        kind: "ORDER",
         employeeId: anna,
         orderId: orderB,
         momentId: svetsning,
@@ -291,6 +309,7 @@ describe("offline-kön skapar inga dubbletter", () => {
     // ordningen. Att avvisa hade dessutom kostat arbetstid: kön plockar bort
     // ett tryck som avvisas.
     await clockIn(companyId, {
+      kind: "ORDER",
       employeeId: anna,
       orderId: orderA,
       momentId: svetsning,
@@ -298,6 +317,7 @@ describe("offline-kön skapar inga dubbletter", () => {
     });
 
     const { started, autoClosed } = await clockIn(companyId, {
+      kind: "ORDER",
       employeeId: anna,
       orderId: orderB,
       momentId: montering,
@@ -314,6 +334,7 @@ describe("ogiltiga stämplingar avvisas", () => {
   it("okänd anställd", async () => {
     await expect(
       clockIn(companyId, {
+        kind: "ORDER",
         employeeId: "finns-inte",
         orderId: orderA,
         momentId: svetsning,
@@ -324,6 +345,7 @@ describe("ogiltiga stämplingar avvisas", () => {
   it("inaktiv anställd", async () => {
     await expect(
       clockIn(companyId, {
+        kind: "ORDER",
         employeeId: inaktivPelle,
         orderId: orderA,
         momentId: svetsning,
@@ -334,6 +356,7 @@ describe("ogiltiga stämplingar avvisas", () => {
   it("stängd order", async () => {
     await expect(
       clockIn(companyId, {
+        kind: "ORDER",
         employeeId: anna,
         orderId: stangdOrder,
         momentId: svetsning,
@@ -344,6 +367,7 @@ describe("ogiltiga stämplingar avvisas", () => {
   it("okänt moment", async () => {
     await expect(
       clockIn(companyId, {
+        kind: "ORDER",
         employeeId: anna,
         orderId: orderA,
         momentId: "finns-inte",
@@ -418,6 +442,7 @@ describe("admin lägger in en stämpling för hand", () => {
 
 describe("överlappande tider på samma arbetsmoment avvisas", () => {
   const manual = (from: string, to: string) => ({
+    kind: "ORDER" as const,
     employeeId: anna,
     orderId: orderA,
     momentId: svetsning,
@@ -482,6 +507,7 @@ describe("överlappande tider på samma arbetsmoment avvisas", () => {
   it("krock med ett pågående jobb avvisas", async () => {
     await unsafeGlobalPrisma.timeEntry.deleteMany({ where: { companyId } });
     await clockIn(companyId, {
+      kind: "ORDER",
       employeeId: anna,
       orderId: orderA,
       momentId: svetsning,
@@ -551,6 +577,7 @@ describe("överlappande tider på samma arbetsmoment avvisas", () => {
 describe("glömd utstämpling stängs vid klockslaget och flaggas", () => {
   it("stänger gårdagens öppna stämpling på 18:00 lokal tid", async () => {
     await clockIn(companyId, {
+      kind: "ORDER",
       employeeId: anna,
       orderId: orderA,
       momentId: svetsning,
@@ -573,6 +600,7 @@ describe("glömd utstämpling stängs vid klockslaget och flaggas", () => {
 
   it("stänger inte i förtid — kvällsskift får jobba vidare", async () => {
     await clockIn(companyId, {
+      kind: "ORDER",
       employeeId: anna,
       orderId: orderA,
       momentId: svetsning,
@@ -592,6 +620,7 @@ describe("glömd utstämpling stängs vid klockslaget och flaggas", () => {
 
   it("kvällsskiftet stängs först nästa dags klockslag", async () => {
     await clockIn(companyId, {
+      kind: "ORDER",
       employeeId: anna,
       orderId: orderA,
       momentId: svetsning,
@@ -609,6 +638,7 @@ describe("glömd utstämpling stängs vid klockslaget och flaggas", () => {
 
   it("rör inte redan avslutade stämplingar", async () => {
     await clockIn(companyId, {
+      kind: "ORDER",
       employeeId: anna,
       orderId: orderA,
       momentId: svetsning,
@@ -655,6 +685,7 @@ describe("avsluta en order med pågående stämplingar", () => {
 
   it("listar dem som står instämplade innan något ändras", async () => {
     await clockIn(companyId, {
+      kind: "ORDER",
       employeeId: anna,
       orderId: order,
       momentId: svetsning,
@@ -696,6 +727,7 @@ describe("avsluta en order med pågående stämplingar", () => {
 
   it("stämplar ut dem som står kvar och flaggar tiden för granskning", async () => {
     await clockIn(companyId, {
+      kind: "ORDER",
       employeeId: anna,
       orderId: order,
       momentId: svetsning,
@@ -722,6 +754,7 @@ describe("avsluta en order med pågående stämplingar", () => {
 
   it("rör inte pågående stämplingar på andra ordrar", async () => {
     await clockIn(companyId, {
+      kind: "ORDER",
       employeeId: anna,
       orderId: orderA,
       momentId: svetsning,
@@ -740,6 +773,7 @@ describe("avsluta en order med pågående stämplingar", () => {
     // En skärm med fel klocka kan ha stämplat in på en tidpunkt som ligger
     // framåt i tiden. Utstämplingen får då inte hamna före instämplingen.
     await clockIn(companyId, {
+      kind: "ORDER",
       employeeId: anna,
       orderId: order,
       momentId: svetsning,
@@ -766,6 +800,7 @@ describe("avsluta en order med pågående stämplingar", () => {
 
     await expect(
       clockIn(companyId, {
+        kind: "ORDER",
         employeeId: anna,
         orderId: order,
         momentId: svetsning,
@@ -783,6 +818,7 @@ describe("avsluta en order med pågående stämplingar", () => {
 describe("två maskiner samtidigt", () => {
   it("instämpling på ett annat moment stänger inte det pågående", async () => {
     const { started: svets } = await clockIn(companyId, {
+      kind: "ORDER",
       employeeId: anna,
       orderId: orderA,
       momentId: svetsning,
@@ -790,6 +826,7 @@ describe("två maskiner samtidigt", () => {
     });
 
     const { started: montage, autoClosed } = await clockIn(companyId, {
+      kind: "ORDER",
       employeeId: anna,
       orderId: orderB,
       momentId: montering,
@@ -813,6 +850,7 @@ describe("två maskiner samtidigt", () => {
       [orderB, montering],
     ]) {
       await clockIn(companyId, {
+        kind: "ORDER",
         employeeId: anna,
         orderId,
         momentId,
@@ -838,11 +876,13 @@ describe("två maskiner samtidigt", () => {
 
   it("hittar det pågående jobbet på ett bestämt moment", async () => {
     await clockIn(companyId, {
+      kind: "ORDER",
       employeeId: anna,
       orderId: orderA,
       momentId: svetsning,
     });
     await clockIn(companyId, {
+      kind: "ORDER",
       employeeId: anna,
       orderId: orderB,
       momentId: montering,
@@ -864,6 +904,7 @@ describe("två maskiner samtidigt", () => {
       [orderB, montering],
     ]) {
       await clockIn(companyId, {
+        kind: "ORDER",
         employeeId: anna,
         orderId,
         momentId,
@@ -887,12 +928,14 @@ describe("två maskiner samtidigt", () => {
 describe("utstämpling när två jobb pågår", () => {
   async function tvaJobb() {
     await clockIn(companyId, {
+      kind: "ORDER",
       employeeId: anna,
       orderId: orderA,
       momentId: svetsning,
       at: new Date("2026-08-05T06:00:00Z"),
     });
     await clockIn(companyId, {
+      kind: "ORDER",
       employeeId: anna,
       orderId: orderB,
       momentId: montering,
@@ -959,6 +1002,7 @@ describe("utstämpling när två jobb pågår", () => {
   it("flaggar inte när bara ett jobb pågår och momentet saknas", async () => {
     // Det vanliga fallet, och det som köade tryck från äldre skärmar bär.
     await clockIn(companyId, {
+      kind: "ORDER",
       employeeId: anna,
       orderId: orderA,
       momentId: svetsning,
@@ -994,6 +1038,7 @@ describe("utstämpling när två jobb pågår", () => {
 
   it("utstämpling från ett moment personen inte är inne på gör ingenting", async () => {
     await clockIn(companyId, {
+      kind: "ORDER",
       employeeId: anna,
       orderId: orderA,
       momentId: svetsning,
@@ -1003,5 +1048,155 @@ describe("utstämpling när två jobb pågår", () => {
       await clockOut(companyId, { employeeId: anna, momentId: montering })
     ).toBeNull();
     expect(await getOpenEntries(forCompany(companyId), anna)).toHaveLength(1);
+  });
+});
+
+describe("inproduktiv tid", () => {
+  it("stämplar in utan order", async () => {
+    const { started } = await clockIn(companyId, {
+      kind: "INDIRECT",
+      employeeId: anna,
+      indirectMomentId: stadning,
+      at: new Date("2026-08-05T06:00:00Z"),
+    });
+
+    expect(started.kind).toBe("INDIRECT");
+    expect(started.indirectMomentId).toBe(stadning);
+    expect(started.orderId).toBeNull();
+    expect(started.momentId).toBeNull();
+    // Inproduktiv tid kalkyleras inte. Ingen timkostnad att kopiera.
+    expect(started.costRateOre).toBeNull();
+  });
+
+  it("en orderstämpling har inget inproduktivt moment", async () => {
+    const { started } = await clockIn(companyId, {
+      kind: "ORDER",
+      employeeId: anna,
+      orderId: orderA,
+      momentId: svetsning,
+    });
+
+    expect(started.kind).toBe("ORDER");
+    expect(started.indirectMomentId).toBeNull();
+  });
+
+  it("instämpling på städning stänger inte det pågående orderjobbet", async () => {
+    await clockIn(companyId, {
+      kind: "ORDER",
+      employeeId: anna,
+      orderId: orderA,
+      momentId: svetsning,
+      at: new Date("2026-08-05T06:00:00Z"),
+    });
+
+    const { autoClosed } = await clockIn(companyId, {
+      kind: "INDIRECT",
+      employeeId: anna,
+      indirectMomentId: stadning,
+      at: new Date("2026-08-05T07:00:00Z"),
+    });
+
+    expect(autoClosed).toBeNull();
+    expect(await getOpenEntries(forCompany(companyId), anna)).toHaveLength(2);
+  });
+
+  it("instämpling på samma inproduktiva moment stänger det förra", async () => {
+    await clockIn(companyId, {
+      kind: "INDIRECT",
+      employeeId: anna,
+      indirectMomentId: stadning,
+      at: new Date("2026-08-05T06:00:00Z"),
+    });
+
+    const { autoClosed } = await clockIn(companyId, {
+      kind: "INDIRECT",
+      employeeId: anna,
+      indirectMomentId: stadning,
+      at: new Date("2026-08-05T07:00:00Z"),
+    });
+
+    expect(autoClosed).not.toBeNull();
+    expect(await getOpenEntries(forCompany(companyId), anna)).toHaveLength(1);
+  });
+
+  it("stämplas ut med sitt inproduktiva moment", async () => {
+    await clockIn(companyId, {
+      kind: "INDIRECT",
+      employeeId: anna,
+      indirectMomentId: stadning,
+      at: new Date("2026-08-05T06:00:00Z"),
+    });
+    await clockIn(companyId, {
+      kind: "ORDER",
+      employeeId: anna,
+      orderId: orderA,
+      momentId: svetsning,
+      at: new Date("2026-08-05T06:30:00Z"),
+    });
+
+    const closed = await clockOut(companyId, {
+      employeeId: anna,
+      indirectMomentId: stadning,
+      at: new Date("2026-08-05T08:00:00Z"),
+    });
+
+    expect(closed?.kind).toBe("INDIRECT");
+
+    const kvar = await getOpenEntries(forCompany(companyId), anna);
+    expect(kvar).toHaveLength(1);
+    expect(kvar[0].kind).toBe("ORDER");
+  });
+
+  it("okänt inproduktivt moment avvisas", async () => {
+    await expect(
+      clockIn(companyId, {
+        kind: "INDIRECT",
+        employeeId: anna,
+        indirectMomentId: "finns-inte",
+      })
+    ).rejects.toThrow(ClockError);
+  });
+
+  it("avaktiverat inproduktivt moment avvisas", async () => {
+    const vilande = await unsafeGlobalPrisma.indirectMoment.create({
+      data: { companyId, name: "Utbildning", active: false },
+    });
+
+    await expect(
+      clockIn(companyId, {
+        kind: "INDIRECT",
+        employeeId: anna,
+        indirectMomentId: vilande.id,
+      })
+    ).rejects.toThrow(ClockError);
+
+    await unsafeGlobalPrisma.indirectMoment.delete({ where: { id: vilande.id } });
+  });
+
+  it("glömd inproduktiv stämpling stängs vid klockslaget och flaggas", async () => {
+    await clockIn(companyId, {
+      kind: "INDIRECT",
+      employeeId: anna,
+      indirectMomentId: stadning,
+      at: new Date("2026-08-05T06:00:00Z"),
+    });
+
+    const closed = await autoCloseForgottenEntries(
+      companyId,
+      new Date("2026-08-06T05:00:00Z")
+    );
+
+    expect(closed).toHaveLength(1);
+    expect(closed[0].needsReview).toBe(true);
+  });
+
+  it("syns inte bland dem som blockerar ett orderavslut", async () => {
+    await clockIn(companyId, {
+      kind: "INDIRECT",
+      employeeId: anna,
+      indirectMomentId: stadning,
+    });
+
+    expect(await openEntriesOnOrder(companyId, orderA)).toHaveLength(0);
   });
 });

@@ -59,6 +59,9 @@ export async function getOrderExports(
       status: true,
       budgetMinutes: true,
       timeEntries: {
+        // Inproduktiv tid kan aldrig ha en order, men filtret sager vad
+        // fragan handlar om och kostar ingenting.
+        where: { kind: "ORDER" },
         orderBy: { clockInAt: "asc" },
         select: {
           clockInAt: true,
@@ -76,7 +79,7 @@ export async function getOrderExports(
     const rows: OrderExportRow[] = order.timeEntries.map((entry) => ({
       employeeName: entry.employee.name,
       employeeNumber: entry.employee.employeeNumber,
-      momentName: entry.moment.name,
+      momentName: entry.moment?.name ?? "",
       clockInAt: entry.clockInAt,
       clockOutAt: entry.clockOutAt,
       minutes: minutesBetween(entry.clockInAt, entry.clockOutAt),

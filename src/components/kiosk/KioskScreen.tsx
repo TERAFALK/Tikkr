@@ -53,12 +53,68 @@ interface Moment {
   name: string;
 }
 
-interface ActiveJob {
+/**
+ * Vilket jobb en stämpling gäller.
+ *
+ * En diskriminerad union: antingen order plus arbetsmoment, eller ett
+ * inproduktivt moment. Aldrig något däremellan, och aldrig fyra valfria fält
+ * där man får gissa vilka som är ifyllda.
+ *
+ * Exporterad eftersom både src/app/kiosk/page.tsx och kioskens state-route
+ * bygger den här formen. Skärmen och servern ska inte kunna glida isär.
+ */
+export type KioskJobChoice =
+  | {
+      kind: "ORDER";
+      order: { id: string; orderNumber: string };
+      moment: { id: string; name: string };
+    }
+  | { kind: "INDIRECT"; indirectMoment: { id: string; name: string } };
+
+export interface KioskActiveJob {
   since: string;
-  orderId: string;
-  orderNumber: string;
-  momentId: string;
-  momentName: string;
+  /** "2601 · Svetsning" eller "Städning". Färdig för skärmen. */
+  label: string;
+  choice: KioskJobChoice;
+}
+
+export interface KioskRecentJob {
+  label: string;
+  choice: KioskJobChoice;
+}
+
+type ActiveJob = KioskActiveJob;
+
+/**
+ * Nyckeln som skiljer en persons parallella jobb åt.
+ *
+ * Arbetsmomentet för ordertid — momentet är maskinen, och en maskin kör ett
+ * jobb i taget. Det inproduktiva momentet för resten: man städar inte två
+ * gånger samtidigt.
+ */
+function jobKey(choice: KioskJobChoice): string {
+  return choice.kind === "ORDER" ? choice.moment.id : choice.indirectMoment.id;
+}
+
+/** Fälten som pekar ut jobbet vid en utstämpling. */
+function outFields(choice: KioskJobChoice) {
+  return choice.kind === "ORDER"
+    ? { momentId: choice.moment.id }
+    : { indirectMomentId: choice.indirectMoment.id };
+}
+
+/** Fälten som skapar jobbet vid en instämpling. */
+function inFields(choice: KioskJobChoice) {
+  return choice.kind === "ORDER"
+    ? { orderId: choice.order.id, momentId: choice.moment.id }
+    : { indirectMomentId: choice.indirectMoment.id };
+}
+
+/** Kort text för kvittenser och köetiketter. */
+function jobLabel(choice: KioskJobChoice): string {
+  return choice.kind === "ORDER"
+    ? `${choice.order.orderNumber} · ${choice.moment.name}`
+    : choice.indirectMoment.name;
 }
 
 /**
@@ -71,12 +127,7 @@ interface ActiveJob {
  * Bara jobb som fortfarande GÅR att stämpla på hamnar här; se filtreringen i
  * src/app/kiosk/page.tsx.
  */
-interface RecentJob {
-  orderId: string;
-  orderNumber: string;
-  momentId: string;
-  momentName: string;
-}
+type RecentJob = KioskRecentJob;
 
 /** Driftmeddelande från plattformen. Kortad form — bannern behöver inte datum. */
 export interface KioskNotice {
@@ -92,6 +143,8 @@ interface Props {
   employees: Employee[];
   orders: Order[];
   moments: Moment[];
+  /** Städning, möte, underhåll. Tid som aldrig når ett fakturaunderlag. */
+  indirectMoments: Moment[];
   /**
    * Pågående jobb per anställd. En LISTA: en operatör kan köra två maskiner
    * samtidigt, och skärmen måste visa båda. Senast påbörjad först.
@@ -115,7 +168,8 @@ type View =
   | { name: "order"; employee: Employee }
   | { name: "orderNumber"; employee: Employee }
   | { name: "quickCustomer"; employee: Employee; orderNumber: string }
-  | { name: "moment"; employee: Employee; order: Order };
+  | { name: "moment"; employee: Employee; order: Order }
+  | { name: "indirect"; employee: Employee };
 
 /** Hur många siffror ett ordernummer får vara innan knappsatsen slutar ta emot. */
 const MAX_ORDER_DIGITS = 10;
@@ -158,6 +212,7 @@ export default function KioskScreen({
   employees,
   orders,
   moments,
+  indirectMoments,
   activeByEmployee,
   recentByEmployee,
   customers,
@@ -444,33 +499,28 @@ export default function KioskScreen({
   );
 
   const punchIn = useCallback(
-    (
-      employee: Employee,
-      order: { id: string; orderNumber: string },
-      moment: { id: string; name: string }
-    ) => {
-      // Byter man från ett annat moment stämplas det ut NU, när det nya
-      // faktiskt börjat. Är det samma moment sköter servern stängningen.
+    (employee: Employee, choice: KioskJobChoice) => {
+      const key = jobKey(choice);
+      const label = jobLabel(choice);
+
+      // Byter man från ett annat jobb stämplas det ut NU, när det nya
+      // faktiskt börjat. Är det samma jobb sköter servern stängningen.
       const left =
-        replacing && replacing.momentId !== moment.id ? replacing : null;
+        replacing && jobKey(replacing.choice) !== key ? replacing : null;
       // Ett jobb på samma moment ersätts — maskinen kan bara köra ett i taget,
       // och servern stänger det gamla. Jobb på andra moment står kvar.
       setActive((current) => {
+        const leftKey = left ? jobKey(left.choice) : null;
+
         const others = (current[employee.id] ?? []).filter(
           (entry) =>
-            entry.momentId !== moment.id && entry.momentId !== left?.momentId
+            jobKey(entry.choice) !== key && jobKey(entry.choice) !== leftKey
         );
 
         return {
           ...current,
           [employee.id]: [
-            {
-              since: new Date().toISOString(),
-              orderId: order.id,
-              orderNumber: order.orderNumber,
-              momentId: moment.id,
-              momentName: moment.name,
-            },
+            { since: new Date().toISOString(), label, choice },
             ...others,
           ],
         };
@@ -479,16 +529,11 @@ export default function KioskScreen({
         // Jobbet man lämnade blir förslaget nästa gång hen kommer fram.
         setRecent((current) => ({
           ...current,
-          [employee.id]: {
-            orderId: left.orderId,
-            orderNumber: left.orderNumber,
-            momentId: left.momentId,
-            momentName: left.momentName,
-          },
+          [employee.id]: { label: left.label, choice: left.choice },
         }));
       }
 
-      setReceipt(`${employee.name}: ${order.orderNumber}, ${moment.name}`);
+      setReceipt(`${employee.name}: ${label}`);
       setReceiptVisible(true);
       goHome();
 
@@ -496,17 +541,16 @@ export default function KioskScreen({
         void send({
           action: "out",
           employeeId: employee.id,
-          momentId: left.momentId,
-          label: `${employee.name}, utstämpling från ${left.momentName}`,
+          ...outFields(left.choice),
+          label: `${employee.name}, utstämpling från ${left.label}`,
         });
       }
 
       void send({
         action: "in",
         employeeId: employee.id,
-        orderId: order.id,
-        momentId: moment.id,
-        label: `${employee.name}, order ${order.orderNumber}`,
+        ...inFields(choice),
+        label: `${employee.name}, ${label}`,
       });
     },
     [goHome, replacing, send]
@@ -524,19 +568,14 @@ export default function KioskScreen({
       // Jobbet hen lämnar blir förslaget nästa gång hen kommer fram.
       setRecent((current) => ({
         ...current,
-        [employee.id]: {
-          orderId: job.orderId,
-          orderNumber: job.orderNumber,
-          momentId: job.momentId,
-          momentName: job.momentName,
-        },
+        [employee.id]: { label: job.label, choice: job.choice },
       }));
 
       // Bara det här jobbet tas bort. Att radera personens nyckel hade fått
       // skärmen att visa någon som utstämplad medan maskin två räknar vidare.
       setActive((current) => {
         const rest = (current[employee.id] ?? []).filter(
-          (entry) => entry.momentId !== job.momentId
+          (entry) => jobKey(entry.choice) !== jobKey(job.choice)
         );
 
         const next = { ...current };
@@ -545,7 +584,7 @@ export default function KioskScreen({
         return next;
       });
 
-      setReceipt(`${employee.name} utstämplad från ${job.momentName}`);
+      setReceipt(`${employee.name} utstämplad från ${job.label}`);
       setReceiptVisible(true);
 
       goHome();
@@ -553,7 +592,7 @@ export default function KioskScreen({
       void send({
         action: "out",
         employeeId: employee.id,
-        momentId: job.momentId,
+        ...outFields(job.choice),
         label: `${employee.name}, utstämpling`,
       });
     },
@@ -573,12 +612,7 @@ export default function KioskScreen({
       if (last) {
         setRecent((current) => ({
           ...current,
-          [employee.id]: {
-            orderId: last.orderId,
-            orderNumber: last.orderNumber,
-            momentId: last.momentId,
-            momentName: last.momentName,
-          },
+          [employee.id]: { label: last.label, choice: last.choice },
         }));
       }
 
@@ -683,12 +717,7 @@ export default function KioskScreen({
             onAdd={() => setView({ name: "order", employee: view.employee })}
             onResume={() => {
               const last = recent[view.employee.id];
-              if (!last) return;
-              punchIn(
-                view.employee,
-                { id: last.orderId, orderNumber: last.orderNumber },
-                { id: last.momentId, name: last.momentName }
-              );
+              if (last) punchIn(view.employee, last.choice);
             }}
           />
         )}
@@ -697,19 +726,34 @@ export default function KioskScreen({
           <Chooser
             title={
               replacing
-                ? `${view.employee.name}: byter från ${replacing.momentName}`
+                ? `${view.employee.name}: byter från ${replacing.label}`
                 : `${view.employee.name}: välj order`
             }
             empty="Inga öppna ordrar. Kontakta administratören."
             action={
-              <button
-                onClick={() =>
-                  setView({ name: "orderNumber", employee: view.employee })
-                }
-                className="kiosk-press shrink-0 rounded-xl border border-neutral-200 bg-white px-5 py-4 text-base font-semibold text-neutral-900 active:bg-neutral-50 sm:text-lg"
-              >
-                Slå in ordernummer
-              </button>
+              <div className="flex shrink-0 gap-2">
+                <button
+                  onClick={() =>
+                    setView({ name: "orderNumber", employee: view.employee })
+                  }
+                  className="kiosk-press rounded-xl border border-neutral-200 bg-white px-5 py-4 text-base font-semibold text-neutral-900 active:bg-neutral-50 sm:text-lg"
+                >
+                  Slå in ordernummer
+                </button>
+                {/* Ligger här och inte bland ordrarna. Inproduktiv tid hör
+                    inte till någon kund, och den som letar efter sin order
+                    ska inte kunna råka trycka på Städning. */}
+                {indirectMoments.length > 0 && (
+                  <button
+                    onClick={() =>
+                      setView({ name: "indirect", employee: view.employee })
+                    }
+                    className="kiosk-press rounded-xl border border-neutral-200 bg-white px-5 py-4 text-base font-semibold text-neutral-600 active:bg-neutral-50 sm:text-lg"
+                  >
+                    Inproduktiv tid
+                  </button>
+                )}
+              </div>
             }
             items={orders.map((order) => ({
               key: order.id,
@@ -766,7 +810,28 @@ export default function KioskScreen({
             items={moments.map((moment) => ({
               key: moment.id,
               primary: moment.name,
-              onPick: () => punchIn(view.employee, view.order, moment),
+              onPick: () =>
+                punchIn(view.employee, {
+                  kind: "ORDER",
+                  order: view.order,
+                  moment,
+                }),
+            }))}
+          />
+        )}
+
+        {view.name === "indirect" && (
+          <Chooser
+            title={`${view.employee.name}: inproduktiv tid`}
+            empty="Inga inproduktiva moment upplagda. Kontakta administratören."
+            items={indirectMoments.map((moment) => ({
+              key: moment.id,
+              primary: moment.name,
+              onPick: () =>
+                punchIn(view.employee, {
+                  kind: "INDIRECT",
+                  indirectMoment: moment,
+                }),
             }))}
           />
         )}
@@ -789,6 +854,7 @@ const STEPS: Partial<
   orderNumber: { current: 2, label: "Slå in ordernummer" },
   quickCustomer: { current: 2, label: "Vilken kund?" },
   moment: { current: 3, label: "Välj arbetsmoment" },
+  indirect: { current: 2, label: "Inproduktiv tid" },
 };
 
 function Header({
@@ -1023,10 +1089,10 @@ function EmployeeGrid({
                 </span>
                 {jobs.slice(0, 2).map((entry) => (
                   <span
-                    key={entry.momentId}
+                    key={jobKey(entry.choice)}
                     className="mt-1.5 block truncate text-sm text-white/80"
                   >
-                    {entry.orderNumber} · {entry.momentName}
+                    {entry.label}
                   </span>
                 ))}
                 {jobs.length > 2 && (
@@ -1040,7 +1106,7 @@ function EmployeeGrid({
               // som ser sitt jobb redan på namnknappen vet att genvägen finns
               // innan hen ens tryckt.
               <span className="mt-3 block truncate text-sm text-neutral-500">
-                Senast: {last.orderNumber} · {last.momentName}
+                Senast: {last.label}
               </span>
             ) : (
               <span className="mt-3 block text-sm text-neutral-400">
@@ -1105,9 +1171,7 @@ function ActionChoice({
               <span className="h-2 w-2 rounded-full bg-white" />
               Pågår sedan <Elapsed since={single.since} />
             </span>
-            <span>
-              {single.orderNumber} · {single.momentName}
-            </span>
+            <span>{single.label}</span>
           </div>
         )}
       </div>
@@ -1119,12 +1183,12 @@ function ActionChoice({
         <div className="mt-3 space-y-3">
           {jobs.map((job) => (
             <div
-              key={job.momentId}
+              key={jobKey(job.choice)}
               className="flex items-center gap-3 rounded-xl border border-emerald-600 bg-emerald-600 p-4"
             >
               <span className="min-w-0 flex-1">
                 <span className="block truncate text-xl font-semibold text-white">
-                  {job.orderNumber} · {job.momentName}
+                  {job.label}
                 </span>
                 <span className="mt-1 block text-sm text-white/80">
                   Pågår sedan <Elapsed since={job.since} />
@@ -1205,7 +1269,7 @@ function ActionChoice({
             >
               Fortsätt
               <span className="mt-1.5 block truncate text-base font-normal text-white/80">
-                {recent.orderNumber} · {recent.momentName}
+                {recent.label}
               </span>
             </button>
             <button

@@ -14,6 +14,7 @@ import {
   Tr,
 } from "@/components/ui";
 import { formatDateTime, formatDuration, minutesBetween } from "@/lib/format";
+import { describeEntry } from "@/lib/entry-label";
 import { wallTimeIn } from "@/lib/time-zone";
 import { approveEntry, correctEntry } from "./actions";
 
@@ -37,8 +38,10 @@ export default async function ReviewPage() {
       clockOutAt: true,
       reviewNote: true,
       employee: { select: { name: true } },
+      kind: true,
       order: { select: { orderNumber: true, customerName: true } },
       moment: { select: { name: true } },
+      indirectMoment: { select: { name: true } },
     },
   });
 
@@ -75,10 +78,15 @@ export default async function ReviewPage() {
                   <Td>
                     <span className="font-medium">{entry.employee.name}</span>
                     <span className="mt-0.5 block text-sm text-neutral-500">
-                      {entry.order.orderNumber}
-                      {entry.order.customerName && ` · ${entry.order.customerName}`}
-                      {` · ${entry.moment.name}`}
+                      {describeEntry(entry).text}
+                      {entry.order?.customerName &&
+                        ` · ${entry.order.customerName}`}
                     </span>
+                    {entry.kind === "INDIRECT" && (
+                      <span className="mt-1 inline-block">
+                        <Badge tone="muted">Inproduktiv</Badge>
+                      </span>
+                    )}
                   </Td>
 
                   <Td muted>{formatDateTime(entry.clockInAt, timeZone)}</Td>

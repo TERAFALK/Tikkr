@@ -23,6 +23,8 @@ interface PunchBody {
   employeeId: string;
   orderId?: string;
   momentId?: string;
+  /** Ifyllt i stället för order och moment när tiden är inproduktiv. */
+  indirectMomentId?: string;
   clientPunchId?: string;
   /** När personen tryckte — inte när anropet råkade komma fram. */
   at?: string;
@@ -115,14 +117,33 @@ export async function POST(request: NextRequest) {
         ...context,
         employeeId: body.employeeId,
         momentId: body.momentId,
+        indirectMomentId: body.indirectMomentId,
       });
       await Promise.all([touchDevice(session.deviceId), refreshKioskCookie()]);
       return NextResponse.json({ ok: true, closed });
     }
 
-    if (!body.orderId || !body.momentId) {
+    // Antingen order OCH moment, eller ett inproduktivt moment. Aldrig både
+    // och, och aldrig ingetdera — se JobRef i src/lib/clock.ts.
+    const job = body.indirectMomentId
+      ? ({
+          kind: "INDIRECT",
+          indirectMomentId: body.indirectMomentId,
+        } as const)
+      : body.orderId && body.momentId
+        ? ({
+            kind: "ORDER",
+            orderId: body.orderId,
+            momentId: body.momentId,
+          } as const)
+        : null;
+
+    if (!job) {
       return NextResponse.json(
-        { error: "Order och arbetsmoment måste anges." },
+        {
+          error:
+            "Ange antingen order och arbetsmoment, eller ett inproduktivt moment.",
+        },
         { status: 400 }
       );
     }
@@ -130,8 +151,7 @@ export async function POST(request: NextRequest) {
     const result = await clockIn(session.companyId, {
       ...context,
       employeeId: body.employeeId,
-      orderId: body.orderId,
-      momentId: body.momentId,
+      ...job,
     });
 
     await Promise.all([touchDevice(session.deviceId), refreshKioskCookie()]);

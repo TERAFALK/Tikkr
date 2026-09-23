@@ -4,6 +4,41 @@ import { forCompany } from "@/lib/tenant";
 import { evaluateAccess } from "@/lib/subscription";
 import { activeNotices } from "@/lib/notices";
 import { recentCustomerNames } from "@/lib/quick-order";
+import { describeEntry } from "@/lib/entry-label";
+import type {
+  KioskActiveJob,
+  KioskJobChoice,
+  KioskRecentJob,
+} from "@/components/kiosk/KioskScreen";
+
+/**
+ * Gör om en databaspost till det val skärmen behöver för att kunna stämpla
+ * om på jobbet.
+ *
+ * Returnerar null när posten saknar det den ska ha. Det ska inte kunna hända
+ * — clock.ts vaktar det — men en trasig rad ska tappas tyst i stället för att
+ * fälla hela stämplingsskärmen.
+ */
+function toJobChoice(entry: {
+  kind: "ORDER" | "INDIRECT";
+  order: { id: string; orderNumber: string } | null;
+  moment: { id: string; name: string } | null;
+  indirectMoment: { id: string; name: string } | null;
+}): KioskJobChoice | null {
+  if (entry.kind === "INDIRECT") {
+    return entry.indirectMoment
+      ? { kind: "INDIRECT", indirectMoment: entry.indirectMoment }
+      : null;
+  }
+
+  return entry.order && entry.moment
+    ? {
+        kind: "ORDER",
+        order: { id: entry.order.id, orderNumber: entry.order.orderNumber },
+        moment: entry.moment,
+      }
+    : null;
+}
 import KioskScreen from "@/components/kiosk/KioskScreen";
 import PairingForm from "@/components/kiosk/PairingForm";
 
@@ -52,6 +87,7 @@ export default async function KioskPage() {
     employees,
     orders,
     moments,
+    indirectMoments,
     openEntries,
     recentEntries,
     notices,
@@ -75,6 +111,13 @@ export default async function KioskPage() {
       orderBy: { name: "asc" },
       select: { id: true, name: true },
     }),
+    // Inproduktiv tid: städning, möten, underhåll. Egen lista med flit — det
+    // ska vara omöjligt att råka välja Städning på en kundorder.
+    db.indirectMoment.findMany({
+      where: { active: true },
+      orderBy: { name: "asc" },
+      select: { id: true, name: true },
+    }),
     db.timeEntry.findMany({
       where: { clockOutAt: null },
       // Senast påbörjad först, och uttryckligen sorterad: utan ordning avgör
@@ -86,8 +129,10 @@ export default async function KioskPage() {
         clockInAt: true,
         // Id:na behövs för att skärmen ska kunna bygga ett "senast"-förslag
         // direkt vid utstämpling, utan att först vänta på en omladdning.
+        kind: true,
         order: { select: { id: true, orderNumber: true } },
         moment: { select: { id: true, name: true } },
+        indirectMoment: { select: { id: true, name: true } },
       },
     }),
     // Senast avslutade jobb per anställd — underlaget för "Fortsätt".
@@ -99,8 +144,10 @@ export default async function KioskPage() {
       orderBy: [{ employeeId: "asc" }, { clockInAt: "desc" }],
       select: {
         employeeId: true,
+        kind: true,
         order: { select: { id: true, orderNumber: true, status: true } },
         moment: { select: { id: true, name: true, active: true } },
+        indirectMoment: { select: { id: true, name: true, active: true } },
       },
     }),
     activeNotices("kiosk"),
@@ -113,24 +160,16 @@ export default async function KioskPage() {
   // En LISTA per person. En operatör kan köra två maskiner samtidigt, och
   // Object.fromEntries hade behållit den sista posten tyst — skärmen hade då
   // visat ett jobb som pågick och dolt det andra.
-  const activeByEmployee: Record<
-    string,
-    {
-      since: string;
-      orderId: string;
-      orderNumber: string;
-      momentId: string;
-      momentName: string;
-    }[]
-  > = {};
+  const activeByEmployee: Record<string, KioskActiveJob[]> = {};
 
   for (const entry of openEntries) {
+    const choice = toJobChoice(entry);
+    if (!choice) continue;
+
     (activeByEmployee[entry.employeeId] ??= []).push({
       since: entry.clockInAt.toISOString(),
-      orderId: entry.order.id,
-      orderNumber: entry.order.orderNumber,
-      momentId: entry.moment.id,
-      momentName: entry.moment.name,
+      label: describeEntry(entry).text,
+      choice,
     });
   }
 
@@ -140,19 +179,25 @@ export default async function KioskPage() {
   // låter det falla bort om det inte längre går att stämpla på — vi letar
   // alltså inte vidare bakåt efter något som råkar fungera. Ett "Senast"
   // som pekar på fel jobb får hela skärmen att se trasig ut.
-  const recentByEmployee = Object.fromEntries(
-    recentEntries
-      .filter((entry) => entry.order.status === "OPEN" && entry.moment.active)
-      .map((entry) => [
-        entry.employeeId,
-        {
-          orderId: entry.order.id,
-          orderNumber: entry.order.orderNumber,
-          momentId: entry.moment.id,
-          momentName: entry.moment.name,
-        },
-      ])
-  );
+  const recentByEmployee: Record<string, KioskRecentJob> = {};
+
+  for (const entry of recentEntries) {
+    // Går jobbet fortfarande att stämpla på? Annars inget förslag.
+    const usable =
+      entry.kind === "ORDER"
+        ? entry.order?.status === "OPEN" && entry.moment?.active === true
+        : entry.indirectMoment?.active === true;
+
+    if (!usable) continue;
+
+    const choice = toJobChoice(entry);
+    if (!choice) continue;
+
+    recentByEmployee[entry.employeeId] = {
+      label: describeEntry(entry).text,
+      choice,
+    };
+  }
 
   return (
     <KioskScreen
@@ -165,6 +210,7 @@ export default async function KioskPage() {
       }))}
       orders={orders}
       moments={moments}
+      indirectMoments={indirectMoments}
       activeByEmployee={activeByEmployee}
       recentByEmployee={recentByEmployee}
       customers={customers}

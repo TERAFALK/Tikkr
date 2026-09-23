@@ -104,6 +104,9 @@ export async function getOrderCalcs(
       markupPercent: true,
       fixedPriceOre: true,
       timeEntries: {
+        // Inproduktiv tid kan aldrig ha en order, men filtret sager vad
+        // fragan handlar om och kostar ingenting.
+        where: { kind: "ORDER" },
         orderBy: { clockInAt: "asc" },
         select: {
           clockInAt: true,
@@ -145,9 +148,14 @@ export async function getOrderCalcs(
       if (entry.clockOutAt === null) ongoingCount += 1;
       if (entry.needsReview) ungradedCount += 1;
 
-      const group = groups.get(entry.moment.id) ?? {
-        momentId: entry.moment.id,
-        momentName: entry.moment.name,
+      // Frågan filtrerar på kind ORDER, så momentet finns. Fallbacken är
+      // inte en gissning utan en vägran att krascha på data som inte ska
+      // kunna uppstå.
+      const momentId = entry.moment?.id ?? "";
+
+      const group = groups.get(momentId) ?? {
+        momentId,
+        momentName: entry.moment?.name ?? "Okänt arbetsmoment",
         entries: [],
         minutes: 0,
         costOre: 0,
@@ -171,7 +179,7 @@ export async function getOrderCalcs(
       if (costOre === null) group.minutesWithoutRate += minutes;
       else group.costOre += costOre;
 
-      groups.set(entry.moment.id, group);
+      groups.set(momentId, group);
     }
 
     const sorted = [...groups.values()].sort((a, b) => b.costOre - a.costOre);

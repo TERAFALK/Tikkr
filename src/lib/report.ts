@@ -1,5 +1,6 @@
 import type { CompanyDb } from "./tenant";
 import { minutesBetween } from "./format";
+import { describeEntry } from "./entry-label";
 
 /**
  * RAPPORTERNA.
@@ -23,16 +24,37 @@ export interface ReportFilters {
   employeeId?: string;
   orderId?: string;
   momentId?: string;
+  /**
+   * Vilken sorts tid rapporten avser. UTELÄMNAS DEN GÄLLER "ORDER".
+   *
+   * Standardvärdet är inte godtyckligt. Varje anropare som glömmer tänka på
+   * inproduktiv tid får fakturerbar tid — aldrig tvärtom. Den som vill ha med
+   * städtid måste be om det uttryckligen, och skriver då ut ordet i koden.
+   *
+   * Samma princip som forCompany i tenant.ts bygger på: filtret går inte att
+   * glömma, eftersom det inte är något man skriver.
+   */
+  kind?: "ORDER" | "INDIRECT" | "ALL";
 }
 
 export interface ReportRow {
   id: string;
+  kind: "ORDER" | "INDIRECT";
   employeeName: string;
   /** Kundens eget nummer på personen, om ett angetts. */
   employeeNumber: string | null;
-  orderNumber: string;
+  /**
+   * Vad raden avser: "2601 · Svetsning" eller "Städning". Färdigformaterad av
+   * describeEntry, så att ingen vy behöver stava ut skillnaden själv.
+   */
+  label: string;
+  /** Ordernumret. null på inproduktiv tid — den hör inte till någon order. */
+  orderNumber: string | null;
   customerName: string | null;
+  /** Arbetsmomentet, eller det inproduktiva momentet. */
   momentName: string;
+  /** true när raden ska faktureras. false för inproduktiv tid. */
+  billable: boolean;
   clockInAt: Date;
   clockOutAt: Date | null;
   minutes: number;
@@ -57,9 +79,15 @@ export interface ReportResult {
   totalMinutes: number;
   ongoingCount: number;
   needsReviewCount: number;
+  /** Tid som ska faktureras. Summan av raderna med kind ORDER. */
+  billableMinutes: number;
+  /** Inproduktiv tid. Ingår ALDRIG i billableMinutes. */
+  indirectMinutes: number;
   byOrder: ReportGroup[];
   byEmployee: ReportGroup[];
   byMoment: ReportGroup[];
+  /** Per inproduktivt moment. Tom när rapporten bara gäller ordertid. */
+  byIndirect: ReportGroup[];
 }
 
 export async function buildReport(
@@ -71,6 +99,8 @@ export async function buildReport(
       employeeId: filters.employeeId || undefined,
       orderId: filters.orderId || undefined,
       momentId: filters.momentId || undefined,
+      // Utelämnat filter betyder fakturerbar tid. Se ReportFilters.kind.
+      kind: filters.kind === "ALL" ? undefined : (filters.kind ?? "ORDER"),
       clockInAt:
         filters.from || filters.to
           ? { gte: filters.from, lte: filters.to }
@@ -83,37 +113,58 @@ export async function buildReport(
       clockOutAt: true,
       needsReview: true,
       source: true,
+      kind: true,
       employee: { select: { id: true, name: true, employeeNumber: true } },
       order: { select: { id: true, orderNumber: true, customerName: true } },
       moment: { select: { id: true, name: true } },
+      indirectMoment: { select: { id: true, name: true } },
     },
   });
 
-  const rows: ReportRow[] = entries.map((entry) => ({
-    id: entry.id,
-    employeeName: entry.employee.name,
-    employeeNumber: entry.employee.employeeNumber,
-    orderNumber: entry.order.orderNumber,
-    customerName: entry.order.customerName,
-    momentName: entry.moment.name,
-    clockInAt: entry.clockInAt,
-    clockOutAt: entry.clockOutAt,
-    minutes: minutesBetween(entry.clockInAt, entry.clockOutAt),
-    ongoing: entry.clockOutAt === null,
-    needsReview: entry.needsReview,
-    manual: entry.source === "ADMIN_MANUAL",
-  }));
+  const rows: ReportRow[] = entries.map((entry) => {
+    const label = describeEntry(entry);
+
+    return {
+      id: entry.id,
+      kind: entry.kind,
+      employeeName: entry.employee.name,
+      employeeNumber: entry.employee.employeeNumber,
+      label: label.text,
+      orderNumber: entry.order?.orderNumber ?? null,
+      customerName: label.customerName,
+      momentName: entry.moment?.name ?? entry.indirectMoment?.name ?? "",
+      billable: label.billable,
+      clockInAt: entry.clockInAt,
+      clockOutAt: entry.clockOutAt,
+      minutes: minutesBetween(entry.clockInAt, entry.clockOutAt),
+      ongoing: entry.clockOutAt === null,
+      needsReview: entry.needsReview,
+      manual: entry.source === "ADMIN_MANUAL",
+    };
+  });
+
+  // Grupperingarna per order och per arbetsmoment får ALDRIG se inproduktiv
+  // tid. Utan den här uppdelningen hade en Map-nyckel blivit undefined och
+  // gett en tyst skräpgrupp mitt i ett fakturaunderlag.
+  const billable = entries.filter((entry) => entry.kind === "ORDER");
+  const indirect = entries.filter((entry) => entry.kind === "INDIRECT");
 
   return {
     rows,
     totalMinutes: rows.reduce((sum, row) => sum + row.minutes, 0),
+    billableMinutes: rows
+      .filter((row) => row.billable)
+      .reduce((sum, row) => sum + row.minutes, 0),
+    indirectMinutes: rows
+      .filter((row) => !row.billable)
+      .reduce((sum, row) => sum + row.minutes, 0),
     ongoingCount: rows.filter((row) => row.ongoing).length,
     needsReviewCount: rows.filter((row) => row.needsReview).length,
 
-    byOrder: groupBy(entries, (entry) => ({
-      key: entry.order.id,
-      label: entry.order.orderNumber,
-      sublabel: entry.order.customerName ?? undefined,
+    byOrder: groupBy(billable, (entry) => ({
+      key: entry.order?.id ?? "",
+      label: entry.order?.orderNumber ?? "",
+      sublabel: entry.order?.customerName ?? undefined,
     })),
     byEmployee: groupBy(entries, (entry) => ({
       key: entry.employee.id,
@@ -123,9 +174,13 @@ export async function buildReport(
       // rubrik där det stör för alla andra.
       sublabel: entry.employee.employeeNumber ?? undefined,
     })),
-    byMoment: groupBy(entries, (entry) => ({
-      key: entry.moment.id,
-      label: entry.moment.name,
+    byMoment: groupBy(billable, (entry) => ({
+      key: entry.moment?.id ?? "",
+      label: entry.moment?.name ?? "",
+    })),
+    byIndirect: groupBy(indirect, (entry) => ({
+      key: entry.indirectMoment?.id ?? "",
+      label: entry.indirectMoment?.name ?? "",
     })),
   };
 }
@@ -134,8 +189,12 @@ type Entry = {
   clockInAt: Date;
   clockOutAt: Date | null;
   employee: { id: string; name: string; employeeNumber: string | null };
-  order: { id: string; orderNumber: string; customerName: string | null };
-  moment: { id: string; name: string };
+  // Nullbara: en inproduktiv post har varken order eller arbetsmoment, och en
+  // orderpost har inget inproduktivt moment. Anroparen filtrerar på kind INNAN
+  // den grupperar, så att en nyckel aldrig blir tom.
+  order: { id: string; orderNumber: string; customerName: string | null } | null;
+  moment: { id: string; name: string } | null;
+  indirectMoment: { id: string; name: string } | null;
 };
 
 function groupBy(

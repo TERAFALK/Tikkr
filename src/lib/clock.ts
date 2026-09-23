@@ -2,6 +2,7 @@ import { Prisma, type TimeEntry } from "@prisma/client";
 import { unsafeGlobalPrisma } from "./db";
 import { forCompany, type CompanyDb } from "./tenant";
 import { nextOccurrenceOf } from "./time-zone";
+import { describeEntry } from "./entry-label";
 
 /**
  * STÄMPLINGSLOGIKEN.
@@ -56,11 +57,18 @@ export interface PunchContext {
   fromOfflineQueue?: boolean;
 }
 
-export interface ClockInInput extends PunchContext {
-  employeeId: string;
-  orderId: string;
-  momentId: string;
-}
+/**
+ * Vilket jobb en stämpling gäller.
+ *
+ * En diskriminerad union och inte fyra valfria fält. Det gör att man inte kan
+ * skapa en post utan att ha bestämt vad den är, och att TypeScript vägrar läsa
+ * ett ordernummer på inproduktiv tid.
+ */
+export type JobRef =
+  | { kind: "ORDER"; orderId: string; momentId: string }
+  | { kind: "INDIRECT"; indirectMomentId: string };
+
+export type ClockInInput = PunchContext & { employeeId: string } & JobRef;
 
 export interface ClockInResult {
   /** Den nya, pågående stämplingen. */
@@ -136,7 +144,7 @@ export async function clockIn(
     const open = await tx.timeEntry.findFirst({
       where: {
         employeeId: input.employeeId,
-        momentId: input.momentId,
+        ...jobKey(input),
         clockOutAt: null,
       },
       orderBy: { clockInAt: "desc" },
@@ -170,8 +178,7 @@ export async function clockIn(
         // vägrar annars — se src/lib/tenant.ts.
         companyId,
         employeeId: input.employeeId,
-        orderId: input.orderId,
-        momentId: input.momentId,
+        ...jobFields(input),
         clockInAt: at,
         // Kopian av momentets timkostnad. Se schemat: en senare prishöjning
         // får inte ändra en kalkyl som redan tagits ut och fakturerats.
@@ -210,7 +217,13 @@ export async function clockIn(
  */
 export async function clockOut(
   companyId: string,
-  input: PunchContext & { employeeId: string; momentId?: string }
+  input: PunchContext & {
+    employeeId: string;
+    /** Arbetsmomentet, när det är ordertid som ska stängas. */
+    momentId?: string;
+    /** Det inproduktiva momentet, när det är sådan tid som ska stängas. */
+    indirectMomentId?: string;
+  }
 ): Promise<TimeEntry | null> {
   const at = input.at ?? new Date();
   const db = forCompany(companyId);
@@ -228,11 +241,17 @@ export async function clockOut(
   let target: TimeEntry;
   let ambiguous = false;
 
-  if (input.momentId) {
-    const onMoment = open.find((entry) => entry.momentId === input.momentId);
+  const wanted = input.momentId ?? input.indirectMomentId;
+
+  if (wanted) {
+    const onJob = open.find((entry) =>
+      input.momentId
+        ? entry.momentId === input.momentId
+        : entry.indirectMomentId === input.indirectMomentId
+    );
     // Redan utstämplad från just det jobbet. Ingen effekt, inget fel.
-    if (!onMoment) return null;
-    target = onMoment;
+    if (!onJob) return null;
+    target = onJob;
   } else {
     target = open[0];
     ambiguous = open.length > 1;
@@ -386,7 +405,9 @@ export async function openEntriesOnOrder(
   const db = forCompany(companyId);
 
   const open = await db.timeEntry.findMany({
-    where: { orderId, clockOutAt: null },
+    // kind uttryckligen, fastän en inproduktiv post aldrig kan ha en order.
+    // Filtret säger vad frågan handlar om, och kostar ingenting.
+    where: { orderId, kind: "ORDER", clockOutAt: null },
     orderBy: { clockInAt: "asc" },
     select: {
       id: true,
@@ -399,7 +420,7 @@ export async function openEntriesOnOrder(
   return open.map((entry) => ({
     entryId: entry.id,
     employeeName: entry.employee.name,
-    momentName: entry.moment.name,
+    momentName: entry.moment?.name ?? "",
     clockInAt: entry.clockInAt,
   }));
 }
@@ -470,15 +491,13 @@ export async function closeOrder(
   });
 }
 
-export interface ManualEntryInput {
+export type ManualEntryInput = {
   employeeId: string;
-  orderId: string;
-  momentId: string;
   clockInAt: Date;
   clockOutAt: Date;
   /** Vem som skrev in den. Hamnar i review_note så det syns i efterhand. */
   byEmail: string;
-}
+} & JobRef;
 
 /**
  * Lägger in en stämpling för hand.
@@ -501,20 +520,13 @@ export async function createManualEntry(
     historical: true,
   });
   assertSaneInterval(input.clockInAt, input.clockOutAt);
-  await assertNoOverlap(
-    db,
-    input.employeeId,
-    input.momentId,
-    input.clockInAt,
-    input.clockOutAt
-  );
+  await assertNoOverlap(db, input, input.clockInAt, input.clockOutAt);
 
   return db.timeEntry.create({
     data: {
       companyId,
       employeeId: input.employeeId,
-      orderId: input.orderId,
-      momentId: input.momentId,
+      ...jobFields(input),
       clockInAt: input.clockInAt,
       clockOutAt: input.clockOutAt,
       // Momentets timkostnad som den är NU. En tid som skrivs in i efterhand
@@ -540,21 +552,13 @@ export async function updateEntryManually(
     historical: true,
   });
   assertSaneInterval(input.clockInAt, input.clockOutAt);
-  await assertNoOverlap(
-    db,
-    input.employeeId,
-    input.momentId,
-    input.clockInAt,
-    input.clockOutAt,
-    entryId
-  );
+  await assertNoOverlap(db, input, input.clockInAt, input.clockOutAt, entryId);
 
   return db.timeEntry.update({
     where: { id: entryId },
     data: {
       employeeId: input.employeeId,
-      orderId: input.orderId,
-      momentId: input.momentId,
+      ...jobFields(input),
       clockInAt: input.clockInAt,
       clockOutAt: input.clockOutAt,
       // Följer med momentet. Flyttas posten till ett annat arbetsmoment ska
@@ -601,16 +605,15 @@ function assertSaneInterval(from: Date, to: Date) {
  */
 async function assertNoOverlap(
   db: CompanyDb,
-  employeeId: string,
-  momentId: string,
+  job: { employeeId: string } & JobRef,
   from: Date,
   to: Date,
   ignoreEntryId?: string
 ) {
   const clash = await db.timeEntry.findFirst({
     where: {
-      employeeId,
-      momentId,
+      employeeId: job.employeeId,
+      ...jobKey(job),
       id: ignoreEntryId ? { not: ignoreEntryId } : undefined,
       // Två intervall överlappar om det ena börjar innan det andra slutar,
       // och slutar efter att det andra börjat.
@@ -618,21 +621,26 @@ async function assertNoOverlap(
       OR: [{ clockOutAt: null }, { clockOutAt: { gt: from } }],
     },
     select: {
+      kind: true,
       clockInAt: true,
       clockOutAt: true,
-      order: { select: { orderNumber: true } },
+      order: { select: { orderNumber: true, customerName: true } },
       moment: { select: { name: true } },
+      indirectMoment: { select: { name: true } },
     },
   });
 
-  if (clash) {
-    throw new ClockError(
-      `Tiden krockar med en annan stämpling på ${clash.moment.name}, ` +
-        `order ${clash.order.orderNumber}` +
-        (clash.clockOutAt ? "" : " som fortfarande pågår") +
-        ". Samma arbetsmoment kan inte köra två jobb samtidigt."
-    );
-  }
+  if (!clash) return;
+
+  const label = describeEntry(clash);
+  const pending = clash.clockOutAt ? "" : " som fortfarande pågår";
+
+  throw new ClockError(
+    `Tiden krockar med en annan stämpling på ${label.text}${pending}. ` +
+      (label.billable
+        ? "Samma arbetsmoment kan inte köra två jobb samtidigt."
+        : "Samma inproduktiva moment kan inte pågå två gånger samtidigt.")
+  );
 }
 
 /**
@@ -647,16 +655,39 @@ async function assertNoOverlap(
  */
 async function assertBelongsToCompany(
   db: CompanyDb,
-  input: { employeeId: string; orderId: string; momentId: string },
+  input: { employeeId: string } & JobRef,
   options: { historical?: boolean } = {}
 ): Promise<{ momentCostRateOre: number | null }> {
-  const [employee, order, moment] = await Promise.all([
-    db.employee.findFirst({ where: { id: input.employeeId } }),
+  const employee = await db.employee.findFirst({
+    where: { id: input.employeeId },
+  });
+
+  if (!employee) throw new ClockError("Okänd anställd.");
+
+  if (!employee.active && !options.historical) {
+    throw new ClockError("Den anställde är inte aktiv.");
+  }
+
+  if (input.kind === "INDIRECT") {
+    const moment = await db.indirectMoment.findFirst({
+      where: { id: input.indirectMomentId },
+    });
+
+    if (!moment) throw new ClockError("Okänt inproduktivt moment.");
+
+    if (!moment.active && !options.historical) {
+      throw new ClockError("Det inproduktiva momentet är inte aktivt.");
+    }
+
+    // Inproduktiv tid kalkyleras inte. Ingen timkostnad att kopiera.
+    return { momentCostRateOre: null };
+  }
+
+  const [order, moment] = await Promise.all([
     db.order.findFirst({ where: { id: input.orderId } }),
     db.workMoment.findFirst({ where: { id: input.momentId } }),
   ]);
 
-  if (!employee) throw new ClockError("Okänd anställd.");
   if (!order) throw new ClockError("Okänd order.");
   if (!moment) throw new ClockError("Okänt arbetsmoment.");
 
@@ -666,11 +697,46 @@ async function assertBelongsToCompany(
 
   if (options.historical) return result;
 
-  if (!employee.active) throw new ClockError("Den anställde är inte aktiv.");
   if (order.status === "CLOSED") throw new ClockError("Ordern är stängd.");
   if (!moment.active) throw new ClockError("Arbetsmomentet är inte aktivt.");
 
   return result;
+}
+
+/**
+ * Fälten som pekar ut jobbet, för skrivning.
+ *
+ * Nollställer ALLTID den motsatta sidan. Ändrar admin en post från ordertid
+ * till inproduktiv ska ordernumret försvinna, inte ligga kvar och göra raden
+ * till något som varken är det ena eller det andra.
+ */
+function jobFields(job: JobRef) {
+  return job.kind === "ORDER"
+    ? {
+        kind: "ORDER" as const,
+        orderId: job.orderId,
+        momentId: job.momentId,
+        indirectMomentId: null,
+      }
+    : {
+        kind: "INDIRECT" as const,
+        orderId: null,
+        momentId: null,
+        indirectMomentId: job.indirectMomentId,
+      };
+}
+
+/**
+ * Nyckeln som skiljer en persons parallella jobb åt.
+ *
+ * För ordertid är det arbetsmomentet — momentet är maskinen, och en maskin kör
+ * ett jobb i taget. För inproduktiv tid är det det inproduktiva momentet: man
+ * städar inte två gånger samtidigt.
+ */
+function jobKey(job: JobRef) {
+  return job.kind === "ORDER"
+    ? { momentId: job.momentId }
+    : { indirectMomentId: job.indirectMomentId };
 }
 
 /** Prismas felkod för brott mot en unik-regel. */

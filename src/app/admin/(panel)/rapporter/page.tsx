@@ -30,6 +30,8 @@ interface SearchParams {
   employeeId?: string;
   orderId?: string;
   momentId?: string;
+  /** "ORDER" (standard), "INDIRECT" eller "ALL". */
+  kind?: string;
 }
 
 export default async function ReportsPage({
@@ -66,6 +68,12 @@ export default async function ReportsPage({
     employeeId: params.employeeId,
     orderId: params.orderId,
     momentId: params.momentId,
+    // Utelämnad betyder fakturerbar tid. Se ReportFilters.kind — glömska ska
+    // ge det som hör hemma i en faktura, aldrig tvärtom.
+    kind:
+      params.kind === "INDIRECT" || params.kind === "ALL"
+        ? params.kind
+        : "ORDER",
   });
 
   const exportHref = `/api/admin/export?${new URLSearchParams(
@@ -146,6 +154,17 @@ export default async function ReportsPage({
             </Select>
           </Field>
 
+          <Field
+            label="Sorts tid"
+            hint="Fakturerbar tid är standard. Inproduktiv tid ingår aldrig i ett orderunderlag."
+          >
+            <Select name="kind" defaultValue={params.kind ?? "ORDER"}>
+              <option value="ORDER">Fakturerbar tid</option>
+              <option value="INDIRECT">Inproduktiv tid</option>
+              <option value="ALL">Båda</option>
+            </Select>
+          </Field>
+
           <Field label="Arbetsmoment">
             <Select name="momentId" defaultValue={params.momentId ?? ""}>
               <option value="">Alla moment</option>
@@ -198,6 +217,9 @@ export default async function ReportsPage({
             <Summary title="Per order" groups={report.byOrder} />
             <Summary title="Per anställd" groups={report.byEmployee} />
             <Summary title="Per arbetsmoment" groups={report.byMoment} />
+            {report.byIndirect.length > 0 && (
+              <Summary title="Inproduktiv tid" groups={report.byIndirect} />
+            )}
           </div>
 
           <Card>
@@ -228,7 +250,9 @@ export default async function ReportsPage({
                       )}
                     </Td>
                     <Td>
-                      {row.orderNumber}
+                      {row.orderNumber ?? (
+                        <Badge tone="muted">Inproduktiv</Badge>
+                      )}
                       {row.customerName && (
                         <span className="ml-2 text-neutral-500">
                           {row.customerName}

@@ -11,17 +11,32 @@ tillverkningsföretag använder för att registrera arbetstid per **order** och
 
 ### Avgränsning — läs denna först
 
-**Tikkr är underlag för FAKTURERING. Inte för lön.** All tid som registreras
-hör till en kundorder som ska faktureras. Systemet ska aldrig utökas med
-lönearter, övertidsregler, frånvaro, semester eller interna ordrar för
-städning och möten — den tiden hör inte hemma här överhuvudtaget.
+**Tikkr är underlag för FAKTURERING. Inte för lön.** Systemet ska aldrig
+utökas med lönearter, övertidsregler, frånvaro eller semester — den tiden hör
+inte hemma här överhuvudtaget.
 
 Konsekvenser att hålla fast vid:
-- Order är alltid obligatorisk. Inget "Ingen order"-val, inga interna ordrar.
 - Rapporterna svarar på "hur mycket ska kunden faktureras", inte "hur mycket
   har personen jobbat".
 - En felaktig stämpling är ett fakturafel, inte ett lönefel. Allvarligt, men
   hanteras genom att admin rättar posten i efterhand.
+
+**Undantaget: inproduktiv tid** (ändrat 2026-09-23). Städning, möten och
+underhåll får registreras, i ett eget register skilt från arbetsmomenten.
+
+Skälet är inte att den tiden ska faktureras — den når aldrig ett
+fakturaunderlag. Skälet är att den annars göms i närmaste order och förstör
+just det underlaget. En städtimme som bokförts på order 2601 gör den ordern
+dyrare än den var, och kunden betalar för golvet.
+
+Den hålls isär på fyra sätt, och alla fyra ska finnas kvar:
+1. Eget register (`indirect_moments`), inte en bock på arbetsmomenten.
+2. `ReportFilters.kind` utelämnad betyder ORDER. Glömska ger fakturerbar tid,
+   aldrig tvärtom.
+3. Importgrafen: `pdf.ts` och `calc-pdf.ts` ser bara orderdata, aldrig
+   rapporttyperna. Ingen fil ser båda.
+4. `order-export.ts` och `order-calc.ts` filtrerar uttryckligen på
+   `kind: "ORDER"`, fastän en inproduktiv post inte kan ha en order.
 
 ### Kärnflöde (kiosk)
 
@@ -86,9 +101,11 @@ admin-UI m.m.). Kraftfullt, men det motsäger målet om *ett* enkelt paket.
 companies      — id, name, subscription_status, created_at
 employees      — id, company_id, name, active
 orders         — id, company_id, order_number, customer_name, status
-work_moments   — id, company_id, name
-time_entries   — id, company_id, employee_id, order_id, moment_id,
-                 clock_in_at, clock_out_at, source,
+work_moments   — id, company_id, name, cost_rate_ore
+indirect_moments — id, company_id, name, active
+time_entries   — id, company_id, employee_id, kind,
+                 order_id?, moment_id?, indirect_moment_id?,
+                 clock_in_at, clock_out_at, source, cost_rate_ore,
                  needs_review, review_note, kiosk_device_id, source_ip
 admin_users    — id, company_id, email, password_hash, role
 kiosk_devices  — id, company_id, name, device_token, active, last_seen_at
@@ -96,11 +113,17 @@ kiosk_devices  — id, company_id, name, device_token, active, last_seen_at
 
 ### Beslutade regler för stämpling (bestämt 2026-08-10)
 
-1. **Order och moment är obligatoriska.** All registrerad tid hör till en
-   kundorder som ska faktureras — se avgränsningen överst. Inget "Ingen
-   order"-val, inga interna ordrar. Konsekvens: `time_entries.order_id` och
-   `moment_id` är NOT NULL, och ordrar/moment med registrerad tid går inte att
-   radera (`onDelete: Restrict`) — de stängs istället.
+1. **En stämpling är antingen ordertid eller inproduktiv tid.**
+   `time_entries.kind` avgör vilket. ORDER har order + arbetsmoment, INDIRECT
+   har ett inproduktivt moment. Aldrig både och, aldrig ingetdera.
+
+   Ordertid kräver alltid både order OCH moment — det finns inget "Ingen
+   order"-val och inga interna ordrar. Inproduktiv tid går en egen väg, se
+   avgränsningen överst.
+
+   Villkoret kan inte uttryckas i databasen (`db push` saknar CHECK) och vaktas
+   därför i `src/lib/clock.ts`, som är enda vägen in. Ordrar och moment med
+   registrerad tid går inte att radera (`onDelete: Restrict`) — de stängs.
 2. **En anställd kan ha flera pågående stämplingar — en per arbetsmoment.**
    (Ändrat 2026-09-23. Tidigare gällde högst en stämpling alls.)
 

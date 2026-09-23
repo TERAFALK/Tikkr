@@ -20,6 +20,7 @@ import {
   Tr,
 } from "@/components/ui";
 import { formatDateTime, formatDuration, minutesBetween } from "@/lib/format";
+import { describeEntry } from "@/lib/entry-label";
 import { toLocalDateTimeInput } from "@/lib/time-zone";
 import { deleteEntry, editEntry } from "./actions";
 
@@ -80,8 +81,10 @@ export default async function EntriesPage({
         orderId: true,
         momentId: true,
         employee: { select: { name: true } },
+        kind: true,
         order: { select: { orderNumber: true, customerName: true } },
         moment: { select: { name: true } },
+        indirectMoment: { select: { name: true } },
       },
     }),
   ]);
@@ -191,8 +194,8 @@ export default async function EntriesPage({
                     </Td>
 
                     <Td muted>
-                      {entry.order.orderNumber} · {entry.moment.name}
-                      {entry.order.customerName && (
+                      {describeEntry(entry).text}
+                      {entry.order?.customerName && (
                         <span className="mt-0.5 block text-xs text-neutral-400">
                           {entry.order.customerName}
                         </span>

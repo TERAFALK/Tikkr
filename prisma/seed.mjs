@@ -57,6 +57,15 @@ async function main() {
           { name: "Kvalitetskontroll" },
         ],
       },
+      // Inproduktiv tid: eget register, ingen timkostnad, aldrig i ett
+      // fakturaunderlag.
+      indirectMoments: {
+        create: [
+          { name: "Städning" },
+          { name: "Möte" },
+          { name: "Underhåll" },
+        ],
+      },
       orders: {
         create: [
           { orderNumber: "2601", customerName: "Volvo Lastvagnar" },

@@ -254,3 +254,79 @@ describe("omräkning till fakturerbara timmar", () => {
     expect(formatDuration(0.4)).toBe("0:00");
   });
 });
+
+describe("inproduktiv tid hålls utanför fakturaunderlaget", () => {
+  let stadning: string;
+
+  beforeAll(async () => {
+    stadning = (
+      await unsafeGlobalPrisma.indirectMoment.create({
+        data: { companyId, name: "Städning" },
+      })
+    ).id;
+
+    // Två timmar städning samma dag som den övriga testdatan.
+    await unsafeGlobalPrisma.timeEntry.create({
+      data: {
+        companyId,
+        employeeId: anna,
+        kind: "INDIRECT",
+        indirectMomentId: stadning,
+        clockInAt: new Date("2026-08-05T13:00:00Z"),
+        clockOutAt: new Date("2026-08-05T15:00:00Z"),
+      },
+    });
+  });
+
+  it("rapporten räknar som standard bara tid som ska faktureras", async () => {
+    // Filtret är utelämnat. Glömska ska ge fakturerbar tid, aldrig tvärtom.
+    const report = await buildReport(forCompany(companyId), {});
+
+    expect(report.rows.every((row) => row.billable)).toBe(true);
+    expect(report.indirectMinutes).toBe(0);
+    expect(report.byIndirect).toHaveLength(0);
+  });
+
+  it("städtimmarna finns när man ber om dem", async () => {
+    const report = await buildReport(forCompany(companyId), {
+      kind: "INDIRECT",
+    });
+
+    expect(report.rows).toHaveLength(1);
+    expect(report.rows[0].billable).toBe(false);
+    expect(report.rows[0].orderNumber).toBeNull();
+    expect(report.rows[0].label).toBe("Städning");
+    expect(report.indirectMinutes).toBe(120);
+    expect(report.billableMinutes).toBe(0);
+  });
+
+  it("summeringen per order innehåller ingen inproduktiv tid", async () => {
+    const report = await buildReport(forCompany(companyId), { kind: "ALL" });
+
+    // Utan uppdelningen hade en Map-nyckel blivit tom och gett en tyst
+    // skräpgrupp mitt i ett fakturaunderlag.
+    expect(report.byOrder.every((group) => group.key !== "")).toBe(true);
+    expect(report.byMoment.every((group) => group.key !== "")).toBe(true);
+  });
+
+  it("med båda sorterna redovisas de var för sig", async () => {
+    const report = await buildReport(forCompany(companyId), { kind: "ALL" });
+
+    expect(report.indirectMinutes).toBe(120);
+    expect(report.billableMinutes).toBeGreaterThan(0);
+    expect(report.totalMinutes).toBe(
+      report.billableMinutes + report.indirectMinutes
+    );
+    expect(report.byIndirect).toHaveLength(1);
+    expect(report.byIndirect[0].label).toBe("Städning");
+  });
+
+  it("per anställd räknas båda sorterna när man bett om båda", async () => {
+    // Här är det riktigt att slå ihop: frågan är hur mycket personen jobbat,
+    // inte hur mycket som ska faktureras.
+    const report = await buildReport(forCompany(companyId), { kind: "ALL" });
+    const annas = report.byEmployee.find((group) => group.label === "Anna");
+
+    expect(annas?.minutes).toBeGreaterThanOrEqual(120);
+  });
+});

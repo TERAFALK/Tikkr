@@ -20,6 +20,14 @@ enum SubscriptionStatus {
   CANCELED
 }
 
+/// Vad en stämpling avser. Se TimeEntry.kind.
+enum TimeEntryKind {
+  /// Tid som ska faktureras en kundorder.
+  ORDER
+  /// Inproduktiv tid. Når aldrig ett fakturaunderlag.
+  INDIRECT
+}
+
 enum OrderStatus {
   OPEN
   CLOSED
@@ -115,9 +123,10 @@ model Company {
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
-  employees    Employee[]
-  orders       Order[]
-  workMoments  WorkMoment[]
+  employees       Employee[]
+  orders          Order[]
+  workMoments     WorkMoment[]
+  indirectMoments IndirectMoment[]
   timeEntries  TimeEntry[]
   adminUsers   AdminUser[]
   adminInvites AdminInvite[]
@@ -265,14 +274,53 @@ model WorkMoment {
 }
 
 /// En stämpling. clockOutAt = null betyder "pågår just nu".
+/// Inproduktiv tid: städning, möten, underhåll.
+///
+/// Eget register, skilt från WorkMoment med flit. Två skäl. Det ska vara
+/// omöjligt att råka välja Städning på en kundorder, och det ska vara lika
+/// omöjligt att råka få med den tiden i ett fakturaunderlag. En bock på
+/// WorkMoment hade gett båda felen en chans.
+///
+/// Ingen timkostnad här. Inproduktiv tid kalkyleras inte — den redovisas.
+model IndirectMoment {
+  id        String  @id @default(cuid())
+  companyId String  @map("company_id")
+  name      String
+  active    Boolean @default(true)
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  company     Company     @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  timeEntries TimeEntry[]
+
+  @@unique([companyId, name])
+  @@index([companyId, active])
+  @@map("indirect_moments")
+}
+
 model TimeEntry {
   id         String @id @default(cuid())
   companyId  String @map("company_id")
   employeeId String @map("employee_id")
 
-  // Order och moment är obligatoriska: all tid ska höra till ett jobb.
-  orderId  String @map("order_id")
-  momentId String @map("moment_id")
+  /// Vad stämplingen avser. ORDER är tid som ska faktureras en kundorder,
+  /// INDIRECT är inproduktiv tid som aldrig når ett fakturaunderlag.
+  ///
+  /// Fältet är diskriminatorn: exakt ett av fältparen nedan är ifyllt. ORDER
+  /// har order + moment, INDIRECT har indirectMoment. Databasen kan inte
+  /// uttrycka det villkoret — prisma db push saknar CHECK — så det vaktas i
+  /// src/lib/clock.ts, som är enda vägen in.
+  kind TimeEntryKind @default(ORDER)
+
+  /// Ifyllda när kind = ORDER. Restrict: en order eller ett moment går inte
+  /// att radera så länge det finns registrerad tid på det.
+  orderId  String? @map("order_id")
+  momentId String? @map("moment_id")
+
+  /// Ifyllt när kind = INDIRECT. Städning, möte, underhåll — tid som lagts
+  /// ner men inte på någon kunds order.
+  indirectMomentId String? @map("indirect_moment_id")
 
   clockInAt  DateTime  @map("clock_in_at")
   clockOutAt DateTime? @map("clock_out_at")
@@ -316,8 +364,9 @@ model TimeEntry {
   // Restrict: en order eller ett moment går inte att radera så länge det finns
   // registrerad tid på den. Tidsdatan är fakturaunderlag och får inte tappa
   // sin koppling. Admin stänger ordern istället för att radera den.
-  order  Order      @relation(fields: [orderId], references: [id], onDelete: Restrict)
-  moment WorkMoment @relation(fields: [momentId], references: [id], onDelete: Restrict)
+  order          Order?          @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  moment         WorkMoment?     @relation(fields: [momentId], references: [id], onDelete: Restrict)
+  indirectMoment IndirectMoment? @relation(fields: [indirectMomentId], references: [id], onDelete: Restrict)
 
   kioskDevice KioskDevice? @relation(fields: [kioskDeviceId], references: [id], onDelete: SetNull)
 
@@ -325,6 +374,9 @@ model TimeEntry {
   @@index([companyId, employeeId, clockOutAt])
   @@index([companyId, clockInAt])
   @@index([companyId, orderId])
+  @@index([companyId, indirectMomentId])
+  // Bär rapportfrågorna, som nästan alltid vill ha en av sorterna.
+  @@index([companyId, kind, clockInAt])
   // Adminlistan över poster som behöver granskas.
   @@index([companyId, needsReview])
   // Skyddet mot dubbletter från offline-kön. Unikt per företag, inte globalt.

@@ -32,6 +32,15 @@ export async function GET(request: NextRequest) {
     employeeId: params.get("employeeId") ?? undefined,
     orderId: params.get("orderId") ?? undefined,
     momentId: params.get("momentId") ?? undefined,
+    // Speglar rapportvyns filter. Utelämnat betyder fakturerbar tid, så en
+    // export som görs utan att någon tänkt på saken innehåller aldrig
+    // inproduktiv tid.
+    kind:
+      params.get("kind") === "INDIRECT"
+        ? "INDIRECT"
+        : params.get("kind") === "ALL"
+          ? "ALL"
+          : "ORDER",
   });
 
   const workbook = new ExcelJS.Workbook();
@@ -62,7 +71,7 @@ export async function GET(request: NextRequest) {
     details.addRow({
       employee: row.employeeName,
       employeeNumber: row.employeeNumber ?? "",
-      order: row.orderNumber,
+      order: row.orderNumber ?? "",
       customer: row.customerName ?? "",
       moment: row.momentName,
       in: row.clockInAt,
