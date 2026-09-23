@@ -3,6 +3,7 @@ import { unsafeGlobalPrisma } from "@/lib/db";
 import { forCompany } from "@/lib/tenant";
 import { evaluateAccess } from "@/lib/subscription";
 import { activeNotices } from "@/lib/notices";
+import { recentCustomerNames } from "@/lib/quick-order";
 import KioskScreen from "@/components/kiosk/KioskScreen";
 import PairingForm from "@/components/kiosk/PairingForm";
 
@@ -47,56 +48,67 @@ export default async function KioskPage() {
     Date.now() - RECENT_WINDOW_DAYS * 24 * 60 * 60 * 1000
   );
 
-  const [employees, orders, moments, openEntries, recentEntries, notices] =
-    await Promise.all([
-      db.employee.findMany({
-        where: { active: true },
-        orderBy: { name: "asc" },
-        // photoMimeType i stallet for photoData: skarmen behover bara veta OM ett
-        // portratt finns. Bilderna hamtas var for sig och mellanlagras av
-        // webblasaren i stallet for att skickas med varje sidladdning.
-        select: { id: true, name: true, photoMimeType: true },
-      }),
-      db.order.findMany({
-        where: { status: "OPEN" },
-        orderBy: { orderNumber: "asc" },
-        select: { id: true, orderNumber: true, customerName: true },
-      }),
-      db.workMoment.findMany({
-        where: { active: true },
-        orderBy: { name: "asc" },
-        select: { id: true, name: true },
-      }),
-      db.timeEntry.findMany({
-        where: { clockOutAt: null },
-        // Senast påbörjad först, och uttryckligen sorterad: utan ordning avgör
-        // databasen vilket jobb som hamnar överst, och det kan skilja mellan
-        // två pollningar fem sekunder isär.
-        orderBy: { clockInAt: "desc" },
-        select: {
-          employeeId: true,
-          clockInAt: true,
-          // Id:na behövs för att skärmen ska kunna bygga ett "senast"-förslag
-          // direkt vid utstämpling, utan att först vänta på en omladdning.
-          order: { select: { id: true, orderNumber: true } },
-          moment: { select: { id: true, name: true } },
-        },
-      }),
-      // Senast avslutade jobb per anställd — underlaget för "Fortsätt".
-      // clockOutAt: not null utesluter den pågående stämplingen, så en
-      // instämplad person aldrig får sig själv som förslag.
-      db.timeEntry.findMany({
-        where: { clockOutAt: { not: null }, clockInAt: { gte: recentSince } },
-        distinct: ["employeeId"],
-        orderBy: [{ employeeId: "asc" }, { clockInAt: "desc" }],
-        select: {
-          employeeId: true,
-          order: { select: { id: true, orderNumber: true, status: true } },
-          moment: { select: { id: true, name: true, active: true } },
-        },
-      }),
-      activeNotices("kiosk"),
-    ]);
+  const [
+    employees,
+    orders,
+    moments,
+    openEntries,
+    recentEntries,
+    notices,
+    customers,
+  ] = await Promise.all([
+    db.employee.findMany({
+      where: { active: true },
+      orderBy: { name: "asc" },
+      // photoMimeType i stallet for photoData: skarmen behover bara veta OM ett
+      // portratt finns. Bilderna hamtas var for sig och mellanlagras av
+      // webblasaren i stallet for att skickas med varje sidladdning.
+      select: { id: true, name: true, photoMimeType: true },
+    }),
+    db.order.findMany({
+      where: { status: "OPEN" },
+      orderBy: { orderNumber: "asc" },
+      select: { id: true, orderNumber: true, customerName: true },
+    }),
+    db.workMoment.findMany({
+      where: { active: true },
+      orderBy: { name: "asc" },
+      select: { id: true, name: true },
+    }),
+    db.timeEntry.findMany({
+      where: { clockOutAt: null },
+      // Senast påbörjad först, och uttryckligen sorterad: utan ordning avgör
+      // databasen vilket jobb som hamnar överst, och det kan skilja mellan
+      // två pollningar fem sekunder isär.
+      orderBy: { clockInAt: "desc" },
+      select: {
+        employeeId: true,
+        clockInAt: true,
+        // Id:na behövs för att skärmen ska kunna bygga ett "senast"-förslag
+        // direkt vid utstämpling, utan att först vänta på en omladdning.
+        order: { select: { id: true, orderNumber: true } },
+        moment: { select: { id: true, name: true } },
+      },
+    }),
+    // Senast avslutade jobb per anställd — underlaget för "Fortsätt".
+    // clockOutAt: not null utesluter den pågående stämplingen, så en
+    // instämplad person aldrig får sig själv som förslag.
+    db.timeEntry.findMany({
+      where: { clockOutAt: { not: null }, clockInAt: { gte: recentSince } },
+      distinct: ["employeeId"],
+      orderBy: [{ employeeId: "asc" }, { clockInAt: "desc" }],
+      select: {
+        employeeId: true,
+        order: { select: { id: true, orderNumber: true, status: true } },
+        moment: { select: { id: true, name: true, active: true } },
+      },
+    }),
+    activeNotices("kiosk"),
+    // Underlaget för kundvalet när en anställd skapar en order på plats.
+    // Namnen finns redan — skärmen ska kunna erbjuda ett tryck i stället
+    // för ett tangentbord man knappt kan skriva på med handskar.
+    recentCustomerNames(db),
+  ]);
 
   // En LISTA per person. En operatör kan köra två maskiner samtidigt, och
   // Object.fromEntries hade behållit den sista posten tyst — skärmen hade då
@@ -155,6 +167,7 @@ export default async function KioskPage() {
       moments={moments}
       activeByEmployee={activeByEmployee}
       recentByEmployee={recentByEmployee}
+      customers={customers}
       // Stämplingen fungerar oavsett. Varningen finns för att någon i
       // verkstaden ska se den och fråga chefen — den som kan betala står
       // sällan vid skärmen.

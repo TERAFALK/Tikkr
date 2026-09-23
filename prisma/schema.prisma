@@ -189,6 +189,17 @@ model Order {
   /// en spärr mot att arbeta.
   budgetMinutes Int? @map("budget_minutes")
 
+  /// Skapad från stämplingsskärmen av en anställd, inte av admin.
+  ///
+  /// Finns för att arbetet ibland börjar innan kontoret hunnit lägga upp
+  /// ordern. Utan den här utvägen stämplar folk på fel order eller inte alls,
+  /// och den timmen går inte att rekonstruera i efterhand.
+  ///
+  /// Flaggan betyder "någon bör titta på den här": ordernumret kan vara
+  /// avskrivet fel och kunden kan saknas. Den nollställs när en administratör
+  /// sparat orderns uppgifter — det är kvittot på att någon sett den.
+  isQuickJob Boolean @default(false) @map("is_quick_job")
+
   /// Fast pris mot kund för hela ordern, i ÖREN. Frivilligt.
   ///
   /// Ifyllt betyder fastprisorder: kalkylen visar det här som PRIS och räknar
@@ -218,6 +229,7 @@ model Order {
   // kunna ha varsin order "1001" utan att krocka.
   @@unique([companyId, orderNumber])
   @@index([companyId, status])
+  @@index([companyId, isQuickJob])
   @@map("orders")
 }
 

@@ -99,6 +99,8 @@ interface Props {
   activeByEmployee: Record<string, ActiveJob[]>;
   /** Senast avslutade jobb per anställd. Underlaget för "Fortsätt". */
   recentByEmployee: Record<string, RecentJob>;
+  /** Kundnamn företaget använt förut. Underlaget för snabbjobbets kundval. */
+  customers: string[];
   /** Text om prenumerationen, eller null. Stoppar aldrig stämplingen. */
   subscriptionWarning: string | null;
   /** true om företaget laddat upp en egen logotyp. */
@@ -112,6 +114,7 @@ type View =
   | { name: "action"; employee: Employee }
   | { name: "order"; employee: Employee }
   | { name: "orderNumber"; employee: Employee }
+  | { name: "quickCustomer"; employee: Employee; orderNumber: string }
   | { name: "moment"; employee: Employee; order: Order };
 
 /** Hur många siffror ett ordernummer får vara innan knappsatsen slutar ta emot. */
@@ -157,6 +160,7 @@ export default function KioskScreen({
   moments,
   activeByEmployee,
   recentByEmployee,
+  customers,
   subscriptionWarning,
   hasLogo,
   notices,
@@ -376,6 +380,58 @@ export default function KioskScreen({
   // Tar emot det minsta som behövs i stället för hela Order/Moment. Både
   // listornas poster och ett sparat "senast"-jobb passar då in utan att något
   // måste hittas på för fält som inte används här.
+  /** true medan ordern skapas på servern. Knapparna ska inte gå att dubbeltrycka. */
+  const [creatingOrder, setCreatingOrder] = useState(false);
+
+  /**
+   * Skapar en order på plats och går vidare till momentvalet.
+   *
+   * Till skillnad från en stämpling går det INTE att köa. Tiden måste peka på
+   * en order som finns, och ett id kan skärmen inte hitta på. Därför väntar
+   * den på svaret, och säger rakt ut när nätet saknas i stället för att låtsas
+   * att det gick.
+   */
+  const createQuickOrder = useCallback(
+    async (
+      employee: Employee,
+      orderNumber: string,
+      customerName: string | null
+    ) => {
+      setCreatingOrder(true);
+
+      try {
+        const response = await fetch("/api/kiosk/quick-order", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ orderNumber, customerName }),
+          signal: AbortSignal.timeout(8000),
+        });
+
+        const data = (await response.json()) as {
+          order?: Order;
+          error?: string;
+        };
+
+        if (!response.ok || !data.order) {
+          setError(data.error ?? "Ordern kunde inte skapas.");
+          return;
+        }
+
+        // Listorna hämtas om i bakgrunden så den nya ordern finns där nästa
+        // gång någon letar. Vi väntar inte på det — momentvalet kan börja nu.
+        router.refresh();
+        setView({ name: "moment", employee, order: data.order });
+      } catch {
+        setError(
+          "Ingen kontakt med servern. En ny order måste skapas med nätet igång."
+        );
+      } finally {
+        setCreatingOrder(false);
+      }
+    },
+    [router]
+  );
+
   const punchIn = useCallback(
     (
       employee: Employee,
@@ -636,6 +692,31 @@ export default function KioskScreen({
             onBrowse={() =>
               setView({ name: "order", employee: view.employee })
             }
+            onCreate={(orderNumber) =>
+              setView({
+                name: "quickCustomer",
+                employee: view.employee,
+                orderNumber,
+              })
+            }
+          />
+        )}
+
+        {view.name === "quickCustomer" && (
+          <CustomerPicker
+            orderNumber={view.orderNumber}
+            customers={customers}
+            busy={creatingOrder}
+            onPick={(customerName) =>
+              void createQuickOrder(
+                view.employee,
+                view.orderNumber,
+                customerName
+              )
+            }
+            onBack={() =>
+              setView({ name: "orderNumber", employee: view.employee })
+            }
           />
         )}
 
@@ -654,6 +735,22 @@ export default function KioskScreen({
     </main>
   );
 }
+
+/**
+ * Var i flödet man är. Uppslag och inte en kedja av frågor: varianterna blir
+ * fler efterhand, och en ternär i fyra led går inte att läsa.
+ *
+ * Ordervalet, knappsatsen och kundvalet är alla steg två — de är tre vägar
+ * till samma sak, inte tre steg efter varandra.
+ */
+const STEPS: Partial<
+  Record<View["name"], { current: number; label: string }>
+> = {
+  order: { current: 2, label: "Välj order" },
+  orderNumber: { current: 2, label: "Slå in ordernummer" },
+  quickCustomer: { current: 2, label: "Vilken kund?" },
+  moment: { current: 3, label: "Välj arbetsmoment" },
+};
 
 function Header({
   companyName,
@@ -677,14 +774,7 @@ function Header({
 }) {
   // Samma företagsmärke som i adminpanelen, så att det syns att det hänger
   // ihop. Steget visas bara mitt i ett val — på startsidan finns inget steg.
-  const step =
-    view.name === "order"
-      ? { current: 2, label: "Välj order" }
-      : view.name === "orderNumber"
-        ? { current: 2, label: "Slå in ordernummer" }
-        : view.name === "moment"
-          ? { current: 3, label: "Välj arbetsmoment" }
-          : null;
+  const step = STEPS[view.name] ?? null;
 
   return (
     // Fast höjd. Avbryt-knappen är högre än resten av innehållet, och utan en
@@ -1102,6 +1192,166 @@ function ActionChoice({
   );
 }
 
+/** Över så här många kunder blir rutnätet ohanterligt och bokstavsraden dyker upp. */
+const ALPHABET_THRESHOLD = 12;
+
+/**
+ * VILKEN KUND SNABBJOBBET GÄLLER.
+ *
+ * Kundnamnen finns redan i systemet från tidigare ordrar, så det ska vara ett
+ * tryck och inte en inskrivning. Att skriva text på en verkstadsskärm med
+ * handskar på är långsamt, och stavningen varierar — "Volvo", "volvo
+ * lastvagnar", "VOLVO AB" blir tre kunder i rapporterna.
+ *
+ * Med många kunder får rutnätet en bokstavsrad ovanför. Bara de bokstäver som
+ * faktiskt börjar ett kundnamn visas — en rad med hela alfabetet där mer än
+ * hälften inte går att trycka på är mest i vägen.
+ */
+function CustomerPicker({
+  orderNumber,
+  customers,
+  busy,
+  onPick,
+  onBack,
+}: {
+  orderNumber: string;
+  customers: string[];
+  busy: boolean;
+  onPick: (customerName: string | null) => void;
+  onBack: () => void;
+}) {
+  const [letter, setLetter] = useState<string | null>(null);
+  const [typing, setTyping] = useState(false);
+  const [typed, setTyped] = useState("");
+
+  const letters = useMemo(() => {
+    const found = new Set(
+      customers.map((name) => name.trim().charAt(0).toUpperCase())
+    );
+    return [...found].sort((a, b) => a.localeCompare(b, "sv"));
+  }, [customers]);
+
+  const shown = useMemo(() => {
+    if (!letter) return customers;
+    return customers.filter(
+      (name) => name.trim().charAt(0).toUpperCase() === letter
+    );
+  }, [customers, letter]);
+
+  const useAlphabet = customers.length > ALPHABET_THRESHOLD;
+
+  return (
+    <div className="mx-auto max-w-3xl">
+      <h2 className="mb-1 text-xl font-semibold text-neutral-900 sm:text-2xl">
+        Vilken kund?
+      </h2>
+      <p className="mb-4 text-base text-neutral-500">
+        {orderNumber
+          ? `Ordern ${orderNumber} läggs upp och märks för kontoret.`
+          : "Ordern får ett tillfälligt nummer och märks för kontoret."}
+      </p>
+
+      {typing ? (
+        <div className="rounded-xl border border-neutral-200 bg-white p-5">
+          <input
+            autoFocus
+            value={typed}
+            onChange={(event) => setTyped(event.target.value)}
+            placeholder="Kundens namn"
+            className="w-full rounded-xl border-2 border-neutral-200 px-5 py-4 text-2xl text-neutral-900 focus:border-blue-600 focus:outline-none"
+          />
+
+          <div className="mt-3 grid gap-3 sm:grid-cols-2">
+            <button
+              onClick={() => onPick(typed.trim() || null)}
+              disabled={busy}
+              className="kiosk-press min-h-20 rounded-xl bg-blue-600 p-5 text-xl font-semibold text-white active:bg-blue-700 disabled:bg-neutral-200 disabled:text-neutral-400"
+            >
+              {busy ? "Skapar…" : "Klar"}
+            </button>
+            <button
+              onClick={() => setTyping(false)}
+              className="kiosk-press min-h-20 rounded-xl border border-neutral-200 bg-white p-5 text-xl font-semibold text-neutral-900 active:bg-neutral-50"
+            >
+              Tillbaka till listan
+            </button>
+          </div>
+        </div>
+      ) : (
+        <>
+          {useAlphabet && (
+            <div className="mb-3 flex flex-wrap gap-2">
+              <button
+                onClick={() => setLetter(null)}
+                className={`kiosk-press min-h-14 min-w-14 rounded-lg px-4 text-lg font-semibold ${
+                  letter === null
+                    ? "bg-neutral-900 text-white"
+                    : "border border-neutral-200 bg-white text-neutral-900 active:bg-neutral-50"
+                }`}
+              >
+                Alla
+              </button>
+              {letters.map((option) => (
+                <button
+                  key={option}
+                  onClick={() => setLetter(option)}
+                  className={`kiosk-press min-h-14 min-w-14 rounded-lg text-lg font-semibold ${
+                    letter === option
+                      ? "bg-neutral-900 text-white"
+                      : "border border-neutral-200 bg-white text-neutral-900 active:bg-neutral-50"
+                  }`}
+                >
+                  {option}
+                </button>
+              ))}
+            </div>
+          )}
+
+          {shown.length > 0 && (
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4">
+              {shown.map((name) => (
+                <button
+                  key={name}
+                  onClick={() => onPick(name)}
+                  disabled={busy}
+                  className="kiosk-press flex min-h-24 items-center rounded-xl border border-neutral-200 bg-white p-5 text-left text-xl font-semibold text-neutral-900 active:bg-neutral-50 disabled:opacity-50"
+                >
+                  <span className="line-clamp-2">{name}</span>
+                </button>
+              ))}
+            </div>
+          )}
+
+          <div className="mt-3 grid gap-3 sm:grid-cols-3">
+            <button
+              onClick={() => setTyping(true)}
+              className="kiosk-press min-h-20 rounded-xl border border-neutral-200 bg-white p-5 text-lg font-semibold text-neutral-900 active:bg-neutral-50"
+            >
+              Annan kund
+            </button>
+            {/* Att hoppa över är tillåtet. Ordern flaggas ändå för kontoret,
+                och att stå fast vid skärmen för att man inte vet kundens namn
+                vore att förlora timmen man försökte rädda. */}
+            <button
+              onClick={() => onPick(null)}
+              disabled={busy}
+              className="kiosk-press min-h-20 rounded-xl border border-neutral-200 bg-white p-5 text-lg font-semibold text-neutral-500 active:bg-neutral-50 disabled:opacity-50"
+            >
+              {busy ? "Skapar…" : "Vet inte"}
+            </button>
+            <button
+              onClick={onBack}
+              className="kiosk-press min-h-20 rounded-xl border border-neutral-200 bg-white p-5 text-lg font-semibold text-neutral-900 active:bg-neutral-50"
+            >
+              Avbryt
+            </button>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
 /**
  * ORDERNUMMER PÅ KNAPPSATS.
  *
@@ -1126,11 +1376,14 @@ function OrderNumberPad({
   orders,
   onPick,
   onBrowse,
+  onCreate,
 }: {
   employee: Employee;
   orders: Order[];
   onPick: (order: Order) => void;
   onBrowse: () => void;
+  /** Numret som slagits in, eller tom sträng när inget angetts. */
+  onCreate: (orderNumber: string) => void;
 }) {
   const [typed, setTyped] = useState("");
 
@@ -1247,6 +1500,22 @@ function OrderNumberPad({
           </>
         )}
       </button>
+
+      {/* Vägen ut när numret inte finns upplagt. Arbetet börjar ibland innan
+          kontoret hunnit lägga upp ordern, och utan den här knappen stämplar
+          folk på fel order eller inte alls — den timmen går inte att
+          rekonstruera efteråt. */}
+      {!match && (
+        <button
+          onClick={() => onCreate(typed)}
+          className="kiosk-press mt-3 min-h-20 w-full rounded-xl border-2 border-amber-300 bg-amber-50 p-5 text-xl font-semibold text-amber-900 active:bg-amber-100"
+        >
+          {typed ? `Skapa order ${typed}` : "Snabbjobb utan ordernummer"}
+          <span className="mt-1 block text-base font-normal text-amber-800/80">
+            Läggs upp direkt och märks för kontoret att komplettera
+          </span>
+        </button>
+      )}
 
       <button
         onClick={onBrowse}

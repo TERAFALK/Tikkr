@@ -43,6 +43,8 @@ export interface OrderRow {
   markupPercent: number | null;
   /** Avtalat fast pris i ören, eller null för löpande räkning. */
   fixedPriceOre: number | null;
+  /** Skapad från en stämplingsskärm och ännu inte kompletterad av admin. */
+  isQuickJob: boolean;
 }
 
 export default function OrdersTable({
@@ -191,7 +193,14 @@ export default function OrdersTable({
                   )}
                 </Td>
 
-                <Td muted>{order.customerName ?? "—"}</Td>
+                <Td muted>
+                  {order.customerName ?? "—"}
+                  {order.isQuickJob && (
+                    <span className="ml-2">
+                      <Badge tone="warning">Snabbjobb</Badge>
+                    </span>
+                  )}
+                </Td>
                 <Td>
                   {isOpen ? (
                     <Badge tone="active">Öppen</Badge>

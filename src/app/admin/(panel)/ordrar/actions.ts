@@ -106,6 +106,10 @@ export async function updateOrder(
       budgetMinutes: parseHours(formData.get("budgetHours")),
       markupPercent,
       fixedPriceOre,
+      // Att spara uppgifterna ÄR kvittot på att någon tittat. Ett snabbjobb
+      // skapat i verkstaden slutar därmed vara en uppgift att göra, utan att
+      // det behövs en egen knapp för "jag har sett den".
+      isQuickJob: false,
     },
   });
 

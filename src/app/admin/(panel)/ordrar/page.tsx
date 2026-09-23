@@ -1,7 +1,7 @@
 import { requireAdmin } from "@/lib/admin-session";
 import FormDialog from "@/components/admin/FormDialog";
 import OrdersTable from "@/components/admin/OrdersTable";
-import { EmptyState, Field, Input, PageHeader } from "@/components/ui";
+import { Alert, EmptyState, Field, Input, PageHeader } from "@/components/ui";
 import { minutesBetween } from "@/lib/format";
 import { createOrder, toggleOrder, updateOrder } from "./actions";
 
@@ -20,6 +20,7 @@ export default async function OrdersPage() {
       budgetMinutes: true,
       markupPercent: true,
       fixedPriceOre: true,
+      isQuickJob: true,
       timeEntries: { select: { clockInAt: true, clockOutAt: true } },
     },
   });
@@ -32,6 +33,7 @@ export default async function OrdersPage() {
     budgetMinutes: order.budgetMinutes,
     markupPercent: order.markupPercent,
     fixedPriceOre: order.fixedPriceOre,
+    isQuickJob: order.isQuickJob,
     entries: order.timeEntries.length,
     minutes: order.timeEntries.reduce(
       (total, entry) => total + minutesBetween(entry.clockInAt, entry.clockOutAt),
@@ -65,6 +67,8 @@ export default async function OrdersPage() {
     </FormDialog>
   );
 
+  const quickJobs = rows.filter((order) => order.isQuickJob).length;
+
   return (
     <>
       <PageHeader
@@ -72,6 +76,21 @@ export default async function OrdersPage() {
         description="Välj ett ordernummer för underlag och ändringar. Även stängda ordrar."
         action={newOrder}
       />
+
+      {/* Ordrar som verkstaden lagt upp själv. De har ofta ett avskrivet
+          nummer och saknar kund, och tiden på dem faktureras ändå — därför
+          en rad som inte går att missa, inte bara en bricka i tabellen. */}
+      {quickJobs > 0 && (
+        <div className="mb-4">
+          <Alert tone="warning">
+            {quickJobs === 1
+              ? "En order är skapad från en stämplingsskärm och behöver kompletteras."
+              : `${quickJobs} ordrar är skapade från stämplingsskärmar och behöver kompletteras.`}{" "}
+            Kontrollera ordernummer och kund. Märkningen försvinner när du
+            sparat orderns uppgifter.
+          </Alert>
+        </div>
+      )}
 
       {rows.length === 0 ? (
         <EmptyState
