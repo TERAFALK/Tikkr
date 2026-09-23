@@ -69,6 +69,10 @@ export default async function KioskPage() {
       }),
       db.timeEntry.findMany({
         where: { clockOutAt: null },
+        // Senast påbörjad först, och uttryckligen sorterad: utan ordning avgör
+        // databasen vilket jobb som hamnar överst, och det kan skilja mellan
+        // två pollningar fem sekunder isär.
+        orderBy: { clockInAt: "desc" },
         select: {
           employeeId: true,
           clockInAt: true,
@@ -94,18 +98,29 @@ export default async function KioskPage() {
       activeNotices("kiosk"),
     ]);
 
-  const activeByEmployee = Object.fromEntries(
-    openEntries.map((entry) => [
-      entry.employeeId,
-      {
-        since: entry.clockInAt.toISOString(),
-        orderId: entry.order.id,
-        orderNumber: entry.order.orderNumber,
-        momentId: entry.moment.id,
-        momentName: entry.moment.name,
-      },
-    ])
-  );
+  // En LISTA per person. En operatör kan köra två maskiner samtidigt, och
+  // Object.fromEntries hade behållit den sista posten tyst — skärmen hade då
+  // visat ett jobb som pågick och dolt det andra.
+  const activeByEmployee: Record<
+    string,
+    {
+      since: string;
+      orderId: string;
+      orderNumber: string;
+      momentId: string;
+      momentName: string;
+    }[]
+  > = {};
+
+  for (const entry of openEntries) {
+    (activeByEmployee[entry.employeeId] ??= []).push({
+      since: entry.clockInAt.toISOString(),
+      orderId: entry.order.id,
+      orderNumber: entry.order.orderNumber,
+      momentId: entry.moment.id,
+      momentName: entry.moment.name,
+    });
+  }
 
   // Ett förslag som inte går att trycka på är värre än inget förslag: ordern
   // kan ha stängts eller momentet avaktiverats sedan sist, och då hade

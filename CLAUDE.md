@@ -27,7 +27,9 @@ Konsekvenser att hålla fast vid:
 
 En anställd går fram till en touchskärm, trycker på sitt namn, stämplar in/ut,
 väljer order och arbetsmoment (t.ex. "Svetsning"). Stämplar personen in på ett
-nytt jobb stämplas hen **automatiskt ut** från det förra.
+nytt jobb **på samma arbetsmoment** stämplas hen automatiskt ut från det förra
+— en maskin kör ett jobb i taget. Stämplar hen in på ett **annat** moment
+läggs det till bredvid, och båda löper parallellt.
 
 **Ingen PIN-kod. Ingen bekräftelseruta.** Ett tryck ska räcka och det ska kännas
 omedelbart (optimistisk UI-uppdatering).
@@ -46,7 +48,7 @@ via `company_id`-filtrering i koden.
 ### MVP-omfattning
 
 - Stämplingsskärm (touch): välj namn → stämpla in/ut → välj order → välj moment
-- Automatisk utstämpling vid byte av jobb
+- Automatisk utstämpling vid byte av jobb på samma arbetsmoment
 - Adminpanel: CRUD för anställda, ordrar, moment
 - Rapporter med export till Excel (ev. PDF)
 - Multi-tenant: ett företag = en isolerad arbetsyta, samma kodbas
@@ -99,7 +101,24 @@ kiosk_devices  — id, company_id, name, device_token, active, last_seen_at
    order"-val, inga interna ordrar. Konsekvens: `time_entries.order_id` och
    `moment_id` är NOT NULL, och ordrar/moment med registrerad tid går inte att
    radera (`onDelete: Restrict`) — de stängs istället.
-2. **Glömd utstämpling stängs vid ett fast klockslag OCH flaggas.**
+2. **En anställd kan ha flera pågående stämplingar — en per arbetsmoment.**
+   (Ändrat 2026-09-23. Tidigare gällde högst en stämpling alls.)
+
+   Skälet: en operatör kör ibland två maskiner samtidigt. Går två maskiner en
+   timme är det två maskintimmar, och båda ordrarna ska betala sin. Timkostnaden
+   sitter på arbetsmomentet, och **momentet är maskinen** — därför är det
+   momentet och inte personen som får ha ett jobb i taget.
+
+   Skyddet mot dubbelfakturering försvann inte, det smalnade av: aldrig två
+   öppna stämplingar på samma maskin. Den garantin ligger i `clockIn`, och
+   `assertNoOverlap` vaktar samma sak för tider som skrivs in för hand.
+
+   Konsekvens: en utstämpling måste peka ut VILKET jobb den gäller. Gör den
+   inte det, och flera jobb pågår, stängs det senast påbörjade och posten
+   flaggas för granskning — aldrig ett felsvar, eftersom offline-kön kastar
+   tryck som får 4xx och arbetstid då går förlorad.
+
+3. **Glömd utstämpling stängs vid ett fast klockslag OCH flaggas.**
    `companies.auto_close_at` (standard "18:00", per företag) styr när. Posten
    får `source = AUTO_CLOSE`, `needs_review = true` och en `review_note` i
    klartext. Systemet gissar aldrig tyst — admin får en lista att rätta.
@@ -119,8 +138,10 @@ gemensamt lager** i Prisma som alltid filtrerar på inloggad användares
    accepteras ingen stämpling.
 3. **Fullständig audit-logg** — varje stämpling sparar tidsstämpel, kiosk-ID och
    IP, så admin i efterhand kan se och manuellt korrigera en felaktig stämpling.
-4. **Anomali-varningar** (senare fas, ej MVP-kritiskt) — flagga t.ex.
-   "instämplad på två skärmar samtidigt" för granskning.
+4. **Anomali-varningar** (senare fas, ej MVP-kritiskt) — flagga t.ex. ett jobb
+   som pågått orimligt länge, eller en person med fler parallella jobb än hen
+   rimligen hinner sköta. Däremot INTE "instämplad på två ställen samtidigt" —
+   det är numera ett giltigt läge, se regel 3 nedan.
 5. **Fysisk säkerhet är en förutsättning** — modellen bygger på att skärmen
    sitter på arbetsplatsen, precis som en fysisk stämpelklocka. Var transparent
    om detta mot kunden.
@@ -158,7 +179,7 @@ Caddy 0 kr, Stripe 0 kr fast (bara procent per transaktion), domän ca
 | Fas | Vecka | Innehåll | Resultat |
 |---|---|---|---|
 | **0 — Grundstruktur** | 1 | VPS + Docker, Next.js-projekt containerisat, Postgres + Prisma-migration, Caddy/HTTPS, multi-tenant-lagret, GitHub Actions (bygg → staging → SSH-deploy), backup-skript + uptime-monitor, `CLAUDE.md` + README | Tomt skal, tre containrar, driftsatt med auto-deploy, offsite-backup, övervakning |
-| **1 — Kiosk** | 2–3 | Device-token-länk (engångssetup), namnrutnät med stora touchknappar, ett tryck → in/ut → order → moment, auto-utstämpling, offline-kö, dokumentera kiosk-läge (Chrome Kiosk / Android) | Fungerande kioskskärm för en testkund |
+| **1 — Kiosk** | 2–3 | Device-token-länk (engångssetup), namnrutnät med stora touchknappar, ett tryck → in/ut → order → moment, auto-utstämpling per moment, offline-kö, dokumentera kiosk-läge (Chrome Kiosk / Android) | Fungerande kioskskärm för en testkund |
 | **2 — Adminpanel** | 4–5 | Admin-inloggning, CRUD anställda/ordrar/moment, rapportvy (filter order/person/datum, totaltid), Excel-export (ev. PDF) | Admin sköter verksamheten själv |
 | **3 — Multi-tenant & onboarding** | 6 | Signup-flöde, onboarding-wizard, Stripe-prenumeration krävs för åtkomst | Ny kund registrerar sig utan användarens inblandning |
 | **4 — Polish & lansering** | 7–8 | Designgenomgång, prestandatest (optimistisk UI), supportsida/dokumentation | Lansering |

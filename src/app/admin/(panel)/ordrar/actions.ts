@@ -121,7 +121,7 @@ export interface OrderToggleState {
    * De som står instämplade på ordern. Är den ifylld har INGENTING ändrats —
    * det är frågan tillbaka till administratören, inte ett kvitto.
    */
-  blockers?: { employeeName: string; since: string }[];
+  blockers?: { employeeName: string; momentName: string; since: string }[];
 }
 
 /**
@@ -177,6 +177,7 @@ export async function toggleOrder(
       return {
         blockers: blockers.map((blocker) => ({
           employeeName: blocker.employeeName,
+          momentName: blocker.momentName,
           since: blocker.clockInAt.toISOString(),
         })),
       };

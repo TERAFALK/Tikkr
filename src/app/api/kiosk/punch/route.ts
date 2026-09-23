@@ -4,7 +4,7 @@ import {
   refreshKioskCookie,
   touchDevice,
 } from "@/lib/kiosk-auth";
-import { clockIn, clockOut, ClockError } from "@/lib/clock";
+import { clockIn, clockOut, clockOutAll, ClockError } from "@/lib/clock";
 
 // Tar emot en stämpling från kioskskärmen.
 //
@@ -15,7 +15,11 @@ import { clockIn, clockOut, ClockError } from "@/lib/clock";
 export const runtime = "nodejs";
 
 interface PunchBody {
-  action: "in" | "out";
+  /**
+   * "out" stämplar ut från ETT jobb och bör ange momentId — se clockOut om
+   * vad som händer utan. "out-all" stämplar ut från allt personen har igång.
+   */
+  action: "in" | "out" | "out-all";
   employeeId: string;
   orderId?: string;
   momentId?: string;
@@ -69,7 +73,10 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Trasigt anrop." }, { status: 400 });
   }
 
-  if (!body?.employeeId || (body.action !== "in" && body.action !== "out")) {
+  const knownAction =
+    body?.action === "in" || body?.action === "out" || body?.action === "out-all";
+
+  if (!body?.employeeId || !knownAction) {
     return NextResponse.json({ error: "Ofullständigt anrop." }, { status: 400 });
   }
 
@@ -90,10 +97,24 @@ export async function POST(request: NextRequest) {
   };
 
   try {
+    if (body.action === "out-all") {
+      const closed = await clockOutAll(session.companyId, {
+        ...context,
+        employeeId: body.employeeId,
+      });
+      await Promise.all([touchDevice(session.deviceId), refreshKioskCookie()]);
+      return NextResponse.json({ ok: true, closed });
+    }
+
     if (body.action === "out") {
+      // momentId utelämnas av tryck som köats av en äldre skärm. clockOut
+      // stänger då det senast påbörjade och flaggar för granskning i stället
+      // för att svara med ett fel — ett 4xx här skulle få offline-kön att
+      // kasta trycket, och arbetstid får aldrig gå förlorad.
       const closed = await clockOut(session.companyId, {
         ...context,
         employeeId: body.employeeId,
+        momentId: body.momentId,
       });
       await Promise.all([touchDevice(session.deviceId), refreshKioskCookie()]);
       return NextResponse.json({ ok: true, closed });

@@ -24,6 +24,20 @@ import { forCompany } from "@/lib/tenant";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
+/**
+ * Ett pågående jobb, i den form skärmen vill ha det.
+ *
+ * Speglar ActiveJob i src/components/kiosk/KioskScreen.tsx. De två hålls ihop
+ * för hand — svaret går över nätet och kan inte dela typ med mottagaren.
+ */
+interface ActiveJob {
+  since: string;
+  orderId: string;
+  orderNumber: string;
+  momentId: string;
+  momentName: string;
+}
+
 export async function GET() {
   const session = await getKioskSession();
 
@@ -38,6 +52,10 @@ export async function GET() {
 
   const open = await db.timeEntry.findMany({
     where: { clockOutAt: null },
+    // Senast påbörjad först, och uttryckligen sorterad: utan ordning avgör
+    // databasen vilket jobb som hamnar överst, och det kan skilja mellan
+    // två pollningar fem sekunder isär.
+    orderBy: { clockInAt: "desc" },
     select: {
       employeeId: true,
       clockInAt: true,
@@ -48,18 +66,20 @@ export async function GET() {
     },
   });
 
-  const active = Object.fromEntries(
-    open.map((entry) => [
-      entry.employeeId,
-      {
-        since: entry.clockInAt.toISOString(),
-        orderId: entry.order.id,
-        orderNumber: entry.order.orderNumber,
-        momentId: entry.moment.id,
-        momentName: entry.moment.name,
-      },
-    ])
-  );
+  // En LISTA per person. Att en operatör kör två maskiner samtidigt är numera
+  // ett giltigt läge, och Object.fromEntries hade behållit den sista posten
+  // tyst — skärmen hade då visat ett jobb som pågick och dolt det andra.
+  const active: Record<string, ActiveJob[]> = {};
+
+  for (const entry of open) {
+    (active[entry.employeeId] ??= []).push({
+      since: entry.clockInAt.toISOString(),
+      orderId: entry.order.id,
+      orderNumber: entry.order.orderNumber,
+      momentId: entry.moment.id,
+      momentName: entry.moment.name,
+    });
+  }
 
   return NextResponse.json(
     { active },

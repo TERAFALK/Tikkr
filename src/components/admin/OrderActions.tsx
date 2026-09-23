@@ -323,9 +323,11 @@ export default function OrderActions({
             Avsluta order {order.orderNumber}?
           </h2>
           <p className="mt-1 text-[13px] leading-relaxed text-neutral-500">
+            {/* Stämplingar och inte personer: samma person kan vara inne på
+                två arbetsmoment på samma order sedan två maskiner tilläts. */}
             {blockers.length === 1
-              ? "En person är instämplad på ordern just nu."
-              : `${blockers.length} personer är instämplade på ordern just nu.`}{" "}
+              ? "En stämpling pågår på ordern just nu."
+              : `${blockers.length} stämplingar pågår på ordern just nu.`}{" "}
             Avslutar du den stämplas de ut, och tiden flaggas för granskning så
             att du kan rätta den innan fakturering.
           </p>
@@ -334,11 +336,17 @@ export default function OrderActions({
         <ul className="divide-y divide-neutral-100 px-5 py-2">
           {blockers.map((blocker) => (
             <li
-              key={`${blocker.employeeName}-${blocker.since}`}
+              key={`${blocker.employeeName}-${blocker.momentName}-${blocker.since}`}
               className="flex items-baseline justify-between gap-3 py-2"
             >
               <span className="text-[13px] font-medium text-neutral-900">
                 {blocker.employeeName}
+                {blocker.momentName && (
+                  <span className="font-normal text-neutral-500">
+                    {" · "}
+                    {blocker.momentName}
+                  </span>
+                )}
               </span>
               <span className="text-xs text-neutral-500">
                 {/* Förfluten tid i stället för klockslag: skärmen känner inte

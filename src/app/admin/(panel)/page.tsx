@@ -36,6 +36,7 @@ export default async function OverviewPage() {
       orderBy: { clockInAt: "asc" },
       select: {
         id: true,
+        employeeId: true,
         clockInAt: true,
         employee: { select: { name: true } },
         order: { select: { orderNumber: true, customerName: true } },
@@ -49,6 +50,11 @@ export default async function OverviewPage() {
     db.timeEntry.count({ where: { needsReview: true } }),
     db.order.count({ where: { status: "OPEN" } }),
   ]);
+
+  // Antalet PERSONER som arbetar, inte antalet öppna stämplingar. Sedan en
+  // operatör kan köra två maskiner är de två olika tal, och rutan påstår
+  // annars att verkstaden är dubbelt så full som den är.
+  const peopleWorking = new Set(working.map((entry) => entry.employeeId)).size;
 
   const minutesToday = todaysEntries.reduce(
     (total, entry) => total + minutesBetween(entry.clockInAt, entry.clockOutAt),
@@ -86,9 +92,17 @@ export default async function OverviewPage() {
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <Stat
           label="Arbetar just nu"
-          value={working.length}
-          tone={working.length > 0 ? "active" : "neutral"}
-          hint={working.length === 1 ? "person instämplad" : "personer instämplade"}
+          value={peopleWorking}
+          tone={peopleWorking > 0 ? "active" : "neutral"}
+          hint={
+            // Antalet PERSONER, inte antalet stämplingar. En operatör som kör
+            // två maskiner har två öppna poster men är fortfarande en person.
+            working.length > peopleWorking
+              ? `${working.length} pågående jobb`
+              : peopleWorking === 1
+                ? "person instämplad"
+                : "personer instämplade"
+          }
           icon={<IconPeople />}
         />
         <Stat

@@ -23,7 +23,16 @@ const STORE = "punch-queue";
 export interface QueuedPunch {
   /** Skärmens eget id för trycket. Nyckeln som hindrar dubbletter. */
   clientPunchId: string;
-  action: "in" | "out";
+  /**
+   * "out" gäller ETT jobb och bär då momentId — en person kan ha flera igång.
+   * "out-all" stämplar ut från allt och behöver inget moment.
+   *
+   * DB_VERSION höjs inte trots det nya värdet: nyckeln och strukturen är
+   * oförändrade, och köade tryck från en äldre skärm saknar helt enkelt
+   * momentId. Servern tar hand om det fallet i stället för att avvisa det —
+   * ett avvisat tryck plockas bort ur kön, och då är arbetstiden borta.
+   */
+  action: "in" | "out" | "out-all";
   employeeId: string;
   orderId?: string;
   momentId?: string;

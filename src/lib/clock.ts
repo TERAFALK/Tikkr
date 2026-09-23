@@ -9,10 +9,24 @@ import { nextOccurrenceOf } from "./time-zone";
  * Reglerna som avgör om kundens fakturaunderlag stämmer. Allt här är avsiktligt
  * fritt från webb och skärm — det är ren logik som går att testa i detalj.
  *
- * Grundregel: en anställd kan ha HÖGST EN öppen stämpling åt gången. Stämplar
- * någon in på ett nytt jobb stängs det förra automatiskt, i samma ögonblick.
- * Ingen tid får räknas på två ordrar samtidigt — det skulle fakturera samma
- * timme till två kunder.
+ * Grundregel: en anställd kan ha högst en öppen stämpling PER ARBETSMOMENT.
+ * Stämplar någon in på ett moment hen redan är inne på stängs den förra
+ * automatiskt, i samma ögonblick. Stämplar hen in på ett ANNAT moment läggs
+ * det till bredvid, och båda löper parallellt.
+ *
+ * Det är ett medvetet avsteg från den tidigare regeln "högst en öppen
+ * stämpling alls". Skälet: en operatör kör ibland två maskiner samtidigt. Går
+ * två maskiner en timme är det två maskintimmar, och båda ordrarna ska betala
+ * sin — Tikkrs timkostnad sitter på arbetsmomentet, och momentet ÄR maskinen.
+ * Att dela timmen på hälften hade gett fel maskinkostnad på båda ordrarna.
+ *
+ * Skyddet mot dubbelfakturering försvann inte, det smalnade av: aldrig två
+ * öppna stämplingar på samma maskin. Den garantin ligger fortfarande i
+ * clockIn, och assertNoOverlap vaktar samma sak för tider som skrivs in för
+ * hand.
+ *
+ * Databasen kan inte uttrycka regeln själv — prisma db push saknar partiella
+ * unika index — så den vaktas här, och clock.ts är enda vägen in.
  */
 
 export class ClockError extends Error {
@@ -57,23 +71,45 @@ export interface ClockInResult {
   wasDuplicate: boolean;
 }
 
-/** Hämtar den pågående stämplingen för en anställd, eller null. */
-export async function getOpenEntry(
+/**
+ * Alla pågående stämplingar för en anställd, senast startad först.
+ *
+ * Returnerar en LISTA och inte en post. Den som bara vill ha "den öppna"
+ * tvingas därmed bestämma sig för vad som ska hända när det finns två, i
+ * stället för att tyst få den ena.
+ */
+export async function getOpenEntries(
   db: CompanyDb,
   employeeId: string
-): Promise<TimeEntry | null> {
-  return db.timeEntry.findFirst({
+): Promise<TimeEntry[]> {
+  return db.timeEntry.findMany({
     where: { employeeId, clockOutAt: null },
     orderBy: { clockInAt: "desc" },
   });
 }
 
+/** Den pågående stämplingen på ett bestämt arbetsmoment, eller null. */
+export async function getOpenEntryForMoment(
+  db: CompanyDb,
+  employeeId: string,
+  momentId: string
+): Promise<TimeEntry | null> {
+  return db.timeEntry.findFirst({
+    where: { employeeId, momentId, clockOutAt: null },
+    orderBy: { clockInAt: "desc" },
+  });
+}
+
 /**
- * Stämplar in på ett jobb. Stänger automatiskt ett pågående jobb först.
+ * Stämplar in på ett jobb.
+ *
+ * Pågår redan ett jobb på SAMMA arbetsmoment stängs det automatiskt först —
+ * en maskin kan bara köra ett jobb i taget. Pågår jobb på andra moment lämnas
+ * de i fred och löper vidare parallellt.
  *
  * Allt sker i en transaktion: antingen stängs det gamla OCH öppnas det nya,
  * eller så händer ingenting. Utan det skulle ett avbrott mitt i kunna lämna
- * någon utan öppen stämpling, eller med två.
+ * någon med två öppna stämplingar på samma maskin.
  */
 export async function clockIn(
   companyId: string,
@@ -95,8 +131,14 @@ export async function clockIn(
   const { momentCostRateOre } = await assertBelongsToCompany(db, input);
 
   return db.$transaction(async (tx) => {
+    // Bara samma moment. Ett pågående jobb på en ANNAN maskin ska stå kvar —
+    // det är hela poängen med att kunna köra två.
     const open = await tx.timeEntry.findFirst({
-      where: { employeeId: input.employeeId, clockOutAt: null },
+      where: {
+        employeeId: input.employeeId,
+        momentId: input.momentId,
+        clockOutAt: null,
+      },
       orderBy: { clockInAt: "desc" },
     });
 
@@ -113,7 +155,8 @@ export async function clockIn(
 
       // `source` rörs inte: den beskriver hur posten SKAPADES, inte hur den
       // stängdes. Här stängdes den av att den anställde själv började ett nytt
-      // jobb — en helt normal utstämpling som admin inte behöver titta på.
+      // jobb på samma maskin — en helt normal utstämpling som admin inte
+      // behöver titta på.
       autoClosed = await tx.timeEntry.update({
         where: { id: open.id },
         data: { clockOutAt: at },
@@ -145,15 +188,29 @@ export async function clockIn(
 }
 
 /**
- * Stämplar ut från pågående jobb.
+ * Stämplar ut från ett pågående jobb.
+ *
+ * `momentId` pekar ut vilket. Kiosken skickar alltid med det — momentet och
+ * inte postens id, eftersom en post som skapats offline ännu inte har något
+ * id när utstämplingen köas.
  *
  * Finns ingen öppen stämpling händer ingenting och `null` returneras. Det är
  * med flit: trycker någon "stämpla ut" två gånger ska det inte bli ett fel på
  * skärmen, bara ingen ytterligare effekt.
+ *
+ * UTAN momentId, och med flera jobb igång, är anropet tvetydigt. Då stängs det
+ * senast startade OCH posten flaggas för granskning. Den utvägen är vald med
+ * öppna ögon: ett fel här skulle ge 409 från API:t, och offline-kön KASTAR ett
+ * tryck som får 4xx. Ett tvetydigt anrop får kosta en rad i granskningslistan.
+ * Det får aldrig kosta arbetstid.
+ *
+ * Fallet uppstår för tryck som köats av en äldre skärm, innan momentet började
+ * skickas med. Sådana ligger kvar i IndexedDB på riktiga skärmar, så det är
+ * inte ett teoretiskt fall.
  */
 export async function clockOut(
   companyId: string,
-  input: PunchContext & { employeeId: string }
+  input: PunchContext & { employeeId: string; momentId?: string }
 ): Promise<TimeEntry | null> {
   const at = input.at ?? new Date();
   const db = forCompany(companyId);
@@ -165,19 +222,86 @@ export async function clockOut(
     if (existing) return existing;
   }
 
-  const open = await getOpenEntry(db, input.employeeId);
-  if (!open) return null;
+  const open = await getOpenEntries(db, input.employeeId);
+  if (open.length === 0) return null;
 
-  if (open.clockInAt > at) {
+  let target: TimeEntry;
+  let ambiguous = false;
+
+  if (input.momentId) {
+    const onMoment = open.find((entry) => entry.momentId === input.momentId);
+    // Redan utstämplad från just det jobbet. Ingen effekt, inget fel.
+    if (!onMoment) return null;
+    target = onMoment;
+  } else {
+    target = open[0];
+    ambiguous = open.length > 1;
+  }
+
+  if (target.clockInAt > at) {
     throw new ClockError(
       "Utstämplingen ligger före instämplingen. Låt en administratör rätta posten."
     );
   }
 
   return db.timeEntry.update({
-    where: { id: open.id },
-    data: { clockOutAt: at },
+    where: { id: target.id },
+    data: {
+      clockOutAt: at,
+      ...(ambiguous
+        ? {
+            needsReview: true,
+            reviewNote:
+              `Utstämplingen angav inte vilket jobb den gällde, och ${open.length} ` +
+              `jobb pågick. Det senast påbörjade stängdes. Kontrollera vilket ` +
+              `som faktiskt avslutades innan fakturering.`,
+          }
+        : {}),
+    },
   });
+}
+
+/**
+ * Stämplar ut från ALLA pågående jobb.
+ *
+ * Finns för dagens slut. Den som kört två maskiner ska inte behöva två tryck
+ * för att gå hem, och ett glömt andra jobb blir en post som räknas upp hela
+ * natten tills den automatiska utstämplingen tar den.
+ *
+ * Inget flaggas: avsikten är otvetydig, till skillnad från en utstämpling utan
+ * angivet jobb.
+ */
+export async function clockOutAll(
+  companyId: string,
+  input: PunchContext & { employeeId: string }
+): Promise<TimeEntry[]> {
+  const at = input.at ?? new Date();
+  const db = forCompany(companyId);
+
+  if (input.clientPunchId) {
+    const existing = await db.timeEntry.findFirst({
+      where: { clientPunchId: input.clientPunchId },
+    });
+    if (existing) return [existing];
+  }
+
+  const open = await getOpenEntries(db, input.employeeId);
+  const closed: TimeEntry[] = [];
+
+  for (const entry of open) {
+    // En post som börjar efter "nu" hoppas över i stället för att avbryta
+    // hela utstämplingen. De andra jobben ska stängas även om ett är trasigt.
+    if (entry.clockInAt > at) continue;
+
+    closed.push(
+      await db.timeEntry.update({
+        where: { id: entry.id },
+        data: { clockOutAt: at },
+      })
+    );
+  }
+
+  return closed;
 }
 
 /**
@@ -241,6 +365,8 @@ export async function autoCloseForgottenEntries(
 export interface OpenEntryOnOrder {
   entryId: string;
   employeeName: string;
+  /** Vilket arbetsmoment. Samma person kan vara inne på två på samma order. */
+  momentName: string;
   clockInAt: Date;
 }
 
@@ -266,12 +392,14 @@ export async function openEntriesOnOrder(
       id: true,
       clockInAt: true,
       employee: { select: { name: true } },
+      moment: { select: { name: true } },
     },
   });
 
   return open.map((entry) => ({
     entryId: entry.id,
     employeeName: entry.employee.name,
+    momentName: entry.moment.name,
     clockInAt: entry.clockInAt,
   }));
 }
@@ -373,7 +501,13 @@ export async function createManualEntry(
     historical: true,
   });
   assertSaneInterval(input.clockInAt, input.clockOutAt);
-  await assertNoOverlap(db, input.employeeId, input.clockInAt, input.clockOutAt);
+  await assertNoOverlap(
+    db,
+    input.employeeId,
+    input.momentId,
+    input.clockInAt,
+    input.clockOutAt
+  );
 
   return db.timeEntry.create({
     data: {
@@ -409,6 +543,7 @@ export async function updateEntryManually(
   await assertNoOverlap(
     db,
     input.employeeId,
+    input.momentId,
     input.clockInAt,
     input.clockOutAt,
     entryId
@@ -452,16 +587,22 @@ function assertSaneInterval(from: Date, to: Date) {
 }
 
 /**
- * Vägrar om tiden krockar med en annan stämpling för samma person.
+ * Vägrar om tiden krockar med en annan stämpling på SAMMA ARBETSMOMENT.
  *
- * Detta är den regel som skyddar fakturaunderlaget: ingen kan vara på två
- * ordrar samtidigt, och överlappande poster skulle fakturera samma timme till
- * två kunder. Kioskflödet kan inte skapa överlapp — men en admin som skriver
- * in tider för hand kan, och gör det lätt när hen minns fel.
+ * Detta är den regel som skyddar fakturaunderlaget. Den prövar momentet och
+ * inte bara personen, eftersom en operatör kan köra två maskiner samtidigt —
+ * se grundregeln överst i filen. Två jobb på olika moment får därför överlappa;
+ * två jobb på samma moment får det aldrig, för då skulle en och samma maskin
+ * fakturera samma timme till två kunder.
+ *
+ * Kioskflödet kan inte skapa överlapp på samma moment — clockIn stänger det
+ * pågående. Men en admin som skriver in tider för hand kan, och gör det lätt
+ * när hen minns fel.
  */
 async function assertNoOverlap(
   db: CompanyDb,
   employeeId: string,
+  momentId: string,
   from: Date,
   to: Date,
   ignoreEntryId?: string
@@ -469,6 +610,7 @@ async function assertNoOverlap(
   const clash = await db.timeEntry.findFirst({
     where: {
       employeeId,
+      momentId,
       id: ignoreEntryId ? { not: ignoreEntryId } : undefined,
       // Två intervall överlappar om det ena börjar innan det andra slutar,
       // och slutar efter att det andra börjat.
@@ -479,14 +621,16 @@ async function assertNoOverlap(
       clockInAt: true,
       clockOutAt: true,
       order: { select: { orderNumber: true } },
+      moment: { select: { name: true } },
     },
   });
 
   if (clash) {
     throw new ClockError(
-      `Tiden krockar med en annan stämpling på order ${clash.order.orderNumber}` +
+      `Tiden krockar med en annan stämpling på ${clash.moment.name}, ` +
+        `order ${clash.order.orderNumber}` +
         (clash.clockOutAt ? "" : " som fortfarande pågår") +
-        ". Samma timme kan inte faktureras till två kunder."
+        ". Samma arbetsmoment kan inte köra två jobb samtidigt."
     );
   }
 }
