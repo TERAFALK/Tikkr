@@ -21,15 +21,20 @@ import {
 import { formatDuration, formatTime, minutesBetween } from "@/lib/format";
 import { getOnboardingState } from "@/lib/onboarding";
 import { mergedMinutes, parallelMinutes, type Span } from "@/lib/spans";
+import { companyTimeZone } from "@/lib/company";
+import { startOfDayIn } from "@/lib/time-zone";
 
 export const dynamic = "force-dynamic";
 
 export default async function OverviewPage() {
-  const { db, companyName } = await requireAdmin();
+  const { db, companyId, companyName } = await requireAdmin();
   const onboarding = await getOnboardingState(db);
 
-  const startOfToday = new Date();
-  startOfToday.setHours(0, 0, 0, 0);
+  // Dygnet börjar i FÖRETAGETS tidszon, inte serverns. Containern kör UTC, så
+  // ett dygn räknat där börjar 02:00 på verkstadsgolvet på sommaren — och ett
+  // kvällspass hamnar på fel dag jämfört med rapporten för samma datum.
+  const timeZone = await companyTimeZone(companyId);
+  const startOfToday = startOfDayIn(new Date(), timeZone);
 
   const [working, todaysEntries, needsReview, openOrders] = await Promise.all([
     db.timeEntry.findMany({
@@ -216,7 +221,7 @@ export default async function OverviewPage() {
                   <Td muted>
                     {entry.moment?.name ?? entry.indirectMoment?.name ?? "—"}
                   </Td>
-                  <Td muted>{formatTime(entry.clockInAt)}</Td>
+                  <Td muted>{formatTime(entry.clockInAt, timeZone)}</Td>
                   <Td numeric>
                     <Badge tone="active">
                       {formatDuration(minutesBetween(entry.clockInAt, null))}

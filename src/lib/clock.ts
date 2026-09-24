@@ -271,8 +271,19 @@ export async function clockOut(
   // trycket gällde är redan avslutad.
   if (target.clockInAt > at) return null;
 
-  return db.timeEntry.update({
-    where: { id: target.id },
+  // VILLKORET `clockOutAt: null` ÄR SJÄLVA POÄNGEN med updateMany här.
+  //
+  // Mellan uppslaget ovan och den här skrivningen kan posten ha hunnit stängas
+  // av ett annat anrop — samma tryck som nått servern två gånger, eller två
+  // flikar som tömmer samma offline-kö. Ett rakt `update` hade då skrivit över
+  // den redan satta sluttiden med en annan, och ingen hade sett det.
+  //
+  // Med villkoret i frågan avgör databasen vem som vinner, inte turordningen
+  // mellan läsning och skrivning. Den som kommer sist träffar noll rader och
+  // får tillbaka posten som den blev — inget fel, eftersom utstämplingen
+  // faktiskt är gjord.
+  await db.timeEntry.updateMany({
+    where: { id: target.id, clockOutAt: null },
     data: {
       clockOutAt: at,
       clockOutPunchId: input.clientPunchId ?? null,
@@ -287,6 +298,11 @@ export async function clockOut(
         : {}),
     },
   });
+
+  // Läses om i stället för att returnera det vi tänkte skriva. Träffade
+  // skrivningen noll rader hann någon annan före, och då är det den andres
+  // sluttid som gäller — inte vår.
+  return db.timeEntry.findUnique({ where: { id: target.id } });
 }
 
 /**
@@ -317,23 +333,27 @@ export async function clockOutAll(
   }
 
   const open = await getOpenEntries(db, input.employeeId);
-  const closed: TimeEntry[] = [];
 
-  for (const entry of open) {
-    // En post som börjar efter trycket gjordes hoppas över. Antingen har
-    // skärmens klocka gått fel, eller så är det ett gammalt tryck ur kön som
-    // inte gäller det här jobbet. De andra jobben stängs ändå.
-    if (entry.clockInAt > at) continue;
+  // En post som börjar efter trycket gjordes hoppas över. Antingen har
+  // skärmens klocka gått fel, eller så är det ett gammalt tryck ur kön som
+  // inte gäller det här jobbet. De andra jobben stängs ändå.
+  const eligible = open.filter((entry) => entry.clockInAt <= at);
+  if (eligible.length === 0) return [];
 
-    closed.push(
-      await db.timeEntry.update({
-        where: { id: entry.id },
-        data: { clockOutAt: at, clockOutPunchId: input.clientPunchId ?? null },
-      })
-    );
-  }
+  const ids = eligible.map((entry) => entry.id);
 
-  return closed;
+  // Ett anrop för allihop, med `clockOutAt: null` i villkoret av samma skäl
+  // som i clockOut: hinner ett annat anrop stänga en post däremellan ska den
+  // behålla sin sluttid i stället för att få vår påskriven.
+  await db.timeEntry.updateMany({
+    where: { id: { in: ids }, clockOutAt: null },
+    data: { clockOutAt: at, clockOutPunchId: input.clientPunchId ?? null },
+  });
+
+  return db.timeEntry.findMany({
+    where: { id: { in: ids } },
+    orderBy: { clockInAt: "desc" },
+  });
 }
 
 /**
@@ -374,19 +394,26 @@ export async function autoCloseForgottenEntries(
 
     if (now < deadline) continue;
 
-    closed.push(
-      await db.timeEntry.update({
-        where: { id: entry.id },
-        data: {
-          clockOutAt: deadline,
-          source: "AUTO_CLOSE",
-          needsReview: true,
-          reviewNote:
-            `Automatiskt utstämplad ${company.autoCloseAt} — ingen utstämpling ` +
-            `registrerades. Kontrollera tiden innan fakturering.`,
-        },
-      })
-    );
+    // `clockOutAt: null` i villkoret: hinner personen stämpla ut själv mellan
+    // uppslaget och skrivningen ska DERAS tid gälla. Utan villkoret skriver
+    // jobbet över en riktig utstämpling med sin gissning och flaggar posten
+    // för granskning — alltså gör bra data till ett ärende för kontoret.
+    const { count } = await db.timeEntry.updateMany({
+      where: { id: entry.id, clockOutAt: null },
+      data: {
+        clockOutAt: deadline,
+        source: "AUTO_CLOSE",
+        needsReview: true,
+        reviewNote:
+          `Automatiskt utstämplad ${company.autoCloseAt} — ingen utstämpling ` +
+          `registrerades. Kontrollera tiden innan fakturering.`,
+      },
+    });
+
+    if (count === 0) continue;
+
+    const saved = await db.timeEntry.findUnique({ where: { id: entry.id } });
+    if (saved) closed.push(saved);
   }
 
   return closed;

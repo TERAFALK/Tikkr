@@ -1,7 +1,15 @@
 import Link from "next/link";
 import { requireAdmin } from "@/lib/admin-session";
-import { buildWeek, isoWeekNumber, startOfWeek } from "@/lib/week";
-import { formatDuration } from "@/lib/format";
+import { buildWeek, isoWeekNumber } from "@/lib/week";
+import { companyTimeZone } from "@/lib/company";
+import {
+  addDaysInZone,
+  parseLocalDate,
+  startOfWeekIn,
+  toDateInput,
+  wallTimeIn,
+} from "@/lib/time-zone";
+import { formatDate, formatDuration } from "@/lib/format";
 import EmployeeAvatar from "@/components/ui/EmployeeAvatar";
 import {
   Card,
@@ -34,19 +42,30 @@ export default async function WeekPage({
 }: {
   searchParams: Promise<{ v?: string }>;
 }) {
-  const { db } = await requireAdmin();
+  const { db, companyId } = await requireAdmin();
   const params = await searchParams;
 
-  const monday = params.v ? startOfWeek(new Date(params.v)) : startOfWeek(new Date());
-  const week = await buildWeek(db, monday);
+  // Veckan räknas i FÖRETAGETS tidszon, inte serverns. Containern kör UTC, och
+  // gjorde vyn det också skulle en söndagskväll hamna i veckan efter.
+  const timeZone = await companyTimeZone(companyId);
 
-  const shift = (days: number) => {
-    const date = new Date(week.from);
-    date.setDate(date.getDate() + days);
-    return date.toISOString().slice(0, 10);
-  };
+  // Länkarna bär ett kalenderdatum ("2026-09-22"), som tolkas i samma tidszon
+  // som det skrevs i. Ett ogiltigt värde i adressfältet ger denna vecka i
+  // stället för ett fel — vyn är till för att titta på, inte att strula med.
+  const picked = params.v ? parseLocalDate(params.v, timeZone) : null;
+  const week = await buildWeek(db, picked ?? new Date(), timeZone);
 
-  const thisWeek = startOfWeek(new Date()).getTime() === week.from.getTime();
+  const shift = (days: number) =>
+    toDateInput(addDaysInZone(week.from, days, timeZone), timeZone);
+
+  // Veckans sju datum, för kolumnrubrikerna. Räknas fram här och inte ur
+  // raderna, eftersom rubriken ska stämma även innan någon anställd finns.
+  const dayDates = Array.from({ length: 7 }, (_, index) =>
+    addDaysInZone(week.from, index, timeZone)
+  );
+
+  const thisWeek =
+    startOfWeekIn(new Date(), timeZone).getTime() === week.from.getTime();
 
   const employeesWithPhoto = await db.employee.findMany({
     where: { photoMimeType: { not: null } },
@@ -76,8 +95,8 @@ export default async function WeekPage({
       ) : (
         <Card>
           <CardHeader
-            title={`Vecka ${isoWeekNumber(week.from)}`}
-            description={`${week.from.toLocaleDateString("sv-SE")} – ${week.to.toLocaleDateString("sv-SE")}`}
+            title={`Vecka ${isoWeekNumber(week.from, timeZone)}`}
+            description={`${formatDate(week.from, timeZone)} – ${formatDate(week.to, timeZone)}`}
             action={
               <span className="text-[13px] font-medium tabular-nums text-neutral-900">
                 {formatDuration(week.totalMinutes)} totalt
@@ -93,9 +112,7 @@ export default async function WeekPage({
                   <Th key={day} numeric>
                     <span className="block">{day}</span>
                     <span className="block text-[10px] font-normal text-neutral-400">
-                      {new Date(
-                        week.from.getTime() + index * 86_400_000
-                      ).getDate()}
+                      {wallTimeIn(dayDates[index], timeZone).day}
                     </span>
                   </Th>
                 ))}

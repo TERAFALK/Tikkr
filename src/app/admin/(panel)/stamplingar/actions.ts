@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { requireAdmin } from "@/lib/admin-session";
-import { unsafeGlobalPrisma } from "@/lib/db";
+import { companyTimeZone } from "@/lib/company";
 import {
   ClockError,
   createManualEntry,
@@ -15,14 +15,6 @@ const PATH = "/admin/stamplingar";
 export interface EntryFormState {
   error?: string;
   ok?: string;
-}
-
-async function companyTimeZone(companyId: string): Promise<string> {
-  const company = await unsafeGlobalPrisma.company.findUnique({
-    where: { id: companyId },
-    select: { timezone: true },
-  });
-  return company?.timezone ?? "Europe/Stockholm";
 }
 
 function readForm(formData: FormData, timeZone: string) {

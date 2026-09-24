@@ -1,5 +1,11 @@
 import type { CompanyDb } from "./tenant";
 import { mergedMinutes, parallelMinutes, type Span } from "./spans";
+import {
+  addDaysInZone,
+  dayNumberIn,
+  startOfWeekIn,
+  wallTimeIn,
+} from "./time-zone";
 
 /**
  * VECKOVY PER ANSTÄLLD.
@@ -22,10 +28,15 @@ import { mergedMinutes, parallelMinutes, type Span } from "./spans";
  *
  * Veckan börjar på måndag. Det är den svenska konventionen och den verkstäder
  * planerar efter.
+ *
+ * ALLA DYGNSGRÄNSER RÄKNAS I FÖRETAGETS TIDSZON, aldrig i serverns. Containern
+ * kör UTC, och ett dygn som börjar 00:00 UTC börjar 02:00 på verkstadsgolvet
+ * på sommaren. Ett kvällspass hade då hamnat på fel dag här men på rätt dag i
+ * rapporten, vilket är den sortens skillnad man letar efter i en timme.
  */
 
 export interface DayCell {
-  /** Datumet, midnatt lokal tid. */
+  /** Datumet, vid dygnets början i företagets tidszon. */
   date: Date;
   /**
    * Tid i arbete den dagen. Överlappande jobb räknas EN gång — se
@@ -63,32 +74,24 @@ export interface WeekResult {
   totalMinutes: number;
 }
 
-/** Måndagen i veckan ett datum tillhör. */
-export function startOfWeek(date: Date): Date {
-  const monday = new Date(date);
-  monday.setHours(0, 0, 0, 0);
-
-  // getDay() ger 0 för söndag. Söndagen hör till veckan som börjat, alltså sex
-  // dagar bakåt — inte till den som börjar dagen efter.
-  const weekday = (monday.getDay() + 6) % 7;
-  monday.setDate(monday.getDate() - weekday);
-
-  return monday;
-}
-
-/** Veckonumret enligt ISO 8601, som är det svenska sättet att räkna. */
-export function isoWeekNumber(date: Date): number {
-  const target = new Date(date);
-  target.setHours(0, 0, 0, 0);
+/**
+ * Veckonumret enligt ISO 8601, som är det svenska sättet att räkna.
+ *
+ * Räkningen sker på kalenderdatumet i företagets tidszon, uttryckt som ett
+ * UTC-datum. Tidpunkten är då ur vägen och kvar är ren almanacksmatematik.
+ */
+export function isoWeekNumber(date: Date, timeZone: string): number {
+  const wall = wallTimeIn(date, timeZone);
+  const target = new Date(Date.UTC(wall.year, wall.month - 1, wall.day));
 
   // Torsdagen i samma vecka avgör vilket år och vilken vecka det är. Det är
   // hela knepet i ISO-räkningen: en vecka tillhör det år där dess torsdag
   // ligger, vilket är varför nyårsveckan kan heta 53 eller 1.
-  target.setDate(target.getDate() + 3 - ((target.getDay() + 6) % 7));
+  target.setUTCDate(target.getUTCDate() + 3 - ((target.getUTCDay() + 6) % 7));
 
-  const firstThursday = new Date(target.getFullYear(), 0, 4);
-  firstThursday.setDate(
-    firstThursday.getDate() + 3 - ((firstThursday.getDay() + 6) % 7)
+  const firstThursday = new Date(Date.UTC(target.getUTCFullYear(), 0, 4));
+  firstThursday.setUTCDate(
+    firstThursday.getUTCDate() + 3 - ((firstThursday.getUTCDay() + 6) % 7)
   );
 
   const weeks = Math.round(
@@ -100,12 +103,18 @@ export function isoWeekNumber(date: Date): number {
 
 export async function buildWeek(
   db: CompanyDb,
-  monday: Date
+  monday: Date,
+  timeZone: string
 ): Promise<WeekResult> {
-  const from = startOfWeek(monday);
+  const from = startOfWeekIn(monday, timeZone);
 
-  const to = new Date(from);
-  to.setDate(to.getDate() + 7);
+  // Nästa måndags början, inte "sju dygn senare". Veckan med sommartidens
+  // slut är 169 timmar lång, och den timmen hör till veckan.
+  const to = addDaysInZone(from, 7, timeZone);
+
+  // Vilket kalenderdygn veckan börjar på. Posterna sorteras mot det här talet
+  // i stället för mot en millisekundskillnad, som glider vid omställningarna.
+  const firstDayNumber = dayNumberIn(from, timeZone);
 
   const [employees, entries] = await Promise.all([
     db.employee.findMany({
@@ -133,11 +142,11 @@ export async function buildWeek(
   >();
 
   const emptyWeek = () =>
-    Array.from({ length: 7 }, (_, index) => {
-      const date = new Date(from);
-      date.setDate(date.getDate() + index);
-      return { date, spans: [] as Span[], needsReview: false };
-    });
+    Array.from({ length: 7 }, (_, index) => ({
+      date: addDaysInZone(from, index, timeZone),
+      spans: [] as Span[],
+      needsReview: false,
+    }));
 
   // Pågående pass räknas fram till nu. En enda tidpunkt för hela veckan, så
   // att två jobb som fortfarande pågår inte får olika sluttid.
@@ -159,10 +168,7 @@ export async function buildWeek(
     // Posten räknas på den dag den PÅBÖRJADES. Ett nattskift som passerar
     // midnatt hamnar därmed på kvällen det började, vilket är den dag den som
     // läser tänker på.
-    const index = Math.floor(
-      (startOfDay(entry.clockInAt).getTime() - from.getTime()) /
-        (24 * 60 * 60 * 1000)
-    );
+    const index = dayNumberIn(entry.clockInAt, timeZone) - firstDayNumber;
 
     if (index < 0 || index > 6) continue;
 
@@ -194,8 +200,9 @@ export async function buildWeek(
     rows.reduce((total, row) => total + row.days[index].minutes, 0)
   );
 
-  const lastMoment = new Date(to);
-  lastMoment.setMilliseconds(-1);
+  // Sista millisekunden av söndagen. Visas som veckans slutdatum, och ska
+  // alltså vara söndag och inte måndag.
+  const lastMoment = new Date(to.getTime() - 1);
 
   return {
     from,
@@ -224,10 +231,4 @@ function toDayCell(bucket: {
     parallelMinutes: parallelMinutes(bucket.spans),
     needsReview: bucket.needsReview,
   };
-}
-
-function startOfDay(date: Date): Date {
-  const copy = new Date(date);
-  copy.setHours(0, 0, 0, 0);
-  return copy;
 }

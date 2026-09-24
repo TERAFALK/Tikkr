@@ -162,3 +162,118 @@ export function nextOccurrenceOf(
     timeZone
   );
 }
+
+/**
+ * DYGNS- OCH VECKOGRÄNSER I EN VISS TIDSZON.
+ *
+ * Funktionerna nedan finns för att "idag" och "den här veckan" ska betyda
+ * samma sak i hela panelen. Räknar en vy dygnsgränsen med serverns egen
+ * tidszon hamnar den på 00:00 UTC — alltså 02:00 på verkstadsgolvet på
+ * sommaren — och samma stämpling kan då tillhöra olika dagar i två vyer.
+ *
+ * De räknar på KALENDERDATUM och inte på millisekunder. Ett dygn är inte
+ * alltid 24 timmar: sista söndagen i mars är 23 timmar lång och sista i
+ * oktober 25. Den som lägger till 86 400 000 millisekunder sju gånger landar
+ * fel två gånger om året, och just de veckorna ser ut som ett räknefel.
+ */
+
+const MS_PER_DAY = 24 * 60 * 60 * 1000;
+
+/**
+ * Kalenderdagen som ett heltal — dygn sedan epoch, räknat på väggen.
+ *
+ * Används för att avgöra VILKEN dag en tidpunkt tillhör. Två tidpunkter samma
+ * dag ger samma tal, oavsett tidsomställningar däremellan.
+ */
+export function dayNumberIn(instant: Date, timeZone: string): number {
+  const wall = wallTimeIn(instant, timeZone);
+  return Date.UTC(wall.year, wall.month - 1, wall.day) / MS_PER_DAY;
+}
+
+/** Tidpunkten då dygnet börjar på väggen i angiven tidszon. */
+export function startOfDayIn(instant: Date, timeZone: string): Date {
+  const wall = wallTimeIn(instant, timeZone);
+  return instantFromWallTime({ ...wall, hour: 0, minute: 0 }, timeZone);
+}
+
+/**
+ * Dygnets början ett visst antal dagar bort.
+ *
+ * Går via kalenderdatumet och inte via millisekunder, så att resultatet är
+ * midnatt även veckan efter en tidsomställning.
+ */
+export function addDaysInZone(
+  instant: Date,
+  days: number,
+  timeZone: string
+): Date {
+  const wall = wallTimeIn(instant, timeZone);
+
+  // Räknas fram via UTC för att slippa hantera månads- och årsskiften.
+  const shifted = new Date(
+    Date.UTC(wall.year, wall.month - 1, wall.day + days)
+  );
+
+  return instantFromWallTime(
+    {
+      year: shifted.getUTCFullYear(),
+      month: shifted.getUTCMonth() + 1,
+      day: shifted.getUTCDate(),
+      hour: 0,
+      minute: 0,
+    },
+    timeZone
+  );
+}
+
+/**
+ * Måndagen i veckan en tidpunkt tillhör, vid dygnets början.
+ *
+ * Veckan börjar på måndag. Det är den svenska konventionen och den verkstäder
+ * planerar efter.
+ */
+export function startOfWeekIn(instant: Date, timeZone: string): Date {
+  const wall = wallTimeIn(instant, timeZone);
+
+  // getUTCDay() på ett rent kalenderdatum ger veckodagen utan att tidszonen
+  // hinner flytta den. 0 är söndag, som hör till veckan som BÖRJAT — alltså
+  // sex dagar bakåt, inte till den som börjar dagen efter.
+  const weekday =
+    (new Date(Date.UTC(wall.year, wall.month - 1, wall.day)).getUTCDay() + 6) %
+    7;
+
+  return addDaysInZone(instant, -weekday, timeZone);
+}
+
+/** Kalenderdatumet som "2026-09-22". Formatet datumfält och länkar använder. */
+export function toDateInput(instant: Date, timeZone: string): string {
+  const wall = wallTimeIn(instant, timeZone);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${wall.year}-${pad(wall.month)}-${pad(wall.day)}`;
+}
+
+/**
+ * Tolkar "2026-09-22" som den dagen i angiven tidszon.
+ *
+ * Landar mitt på dagen och inte vid midnatt. Datumet ska bara peka ut en dag,
+ * och middagstid ligger tryggt inom dygnet oavsett tidsomställning — till
+ * skillnad från midnatt, som i vissa tidszoner inte finns den natt klockan
+ * ställs fram.
+ *
+ * Returnerar null om värdet inte går att tolka.
+ */
+export function parseLocalDate(value: string, timeZone: string): Date | null {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value.trim());
+  if (!match) return null;
+
+  return instantFromWallTime(
+    {
+      year: Number(match[1]),
+      month: Number(match[2]),
+      day: Number(match[3]),
+      hour: 12,
+      minute: 0,
+    },
+    timeZone
+  );
+}
