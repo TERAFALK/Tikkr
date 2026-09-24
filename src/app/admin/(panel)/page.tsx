@@ -20,6 +20,7 @@ import {
 } from "@/components/ui/icons";
 import { formatDuration, formatTime, minutesBetween } from "@/lib/format";
 import { getOnboardingState } from "@/lib/onboarding";
+import { mergedMinutes, parallelMinutes, type Span } from "@/lib/spans";
 
 export const dynamic = "force-dynamic";
 
@@ -47,7 +48,7 @@ export default async function OverviewPage() {
     }),
     db.timeEntry.findMany({
       where: { clockInAt: { gte: startOfToday } },
-      select: { clockInAt: true, clockOutAt: true },
+      select: { employeeId: true, clockInAt: true, clockOutAt: true },
     }),
     db.timeEntry.count({ where: { needsReview: true } }),
     db.order.count({ where: { status: "OPEN" } }),
@@ -58,8 +59,35 @@ export default async function OverviewPage() {
   // annars att verkstaden är dubbelt så full som den är.
   const peopleWorking = new Set(working.map((entry) => entry.employeeId)).size;
 
-  const minutesToday = todaysEntries.reduce(
-    (total, entry) => total + minutesBetween(entry.clockInAt, entry.clockOutAt),
+  // Samma räknesätt som veckovyn: parallella jobb räknas en gång, och
+  // sammanslagningen sker PER PERSON — se spans.ts. Rutan svarar på hur mycket
+  // tid som registrerats idag, och den som kör två maskiner en timme har varit
+  // i arbete en timme. Rapporten för samma dag visar mer, och ska göra det.
+  //
+  // Pågående jobb räknas fram till en och samma tidpunkt, annars får två jobb
+  // som fortfarande löper olika sluttid och överlappet blir fel.
+  const now = Date.now();
+
+  const spansByEmployee = new Map<string, Span[]>();
+
+  for (const entry of todaysEntries) {
+    const spans = spansByEmployee.get(entry.employeeId) ?? [];
+    spans.push({
+      from: entry.clockInAt.getTime(),
+      to: entry.clockOutAt?.getTime() ?? now,
+    });
+    spansByEmployee.set(entry.employeeId, spans);
+  }
+
+  const allSpans = [...spansByEmployee.values()];
+
+  const minutesToday = allSpans.reduce(
+    (total, spans) => total + mergedMinutes(spans),
+    0
+  );
+
+  const parallelToday = allSpans.reduce(
+    (total, spans) => total + parallelMinutes(spans),
     0
   );
 
@@ -110,7 +138,13 @@ export default async function OverviewPage() {
         <Stat
           label="Registrerat idag"
           value={formatDuration(minutesToday)}
-          hint="inklusive pågående jobb"
+          hint={
+            // Skillnaden mot rapporten skrivs ut. Annars ser den ut som ett
+            // räknefel för den som jämför de två talen.
+            parallelToday > 0
+              ? `inklusive pågående · ${formatDuration(parallelToday)} parallellt räknas en gång`
+              : "inklusive pågående jobb"
+          }
           icon={<IconClock />}
         />
         <Stat

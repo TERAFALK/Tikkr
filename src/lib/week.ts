@@ -1,4 +1,5 @@
 import type { CompanyDb } from "./tenant";
+import { mergedMinutes, parallelMinutes, type Span } from "./spans";
 
 /**
  * VECKOVY PER ANSTÄLLD.
@@ -12,14 +13,9 @@ import type { CompanyDb } from "./tenant";
  * timmar där en utstämpling glömts, eller en person vars hela vecka ligger på
  * en enda order.
  *
- * PARALLELLA JOBB RÄKNAS EN GÅNG. Kör någon svets 08–12 och fräs 11–15 blir
- * dagen sju timmar, inte nio. Vyn svarar på hur länge personen varit i arbete,
- * och personen fanns bara på ett ställe mellan elva och tolv.
- *
- * Den räknar därför med flit ANNORLUNDA än rapporterna. Där är nio timmar rätt
- * svar: två maskiner gick, och båda ordrarna ska betala sin timme. Samma tid,
- * två frågor, två svar. Den parallella delen redovisas separat så att
- * skillnaden går att förklara i stället för att se ut som ett fel.
+ * PARALLELLA JOBB RÄKNAS EN GÅNG — se `spans.ts`, som äger den regeln och
+ * förklaringen till varför rapporterna räknar annorlunda. Översikten använder
+ * samma modul, så att båda vyerna svarar likadant på samma dag.
  *
  * Inproduktiv tid räknas med. Städning är tid på jobbet även om den aldrig
  * faktureras.
@@ -46,12 +42,6 @@ export interface DayCell {
   parallelMinutes: number;
   /** true när någon post den dagen stängts av systemet och inte granskats. */
   needsReview: boolean;
-}
-
-/** Ett pass, som millisekunder. Formen sammanslagningen räknar på. */
-interface Span {
-  from: number;
-  to: number;
 }
 
 export interface WeekRow {
@@ -228,50 +218,12 @@ function toDayCell(bucket: {
   spans: Span[];
   needsReview: boolean;
 }): DayCell {
-  const summed = bucket.spans.reduce(
-    (total, span) => total + Math.max(0, span.to - span.from),
-    0
-  );
-
-  const merged = mergedMilliseconds(bucket.spans);
-
   return {
     date: bucket.date,
-    minutes: merged / 60000,
-    parallelMinutes: Math.max(0, summed - merged) / 60000,
+    minutes: mergedMinutes(bucket.spans),
+    parallelMinutes: parallelMinutes(bucket.spans),
     needsReview: bucket.needsReview,
   };
-}
-
-/**
- * Sammanslagen längd av passen, i millisekunder.
- *
- * Sorterar på starttid och sveper igenom: så länge nästa pass börjar innan det
- * pågående slutat växer samma period, annars läggs den undan och en ny börjar.
- * Tid som täcks av flera pass räknas därmed en gång.
- */
-function mergedMilliseconds(spans: Span[]): number {
-  const sorted = spans
-    .filter((span) => span.to > span.from)
-    .sort((a, b) => a.from - b.from);
-
-  if (sorted.length === 0) return 0;
-
-  let total = 0;
-  let start = sorted[0].from;
-  let end = sorted[0].to;
-
-  for (const span of sorted.slice(1)) {
-    if (span.from <= end) {
-      end = Math.max(end, span.to);
-    } else {
-      total += end - start;
-      start = span.from;
-      end = span.to;
-    }
-  }
-
-  return total + (end - start);
 }
 
 function startOfDay(date: Date): Date {
