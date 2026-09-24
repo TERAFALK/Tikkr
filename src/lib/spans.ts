@@ -2,21 +2,28 @@
  * TID I ARBETE, NÄR FLERA JOBB LÖPER SAMTIDIGT.
  *
  * Sedan en operatör får köra två maskiner samtidigt finns det två riktiga svar
- * på "hur mycket tid blev det", och vilket som är rätt beror på frågan:
+ * på "hur mycket tid blev det", och vilket som är rätt beror på frågan.
  *
- *   Svets 08–12 och fräs 11–15 samma dag — fyra timmar var
- *     → 8 timmar när frågan är vad som ska faktureras. Två maskiner gick under
- *       den överlappande timmen, och båda ordrarna ska betala sin.
- *     → 7 timmar när frågan är hur länge personen varit i arbete. Personen
- *       fanns bara på ett ställe mellan elva och tolv.
+ * RAPPORTERNA OCH EFTERKALKYLERNA summerar rakt av och ska inte röra den här
+ * filen. Svetsar Anna 08–12 och kör fräsen 11–15 är det åtta maskintimmar, och
+ * båda ordrarna ska betala sina fyra. Det är vad som ska faktureras.
  *
- * Rapporterna och efterkalkylerna räknar det första — de summerar rakt av och
- * ska inte röra den här filen. Översiktens och veckovyns tal räknar det andra,
- * och gör det här, så att båda vyerna svarar likadant på samma dag.
+ * ÖVERSIKTEN OCH VECKOVYN räknar i stället HUVUDSTÄMPLINGEN, och svarar då
+ * fyra timmar: bara svetsningen, jobbet hon började på. Fräsen är ett sidojobb
+ * och räknas inte alls — inte heller timmarna 12–15, när svetsen var avslutad.
  *
- * SAMMANSLAGNING SKER ALLTID PER PERSON. Att två personer arbetar samtidigt är
- * inte överlapp — det är två personer. Den som slår ihop över en hel verkstad
- * får fram hur länge lokalen varit bemannad, vilket ingen frågat efter.
+ * Regeln: en stämpling räknas bara om ingenting annat pågick när den började.
+ *
+ * Det är med flit ett lågt tal. Vyerna finns för att se om veckan ser rimlig
+ * ut, och ett sidojobb är inte en extra timme som någon varit på plats — det
+ * är samma timme, bokförd på en order till. Den som vill se all tid tar en
+ * rapport, som är stället där varje stämpling syns för sig.
+ *
+ * SAMMANRÄKNINGEN SKER ALLTID PER PERSON. Att två personer arbetar samtidigt
+ * är inte överlapp — det är två personer.
+ *
+ * Inproduktiv tid räknas med. Städning är tid på jobbet även om den aldrig
+ * faktureras, och den är lika mycket en huvudstämpling som svetsning.
  */
 
 /** Ett pass, som millisekunder sedan epoch. */
@@ -26,50 +33,36 @@ export interface Span {
 }
 
 /**
- * Sammanslagen längd av passen, i minuter.
+ * Huvudstämplingarnas sammanlagda längd, i minuter.
  *
- * Sorterar på starttid och sveper igenom: så länge nästa pass börjar innan det
- * pågående slutat växer samma period, annars läggs den undan och en ny börjar.
- * Tid som täcks av flera pass räknas därmed en gång.
+ * Sorterar på starttid och sveper igenom. Ett pass som börjar innan allt
+ * tidigare hunnit ta slut är ett sidojobb och hoppas över helt; övriga räknas
+ * med sin fulla längd. Passen kan alltså aldrig överlappa varandra i summan.
+ *
+ * Sluttiden som jämförs är den SENASTE hittills sedda, inte det föregående
+ * huvudpassets. Annars hade ett jobb som startade medan ett långt sidojobb
+ * fortfarande pågick räknats som ett nytt huvudjobb, fastän personen redan
+ * stod vid en maskin.
  */
-export function mergedMinutes(spans: Span[]): number {
+export function mainMinutes(spans: Span[]): number {
   const sorted = spans
     .filter((span) => span.to > span.from)
     .sort((a, b) => a.from - b.from);
 
-  if (sorted.length === 0) return 0;
-
   let total = 0;
-  let start = sorted[0].from;
-  let end = sorted[0].to;
+  let busyUntil = -Infinity;
 
-  for (const span of sorted.slice(1)) {
-    if (span.from <= end) {
-      end = Math.max(end, span.to);
-    } else {
-      total += end - start;
-      start = span.from;
-      end = span.to;
+  for (const span of sorted) {
+    if (span.from < busyUntil) {
+      // Sidojobb. Räknas inte, men skjuter fram när nästa jobb kan räknas som
+      // ett huvudjobb — personen står ju vid den maskinen tills den är klar.
+      busyUntil = Math.max(busyUntil, span.to);
+      continue;
     }
+
+    total += span.to - span.from;
+    busyUntil = span.to;
   }
 
-  return (total + (end - start)) / 60000;
-}
-
-/** Rå summa av passen, i minuter. Det fakturerbara talet. */
-export function summedMinutes(spans: Span[]): number {
-  return (
-    spans.reduce((total, span) => total + Math.max(0, span.to - span.from), 0) /
-    60000
-  );
-}
-
-/**
- * Hur mycket av tiden som kördes dubbelt, i minuter.
- *
- * Skillnaden mellan de två svaren ovan. Redovisas separat i vyerna så att den
- * går att förklara i stället för att se ut som ett räknefel.
- */
-export function parallelMinutes(spans: Span[]): number {
-  return Math.max(0, summedMinutes(spans) - mergedMinutes(spans));
+  return total / 60000;
 }

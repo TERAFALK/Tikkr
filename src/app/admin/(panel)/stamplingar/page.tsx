@@ -2,6 +2,7 @@ import { requireAdmin } from "@/lib/admin-session";
 import { companyTimeZone } from "@/lib/company";
 import NewEntryDialog from "@/components/admin/NewEntryDialog";
 import FormDialog from "@/components/admin/FormDialog";
+import FilterForm from "@/components/admin/FilterForm";
 import ConfirmButton from "@/components/admin/ConfirmButton";
 import {
   Badge,
@@ -137,7 +138,7 @@ export default async function EntriesPage({
 
       <Card className="mb-6">
         <CardHeader title="Filter" />
-        <form className="grid gap-4 p-5 sm:grid-cols-3">
+        <FilterForm className="grid gap-4 p-5 sm:grid-cols-3">
           <Field label="Från och med">
             <Input
               type="date"
@@ -163,7 +164,7 @@ export default async function EntriesPage({
               Rensa
             </ButtonLink>
           </div>
-        </form>
+        </FilterForm>
       </Card>
 
       {entries.length === 0 ? (

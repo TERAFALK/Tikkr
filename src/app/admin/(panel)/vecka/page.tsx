@@ -77,7 +77,7 @@ export default async function WeekPage({
     <>
       <PageHeader
         title="Veckovy"
-        description="Tid i arbete per person och dag. Parallella jobb räknas en gång."
+        description="Huvudstämplingen per person och dag. Sidojobb syns i rapporten."
         action={
           <div className="flex items-center gap-1">
             <NavLink href={`/admin/vecka?v=${shift(-7)}`} label="Föregående" />
@@ -162,19 +162,6 @@ export default async function WeekPage({
                           }
                         >
                           {formatDuration(day.minutes)}
-                        </span>
-                      )}
-
-                      {/* Prickad understrykning på tiden hade tagits för ett
-                          fel. En egen rad säger vad som hänt: personen körde
-                          två maskiner, och den gemensamma tiden räknas en
-                          gång här men två gånger i rapporten. */}
-                      {day.parallelMinutes > 0 && (
-                        <span
-                          className="mt-0.5 block text-xs font-normal text-neutral-400"
-                          title="Två jobb pågick samtidigt. Tiden räknas en gång här, men båda ordrarna faktureras var sin timme i rapporten."
-                        >
-                          +{formatDuration(day.parallelMinutes)} parallellt
                         </span>
                       )}
                     </Td>

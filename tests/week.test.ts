@@ -264,7 +264,7 @@ describe("veckorna då klockan ställs om", () => {
   });
 });
 
-describe("parallella jobb räknas en gång", () => {
+describe("bara huvudstämplingen räknas", () => {
   let fräsning: string;
 
   beforeEach(async () => {
@@ -294,16 +294,16 @@ describe("parallella jobb räknas en gång", () => {
   const monday = () =>
     buildWeek(forCompany(companyId), new Date("2026-08-03T12:00:00Z"), SE);
 
-  it("två maskiner som överlappar ger tid i arbete, inte summan", async () => {
-    // Svets 08–12 och fräs 11–15. Personen var i arbete 08–15 = sju timmar.
+  it("fräsen som startas mitt i svetsningen räknas inte alls", async () => {
+    // Svets 08–12 och fräs 11–15 svensk tid. Dagen är fyra timmar: fräsen blev
+    // aldrig huvudjobbet, så varken den överlappande timmen eller 12–15 räknas.
     // Rapporten säger åtta, och det är också rätt — men på en annan fråga.
     await punch("2026-08-03T06:00:00Z", "2026-08-03T10:00:00Z");
     await onFräsning("2026-08-03T09:00:00Z", "2026-08-03T13:00:00Z");
 
     const day = (await monday()).rows[0].days[0];
 
-    expect(day.minutes).toBe(7 * 60);
-    expect(day.parallelMinutes).toBe(60);
+    expect(day.minutes).toBe(4 * 60);
   });
 
   it("ett jobb helt inuti ett annat lägger ingenting till", async () => {
@@ -313,37 +313,34 @@ describe("parallella jobb räknas en gång", () => {
     const day = (await monday()).rows[0].days[0];
 
     expect(day.minutes).toBe(8 * 60);
-    expect(day.parallelMinutes).toBe(60);
   });
 
-  it("jobb som inte överlappar räknas som förut", async () => {
+  it("jobb som inte överlappar räknas båda", async () => {
     await punch("2026-08-03T06:00:00Z", "2026-08-03T10:00:00Z");
     await onFräsning("2026-08-03T11:00:00Z", "2026-08-03T13:00:00Z");
 
     const day = (await monday()).rows[0].days[0];
 
     expect(day.minutes).toBe(6 * 60);
-    expect(day.parallelMinutes).toBe(0);
   });
 
-  it("kant i kant räknas inte som parallellt", async () => {
+  it("kant i kant är två huvudjobb", async () => {
     await punch("2026-08-03T06:00:00Z", "2026-08-03T10:00:00Z");
     await onFräsning("2026-08-03T10:00:00Z", "2026-08-03T12:00:00Z");
 
     const day = (await monday()).rows[0].days[0];
 
     expect(day.minutes).toBe(6 * 60);
-    expect(day.parallelMinutes).toBe(0);
   });
 
-  it("veckans summa följer den sammanslagna tiden", async () => {
+  it("veckans summa följer huvudstämplingarna", async () => {
     await punch("2026-08-03T06:00:00Z", "2026-08-03T10:00:00Z");
     await onFräsning("2026-08-03T09:00:00Z", "2026-08-03T13:00:00Z");
 
     const week = await monday();
 
-    expect(week.rows[0].totalMinutes).toBe(7 * 60);
-    expect(week.dayTotals[0]).toBe(7 * 60);
-    expect(week.totalMinutes).toBe(7 * 60);
+    expect(week.rows[0].totalMinutes).toBe(4 * 60);
+    expect(week.dayTotals[0]).toBe(4 * 60);
+    expect(week.totalMinutes).toBe(4 * 60);
   });
 });

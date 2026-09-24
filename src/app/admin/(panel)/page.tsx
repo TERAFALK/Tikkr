@@ -20,7 +20,7 @@ import {
 } from "@/components/ui/icons";
 import { formatDuration, formatTime, minutesBetween } from "@/lib/format";
 import { getOnboardingState } from "@/lib/onboarding";
-import { mergedMinutes, parallelMinutes, type Span } from "@/lib/spans";
+import { mainMinutes, type Span } from "@/lib/spans";
 import { companyTimeZone } from "@/lib/company";
 import { startOfDayIn } from "@/lib/time-zone";
 
@@ -64,10 +64,10 @@ export default async function OverviewPage() {
   // annars att verkstaden är dubbelt så full som den är.
   const peopleWorking = new Set(working.map((entry) => entry.employeeId)).size;
 
-  // Samma räknesätt som veckovyn: parallella jobb räknas en gång, och
-  // sammanslagningen sker PER PERSON — se spans.ts. Rutan svarar på hur mycket
-  // tid som registrerats idag, och den som kör två maskiner en timme har varit
-  // i arbete en timme. Rapporten för samma dag visar mer, och ska göra det.
+  // Samma räknesätt som veckovyn: bara huvudstämplingen, och per person — se
+  // spans.ts. Ett sidojobb är inte en extra timme någon varit på plats, det är
+  // samma timme bokförd på en order till. Rapporten för samma dag visar mer,
+  // och ska göra det.
   //
   // Pågående jobb räknas fram till en och samma tidpunkt, annars får två jobb
   // som fortfarande löper olika sluttid och överlappet blir fel.
@@ -84,15 +84,8 @@ export default async function OverviewPage() {
     spansByEmployee.set(entry.employeeId, spans);
   }
 
-  const allSpans = [...spansByEmployee.values()];
-
-  const minutesToday = allSpans.reduce(
-    (total, spans) => total + mergedMinutes(spans),
-    0
-  );
-
-  const parallelToday = allSpans.reduce(
-    (total, spans) => total + parallelMinutes(spans),
+  const minutesToday = [...spansByEmployee.values()].reduce(
+    (total, spans) => total + mainMinutes(spans),
     0
   );
 
@@ -143,13 +136,7 @@ export default async function OverviewPage() {
         <Stat
           label="Registrerat idag"
           value={formatDuration(minutesToday)}
-          hint={
-            // Skillnaden mot rapporten skrivs ut. Annars ser den ut som ett
-            // räknefel för den som jämför de två talen.
-            parallelToday > 0
-              ? `inklusive pågående · ${formatDuration(parallelToday)} parallellt räknas en gång`
-              : "inklusive pågående jobb"
-          }
+          hint="inklusive pågående jobb"
           icon={<IconClock />}
         />
         <Stat

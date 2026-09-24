@@ -1,4 +1,5 @@
 import Link from "next/link";
+import FilterForm from "@/components/admin/FilterForm";
 import { requireAdmin } from "@/lib/admin-session";
 import { unsafeGlobalPrisma } from "@/lib/db";
 import { buildReport, type ReportGroup } from "@/lib/report";
@@ -130,9 +131,10 @@ export default async function ReportsPage({
             </div>
           }
         />
-        {/* Vanligt GET-formulär: filtren hamnar i adressen, så en rapport går
-            att spara som bokmärke eller skicka vidare till någon annan. */}
-        <form className="grid gap-4 p-5 sm:grid-cols-2 lg:grid-cols-6">
+        {/* GET-formulär: filtren hamnar i adressen, så en rapport går att
+            spara som bokmärke eller skicka vidare till någon annan. Det
+            tillämpas direkt när ett fält ändras — se FilterForm. */}
+        <FilterForm className="grid gap-4 p-5 sm:grid-cols-2 lg:grid-cols-6">
           <Field label="Från">
             <Input type="date" name="from" defaultValue={params.from ?? ""} />
           </Field>
@@ -202,7 +204,7 @@ export default async function ReportsPage({
               Rensa
             </ButtonLink>
           </div>
-        </form>
+        </FilterForm>
       </Card>
 
       <div className="mb-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">

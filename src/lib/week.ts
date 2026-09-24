@@ -1,5 +1,5 @@
 import type { CompanyDb } from "./tenant";
-import { mergedMinutes, parallelMinutes, type Span } from "./spans";
+import { mainMinutes, type Span } from "./spans";
 import {
   addDaysInZone,
   dayNumberIn,
@@ -19,7 +19,7 @@ import {
  * timmar där en utstämpling glömts, eller en person vars hela vecka ligger på
  * en enda order.
  *
- * PARALLELLA JOBB RÄKNAS EN GÅNG — se `spans.ts`, som äger den regeln och
+ * BARA HUVUDSTÄMPLINGEN RÄKNAS — se `spans.ts`, som äger den regeln och
  * förklaringen till varför rapporterna räknar annorlunda. Översikten använder
  * samma modul, så att båda vyerna svarar likadant på samma dag.
  *
@@ -39,18 +39,10 @@ export interface DayCell {
   /** Datumet, vid dygnets början i företagets tidszon. */
   date: Date;
   /**
-   * Tid i arbete den dagen. Överlappande jobb räknas EN gång — se
+   * Huvudstämplingarnas tid den dagen. Sidojobb räknas inte — se
    * toppkommentaren.
    */
   minutes: number;
-  /**
-   * Hur mycket av dagen som täcktes av mer än ett jobb samtidigt.
-   *
-   * Ingår INTE i minutes. Finns för att förklara varför veckovyn visar mindre
-   * än rapporten för samma dag, i stället för att låta skillnaden se ut som
-   * ett räknefel.
-   */
-  parallelMinutes: number;
   /** true när någon post den dagen stängts av systemet och inte granskats. */
   needsReview: boolean;
 }
@@ -213,13 +205,7 @@ export async function buildWeek(
   };
 }
 
-/**
- * Räknar ihop en dags pass till en cell.
- *
- * `minutes` är den sammanslagna längden: överlappar två jobb räknas den
- * gemensamma tiden en gång. `parallelMinutes` är skillnaden mot den råa
- * summan, alltså hur mycket som kördes dubbelt.
- */
+/** Räknar ihop en dags pass till en cell. */
 function toDayCell(bucket: {
   date: Date;
   spans: Span[];
@@ -227,8 +213,7 @@ function toDayCell(bucket: {
 }): DayCell {
   return {
     date: bucket.date,
-    minutes: mergedMinutes(bucket.spans),
-    parallelMinutes: parallelMinutes(bucket.spans),
+    minutes: mainMinutes(bucket.spans),
     needsReview: bucket.needsReview,
   };
 }

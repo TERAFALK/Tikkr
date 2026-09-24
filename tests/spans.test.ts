@@ -1,108 +1,85 @@
 import { describe, it, expect } from "vitest";
-import { mergedMinutes, summedMinutes, parallelMinutes } from "@/lib/spans";
+import { mainMinutes } from "@/lib/spans";
 
 /**
- * Sammanslagen tid.
+ * Huvudstämplingen.
  *
- * Två maskiner som går samtidigt är två maskintimmar men en arbetstimme.
- * Rapporterna räknar det första, översikten och veckovyn det andra, och den
- * här filen är gränsen mellan svaren. Går den sönder börjar de två vyerna säga
- * olika saker om samma dag utan att någon förstår varför.
+ * Rapporterna summerar rakt av: två maskiner en timme är två maskintimmar, och
+ * båda ordrarna betalar sin. Översikten och veckovyn räknar i stället bara det
+ * jobb personen faktiskt började på, och hoppar över sidojobben helt.
+ *
+ * Regeln: en stämpling räknas bara om ingenting annat pågick när den började.
+ *
+ * Går den här filen sönder börjar de två vyerna säga olika saker om samma dag
+ * utan att någon förstår varför.
  */
 
 const HOUR = 60 * 60 * 1000;
 
 /** Klockslag samma dygn, som millisekunder. Gör passen läsbara. */
-function at(hour: number): number {
-  return hour * HOUR;
+function span(fromHour: number, toHour: number) {
+  return { from: fromHour * HOUR, to: toHour * HOUR };
 }
 
-function span(from: number, to: number) {
-  return { from: at(from), to: at(to) };
-}
-
-describe("ett pass i taget", () => {
+describe("ett jobb i taget", () => {
   it("ger noll när inget registrerats", () => {
-    expect(mergedMinutes([])).toBe(0);
-    expect(summedMinutes([])).toBe(0);
-    expect(parallelMinutes([])).toBe(0);
+    expect(mainMinutes([])).toBe(0);
   });
 
   it("räknar ett ensamt pass rakt av", () => {
-    const spans = [span(8, 12)];
-
-    expect(mergedMinutes(spans)).toBe(240);
-    expect(summedMinutes(spans)).toBe(240);
-    expect(parallelMinutes(spans)).toBe(0);
+    expect(mainMinutes([span(8, 12)])).toBe(240);
   });
 
   it("lägger ihop pass som inte rör varandra", () => {
-    const spans = [span(8, 12), span(13, 17)];
-
-    expect(mergedMinutes(spans)).toBe(480);
-    expect(parallelMinutes(spans)).toBe(0);
+    expect(mainMinutes([span(8, 12), span(13, 17)])).toBe(480);
   });
 
   it("bryr sig inte om vilken ordning passen kommer i", () => {
-    expect(mergedMinutes([span(13, 17), span(8, 12)])).toBe(480);
+    expect(mainMinutes([span(13, 17), span(8, 12)])).toBe(480);
   });
 
   it("räknar inte ett pass utan längd", () => {
     // En instämpling som ångrats i samma sekund. Finns i databasen, men är
     // ingen tid.
-    expect(mergedMinutes([span(8, 8)])).toBe(0);
+    expect(mainMinutes([span(8, 8)])).toBe(0);
+  });
+
+  it("kant i kant är två huvudjobb", () => {
+    // Utstämpling och instämpling i samma ögonblick vid ett jobbyte. Det andra
+    // jobbet började inte medan något pågick, alltså är det ett huvudjobb.
+    expect(mainMinutes([span(8, 12), span(12, 16)])).toBe(480);
   });
 });
 
-describe("pass som överlappar", () => {
-  it("räknar den gemensamma timmen en gång", () => {
-    // Svets 08–12 och fräs 11–15, fyra timmar var: åtta maskintimmar men sju
-    // arbetstimmar, eftersom timmen mellan elva och tolv är samma timme.
-    const spans = [span(8, 12), span(11, 15)];
-
-    expect(summedMinutes(spans)).toBe(480);
-    expect(mergedMinutes(spans)).toBe(420);
-    expect(parallelMinutes(spans)).toBe(60);
+describe("sidojobb räknas inte", () => {
+  it("fräsen som startas mitt i svetsningen räknas inte alls", () => {
+    // Svets 08–12 och fräs 11–15. Dagen är fyra timmar, inte sju och inte
+    // åtta: varken den överlappande timmen eller 12–15 räknas, eftersom fräsen
+    // aldrig blev huvudjobbet.
+    expect(mainMinutes([span(8, 12), span(11, 15)])).toBe(240);
   });
 
-  it("räknar ett pass som ryms helt inuti ett annat en gång", () => {
-    const spans = [span(8, 16), span(10, 12)];
-
-    expect(mergedMinutes(spans)).toBe(480);
-    expect(parallelMinutes(spans)).toBe(120);
+  it("ett jobb helt inuti ett annat lägger ingenting till", () => {
+    expect(mainMinutes([span(8, 16), span(10, 12)])).toBe(480);
   });
 
-  it("slår ihop pass som gränsar till varandra utan glapp", () => {
-    // Utstämpling och instämpling i samma ögonblick vid ett jobbyte. Det är
-    // en sammanhängande period, inte överlapp.
-    const spans = [span(8, 12), span(12, 16)];
-
-    expect(mergedMinutes(spans)).toBe(480);
-    expect(parallelMinutes(spans)).toBe(0);
+  it("tre pass ovanpå varandra räknas som ett", () => {
+    expect(mainMinutes([span(8, 12), span(8, 12), span(8, 12)])).toBe(240);
   });
 
-  it("håller ihop en kedja av pass som överlappar i tur och ordning", () => {
-    const spans = [span(8, 10), span(9, 11), span(10.5, 13)];
-
-    expect(mergedMinutes(spans)).toBe(300);
-    expect(summedMinutes(spans)).toBe(390);
-    expect(parallelMinutes(spans)).toBe(90);
+  it("två jobb som startar i exakt samma ögonblick ger ett", () => {
+    expect(mainMinutes([span(8, 12), span(8, 16)])).toBe(240);
   });
 
-  it("börjar om efter ett glapp mitt i", () => {
-    const spans = [span(8, 12), span(11, 13), span(15, 17)];
-
-    expect(mergedMinutes(spans)).toBe(420);
-    expect(parallelMinutes(spans)).toBe(60);
+  it("ett jobb som börjar medan ett SIDOJOBB pågår är också ett sidojobb", () => {
+    // Svets 08–12 (huvud), fräs 11–18 (sido), borr 13–14. Borren startade
+    // medan fräsen gick — personen stod redan vid en maskin. Bara svetsen.
+    expect(mainMinutes([span(8, 12), span(11, 18), span(13, 14)])).toBe(240);
   });
 
-  it("räknar tre pass ovanpå varandra en gång", () => {
-    // Aldrig meningen att hända, men en glömd utstämpling räcker för att det
-    // ska bli så. Talet ska ändå vara rimligt.
-    const spans = [span(8, 12), span(8, 12), span(8, 12)];
-
-    expect(mergedMinutes(spans)).toBe(240);
-    expect(summedMinutes(spans)).toBe(720);
-    expect(parallelMinutes(spans)).toBe(480);
+  it("ett jobb efter att allt tagit slut är ett nytt huvudjobb", () => {
+    // Svets 08–12 (huvud), fräs 11–15 (sido), montering 16–18. Ingenting
+    // pågick klockan 16, alltså räknas monteringen: 4 + 2 timmar.
+    expect(mainMinutes([span(8, 12), span(11, 15), span(16, 18)])).toBe(360);
   });
 });
