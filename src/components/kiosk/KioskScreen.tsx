@@ -13,9 +13,15 @@ import KioskSettings from "./KioskSettings";
 /**
  * KIOSKSKÄRMEN.
  *
- * Fem vyer: namn → in/ut → order → moment, plus en knappsats för den som
- * hellre slår in ordernumret än letar i listan. Ett tryck i taget, ingen PIN,
- * ingen bekräftelseruta.
+ * Grundflödet är fyra vyer: namn → in/ut → order → moment. Runt det ligger
+ * sidospår för den som hellre slår in ordernumret, lägger upp ett snabbjobb
+ * eller stämplar inproduktiv tid. Ett tryck i taget, ingen PIN, ingen
+ * bekräftelseruta.
+ *
+ * INGEN VY LÄNGS VÄGEN ÄNDRAR NÅGOT. Byt jobb stämplar inte ut förrän det nya
+ * startat, och ett snabbjobb skapar ingen order förrän arbetsmomentet valts.
+ * Den som ångrar sig och backar ur ska aldrig lämna något efter sig — varken
+ * en utstämplad person utan nytt jobb eller en order ingen stämplat på.
  *
  * Tre saker styr utformningen:
  *
@@ -168,6 +174,12 @@ type View =
   | { name: "order"; employee: Employee }
   | { name: "orderNumber"; employee: Employee }
   | { name: "quickCustomer"; employee: Employee; orderNumber: string }
+  | {
+      name: "quickMoment";
+      employee: Employee;
+      orderNumber: string;
+      customerName: string | null;
+    }
   | { name: "moment"; employee: Employee; order: Order }
   | { name: "indirect"; employee: Employee };
 
@@ -446,11 +458,24 @@ export default function KioskScreen({
   // Tar emot det minsta som behövs i stället för hela Order/Moment. Både
   // listornas poster och ett sparat "senast"-jobb passar då in utan att något
   // måste hittas på för fält som inte används här.
-  /** true medan ordern skapas på servern. Knapparna ska inte gå att dubbeltrycka. */
-  const [creatingOrder, setCreatingOrder] = useState(false);
+  /**
+   * true medan en order håller på att skapas.
+   *
+   * En ref och inte ett tillstånd. Två tryck i snabb följd hinner båda läsa
+   * samma gamla värde innan React renderat om, och då skapas två ordrar — ett
+   * påhittat SNABB-nummer räknas upp för varje anrop, så dubbletten får ett
+   * eget nummer och fångas inte av serverns dubblettskydd.
+   */
+  const creatingOrder = useRef(false);
 
   /**
-   * Skapar en order på plats och går vidare till momentvalet.
+   * Skapar en order på plats och ger tillbaka den.
+   *
+   * Anropas FÖRST när ett arbetsmoment valts, alltså i samma ögonblick som
+   * jobbet startar. Skapades ordern redan vid kundvalet blev den kvar i
+   * systemet för den som ångrade sig — en order utan tid på sig, som kontoret
+   * måste reda ut. Samma sak som gällde "Byt jobb": sidoeffekten hör hemma
+   * vid det tryck som är ett åtagande, inte vid ett steg på vägen.
    *
    * Till skillnad från en stämpling går det INTE att köa. Tiden måste peka på
    * en order som finns, och ett id kan skärmen inte hitta på. Därför väntar
@@ -459,11 +484,10 @@ export default function KioskScreen({
    */
   const createQuickOrder = useCallback(
     async (
-      employee: Employee,
       orderNumber: string,
       customerName: string | null
-    ) => {
-      setCreatingOrder(true);
+    ): Promise<Order | null> => {
+      creatingOrder.current = true;
 
       try {
         const response = await fetch("/api/kiosk/quick-order", {
@@ -480,19 +504,20 @@ export default function KioskScreen({
 
         if (!response.ok || !data.order) {
           setError(data.error ?? "Ordern kunde inte skapas.");
-          return;
+          return null;
         }
 
         // Listorna hämtas om i bakgrunden så den nya ordern finns där nästa
-        // gång någon letar. Vi väntar inte på det — momentvalet kan börja nu.
+        // gång någon letar. Vi väntar inte på svaret — stämplingen ska igång.
         router.refresh();
-        setView({ name: "moment", employee, order: data.order });
+        return data.order;
       } catch {
         setError(
           "Ingen kontakt med servern. En ny order måste skapas med nätet igång."
         );
+        return null;
       } finally {
-        setCreatingOrder(false);
+        creatingOrder.current = false;
       }
     },
     [router]
@@ -789,17 +814,55 @@ export default function KioskScreen({
           <CustomerPicker
             orderNumber={view.orderNumber}
             customers={customers}
-            busy={creatingOrder}
             onPick={(customerName) =>
-              void createQuickOrder(
-                view.employee,
-                view.orderNumber,
-                customerName
-              )
+              // Ingenting skapas här. Kunden är ett val på vägen, och den som
+              // backar ur ska inte lämna en order efter sig.
+              setView({
+                name: "quickMoment",
+                employee: view.employee,
+                orderNumber: view.orderNumber,
+                customerName,
+              })
             }
             onBack={() =>
               setView({ name: "orderNumber", employee: view.employee })
             }
+          />
+        )}
+
+        {view.name === "quickMoment" && (
+          <Chooser
+            title={`${
+              [view.orderNumber, view.customerName].filter(Boolean).join(" · ") ||
+              "Nytt snabbjobb"
+            }: välj arbetsmoment`}
+            empty="Inga arbetsmoment upplagda. Kontakta administratören."
+            items={moments.map((moment) => ({
+              key: moment.id,
+              primary: moment.name,
+              onPick: () => {
+                // Spärr mot dubbeltryck. Två tryck hade annars gett två
+                // ordrar, eftersom ett påhittat SNABB-nummer räknas upp för
+                // varje anrop.
+                if (creatingOrder.current) return;
+
+                void (async () => {
+                  const order = await createQuickOrder(
+                    view.orderNumber,
+                    view.customerName
+                  );
+
+                  // Gick det inte står felet i rutan och skärmen väntar kvar.
+                  if (!order) return;
+
+                  punchIn(view.employee, {
+                    kind: "ORDER",
+                    order,
+                    moment,
+                  });
+                })();
+              },
+            }))}
           />
         )}
 
@@ -853,6 +916,7 @@ const STEPS: Partial<
   order: { current: 2, label: "Välj order" },
   orderNumber: { current: 2, label: "Slå in ordernummer" },
   quickCustomer: { current: 2, label: "Vilken kund?" },
+  quickMoment: { current: 3, label: "Välj arbetsmoment" },
   moment: { current: 3, label: "Välj arbetsmoment" },
   indirect: { current: 2, label: "Inproduktiv tid" },
 };
@@ -1315,13 +1379,11 @@ const ALPHABET_THRESHOLD = 12;
 function CustomerPicker({
   orderNumber,
   customers,
-  busy,
   onPick,
   onBack,
 }: {
   orderNumber: string;
   customers: string[];
-  busy: boolean;
   onPick: (customerName: string | null) => void;
   onBack: () => void;
 }) {
@@ -1369,10 +1431,9 @@ function CustomerPicker({
           <div className="mt-3 grid gap-3 sm:grid-cols-2">
             <button
               onClick={() => onPick(typed.trim() || null)}
-              disabled={busy}
-              className="kiosk-press min-h-20 rounded-xl bg-blue-600 p-5 text-xl font-semibold text-white active:bg-blue-700 disabled:bg-neutral-200 disabled:text-neutral-400"
+              className="kiosk-press min-h-20 rounded-xl bg-blue-600 p-5 text-xl font-semibold text-white active:bg-blue-700"
             >
-              {busy ? "Skapar…" : "Klar"}
+              Klar
             </button>
             <button
               onClick={() => setTyping(false)}
@@ -1418,8 +1479,7 @@ function CustomerPicker({
                 <button
                   key={name}
                   onClick={() => onPick(name)}
-                  disabled={busy}
-                  className="kiosk-press flex min-h-24 items-center rounded-xl border border-neutral-200 bg-white p-5 text-left text-xl font-semibold text-neutral-900 active:bg-neutral-50 disabled:opacity-50"
+                  className="kiosk-press flex min-h-24 items-center rounded-xl border border-neutral-200 bg-white p-5 text-left text-xl font-semibold text-neutral-900 active:bg-neutral-50"
                 >
                   <span className="line-clamp-2">{name}</span>
                 </button>
@@ -1439,10 +1499,9 @@ function CustomerPicker({
                 vore att förlora timmen man försökte rädda. */}
             <button
               onClick={() => onPick(null)}
-              disabled={busy}
-              className="kiosk-press min-h-20 rounded-xl border border-neutral-200 bg-white p-5 text-lg font-semibold text-neutral-500 active:bg-neutral-50 disabled:opacity-50"
+              className="kiosk-press min-h-20 rounded-xl border border-neutral-200 bg-white p-5 text-lg font-semibold text-neutral-500 active:bg-neutral-50"
             >
-              {busy ? "Skapar…" : "Vet inte"}
+              Vet inte
             </button>
             <button
               onClick={onBack}
