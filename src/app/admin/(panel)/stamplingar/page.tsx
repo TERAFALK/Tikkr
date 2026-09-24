@@ -1,5 +1,5 @@
 import { requireAdmin } from "@/lib/admin-session";
-import { unsafeGlobalPrisma } from "@/lib/db";
+import { companyTimeZone } from "@/lib/company";
 import NewEntryDialog from "@/components/admin/NewEntryDialog";
 import FormDialog from "@/components/admin/FormDialog";
 import ConfirmButton from "@/components/admin/ConfirmButton";
@@ -21,7 +21,13 @@ import {
 } from "@/components/ui";
 import { formatDateTime, formatDuration, minutesBetween } from "@/lib/format";
 import { describeEntry } from "@/lib/entry-label";
-import { toLocalDateTimeInput } from "@/lib/time-zone";
+import {
+  addDaysInZone,
+  parseLocalDate,
+  startOfDayIn,
+  toDateInput,
+  toLocalDateTimeInput,
+} from "@/lib/time-zone";
 import { deleteEntry, editEntry } from "./actions";
 
 export const dynamic = "force-dynamic";
@@ -39,55 +45,62 @@ export default async function EntriesPage({
   const { db, companyId } = await requireAdmin();
   const params = await searchParams;
 
-  const company = await unsafeGlobalPrisma.company.findUnique({
-    where: { id: companyId },
-    select: { timezone: true },
-  });
-  const timeZone = company?.timezone ?? "Europe/Stockholm";
+  const timeZone = await companyTimeZone(companyId);
 
   // Standard: de senaste två veckorna. En obegränsad lista blir oanvändbar
   // efter några månaders drift.
-  const defaultFrom = new Date();
-  defaultFrom.setDate(defaultFrom.getDate() - 14);
-  const from = params.from ? new Date(`${params.from}T00:00:00`) : defaultFrom;
+  //
+  // Datumen räknas i företagets tidszon. Gjorde de inte det skulle filtret
+  // "från och med idag" börja 02:00 på verkstadsgolvet och tappa morgonens
+  // stämplingar — servern kör UTC.
+  const defaultFrom = addDaysInZone(new Date(), -14, timeZone);
+  const from =
+    (params.from ? parseLocalDate(params.from, timeZone) : null) ?? defaultFrom;
+  const fromDayStart = startOfDayIn(from, timeZone);
 
-  const [employees, orders, moments, entries] = await Promise.all([
-    db.employee.findMany({
-      orderBy: { name: "asc" },
-      select: { id: true, name: true },
-    }),
-    db.order.findMany({
-      orderBy: { orderNumber: "asc" },
-      select: { id: true, orderNumber: true, customerName: true },
-    }),
-    db.workMoment.findMany({
-      orderBy: { name: "asc" },
-      select: { id: true, name: true },
-    }),
-    db.timeEntry.findMany({
-      where: {
-        employeeId: params.employeeId || undefined,
-        clockInAt: { gte: from },
-      },
-      orderBy: { clockInAt: "desc" },
-      take: 200,
-      select: {
-        id: true,
-        clockInAt: true,
-        clockOutAt: true,
-        source: true,
-        needsReview: true,
-        employeeId: true,
-        orderId: true,
-        momentId: true,
-        employee: { select: { name: true } },
-        kind: true,
-        order: { select: { orderNumber: true, customerName: true } },
-        moment: { select: { name: true } },
-        indirectMoment: { select: { name: true } },
-      },
-    }),
-  ]);
+  const [employees, orders, moments, indirectMoments, entries] =
+    await Promise.all([
+      db.employee.findMany({
+        orderBy: { name: "asc" },
+        select: { id: true, name: true },
+      }),
+      db.order.findMany({
+        orderBy: { orderNumber: "asc" },
+        select: { id: true, orderNumber: true, customerName: true },
+      }),
+      db.workMoment.findMany({
+        orderBy: { name: "asc" },
+        select: { id: true, name: true },
+      }),
+      db.indirectMoment.findMany({
+        orderBy: { name: "asc" },
+        select: { id: true, name: true },
+      }),
+      db.timeEntry.findMany({
+        where: {
+          employeeId: params.employeeId || undefined,
+          clockInAt: { gte: fromDayStart },
+        },
+        orderBy: { clockInAt: "desc" },
+        take: 200,
+        select: {
+          id: true,
+          clockInAt: true,
+          clockOutAt: true,
+          source: true,
+          needsReview: true,
+          employeeId: true,
+          orderId: true,
+          momentId: true,
+          indirectMomentId: true,
+          employee: { select: { name: true } },
+          kind: true,
+          order: { select: { orderNumber: true, customerName: true } },
+          moment: { select: { name: true } },
+          indirectMoment: { select: { name: true } },
+        },
+      }),
+    ]);
 
   const employeeOptions = employees.map((employee) => ({
     id: employee.id,
@@ -100,6 +113,10 @@ export default async function EntriesPage({
       : order.orderNumber,
   }));
   const momentOptions = moments.map((moment) => ({
+    id: moment.id,
+    label: moment.name,
+  }));
+  const indirectOptions = indirectMoments.map((moment) => ({
     id: moment.id,
     label: moment.name,
   }));
@@ -125,7 +142,7 @@ export default async function EntriesPage({
             <Input
               type="date"
               name="from"
-              defaultValue={params.from ?? defaultFrom.toISOString().slice(0, 10)}
+              defaultValue={params.from ?? toDateInput(defaultFrom, timeZone)}
             />
           </Field>
 
@@ -243,25 +260,59 @@ export default async function EntriesPage({
                               value={entry.employeeId}
                             />
 
-                            <Field label="Order">
-                              <Select name="orderId" defaultValue={entry.orderId}>
-                                {orderOptions.map((option) => (
-                                  <option key={option.id} value={option.id}>
-                                    {option.label}
-                                  </option>
-                                ))}
-                              </Select>
-                            </Field>
+                            {/* Posten behåller sin sort. En inproduktiv
+                                stämpling har varken order eller arbetsmoment,
+                                och visades den i orderformuläret skulle ett
+                                sparat formulär göra en städtimme till
+                                fakturerbar ordertid — tyst. */}
+                            <input
+                              type="hidden"
+                              name="kind"
+                              value={entry.kind}
+                            />
 
-                            <Field label="Arbetsmoment">
-                              <Select name="momentId" defaultValue={entry.momentId}>
-                                {momentOptions.map((option) => (
-                                  <option key={option.id} value={option.id}>
-                                    {option.label}
-                                  </option>
-                                ))}
-                              </Select>
-                            </Field>
+                            {entry.kind === "INDIRECT" ? (
+                              <Field label="Inproduktivt moment">
+                                <Select
+                                  name="indirectMomentId"
+                                  defaultValue={entry.indirectMomentId ?? ""}
+                                >
+                                  {indirectOptions.map((option) => (
+                                    <option key={option.id} value={option.id}>
+                                      {option.label}
+                                    </option>
+                                  ))}
+                                </Select>
+                              </Field>
+                            ) : (
+                              <>
+                                <Field label="Order">
+                                  <Select
+                                    name="orderId"
+                                    defaultValue={entry.orderId ?? ""}
+                                  >
+                                    {orderOptions.map((option) => (
+                                      <option key={option.id} value={option.id}>
+                                        {option.label}
+                                      </option>
+                                    ))}
+                                  </Select>
+                                </Field>
+
+                                <Field label="Arbetsmoment">
+                                  <Select
+                                    name="momentId"
+                                    defaultValue={entry.momentId ?? ""}
+                                  >
+                                    {momentOptions.map((option) => (
+                                      <option key={option.id} value={option.id}>
+                                        {option.label}
+                                      </option>
+                                    ))}
+                                  </Select>
+                                </Field>
+                              </>
+                            )}
 
                             <div className="grid gap-4 sm:grid-cols-2">
                               <Field label="Instämplad">

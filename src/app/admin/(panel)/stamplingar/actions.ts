@@ -31,6 +31,8 @@ function readForm(formData: FormData, timeZone: string) {
     employeeId: String(formData.get("employeeId") ?? ""),
     orderId: String(formData.get("orderId") ?? ""),
     momentId: String(formData.get("momentId") ?? ""),
+    indirectMomentId: String(formData.get("indirectMomentId") ?? ""),
+    kind: formData.get("kind") === "INDIRECT" ? "INDIRECT" : "ORDER",
     clockInAt,
     clockOutAt,
   };
@@ -84,12 +86,32 @@ export async function editEntry(formData: FormData) {
   const input = readForm(formData, timeZone);
   if (!id || !input.clockInAt || !input.clockOutAt) return;
 
+  // Posten behåller sin sort. Formuläret visar bara fälten som hör till den,
+  // och ändringen får aldrig flytta en post mellan ordertid och inproduktiv
+  // tid — det hade ändrat vad som hamnar på ett fakturaunderlag.
+  const job =
+    input.kind === "INDIRECT"
+      ? ({
+          kind: "INDIRECT",
+          indirectMomentId: input.indirectMomentId,
+        } as const)
+      : ({
+          kind: "ORDER",
+          orderId: input.orderId,
+          momentId: input.momentId,
+        } as const);
+
+  const complete =
+    job.kind === "INDIRECT"
+      ? Boolean(job.indirectMomentId)
+      : Boolean(job.orderId && job.momentId);
+
+  if (!complete) return;
+
   try {
     await updateEntryManually(companyId, id, {
-      kind: "ORDER",
+      ...job,
       employeeId: input.employeeId,
-      orderId: input.orderId,
-      momentId: input.momentId,
       clockInAt: input.clockInAt,
       clockOutAt: input.clockOutAt,
       byEmail: email,
