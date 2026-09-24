@@ -2,6 +2,7 @@ import PDFDocument from "pdfkit";
 import type { OrderExport } from "./order-export";
 import { formatDate, formatDateTime, formatDuration } from "./format";
 import { drawBarChart } from "./pdf-chart";
+import { drawFooter } from "./pdf-footer";
 
 /**
  * UNDERLAG SOM PDF.
@@ -31,6 +32,7 @@ import { drawBarChart } from "./pdf-chart";
  */
 
 const A4_WIDTH = 595.28;
+const FOOTER_Y = 800;
 const MARGIN = 50;
 const CONTENT_WIDTH = A4_WIDTH - MARGIN * 2;
 
@@ -285,10 +287,10 @@ function renderOrder(
 
   /* --- Sidfot ------------------------------------------------------------- */
 
-  doc.font("Helvetica").fontSize(7).fillColor("#a3a3a3");
-  doc.text("Tidsunderlag skapat med Tikkr", MARGIN, 800, {
-    width: CONTENT_WIDTH,
-    align: "center",
+  drawFooter(doc, "Tidsunderlag skapat med Tikkr", {
+    marginLeft: MARGIN,
+    contentWidth: CONTENT_WIDTH,
+    y: FOOTER_Y,
   });
 }
 
@@ -331,9 +333,9 @@ function drawMomentChart(
     marginLeft: MARGIN,
     contentWidth: CONTENT_WIDTH,
     pageWidth: A4_WIDTH,
-    // Sidfoten står på 800. Diagrammet fick tidigare skriva rakt igenom den
-    // när en order hade många moment.
-    bottomLimit: 760,
+    // Diagrammet fick tidigare skriva rakt igenom sidfoten när en order hade
+    // många moment.
+    bottomLimit: FOOTER_Y - 40,
     pageTopY: MARGIN,
   });
 }

@@ -102,6 +102,34 @@ function jobKey(choice: KioskJobChoice): string {
   return choice.kind === "ORDER" ? choice.moment.id : choice.indirectMoment.id;
 }
 
+/**
+ * FÄRGEN SOM SÄGER VAD SOM PÅGÅR.
+ *
+ * Grönt: det löper fakturerbar tid. Gult: allt som pågår är inproduktivt —
+ * städning, möte, underhåll — och ingenting av det når ett fakturaunderlag.
+ *
+ * Skillnaden ska gå att läsa tvärs över en verkstad, precis som skillnaden
+ * mellan instämplad och utstämplad. Den som ser ett gult kort vet att personen
+ * är på plats men inte på ett jobb som betalas.
+ */
+const JOB_TONE = {
+  order: "border-emerald-600 bg-emerald-600 active:bg-emerald-700",
+  indirect: "border-amber-500 bg-amber-500 active:bg-amber-600",
+} as const;
+
+/**
+ * True när ALLT som pågår är inproduktivt.
+ *
+ * Kör någon både en maskin och något inproduktivt är kortet grönt. Frågan
+ * gulmarkeringen besvarar är "går det tid som inte faktureras", och svaret är
+ * då att det också går tid som gör det — vilket är det viktigare beskedet.
+ */
+function onlyIndirect(jobs: ActiveJob[]): boolean {
+  return (
+    jobs.length > 0 && jobs.every((job) => job.choice.kind === "INDIRECT")
+  );
+}
+
 /** Fälten som pekar ut jobbet vid en utstämpling. */
 function outFields(choice: KioskJobChoice) {
   return choice.kind === "ORDER"
@@ -1115,7 +1143,9 @@ function EmployeeGrid({
             // på det avstånd skärmen faktiskt används.
             className={`kiosk-press flex min-h-36 flex-col justify-between rounded-xl border p-5 text-left ${
               job
-                ? "border-emerald-600 bg-emerald-600 active:bg-emerald-700"
+                ? onlyIndirect(jobs)
+                  ? JOB_TONE.indirect
+                  : JOB_TONE.order
                 : "border-neutral-200 bg-white active:bg-neutral-50"
             }`}
           >
@@ -1231,7 +1261,13 @@ function ActionChoice({
 
         {single && (
           <div className="mt-3 flex flex-wrap items-center gap-2 text-[15px] text-neutral-600">
-            <span className="inline-flex items-center gap-2 rounded-md bg-emerald-600 px-3 py-1.5 font-semibold text-white">
+            <span
+              className={`inline-flex items-center gap-2 rounded-md px-3 py-1.5 font-semibold text-white ${
+                single.choice.kind === "INDIRECT"
+                  ? "bg-amber-500"
+                  : "bg-emerald-600"
+              }`}
+            >
               <span className="h-2 w-2 rounded-full bg-white" />
               Pågår sedan <Elapsed since={single.since} />
             </span>
@@ -1248,7 +1284,11 @@ function ActionChoice({
           {jobs.map((job) => (
             <div
               key={jobKey(job.choice)}
-              className="flex items-center gap-3 rounded-xl border border-emerald-600 bg-emerald-600 p-4"
+              className={`flex items-center gap-3 rounded-xl border p-4 ${
+                job.choice.kind === "INDIRECT"
+                  ? JOB_TONE.indirect
+                  : JOB_TONE.order
+              }`}
             >
               <span className="min-w-0 flex-1">
                 <span className="block truncate text-xl font-semibold text-white">

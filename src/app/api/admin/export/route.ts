@@ -46,7 +46,11 @@ export async function GET(request: NextRequest) {
           : "ORDER",
   });
 
-  const view = params.get("visning") === "person" ? "person" : "detalj";
+  const requested = params.get("visning");
+  const view: ReportView =
+    requested === "person" || requested === "persondetalj"
+      ? requested
+      : "detalj";
 
   if (params.get("format") === "pdf") {
     return reportAsPdf(companyId, companyName, report, params, view);
@@ -240,7 +244,11 @@ async function reportAsPdf(
       : params.get("kind") === "ALL"
         ? "Fakturerbar och inproduktiv tid"
         : "Fakturerbar tid",
-    view === "person" ? "Summerat per anställd" : "Varje stämpling",
+    view === "person"
+      ? "Summerat per anställd"
+      : view === "persondetalj"
+        ? "Varje stämpling, grupperad per anställd"
+        : "Varje stämpling",
   ];
 
   try {

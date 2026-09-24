@@ -3,6 +3,7 @@ import type { OrderCalc, OrderCalcGroup } from "./order-calc";
 import { formatDate, formatDuration, formatTime } from "./format";
 import { formatCurrency, formatMarkup } from "./money";
 import { drawBarChart } from "./pdf-chart";
+import { drawFooter } from "./pdf-footer";
 
 /**
  * EFTERKALKYL SOM PDF — INTERNT UNDERLAG.
@@ -291,12 +292,10 @@ function renderCalc(
 
   /* --- Sidfot -------------------------------------------------------------- */
 
-  doc.font("Helvetica").fontSize(7).fillColor("#a3a3a3");
-  doc.text(
+  drawFooter(
+    doc,
     "Internt underlag skapat med Tikkr — innehåller självkostnad och marginal",
-    MARGIN,
-    FOOTER_Y,
-    { width: CONTENT_WIDTH, align: "center" }
+    { marginLeft: MARGIN, contentWidth: CONTENT_WIDTH, y: FOOTER_Y }
   );
 }
 

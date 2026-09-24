@@ -2,6 +2,7 @@ import PDFDocument from "pdfkit";
 import type { ReportResult, ReportGroup } from "./report";
 import { formatDate, formatDateTime, formatDuration } from "./format";
 import { drawBarChart } from "./pdf-chart";
+import { drawFooter } from "./pdf-footer";
 
 /**
  * RAPPORTEN SOM PDF.
@@ -25,7 +26,7 @@ const CONTENT_WIDTH = A4_WIDTH - MARGIN * 2;
 const FOOTER_Y = 800;
 const PAGE_BREAK_Y = 720;
 
-export type ReportView = "detalj" | "person";
+export type ReportView = "detalj" | "person" | "persondetalj";
 
 export interface ReportPdfCompany {
   name: string;
@@ -49,6 +50,16 @@ const DETAIL_COLUMNS = [
   // Bara klockslaget — datumet står redan i kolumnen före.
   { label: "Slut", width: 50, align: "left" as const },
   { label: "Tid (tim:min)", width: 75, align: "right" as const },
+];
+
+// Varje stämpling, men utan kolumnen Anställd: namnet står i rubriken över
+// gruppen. Den frigjorda bredden går till Vad, där order och moment ska rymmas
+// utan att klippas.
+const EMPLOYEE_DETAIL_COLUMNS = [
+  { label: "Vad", width: 250, align: "left" as const },
+  { label: "Instämplad", width: 120, align: "left" as const },
+  { label: "Slut", width: 55, align: "left" as const },
+  { label: "Tid (tim:min)", width: 70, align: "right" as const },
 ];
 
 const PERSON_COLUMNS = [
@@ -186,16 +197,18 @@ function render(
 
   if (options.view === "person") {
     y = drawPersonTable(doc, report.byEmployee, y);
+  } else if (options.view === "persondetalj") {
+    y = drawEmployeeDetailTable(doc, company, report, y);
   } else {
     y = drawDetailTable(doc, company, report, y);
   }
 
   /* --- Sidfot -------------------------------------------------------------- */
 
-  doc.font("Helvetica").fontSize(7).fillColor("#a3a3a3");
-  doc.text("Tidrapport skapad med Tikkr", MARGIN, FOOTER_Y, {
-    width: CONTENT_WIDTH,
-    align: "center",
+  drawFooter(doc, "Tidrapport skapad med Tikkr", {
+    marginLeft: MARGIN,
+    contentWidth: CONTENT_WIDTH,
+    y: FOOTER_Y,
   });
 }
 
@@ -413,4 +426,116 @@ function line(doc: PDFKit.PDFDocument, y: number) {
     .lineTo(A4_WIDTH - MARGIN, y)
     .strokeColor("#f0f0f0")
     .stroke();
+}
+
+/**
+ * VARJE STÄMPLING, GRUPPERAD PER ANSTÄLLD.
+ *
+ * Formen kunden bad om: en rubrik per person, personens stämplingar under den
+ * i tidsordning, och en delsumma innan nästa person börjar.
+ *
+ * Skillnaden mot "Varje stämpling" är inte vilka rader som visas utan vad man
+ * kan göra med pappret. En lista sorterad på tid besvarar "vad hände i
+ * veckan"; den här besvarar "vad gjorde Anna", och det är den frågan man har
+ * när man ska stämma av en vecka med någon.
+ *
+ * Grupperingen sker här och inte i report.ts. Raderna bär redan namn och
+ * nummer, och ReportResult är delad med Excel-exporten och rapportvyn — en ny
+ * gruppering där hade fått alla tre att bära något bara den här sidan behöver.
+ */
+function drawEmployeeDetailTable(
+  doc: PDFKit.PDFDocument,
+  company: ReportPdfCompany,
+  report: ReportResult,
+  startY: number
+): number {
+  let y = startY + 6;
+
+  if (report.rows.length === 0) {
+    doc.font("Helvetica").fontSize(9).fillColor("#737373");
+    doc.text("Ingen registrerad tid i perioden.", MARGIN, y);
+    return doc.y + 10;
+  }
+
+  // Personerna i bokstavsordning, deras stämplingar i tidsordning. Rapporten
+  // levereras nyast först, vilket är fel håll när en vecka ska läsas igenom.
+  const byEmployee = new Map<string, typeof report.rows>();
+
+  for (const row of report.rows) {
+    const heading = row.employeeNumber
+      ? `${row.employeeName} (${row.employeeNumber})`
+      : row.employeeName;
+
+    const rows = byEmployee.get(heading) ?? [];
+    rows.push(row);
+    byEmployee.set(heading, rows);
+  }
+
+  const people = [...byEmployee.entries()].sort((a, b) =>
+    a[0].localeCompare(b[0], "sv")
+  );
+
+  for (const [heading, rows] of people) {
+    rows.sort((a, b) => a.clockInAt.getTime() - b.clockInAt.getTime());
+
+    // Rubriken ska aldrig bli ensam kvar längst ner på en sida. Plats för
+    // namnet, tabellhuvudet och minst en rad, annars börjar personen på nästa.
+    if (y + 18 + 22 + 20 > PAGE_BREAK_Y) {
+      doc.addPage();
+      y = MARGIN;
+    }
+
+    doc.font("Helvetica-Bold").fontSize(11).fillColor("#0a0a0a");
+    doc.text(heading, MARGIN, y);
+    y += 18;
+
+    y = drawHead(doc, EMPLOYEE_DETAIL_COLUMNS, y);
+    doc.font("Helvetica").fontSize(9);
+
+    for (const row of rows) {
+      if (y + 20 > PAGE_BREAK_Y) {
+        doc.addPage();
+        y = drawHead(doc, EMPLOYEE_DETAIL_COLUMNS, MARGIN);
+        doc.font("Helvetica").fontSize(9);
+      }
+
+      drawRow(
+        doc,
+        EMPLOYEE_DETAIL_COLUMNS,
+        [
+          row.label,
+          formatDateTime(row.clockInAt, company.timezone),
+          row.ongoing
+            ? "pågår"
+            : formatDateTime(row.clockOutAt!, company.timezone).slice(11),
+          formatDuration(row.minutes),
+        ],
+        y,
+        // Inproduktiv tid i samma gula som överallt annars. Den ska synas i
+        // listan utan att läsas som något som ska faktureras.
+        row.billable ? "#404040" : "#a16207"
+      );
+
+      y += 20;
+      line(doc, y);
+    }
+
+    const minutes = rows.reduce((total, row) => total + row.minutes, 0);
+
+    y = drawTotal(
+      doc,
+      EMPLOYEE_DETAIL_COLUMNS,
+      [heading, "", "", formatDuration(minutes)],
+      y
+    );
+
+    y += 6;
+  }
+
+  return drawTotal(
+    doc,
+    EMPLOYEE_DETAIL_COLUMNS,
+    ["TOTALT", "", "", formatDuration(report.totalMinutes)],
+    y
+  );
 }

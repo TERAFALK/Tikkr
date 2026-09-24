@@ -22,6 +22,8 @@ import {
   Tr,
 } from "@/components/ui";
 import { formatDateTime, formatDuration, formatDecimalHours } from "@/lib/format";
+import type { ReportResult, ReportRow } from "@/lib/report";
+import type { ReportView } from "@/lib/report-pdf";
 
 export const dynamic = "force-dynamic";
 
@@ -49,7 +51,19 @@ export default async function ReportsPage({
     where: { id: companyId },
     select: { timezone: true },
   });
-  const presets = datePresets(company?.timezone ?? "Europe/Stockholm");
+  const timeZone = company?.timezone ?? "Europe/Stockholm";
+  const { presets, lastWeek } = datePresets(timeZone);
+
+  // Förra veckans stämplingar per anställd, direkt som PDF. Den utskriften
+  // görs varje måndag, och den ska inte kräva fyra val först.
+  //
+  // kind=ALL med flit: frågan är vad personen gjort i veckan, och då hör
+  // städning och möten dit. Inproduktiva rader står i gult och rubriken säger
+  // "Fakturerbar och inproduktiv tid", så utskriften kan inte förväxlas med
+  // ett orderunderlag.
+  const lastWeekHref =
+    `/api/admin/export?from=${lastWeek.from}&to=${lastWeek.to}` +
+    `&visning=persondetalj&kind=ALL&format=pdf`;
 
   const [employees, orders, moments] = await Promise.all([
     db.employee.findMany({ orderBy: { name: "asc" }, select: { id: true, name: true } }),
@@ -80,7 +94,16 @@ export default async function ReportsPage({
   });
 
   // "detalj" är standard: den som öppnar en rapport vill oftast se raderna.
-  const view = params.visning === "person" ? "person" : "detalj";
+  const view: ReportView =
+    params.visning === "person" || params.visning === "persondetalj"
+      ? params.visning
+      : "detalj";
+
+  // Skärmen och PDF:en ska visa samma sak. Grupperingen räknas därför fram
+  // här också, med samma regel som i report-pdf.ts: personerna i
+  // bokstavsordning, deras stämplingar i tidsordning.
+  const employeeGroups =
+    view === "persondetalj" ? groupByEmployee(report.rows) : [];
 
   const exportHref = `/api/admin/export?${new URLSearchParams(
     Object.entries(params).filter(([, value]) => value) as [string, string][]
@@ -92,14 +115,24 @@ export default async function ReportsPage({
         title="Rapporter"
         description="Underlaget för fakturering. Filtrera och exportera."
         action={
-          report.rows.length > 0 ? (
-            <div className="flex gap-2">
-              <ButtonLink href={`${exportHref}&format=pdf`} tone="secondary">
-                PDF
-              </ButtonLink>
-              <ButtonLink href={exportHref}>Excel</ButtonLink>
-            </div>
-          ) : undefined
+          <div className="flex flex-wrap gap-2">
+            {/* Står kvar även när filtren gett en tom rapport: knappen gäller
+                förra veckan och inte det som råkar visas på skärmen. */}
+            <ButtonLink href={lastWeekHref} tone="secondary">
+              Förra veckan per anställd
+            </ButtonLink>
+            {report.rows.length > 0 && (
+              <>
+                <ButtonLink
+                  href={`${exportHref}&format=pdf`}
+                  tone="secondary"
+                >
+                  PDF
+                </ButtonLink>
+                <ButtonLink href={exportHref}>Excel</ButtonLink>
+              </>
+            )}
+          </div>
         }
       />
 
@@ -172,6 +205,9 @@ export default async function ReportsPage({
           >
             <Select name="visning" defaultValue={params.visning ?? "detalj"}>
               <option value="detalj">Varje stämpling</option>
+              <option value="persondetalj">
+                Varje stämpling, per anställd
+              </option>
               <option value="person">Summerat per anställd</option>
             </Select>
           </Field>
@@ -278,6 +314,44 @@ export default async function ReportsPage({
                 </tbody>
               </Table>
             </Card>
+          ) : view === "persondetalj" ? (
+            <div className="space-y-4">
+              {employeeGroups.map((group) => (
+                <Card key={group.heading}>
+                  <CardHeader
+                    title={group.heading}
+                    description={`${group.rows.length} ${
+                      group.rows.length === 1 ? "stämpling" : "stämplingar"
+                    }, äldsta först.`}
+                    action={
+                      <span className="text-[13px] font-medium tabular-nums text-neutral-900">
+                        {formatDuration(group.minutes)}
+                      </span>
+                    }
+                  />
+                  <Table>
+                    <thead>
+                      <tr>
+                        <Th>Order</Th>
+                        <Th>Moment</Th>
+                        <Th>In</Th>
+                        <Th>Ut</Th>
+                        <Th numeric>Tid (tim:min)</Th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {group.rows.map((row) => (
+                        <EntryRow
+                          key={row.id}
+                          row={row}
+                          timeZone={timeZone}
+                        />
+                      ))}
+                    </tbody>
+                  </Table>
+                </Card>
+              ))}
+            </div>
           ) : (
           <Card>
             <CardHeader
@@ -297,48 +371,12 @@ export default async function ReportsPage({
               </thead>
               <tbody>
                 {report.rows.map((row) => (
-                  <Tr key={row.id}>
-                    <Td>
-                      {row.employeeName}
-                      {row.employeeNumber && (
-                        <span className="ml-2 text-neutral-400">
-                          {row.employeeNumber}
-                        </span>
-                      )}
-                    </Td>
-                    <Td>
-                      {row.orderNumber ?? (
-                        <Badge tone="muted">Inproduktiv</Badge>
-                      )}
-                      {row.customerName && (
-                        <span className="ml-2 text-neutral-500">
-                          {row.customerName}
-                        </span>
-                      )}
-                    </Td>
-                    <Td muted>{row.momentName}</Td>
-                    <Td muted>{formatDateTime(row.clockInAt)}</Td>
-                    <Td muted>
-                      {row.clockOutAt ? (
-                        formatDateTime(row.clockOutAt)
-                      ) : (
-                        <Badge tone="active">Pågår</Badge>
-                      )}
-                    </Td>
-                    <Td numeric>
-                      {formatDuration(row.minutes)}
-                      {row.needsReview && (
-                        <span className="ml-2">
-                          <Badge tone="warning">Ogranskad</Badge>
-                        </span>
-                      )}
-                      {row.manual && (
-                        <span className="ml-2">
-                          <Badge>Manuell</Badge>
-                        </span>
-                      )}
-                    </Td>
-                  </Tr>
+                  <EntryRow
+                    key={row.id}
+                    row={row}
+                    timeZone={timeZone}
+                    showEmployee
+                  />
                 ))}
               </tbody>
             </Table>
@@ -370,6 +408,14 @@ function datePresets(timeZone: string) {
   const monday = new Date(asUtc);
   monday.setUTCDate(asUtc.getUTCDate() - weekday);
 
+  // Förra veckan: måndag till söndag, hela veckan som är klar. Ligger här
+  // eftersom kalenderräkningen redan finns i funktionen, men returneras för
+  // sig — det är en utskriftsknapp och inte ett datumfilter bland de andra.
+  const lastMonday = new Date(monday);
+  lastMonday.setUTCDate(monday.getUTCDate() - 7);
+  const lastSunday = new Date(lastMonday);
+  lastSunday.setUTCDate(lastMonday.getUTCDate() + 6);
+
   const firstOfMonth = iso(wall.year, wall.month, 1);
 
   const lastMonthEnd = new Date(Date.UTC(wall.year, wall.month - 1, 0));
@@ -378,16 +424,19 @@ function datePresets(timeZone: string) {
   );
   const toIso = (date: Date) => date.toISOString().slice(0, 10);
 
-  return [
-    { label: "Idag", from: today, to: today },
-    { label: "Denna vecka", from: toIso(monday), to: today },
-    { label: "Denna månad", from: firstOfMonth, to: today },
-    {
-      label: "Förra månaden",
-      from: toIso(lastMonthStart),
-      to: toIso(lastMonthEnd),
-    },
-  ];
+  return {
+    presets: [
+      { label: "Idag", from: today, to: today },
+      { label: "Denna vecka", from: toIso(monday), to: today },
+      { label: "Denna månad", from: firstOfMonth, to: today },
+      {
+        label: "Förra månaden",
+        from: toIso(lastMonthStart),
+        to: toIso(lastMonthEnd),
+      },
+    ],
+    lastWeek: { from: toIso(lastMonday), to: toIso(lastSunday) },
+  };
 }
 
 function Summary({ title, groups }: { title: string; groups: ReportGroup[] }) {
@@ -420,4 +469,98 @@ function Summary({ title, groups }: { title: string; groups: ReportGroup[] }) {
       </ul>
     </Card>
   );
+}
+
+/**
+ * En rad i stämplingslistan.
+ *
+ * Delad mellan den platta listan och den grupperade per anställd, så att de
+ * två inte hinner glida isär i vad de visar. Anställdkolumnen är valfri:
+ * i den grupperade vyn står namnet i rubriken över tabellen.
+ */
+function EntryRow({
+  row,
+  timeZone,
+  showEmployee = false,
+}: {
+  row: ReportRow;
+  timeZone: string;
+  showEmployee?: boolean;
+}) {
+  return (
+    <Tr>
+      {showEmployee && (
+        <Td>
+          {row.employeeName}
+          {row.employeeNumber && (
+            <span className="ml-2 text-neutral-400">{row.employeeNumber}</span>
+          )}
+        </Td>
+      )}
+      <Td>
+        {row.orderNumber ?? <Badge tone="muted">Inproduktiv</Badge>}
+        {row.customerName && (
+          <span className="ml-2 text-neutral-500">{row.customerName}</span>
+        )}
+      </Td>
+      <Td muted>{row.momentName}</Td>
+      <Td muted>{formatDateTime(row.clockInAt, timeZone)}</Td>
+      <Td muted>
+        {row.clockOutAt ? (
+          formatDateTime(row.clockOutAt, timeZone)
+        ) : (
+          <Badge tone="active">Pågår</Badge>
+        )}
+      </Td>
+      <Td numeric>
+        {formatDuration(row.minutes)}
+        {row.needsReview && (
+          <span className="ml-2">
+            <Badge tone="warning">Ogranskad</Badge>
+          </span>
+        )}
+        {row.manual && (
+          <span className="ml-2">
+            <Badge>Manuell</Badge>
+          </span>
+        )}
+      </Td>
+    </Tr>
+  );
+}
+
+/**
+ * Stämplingarna grupperade per anställd.
+ *
+ * Samma regel som i report-pdf.ts, med flit upprepad i stället för delad:
+ * skärmen och PDF:en får sina rader ur samma ReportResult, och en gemensam
+ * hjälpfunktion hade behövt ligga i report.ts — där den tvingat på
+ * Excel-exporten en gruppering ingen bett om.
+ */
+function groupByEmployee(
+  rows: ReportResult["rows"]
+): { heading: string; rows: ReportRow[]; minutes: number }[] {
+  const byEmployee = new Map<string, ReportRow[]>();
+
+  for (const row of rows) {
+    const heading = row.employeeNumber
+      ? `${row.employeeName} (${row.employeeNumber})`
+      : row.employeeName;
+
+    const existing = byEmployee.get(heading) ?? [];
+    existing.push(row);
+    byEmployee.set(heading, existing);
+  }
+
+  return [...byEmployee.entries()]
+    .sort((a, b) => a[0].localeCompare(b[0], "sv"))
+    .map(([heading, grouped]) => ({
+      heading,
+      // Äldsta först. Rapporten levereras nyast först, vilket är fel håll när
+      // en vecka ska läsas igenom med den det gäller.
+      rows: [...grouped].sort(
+        (a, b) => a.clockInAt.getTime() - b.clockInAt.getTime()
+      ),
+      minutes: grouped.reduce((total, row) => total + row.minutes, 0),
+    }));
 }
