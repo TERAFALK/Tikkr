@@ -352,6 +352,22 @@ model TimeEntry {
   /// och inte blir en dubblett. Se @@unique längre ner.
   clientPunchId String? @map("client_punch_id")
 
+  /// Skärmens id för det tryck som STÄNGDE posten.
+  ///
+  /// Eget fält, inte samma som clientPunchId: en post bär redan sin
+  /// instämplings id, och ett fält kan inte hålla två.
+  ///
+  /// Utan det här fungerade dubblettskyddet aldrig för utstämplingar —
+  /// clockOut letade efter ett tidigare tryck men skrev aldrig något, så
+  /// uppslaget kunde per definition inte träffa. En omsänd utstämpling kunde
+  /// därmed stänga ett jobb personen hunnit starta efteråt.
+  ///
+  /// INTE unikt, till skillnad från clientPunchId: "stämpla ut allt" stänger
+  /// flera poster med ETT tryck, och alla får samma id. Indexet räcker för
+  /// uppslaget, och ett dubblettskydd som vägrar sin egen avsedda användning
+  /// vore sämre än inget.
+  clockOutPunchId String? @map("clock_out_punch_id")
+
   // Audit-logg: vem/var/när, så en felaktig stämpling går att reda ut i efterhand.
   kioskDeviceId String?  @map("kiosk_device_id")
   sourceIp      String?  @map("source_ip")
@@ -379,6 +395,8 @@ model TimeEntry {
   @@index([companyId, kind, clockInAt])
   // Adminlistan över poster som behöver granskas.
   @@index([companyId, needsReview])
+  // Bär dubblettkontrollen vid varje utstämpling från offline-kön.
+  @@index([companyId, clockOutPunchId])
   // Skyddet mot dubbletter från offline-kön. Unikt per företag, inte globalt.
   @@unique([companyId, clientPunchId])
   @@map("time_entries")

@@ -1,5 +1,4 @@
 import type { CompanyDb } from "./tenant";
-import { minutesBetween } from "./format";
 
 /**
  * VECKOVY PER ANSTÄLLD.
@@ -13,6 +12,18 @@ import { minutesBetween } from "./format";
  * timmar där en utstämpling glömts, eller en person vars hela vecka ligger på
  * en enda order.
  *
+ * PARALLELLA JOBB RÄKNAS EN GÅNG. Kör någon svets 08–12 och fräs 11–15 blir
+ * dagen sju timmar, inte nio. Vyn svarar på hur länge personen varit i arbete,
+ * och personen fanns bara på ett ställe mellan elva och tolv.
+ *
+ * Den räknar därför med flit ANNORLUNDA än rapporterna. Där är nio timmar rätt
+ * svar: två maskiner gick, och båda ordrarna ska betala sin timme. Samma tid,
+ * två frågor, två svar. Den parallella delen redovisas separat så att
+ * skillnaden går att förklara i stället för att se ut som ett fel.
+ *
+ * Inproduktiv tid räknas med. Städning är tid på jobbet även om den aldrig
+ * faktureras.
+ *
  * Veckan börjar på måndag. Det är den svenska konventionen och den verkstäder
  * planerar efter.
  */
@@ -20,9 +31,27 @@ import { minutesBetween } from "./format";
 export interface DayCell {
   /** Datumet, midnatt lokal tid. */
   date: Date;
+  /**
+   * Tid i arbete den dagen. Överlappande jobb räknas EN gång — se
+   * toppkommentaren.
+   */
   minutes: number;
+  /**
+   * Hur mycket av dagen som täcktes av mer än ett jobb samtidigt.
+   *
+   * Ingår INTE i minutes. Finns för att förklara varför veckovyn visar mindre
+   * än rapporten för samma dag, i stället för att låta skillnaden se ut som
+   * ett räknefel.
+   */
+  parallelMinutes: number;
   /** true när någon post den dagen stängts av systemet och inte granskats. */
   needsReview: boolean;
+}
+
+/** Ett pass, som millisekunder. Formen sammanslagningen räknar på. */
+interface Span {
+  from: number;
+  to: number;
 }
 
 export interface WeekRow {
@@ -105,14 +134,24 @@ export async function buildWeek(
     }),
   ]);
 
-  const byEmployee = new Map<string, DayCell[]>();
+  // Passen samlas först, och räknas ihop sist. Att summera direkt hade
+  // dubbelräknat den som kör två maskiner — överlappet syns bara när man har
+  // hela dagen framför sig.
+  const byEmployee = new Map<
+    string,
+    { date: Date; spans: Span[]; needsReview: boolean }[]
+  >();
 
   const emptyWeek = () =>
     Array.from({ length: 7 }, (_, index) => {
       const date = new Date(from);
       date.setDate(date.getDate() + index);
-      return { date, minutes: 0, needsReview: false };
+      return { date, spans: [] as Span[], needsReview: false };
     });
+
+  // Pågående pass räknas fram till nu. En enda tidpunkt för hela veckan, så
+  // att två jobb som fortfarande pågår inte får olika sluttid.
+  const now = Date.now();
 
   for (const employee of employees) {
     byEmployee.set(employee.id, emptyWeek());
@@ -137,20 +176,28 @@ export async function buildWeek(
 
     if (index < 0 || index > 6) continue;
 
-    week[index].minutes += minutesBetween(entry.clockInAt, entry.clockOutAt);
+    week[index].spans.push({
+      from: entry.clockInAt.getTime(),
+      to: entry.clockOutAt?.getTime() ?? now,
+    });
+
     if (entry.needsReview) week[index].needsReview = true;
   }
 
   const known = new Map(employees.map((employee) => [employee.id, employee]));
 
   const rows: WeekRow[] = [...byEmployee.entries()]
-    .map(([employeeId, days]) => ({
-      employeeId,
-      employeeName: known.get(employeeId)?.name ?? "Tidigare anställd",
-      employeeNumber: known.get(employeeId)?.employeeNumber ?? null,
-      days,
-      totalMinutes: days.reduce((total, day) => total + day.minutes, 0),
-    }))
+    .map(([employeeId, buckets]) => {
+      const days = buckets.map(toDayCell);
+
+      return {
+        employeeId,
+        employeeName: known.get(employeeId)?.name ?? "Tidigare anställd",
+        employeeNumber: known.get(employeeId)?.employeeNumber ?? null,
+        days,
+        totalMinutes: days.reduce((total, day) => total + day.minutes, 0),
+      };
+    })
     .sort((a, b) => a.employeeName.localeCompare(b.employeeName, "sv"));
 
   const dayTotals = Array.from({ length: 7 }, (_, index) =>
@@ -167,6 +214,64 @@ export async function buildWeek(
     dayTotals,
     totalMinutes: dayTotals.reduce((total, minutes) => total + minutes, 0),
   };
+}
+
+/**
+ * Räknar ihop en dags pass till en cell.
+ *
+ * `minutes` är den sammanslagna längden: överlappar två jobb räknas den
+ * gemensamma tiden en gång. `parallelMinutes` är skillnaden mot den råa
+ * summan, alltså hur mycket som kördes dubbelt.
+ */
+function toDayCell(bucket: {
+  date: Date;
+  spans: Span[];
+  needsReview: boolean;
+}): DayCell {
+  const summed = bucket.spans.reduce(
+    (total, span) => total + Math.max(0, span.to - span.from),
+    0
+  );
+
+  const merged = mergedMilliseconds(bucket.spans);
+
+  return {
+    date: bucket.date,
+    minutes: merged / 60000,
+    parallelMinutes: Math.max(0, summed - merged) / 60000,
+    needsReview: bucket.needsReview,
+  };
+}
+
+/**
+ * Sammanslagen längd av passen, i millisekunder.
+ *
+ * Sorterar på starttid och sveper igenom: så länge nästa pass börjar innan det
+ * pågående slutat växer samma period, annars läggs den undan och en ny börjar.
+ * Tid som täcks av flera pass räknas därmed en gång.
+ */
+function mergedMilliseconds(spans: Span[]): number {
+  const sorted = spans
+    .filter((span) => span.to > span.from)
+    .sort((a, b) => a.from - b.from);
+
+  if (sorted.length === 0) return 0;
+
+  let total = 0;
+  let start = sorted[0].from;
+  let end = sorted[0].to;
+
+  for (const span of sorted.slice(1)) {
+    if (span.from <= end) {
+      end = Math.max(end, span.to);
+    } else {
+      total += end - start;
+      start = span.from;
+      end = span.to;
+    }
+  }
+
+  return total + (end - start);
 }
 
 function startOfDay(date: Date): Date {

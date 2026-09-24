@@ -1200,3 +1200,154 @@ describe("inproduktiv tid", () => {
     expect(await openEntriesOnOrder(companyId, orderA)).toHaveLength(0);
   });
 });
+
+describe("offline-kön skapar inga dubbletter vid utstämpling", () => {
+  it("samma utstämpling skickad två gånger stänger bara en gång", async () => {
+    await clockIn(companyId, {
+      kind: "ORDER",
+      employeeId: anna,
+      orderId: orderA,
+      momentId: svetsning,
+      at: new Date("2026-08-05T06:00:00Z"),
+    });
+
+    const punch = {
+      employeeId: anna,
+      momentId: svetsning,
+      clientPunchId: "ut-1",
+      at: new Date("2026-08-05T12:00:00Z"),
+    };
+
+    const first = await clockOut(companyId, punch);
+    const second = await clockOut(companyId, punch);
+
+    expect(second?.id).toBe(first?.id);
+    expect(second?.clockOutAt?.toISOString()).toBe("2026-08-05T12:00:00.000Z");
+  });
+
+  it("en omsänd utstämpling stänger inte ett jobb som startats efteråt", async () => {
+    // Felet som fanns: kontrollen letade i clientPunchId, som bär postens
+    // INSTÄMPLING, och kunde därför aldrig träffa. Trycket sändes om och
+    // stängde eftermiddagens jobb i stället.
+    await clockIn(companyId, {
+      kind: "ORDER",
+      employeeId: anna,
+      orderId: orderA,
+      momentId: svetsning,
+      at: new Date("2026-08-05T06:00:00Z"),
+    });
+
+    const punch = {
+      employeeId: anna,
+      momentId: svetsning,
+      clientPunchId: "ut-2",
+      at: new Date("2026-08-05T10:00:00Z"),
+    };
+
+    await clockOut(companyId, punch);
+
+    // Samma maskin, nytt jobb efter lunch.
+    await clockIn(companyId, {
+      kind: "ORDER",
+      employeeId: anna,
+      orderId: orderB,
+      momentId: svetsning,
+      at: new Date("2026-08-05T11:00:00Z"),
+    });
+
+    await clockOut(companyId, punch);
+
+    const eftermiddagen = await getOpenEntryForMoment(
+      forCompany(companyId),
+      anna,
+      svetsning
+    );
+
+    expect(eftermiddagen).not.toBeNull();
+    expect(eftermiddagen?.orderId).toBe(orderB);
+    expect(eftermiddagen?.clockOutAt).toBeNull();
+  });
+
+  it("en utstämpling som ligger före det pågående jobbet rör ingenting", async () => {
+    // Ett gammalt tryck ur kön vars egen post redan hunnit stängas. Det får
+    // varken stänga det nya jobbet eller kasta ett fel — ett fel ger 409, och
+    // kön plockar bort tryck som får 4xx.
+    await clockIn(companyId, {
+      kind: "ORDER",
+      employeeId: anna,
+      orderId: orderA,
+      momentId: svetsning,
+      at: new Date("2026-08-05T10:00:00Z"),
+    });
+
+    const closed = await clockOut(companyId, {
+      employeeId: anna,
+      momentId: svetsning,
+      at: new Date("2026-08-05T08:00:00Z"),
+    });
+
+    expect(closed).toBeNull();
+    expect(await getOpenEntries(forCompany(companyId), anna)).toHaveLength(1);
+  });
+
+  it("stämpla ut allt skickat två gånger stänger bara en gång", async () => {
+    for (const [orderId, momentId] of [
+      [orderA, svetsning],
+      [orderB, montering],
+    ]) {
+      await clockIn(companyId, {
+        kind: "ORDER",
+        employeeId: anna,
+        orderId,
+        momentId,
+        at: new Date("2026-08-05T06:00:00Z"),
+      });
+    }
+
+    const punch = {
+      employeeId: anna,
+      clientPunchId: "ut-allt-1",
+      at: new Date("2026-08-05T12:00:00Z"),
+    };
+
+    const first = await clockOutAll(companyId, punch);
+    const second = await clockOutAll(companyId, punch);
+
+    expect(first).toHaveLength(2);
+    // Andra gången stänger ingenting nytt — den returnerar det som redan
+    // stängdes av samma tryck.
+    expect(second.map((entry) => entry.id).sort()).toEqual(
+      first.map((entry) => entry.id).sort()
+    );
+
+    for (const entry of second) {
+      expect(entry.clockOutAt?.toISOString()).toBe("2026-08-05T12:00:00.000Z");
+    }
+  });
+
+  it("utstämplingens tryck-id sparas i sitt eget fält", async () => {
+    // Postens clientPunchId bär INSTÄMPLINGEN och får inte skrivas över.
+    const { started } = await clockIn(companyId, {
+      kind: "ORDER",
+      employeeId: anna,
+      orderId: orderA,
+      momentId: svetsning,
+      clientPunchId: "in-1",
+      at: new Date("2026-08-05T06:00:00Z"),
+    });
+
+    await clockOut(companyId, {
+      employeeId: anna,
+      momentId: svetsning,
+      clientPunchId: "ut-3",
+      at: new Date("2026-08-05T12:00:00Z"),
+    });
+
+    const saved = await unsafeGlobalPrisma.timeEntry.findUniqueOrThrow({
+      where: { id: started.id },
+    });
+
+    expect(saved.clientPunchId).toBe("in-1");
+    expect(saved.clockOutPunchId).toBe("ut-3");
+  });
+});

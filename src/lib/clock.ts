@@ -228,11 +228,15 @@ export async function clockOut(
   const at = input.at ?? new Date();
   const db = forCompany(companyId);
 
+  // Dubblettskyddet slår mot clockOutPunchId och inte clientPunchId. Det
+  // senare bär postens INSTÄMPLING, och letade man där kunde uppslaget aldrig
+  // träffa — vilket var precis felet: skyddet såg ut att finnas men gjorde
+  // ingenting.
   if (input.clientPunchId) {
-    const existing = await db.timeEntry.findFirst({
-      where: { clientPunchId: input.clientPunchId },
+    const alreadyApplied = await db.timeEntry.findFirst({
+      where: { clockOutPunchId: input.clientPunchId },
     });
-    if (existing) return existing;
+    if (alreadyApplied) return alreadyApplied;
   }
 
   const open = await getOpenEntries(db, input.employeeId);
@@ -257,16 +261,21 @@ export async function clockOut(
     ambiguous = open.length > 1;
   }
 
-  if (target.clockInAt > at) {
-    throw new ClockError(
-      "Utstämplingen ligger före instämplingen. Låt en administratör rätta posten."
-    );
-  }
+  // Posten började EFTER trycket gjordes. Då gäller trycket inte den här
+  // posten — det är en gammal utstämpling ur kön vars egen post redan hunnit
+  // stängas, och personen har startat något nytt sedan dess.
+  //
+  // Ingenting stängs, och inget fel kastas. Ett fel hade gett 409, och
+  // offline-kön plockar bort tryck som får 4xx — då vore trycket borta OCH
+  // det nya jobbet felaktigt stängt. Att göra ingenting är rätt svar: den post
+  // trycket gällde är redan avslutad.
+  if (target.clockInAt > at) return null;
 
   return db.timeEntry.update({
     where: { id: target.id },
     data: {
       clockOutAt: at,
+      clockOutPunchId: input.clientPunchId ?? null,
       ...(ambiguous
         ? {
             needsReview: true,
@@ -297,25 +306,29 @@ export async function clockOutAll(
   const at = input.at ?? new Date();
   const db = forCompany(companyId);
 
+  // Samma dubblettskydd som clockOut. Alla poster som stängs av ETT tryck får
+  // samma clockOutPunchId, så en träff betyder att hela trycket redan gått
+  // igenom — därför returneras allt som bär id:t, inte bara en post.
   if (input.clientPunchId) {
-    const existing = await db.timeEntry.findFirst({
-      where: { clientPunchId: input.clientPunchId },
+    const alreadyApplied = await db.timeEntry.findMany({
+      where: { clockOutPunchId: input.clientPunchId },
     });
-    if (existing) return [existing];
+    if (alreadyApplied.length > 0) return alreadyApplied;
   }
 
   const open = await getOpenEntries(db, input.employeeId);
   const closed: TimeEntry[] = [];
 
   for (const entry of open) {
-    // En post som börjar efter "nu" hoppas över i stället för att avbryta
-    // hela utstämplingen. De andra jobben ska stängas även om ett är trasigt.
+    // En post som börjar efter trycket gjordes hoppas över. Antingen har
+    // skärmens klocka gått fel, eller så är det ett gammalt tryck ur kön som
+    // inte gäller det här jobbet. De andra jobben stängs ändå.
     if (entry.clockInAt > at) continue;
 
     closed.push(
       await db.timeEntry.update({
         where: { id: entry.id },
-        data: { clockOutAt: at },
+        data: { clockOutAt: at, clockOutPunchId: input.clientPunchId ?? null },
       })
     );
   }

@@ -164,3 +164,87 @@ describe("tid per dag", () => {
     expect(week.totalMinutes).toBe(0);
   });
 });
+
+describe("parallella jobb räknas en gång", () => {
+  let fräsning: string;
+
+  beforeEach(async () => {
+    // Ett andra arbetsmoment, alltså en andra maskin. Två överlappande pass på
+    // SAMMA moment kan inte uppstå — clock.ts vägrar det — så testdatan ska
+    // inte se ut så heller.
+    fräsning = (
+      await unsafeGlobalPrisma.workMoment.create({
+        data: { companyId, name: `Fräsning ${unique}` },
+      })
+    ).id;
+  });
+
+  const onFräsning = async (from: string, to: string) => {
+    await unsafeGlobalPrisma.timeEntry.create({
+      data: {
+        companyId,
+        employeeId,
+        orderId,
+        momentId: fräsning,
+        clockInAt: new Date(from),
+        clockOutAt: new Date(to),
+      },
+    });
+  };
+
+  const monday = () =>
+    buildWeek(forCompany(companyId), new Date("2026-08-03T12:00:00Z"));
+
+  it("två maskiner som överlappar ger tid i arbete, inte summan", async () => {
+    // Svets 08–12 och fräs 11–15. Personen var i arbete 08–15 = sju timmar.
+    // Rapporten säger nio, och det är också rätt — men på en annan fråga.
+    await punch("2026-08-03T06:00:00Z", "2026-08-03T10:00:00Z");
+    await onFräsning("2026-08-03T09:00:00Z", "2026-08-03T13:00:00Z");
+
+    const day = (await monday()).rows[0].days[0];
+
+    expect(day.minutes).toBe(7 * 60);
+    expect(day.parallelMinutes).toBe(60);
+  });
+
+  it("ett jobb helt inuti ett annat lägger ingenting till", async () => {
+    await punch("2026-08-03T06:00:00Z", "2026-08-03T14:00:00Z");
+    await onFräsning("2026-08-03T08:00:00Z", "2026-08-03T09:00:00Z");
+
+    const day = (await monday()).rows[0].days[0];
+
+    expect(day.minutes).toBe(8 * 60);
+    expect(day.parallelMinutes).toBe(60);
+  });
+
+  it("jobb som inte överlappar räknas som förut", async () => {
+    await punch("2026-08-03T06:00:00Z", "2026-08-03T10:00:00Z");
+    await onFräsning("2026-08-03T11:00:00Z", "2026-08-03T13:00:00Z");
+
+    const day = (await monday()).rows[0].days[0];
+
+    expect(day.minutes).toBe(6 * 60);
+    expect(day.parallelMinutes).toBe(0);
+  });
+
+  it("kant i kant räknas inte som parallellt", async () => {
+    await punch("2026-08-03T06:00:00Z", "2026-08-03T10:00:00Z");
+    await onFräsning("2026-08-03T10:00:00Z", "2026-08-03T12:00:00Z");
+
+    const day = (await monday()).rows[0].days[0];
+
+    expect(day.minutes).toBe(6 * 60);
+    expect(day.parallelMinutes).toBe(0);
+  });
+
+  it("veckans summa följer den sammanslagna tiden", async () => {
+    await punch("2026-08-03T06:00:00Z", "2026-08-03T10:00:00Z");
+    await onFräsning("2026-08-03T09:00:00Z", "2026-08-03T13:00:00Z");
+
+    const week = await monday();
+
+    expect(week.rows[0].totalMinutes).toBe(7 * 60);
+    expect(week.dayTotals[0]).toBe(7 * 60);
+    expect(week.totalMinutes).toBe(7 * 60);
+  });
+});
