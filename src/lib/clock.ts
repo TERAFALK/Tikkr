@@ -751,19 +751,38 @@ async function assertBelongsToCompany(
  * till något som varken är det ena eller det andra.
  */
 function jobFields(job: JobRef) {
-  return job.kind === "ORDER"
-    ? {
-        kind: "ORDER" as const,
-        orderId: job.orderId,
-        momentId: job.momentId,
-        indirectMomentId: null,
-      }
-    : {
-        kind: "INDIRECT" as const,
-        orderId: null,
-        momentId: null,
-        indirectMomentId: job.indirectMomentId,
-      };
+  if (job.kind === "ORDER") {
+    return {
+      kind: "ORDER" as const,
+      orderId: job.orderId,
+      momentId: job.momentId,
+      indirectMomentId: null,
+    };
+  }
+
+  if (job.kind === "INDIRECT") {
+    return {
+      kind: "INDIRECT" as const,
+      orderId: null,
+      momentId: null,
+      indirectMomentId: job.indirectMomentId,
+    };
+  }
+
+  // INGEN TYST GREN HÄR, och det är hela poängen.
+  //
+  // Stod INDIRECT som else-gren blev en anropare som glömt `kind` tyst
+  // inproduktiv tid: en stämpling på en order som aldrig når ett
+  // fakturaunderlag, utan felmeddelande och utan att någon märker det förrän
+  // kunden inte fakturerats. Det är precis tvärtom mot regeln att glömska ska
+  // ge fakturerbar tid och aldrig omvänt.
+  //
+  // Typerna hindrar det i appen, men de kontrolleras inte överallt — testerna
+  // gjorde exakt det här misstaget och gick igenom tills posterna räknades.
+  throw new ClockError(
+    `Stämplingen saknar giltig typ (kind). Ange antingen order och ` +
+      `arbetsmoment, eller ett inproduktivt moment.`
+  );
 }
 
 /**

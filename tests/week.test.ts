@@ -296,7 +296,7 @@ describe("parallella jobb räknas en gång", () => {
 
   it("två maskiner som överlappar ger tid i arbete, inte summan", async () => {
     // Svets 08–12 och fräs 11–15. Personen var i arbete 08–15 = sju timmar.
-    // Rapporten säger nio, och det är också rätt — men på en annan fråga.
+    // Rapporten säger åtta, och det är också rätt — men på en annan fråga.
     await punch("2026-08-03T06:00:00Z", "2026-08-03T10:00:00Z");
     await onFräsning("2026-08-03T09:00:00Z", "2026-08-03T13:00:00Z");
 

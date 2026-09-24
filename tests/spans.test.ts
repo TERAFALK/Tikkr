@@ -56,10 +56,11 @@ describe("ett pass i taget", () => {
 
 describe("pass som överlappar", () => {
   it("räknar den gemensamma timmen en gång", () => {
-    // Svets 08–12 och fräs 11–15: nio maskintimmar, sju arbetstimmar.
+    // Svets 08–12 och fräs 11–15, fyra timmar var: åtta maskintimmar men sju
+    // arbetstimmar, eftersom timmen mellan elva och tolv är samma timme.
     const spans = [span(8, 12), span(11, 15)];
 
-    expect(summedMinutes(spans)).toBe(540);
+    expect(summedMinutes(spans)).toBe(480);
     expect(mergedMinutes(spans)).toBe(420);
     expect(parallelMinutes(spans)).toBe(60);
   });

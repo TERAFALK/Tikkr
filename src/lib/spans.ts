@@ -4,8 +4,8 @@
  * Sedan en operatör får köra två maskiner samtidigt finns det två riktiga svar
  * på "hur mycket tid blev det", och vilket som är rätt beror på frågan:
  *
- *   Svets 08–12 och fräs 11–15 samma dag
- *     → 9 timmar när frågan är vad som ska faktureras. Två maskiner gick under
+ *   Svets 08–12 och fräs 11–15 samma dag — fyra timmar var
+ *     → 8 timmar när frågan är vad som ska faktureras. Två maskiner gick under
  *       den överlappande timmen, och båda ordrarna ska betala sin.
  *     → 7 timmar när frågan är hur länge personen varit i arbete. Personen
  *       fanns bara på ett ställe mellan elva och tolv.

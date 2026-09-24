@@ -166,7 +166,12 @@ describe("automatisk utstämpling vid byte av jobb på samma maskin", () => {
 
   it("lämnar aldrig två öppna stämplingar på samma moment", async () => {
     for (const orderId of [orderA, orderB, orderA]) {
-      await clockIn(companyId, { employeeId: anna, orderId, momentId: svetsning });
+      await clockIn(companyId, {
+        kind: "ORDER",
+        employeeId: anna,
+        orderId,
+        momentId: svetsning,
+      });
     }
 
     const oppna = await unsafeGlobalPrisma.timeEntry.count({
@@ -248,6 +253,7 @@ describe("stämpla ut", () => {
 describe("offline-kön skapar inga dubbletter", () => {
   it("samma tryck skickat två gånger registreras en gång", async () => {
     const punch = {
+      kind: "ORDER" as const,
       employeeId: anna,
       orderId: orderA,
       momentId: svetsning,
@@ -378,6 +384,7 @@ describe("ogiltiga stämplingar avvisas", () => {
 
 describe("admin lägger in en stämpling för hand", () => {
   const manual = (from: string, to: string, overrides = {}) => ({
+    kind: "ORDER" as const,
     employeeId: anna,
     orderId: orderA,
     momentId: svetsning,
