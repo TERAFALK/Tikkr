@@ -7,7 +7,8 @@
 # plattformspanelen — och en testkörning skulle kunna radera något på riktigt.
 #
 # Koden monteras in istället för att bakas in, så testerna alltid ser din
-# senaste ändring utan att imagen byggs om.
+# senaste ändring utan att imagen byggs om. Det gäller även prisma/schema.prisma
+# — både databasen och Prisma-klienten byggs om ur det vid varje körning.
 #
 #   ./scripts/test.sh              kör alla tester
 #   ./scripts/test.sh tenant       kör bara tester vars namn matchar "tenant"
@@ -36,10 +37,22 @@ MOUNTS=(
   -v "$PWD/vitest.config.ts:/app/vitest.config.ts"
 )
 
-# Testdatabasen ges samma tabeller som schemat beskriver. Går snabbt när den
-# redan stämmer, och fångar upp schemaändringar automatiskt.
+# Tre steg i EN container, och det är avsiktligt:
+#
+#  1. Testdatabasen ges samma tabeller som schemat beskriver.
+#  2. Prisma-klienten genereras om ur schemat.
+#  3. Testerna körs.
+#
+# Steg 2 finns för att prisma/ monteras in från värden och därmed kan vara
+# nyare än den klient som bakades in i imagen. Utan det kör testerna mot en
+# gammal klient och faller på fält som finns i databasen men inte i koden —
+# ett fel som pekar åt helt fel håll och tar en stund att genomskåda.
+#
+# Att det sker i SAMMA container är inte en förenkling utan ett krav:
+# node_modules ligger i containerns eget filsystem och följer inte med till
+# nästa "docker compose run", så en generate i en egen körning kastas bort.
 docker compose run --rm -e DATABASE_URL="$TEST_URL" "${MOUNTS[@]}" migrate \
-  npx prisma db push --skip-generate --accept-data-loss >/dev/null
-
-docker compose run --rm -e DATABASE_URL="$TEST_URL" "${MOUNTS[@]}" migrate \
-  npx vitest run ${FILTER:+"$FILTER"}
+  sh -c 'npx prisma db push --skip-generate --accept-data-loss >/dev/null \
+    && npx prisma generate >/dev/null \
+    && npx vitest run "$@"' \
+  sh ${FILTER:+"$FILTER"}
