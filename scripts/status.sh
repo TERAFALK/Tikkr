@@ -84,6 +84,8 @@ else
   bad "schemajobbet är INTE schemalagt — glömda stämplingar stängs aldrig"
   echo "      crontab -e  och lägg till:"
   echo "      */15 * * * * $PWD/scripts/auto-close.sh >> /var/log/tikkr-autoclose.log 2>&1"
+  echo "      Skapa loggfilen först, annars nekas skrivningen tyst:"
+  echo "      sudo install -o \"\$USER\" -g \"\$USER\" -m 644 /dev/null /var/log/tikkr-autoclose.log"
 fi
 
 UNAUTH="$(curl -s -o /dev/null -w '%{http_code}' -X POST --max-time 5 \
@@ -120,6 +122,8 @@ if crontab -l 2>/dev/null | grep -q 'backup.sh'; then
 else
   bad "backupjobbet är INTE schemalagt"
   echo "      0 3 * * * $PWD/scripts/backup.sh >> /var/log/tikkr-backup.log 2>&1"
+  echo "      Skapa loggfilen först, annars nekas skrivningen tyst:"
+  echo "      sudo install -o \"\$USER\" -g \"\$USER\" -m 644 /dev/null /var/log/tikkr-backup.log"
 fi
 
 LATEST="$(find backups -name 'tikkr_*.sql.gz' -type f 2>/dev/null | sort | tail -1)"

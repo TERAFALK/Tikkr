@@ -58,6 +58,15 @@ stämplingar aldrig. En post som ingen stämplat ut räknas upp i evighet, och
 granskningslistan i adminpanelen förblir tom trots att den inte borde vara det.
 Felet märks först när en rapport visar någon med 400 timmar.
 
+
+Skapa loggfilen först. `/var/log` ägs av root, så cron-raden misslyckas annars
+med "Permission denied" — och då finns ingen logg att felsöka i, vilket är
+precis när den behövs:
+
+```bash
+sudo install -o "$USER" -g "$USER" -m 644 /dev/null /var/log/tikkr-autoclose.log
+```
+
 ```bash
 crontab -e
 ```
@@ -104,6 +113,15 @@ Testa att det fungerar, och schemalägg:
 
 ```bash
 ./scripts/backup.sh
+```
+
+
+Skapa loggfilen först. `/var/log` ägs av root, så cron-raden misslyckas annars
+med "Permission denied" — och då finns ingen logg att felsöka i, vilket är
+precis när den behövs:
+
+```bash
+sudo install -o "$USER" -g "$USER" -m 644 /dev/null /var/log/tikkr-backup.log
 ```
 
 ```bash

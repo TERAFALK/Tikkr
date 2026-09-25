@@ -8,6 +8,11 @@
 # Lägg in i crontab:
 #   crontab -e
 #   */15 * * * * /sokvag/till/tikkr/scripts/auto-close.sh >> /var/log/tikkr-autoclose.log 2>&1
+#
+# Loggfilen måste finnas och vara skrivbar FÖR DIG först. /var/log ägs av root,
+# så cron-raden misslyckas annars med "Permission denied" — och då finns ingen
+# logg att felsöka i, vilket är exakt när man behöver den:
+#   sudo install -o "$USER" -g "$USER" -m 644 /dev/null /var/log/tikkr-autoclose.log
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
