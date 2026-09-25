@@ -288,14 +288,17 @@ describe("supportläge", () => {
   });
 
   it("ett besök hos ett raderat företag ger ingen session", async () => {
-    const visit = await enterSupport();
+    // GILTIG cookie, borta företag. Grinden faller INTE tillbaka på kundens
+    // egen session här — beforeEach har lagt en sådan, och den vore fel svar:
+    // ett uttryckligt supportbesök ska inte tyst bli en vanlig inloggning.
+    await enterSupport();
     await unsafeGlobalPrisma.company.delete({ where: { id: companyId } });
 
     expect(await currentAdmin()).toBeNull();
-    expect(visit.id).toBeTruthy();
   });
 
-  it("en utgången cookie ger ingen session", async () => {
+  /** En utgången cookie som pekar på ett riktigt besök. */
+  async function expiredCookie() {
     const visit = await unsafeGlobalPrisma.supportVisit.create({
       data: { companyId, email: "adi@terafalk.se" },
     });
@@ -306,7 +309,28 @@ describe("supportläge", () => {
       visitId: visit.id,
       exp: Math.floor(Date.now() / 1000) - 1,
     });
+  }
+
+  it("en utgången cookie ger inget supportläge", async () => {
+    sessionUserId = null;
+    await expiredCookie();
 
     expect(await currentAdmin()).toBeNull();
+  });
+
+  it("en utgången cookie låser inte ut dig ur ditt eget konto", async () => {
+    // Skillnaden mot testet ovan: en UTGÅNGEN cookie är inte ett pågående
+    // besök, den är skräp i webbläsaren. Då ska den egna inloggningen gälla.
+    // Ett raderat företag under ett GILTIGT besök är något annat, och ger null.
+    //
+    // beforeEach har redan lagt en kundsession, men den sätts här igen så att
+    // testet inte vilar på något som står femtio rader bort.
+    sessionUserId = ownerId;
+    await expiredCookie();
+
+    const session = await currentAdmin();
+
+    expect(session?.companyId).toBe(companyId);
+    expect(session?.support).toBeUndefined();
   });
 });
