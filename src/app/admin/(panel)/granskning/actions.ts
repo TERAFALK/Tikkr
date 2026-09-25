@@ -8,13 +8,26 @@ import { instantFromWallTime } from "@/lib/time-zone";
 const PATH = "/admin/granskning";
 
 /**
- * Rättar sluttiden på en post systemet räknat fram.
+ * GRANSKAR EN POST SYSTEMET RÄKNAT FRAM SLUTTIDEN PÅ.
  *
- * Posten märks som ADMIN_MANUAL. Det är viktigt: en tid någon skrivit in för
- * hand ska aldrig gå att förväxla med en riktig stämpling, varken i rapporter
- * eller vid en framtida diskussion om en faktura.
+ * EN knapp, två utfall. Servern jämför tiden i fältet med den som står på
+ * posten och avgör vilket det blev:
+ *
+ *   Orörd tid  → posten godkänns. `source` förblir AUTO_CLOSE, alltså räknad
+ *                av systemet och nu bekräftad av en människa.
+ *   Ändrad tid → posten rättas och märks ADMIN_MANUAL, alltså inskriven av
+ *                någon.
+ *
+ * Skillnaden mellan de två syns i rapporterna och spelar roll den dag någon
+ * ifrågasätter en faktura: en tid en människa skrivit in ska aldrig gå att
+ * förväxla med en riktig stämpling.
+ *
+ * Tidigare låg utfallen på varsin knapp, vilket lade ett val på användaren som
+ * servern kan göra själv — och som var lätt att göra fel, eftersom knapparna
+ * såg ut att göra samma sak. Den som granskar ska svara på en fråga: när
+ * slutade arbetet?
  */
-export async function correctEntry(formData: FormData) {
+export async function reviewEntry(formData: FormData) {
   const { db, companyId, email } = await requireAdmin();
 
   const id = String(formData.get("id") ?? "");
@@ -50,33 +63,32 @@ export async function correctEntry(formData: FormData) {
   // En sluttid före starttiden vore en negativ arbetsdag.
   if (clockOutAt <= entry.clockInAt) return;
 
+  // Jämförs på MINUTEN, eftersom fältet inte har sekunder. Utan avrundningen
+  // hade varje godkännande räknats som en ändring, och då vore hela poängen
+  // med att skilja på de två borta.
+  const sameMinute =
+    entry.clockOutAt !== null &&
+    toMinute(entry.clockOutAt) === toMinute(clockOutAt);
+
   await db.timeEntry.update({
     where: { id },
-    data: {
-      clockOutAt,
-      source: "ADMIN_MANUAL",
-      needsReview: false,
-      reviewNote: `Rättad av ${email}.`,
-    },
+    data: sameMinute
+      ? {
+          needsReview: false,
+          reviewNote: `Granskad och godkänd av ${email}.`,
+        }
+      : {
+          clockOutAt,
+          source: "ADMIN_MANUAL",
+          needsReview: false,
+          reviewNote: `Rättad av ${email}.`,
+        },
   });
 
   revalidatePath(PATH);
 }
 
-/** Godkänner den beräknade sluttiden som den är. */
-export async function approveEntry(formData: FormData) {
-  const { db, email } = await requireAdmin();
-
-  const id = String(formData.get("id") ?? "");
-  if (!id) return;
-
-  await db.timeEntry.update({
-    where: { id },
-    data: {
-      needsReview: false,
-      reviewNote: `Granskad och godkänd av ${email}.`,
-    },
-  });
-
-  revalidatePath(PATH);
+/** Tidpunkten avrundad till hel minut, som millisekunder. */
+function toMinute(value: Date): number {
+  return Math.floor(value.getTime() / 60_000);
 }
