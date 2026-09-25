@@ -23,12 +23,18 @@ import { getOnboardingState } from "@/lib/onboarding";
 import { mainMinutes, type Span } from "@/lib/spans";
 import { companyTimeZone } from "@/lib/company";
 import { startOfDayIn } from "@/lib/time-zone";
+import { cronStatus } from "@/lib/platform-health";
 
 export const dynamic = "force-dynamic";
 
 export default async function OverviewPage() {
   const { db, companyId, companyName } = await requireAdmin();
   const onboarding = await getOnboardingState(db);
+
+  // Ligger schemajobbet nere stängs inga glömda stämplingar, och posterna
+  // räknas upp i evighet. Det måste stå i panelen: en säkerhetsfunktion som
+  // tyst slutat köra är värre än ingen alls, eftersom man litar på den.
+  const cron = await cronStatus();
 
   // Dygnet börjar i FÖRETAGETS tidszon, inte serverns. Containern kör UTC, så
   // ett dygn räknat där börjar 02:00 på verkstadsgolvet på sommaren — och ett
@@ -148,6 +154,24 @@ export default async function OverviewPage() {
         />
         <Stat label="Öppna ordrar" value={openOrders} icon={<IconOrder />} />
       </div>
+
+      {cron.stale && (
+        /* Rött och inte gult. Det här är inte något att titta på när man får
+           tid — tid som inte stängs blir fel fakturaunderlag, och varje dygn
+           som går lägger till en post till. */
+        <Card className="mt-6 border-red-200 bg-red-50/60 p-4">
+          <p className="text-sm font-medium text-red-900">
+            Automatisk utstämpling körs inte
+          </p>
+          <p className="mt-0.5 text-[13px] text-red-800">
+            {cron.lastRun
+              ? `Schemajobbet rapporterade senast in för ${cron.minutesAgo} minuter sedan. Det ska köra var 15:e minut.`
+              : "Schemajobbet har aldrig rapporterat in."}{" "}
+            Glömda stämplingar stängs inte, utan ligger öppna och räknas upp.
+            Kontakta den som driftar servern — jobbet läggs in där, inte här.
+          </p>
+        </Card>
+      )}
 
       {needsReview > 0 && (
         <Card className="mt-6 border-amber-200 bg-amber-50/60 p-4">

@@ -8,9 +8,13 @@ vi.mock("next/navigation", () => ({
 }));
 
 const {
+  cronStatus,
   endingTrials,
+  noteCronRun,
   quietCustomers,
   silentDevices,
+  CRON_STALE_MINUTES,
+  LAST_CRON_KEY,
   QUIET_CUSTOMER_DAYS,
   SILENT_DEVICE_HOURS,
 } = await import("@/lib/platform-health");
@@ -210,5 +214,73 @@ describe("betalande kunder som slutat registrera tid", () => {
     // Listan handlar om kunder som betalar för något de slutat använda.
     const list = await quietCustomers();
     expect(list.map((row) => row.companyId)).not.toContain(companyId);
+  });
+});
+
+describe("schemajobbet som stänger glömda stämplingar", () => {
+  /**
+   * Jobbet är en crontab-rad på servern. Appen kan inte starta det, bara se
+   * att det uteblivit — och det är just den möjligheten som saknades när en
+   * kund upptäckte att inga poster stängdes.
+   *
+   * Körs det inte ligger glömda stämplingar öppna och räknas upp. Ett fel här
+   * gör att varningen aldrig visas, alltså exakt det läge den finns för.
+   */
+
+  const MINUTE = 60 * 1000;
+
+  beforeEach(async () => {
+    await unsafeGlobalPrisma.platformState.deleteMany({
+      where: { key: LAST_CRON_KEY },
+    });
+  });
+
+  it("aldrig kört räknas som trasigt", async () => {
+    const status = await cronStatus();
+
+    expect(status.lastRun).toBeNull();
+    expect(status.minutesAgo).toBeNull();
+    // Det vanligaste felet: crontab-raden lades aldrig in. Utan den här
+    // raden ser en helt oinstallerad automatik ut som en fungerande.
+    expect(status.stale).toBe(true);
+  });
+
+  it("en färsk körning är i ordning", async () => {
+    const now = new Date("2026-09-25T10:00:00Z");
+    await noteCronRun(new Date(now.getTime() - 5 * MINUTE));
+
+    const status = await cronStatus(now);
+
+    expect(status.stale).toBe(false);
+    expect(status.minutesAgo).toBe(5);
+  });
+
+  it("precis inom gränsen är fortfarande i ordning", async () => {
+    const now = new Date("2026-09-25T10:00:00Z");
+    await noteCronRun(new Date(now.getTime() - CRON_STALE_MINUTES * MINUTE));
+
+    expect((await cronStatus(now)).stale).toBe(false);
+  });
+
+  it("en minut över gränsen flaggas", async () => {
+    const now = new Date("2026-09-25T10:00:00Z");
+    await noteCronRun(
+      new Date(now.getTime() - (CRON_STALE_MINUTES + 1) * MINUTE)
+    );
+
+    const status = await cronStatus(now);
+
+    expect(status.stale).toBe(true);
+    expect(status.minutesAgo).toBe(CRON_STALE_MINUTES + 1);
+  });
+
+  it("en ny körning släcker varningen", async () => {
+    const now = new Date("2026-09-25T10:00:00Z");
+    await noteCronRun(new Date(now.getTime() - 5 * 60 * MINUTE));
+    expect((await cronStatus(now)).stale).toBe(true);
+
+    await noteCronRun(now);
+
+    expect((await cronStatus(now)).stale).toBe(false);
   });
 });

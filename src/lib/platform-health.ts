@@ -240,6 +240,48 @@ export async function systemHealth(): Promise<SystemHealth> {
 /** Nyckeln som schemajobbet skriver sin senaste körning på. */
 export const LAST_CRON_KEY = "last-cron-run";
 
+/**
+ * Hur länge schemajobbet får vara tyst innan det räknas som trasigt.
+ *
+ * Jobbet ska köra var 15:e minut. Två timmar ger gott om marginal för en
+ * omstart, en långsam deploy eller en server som bootar — men fångar ändå en
+ * crontab som aldrig lades in, vilket är det vanligaste sättet det går fel.
+ */
+export const CRON_STALE_MINUTES = 120;
+
+/**
+ * När den automatiska utstämplingen senast körde, och om den ligger efter.
+ *
+ * VARFÖR DEN HÄR FINNS I KUNDENS PANEL och inte bara i plattformsvyn: en
+ * säkerhetsfunktion som tyst slutar köra är värre än ingen alls, eftersom man
+ * litar på den. Körs inte jobbet ligger glömda stämplingar öppna och räknas upp
+ * i evighet, och det märks först när någon undrar varför gårdagens post visar
+ * nitton timmar — alltså när fakturaunderlaget redan är fel.
+ *
+ * Jobbet är en crontab-rad på servern, inte något appen kan starta själv. Det
+ * enda appen kan göra är att säga att den saknas.
+ */
+export interface CronStatus {
+  lastRun: Date | null;
+  /** true när jobbet aldrig rapporterat in, eller ligger för långt efter. */
+  stale: boolean;
+  /** Minuter sedan senaste körningen. null när den aldrig kört. */
+  minutesAgo: number | null;
+}
+
+export async function cronStatus(now: Date = new Date()): Promise<CronStatus> {
+  const row = await unsafeGlobalPrisma.platformState.findUnique({
+    where: { key: LAST_CRON_KEY },
+  });
+
+  if (!row) return { lastRun: null, stale: true, minutesAgo: null };
+
+  const lastRun = new Date(row.value);
+  const minutesAgo = Math.floor((now.getTime() - lastRun.getTime()) / 60000);
+
+  return { lastRun, stale: minutesAgo > CRON_STALE_MINUTES, minutesAgo };
+}
+
 /** Anropas av schemajobbet, så att en utebliven körning går att se. */
 export async function noteCronRun(at: Date = new Date()): Promise<void> {
   await unsafeGlobalPrisma.platformState.upsert({
