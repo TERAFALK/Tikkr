@@ -13,6 +13,7 @@ import {
   Th,
   Tr,
 } from "@/components/ui";
+import { formatCurrency } from "@/lib/money";
 import { createEmployee, toggleEmployee, updateEmployee } from "./actions";
 
 export const dynamic = "force-dynamic";
@@ -27,6 +28,7 @@ export default async function EmployeesPage() {
       name: true,
       active: true,
       employeeNumber: true,
+      costRateOre: true,
       // Bara OM ett foto finns, aldrig själva bytena. En lista med tjugo
       // porträtt skulle annars bli flera megabyte i sidans svar.
       photoMimeType: true,
@@ -69,6 +71,7 @@ export default async function EmployeesPage() {
               <tr>
                 <Th>Namn</Th>
                 <Th>Anställningsnummer</Th>
+                <Th numeric>Timkostnad</Th>
                 <Th>Status</Th>
                 <Th numeric>Stämplingar</Th>
                 <Th>
@@ -95,6 +98,13 @@ export default async function EmployeesPage() {
                       <span className="text-neutral-300">—</span>
                     )}
                   </Td>
+                  <Td numeric muted={employee.costRateOre === null}>
+                    {employee.costRateOre === null ? (
+                      <span className="text-neutral-300">—</span>
+                    ) : (
+                      `${formatCurrency(employee.costRateOre)}/tim`
+                    )}
+                  </Td>
                   <Td>
                     {employee.active ? (
                       <Badge tone="active">Aktiv</Badge>
@@ -111,13 +121,14 @@ export default async function EmployeesPage() {
                         trigger="Ändra"
                         triggerTone="ghost"
                         title="Ändra anställd"
-                        description="Namn, anställningsnummer och bild."
+                        description="Namn, nummer, timkostnad och bild."
                         action={updateEmployee}
                         submitLabel="Spara"
                         employee={{
                           id: employee.id,
                           name: employee.name,
                           employeeNumber: employee.employeeNumber,
+                          costRateOre: employee.costRateOre,
                           hasPhoto: Boolean(employee.photoMimeType),
                         }}
                       />

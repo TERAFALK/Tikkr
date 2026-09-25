@@ -17,10 +17,15 @@ import { toDecimalHours } from "./format";
  * Summorna skrivs som FORMLER och inte som färdiga tal. Ett ark där man fyller
  * i materialkostnaden och ingenting räknas om är ett dött papper.
  *
- * Raden heter "Tid och maskin" och INTE vad den hette i deras ark. Där bär den
- * namnet på det system de lämnar, och att Tikkr skulle skriva ut en konkurrents
- * namn på kundens interna underlag vore befängt — särskilt när siffran numera
- * kommer härifrån. Rubriken beskriver vad raden är, inte var den kom ifrån.
+ * Raden heter "Person och maskin" och INTE vad den hette i deras ark. Där bär
+ * den namnet på det system de lämnar, och att Tikkr skulle skriva ut en
+ * konkurrents namn på kundens interna underlag vore befängt — särskilt när
+ * siffran numera kommer härifrån. Rubriken beskriver vad raden är, inte var den
+ * kom ifrån.
+ *
+ * Namnet ändrades när timkostnad per anställd infördes: summan bär nu både
+ * människans och maskinens sats, och "Tid och maskin" hade sagt att personen
+ * inte kostade något.
  */
 
 /** Radnummer, så att formlerna och cellerna inte glider isär. */
@@ -155,7 +160,7 @@ function renderSheet(
   // Den enda raden Tikkr kan fylla i, och skälet till att arket finns.
   // Beloppet är arbetsmomentens timkostnad gånger nedlagd tid, alltså både
   // maskinen och arbetet vid den.
-  costRow(ROW.workTime, "Tid och maskin:", order.totalCostOre / 100);
+  costRow(ROW.workTime, "Person och maskin:", order.totalCostOre / 100);
   bold(`A${ROW.workTime}`);
   bold(`E${ROW.workTime}`);
 

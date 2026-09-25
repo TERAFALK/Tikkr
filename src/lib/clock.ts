@@ -70,6 +70,20 @@ export type JobRef =
 
 export type ClockInInput = PunchContext & { employeeId: string } & JobRef;
 
+/**
+ * Självkostnaden som kopieras till stämplingen.
+ *
+ * Två satser som LÄGGS IHOP: människan och maskinen. Verkstaden betalar för
+ * båda samtidigt, och kalkylen ska kunna visa dem var för sig — ett belopp som
+ * inte går att bryta ned går inte att förklara.
+ *
+ * null betyder att satsen inte var angiven, inte att den var noll.
+ */
+export interface CostRates {
+  momentCostRateOre: number | null;
+  employeeCostRateOre: number | null;
+}
+
 export interface ClockInResult {
   /** Den nya, pågående stämplingen. */
   started: TimeEntry;
@@ -136,7 +150,7 @@ export async function clockIn(
     }
   }
 
-  const { momentCostRateOre } = await assertBelongsToCompany(db, input);
+  const rates = await assertBelongsToCompany(db, input);
 
   return db.$transaction(async (tx) => {
     // Bara samma moment. Ett pågående jobb på en ANNAN maskin ska stå kvar —
@@ -180,9 +194,10 @@ export async function clockIn(
         employeeId: input.employeeId,
         ...jobFields(input),
         clockInAt: at,
-        // Kopian av momentets timkostnad. Se schemat: en senare prishöjning
-        // får inte ändra en kalkyl som redan tagits ut och fakturerats.
-        costRateOre: momentCostRateOre,
+        // Kopior av personens och maskinens timkostnad. Se schemat: en senare
+        // prishöjning får inte ändra en kalkyl som redan tagits ut och
+        // fakturerats.
+        ...rates,
         source: input.fromOfflineQueue ? "KIOSK_OFFLINE_SYNC" : "KIOSK",
         kioskDeviceId: input.kioskDeviceId ?? null,
         sourceIp: input.sourceIp ?? null,
@@ -556,7 +571,7 @@ export async function createManualEntry(
 ): Promise<TimeEntry> {
   const db = forCompany(companyId);
 
-  const { momentCostRateOre } = await assertBelongsToCompany(db, input, {
+  const rates = await assertBelongsToCompany(db, input, {
     historical: true,
   });
   assertSaneInterval(input.clockInAt, input.clockOutAt);
@@ -569,10 +584,10 @@ export async function createManualEntry(
       ...jobFields(input),
       clockInAt: input.clockInAt,
       clockOutAt: input.clockOutAt,
-      // Momentets timkostnad som den är NU. En tid som skrivs in i efterhand
-      // saknar egen historia — det enda systemet vet är vad momentet kostar
+      // Satserna som de är NU. En tid som skrivs in i efterhand saknar egen
+      // historia — det enda systemet vet är vad personen och momentet kostar
       // idag, och att gissa något annat vore att hitta på.
-      costRateOre: momentCostRateOre,
+      ...rates,
       source: "ADMIN_MANUAL",
       needsReview: false,
       reviewNote: `Inlagd för hand av ${input.byEmail}.`,
@@ -588,7 +603,7 @@ export async function updateEntryManually(
 ): Promise<TimeEntry> {
   const db = forCompany(companyId);
 
-  const { momentCostRateOre } = await assertBelongsToCompany(db, input, {
+  const rates = await assertBelongsToCompany(db, input, {
     historical: true,
   });
   assertSaneInterval(input.clockInAt, input.clockOutAt);
@@ -601,10 +616,10 @@ export async function updateEntryManually(
       ...jobFields(input),
       clockInAt: input.clockInAt,
       clockOutAt: input.clockOutAt,
-      // Följer med momentet. Flyttas posten till ett annat arbetsmoment ska
-      // den också kosta det momentets timpris — annars hade kalkylen visat
-      // svetsning till måleripris.
-      costRateOre: momentCostRateOre,
+      // Följer med posten. Flyttas den till ett annat arbetsmoment eller en
+      // annan person ska den också kosta det som gäller där — annars hade
+      // kalkylen visat svetsning till måleripris.
+      ...rates,
       source: "ADMIN_MANUAL",
       needsReview: false,
       reviewNote: `Ändrad för hand av ${input.byEmail}.`,
@@ -697,7 +712,7 @@ async function assertBelongsToCompany(
   db: CompanyDb,
   input: { employeeId: string } & JobRef,
   options: { historical?: boolean } = {}
-): Promise<{ momentCostRateOre: number | null }> {
+): Promise<CostRates> {
   const employee = await db.employee.findFirst({
     where: { id: input.employeeId },
   });
@@ -719,8 +734,10 @@ async function assertBelongsToCompany(
       throw new ClockError("Det inproduktiva momentet är inte aktivt.");
     }
 
-    // Inproduktiv tid kalkyleras inte. Ingen timkostnad att kopiera.
-    return { momentCostRateOre: null };
+    // Inproduktiv tid kalkyleras inte. Varken personens eller maskinens sats
+    // kopieras — den tiden når aldrig ett fakturaunderlag, och en sats på
+    // raden hade inbjudit till att räkna på den.
+    return { momentCostRateOre: null, employeeCostRateOre: null };
   }
 
   const [order, moment] = await Promise.all([
@@ -731,9 +748,12 @@ async function assertBelongsToCompany(
   if (!order) throw new ClockError("Okänd order.");
   if (!moment) throw new ClockError("Okänt arbetsmoment.");
 
-  // Momentet är redan hämtat, så timkostnaden följer med gratis. Den läses
-  // här och inte vid skrivningen, för att slippa en fråga till.
-  const result = { momentCostRateOre: moment.costRateOre };
+  // Båda raderna är redan hämtade, så satserna följer med gratis. De läses
+  // här och inte vid skrivningen, för att slippa två frågor till.
+  const result: CostRates = {
+    momentCostRateOre: moment.costRateOre,
+    employeeCostRateOre: employee.costRateOre,
+  };
 
   if (options.historical) return result;
 

@@ -39,6 +39,7 @@ export default function EmployeeDialog({
     id: string;
     name: string;
     employeeNumber: string | null;
+    costRateOre: number | null;
     hasPhoto: boolean;
   };
 }) {
@@ -168,6 +169,22 @@ export default function EmployeeDialog({
                 name="employeeNumber"
                 defaultValue={employee?.employeeNumber ?? ""}
                 placeholder="1042"
+              />
+            </Field>
+
+            <Field
+              label="Timkostnad (kr/tim)"
+              hint="Valfritt. Läggs till arbetsmomentets kostnad i efterkalkylen. Syns aldrig på stämplingsskärmen."
+            >
+              <Input
+                name="costRate"
+                inputMode="decimal"
+                placeholder="350"
+                defaultValue={
+                  employee?.costRateOre == null
+                    ? ""
+                    : String(employee.costRateOre / 100).replace(".", ",")
+                }
               />
             </Field>
           </div>

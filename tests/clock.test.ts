@@ -1071,8 +1071,10 @@ describe("inproduktiv tid", () => {
     expect(started.indirectMomentId).toBe(stadning);
     expect(started.orderId).toBeNull();
     expect(started.momentId).toBeNull();
-    // Inproduktiv tid kalkyleras inte. Ingen timkostnad att kopiera.
-    expect(started.costRateOre).toBeNull();
+    // Inproduktiv tid kalkyleras inte. Varken personens eller maskinens sats
+    // kopieras — den tiden når aldrig ett fakturaunderlag.
+    expect(started.momentCostRateOre).toBeNull();
+    expect(started.employeeCostRateOre).toBeNull();
   });
 
   it("en orderstämpling har inget inproduktivt moment", async () => {

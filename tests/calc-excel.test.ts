@@ -78,7 +78,7 @@ describe("raden Tikkr fyller i", () => {
   it("skriver tidskostnaden i kronor på rad 9", () => {
     const sheet = sheetFor(calc());
 
-    expect(sheet.getCell("A9").value).toBe("Tid och maskin:");
+    expect(sheet.getCell("A9").value).toBe("Person och maskin:");
     expect(sheet.getCell("E9").value).toBe(2711.5);
   });
 

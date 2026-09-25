@@ -68,10 +68,17 @@ beforeAll(async () => {
 
 beforeEach(async () => {
   await unsafeGlobalPrisma.timeEntry.deleteMany({ where: { companyId } });
-  // Timkostnaderna återställs: ett test höjer dem med flit.
+  // Timkostnaderna återställs: flera tester ändrar dem med flit.
   await unsafeGlobalPrisma.workMoment.update({
     where: { id: svetsning },
     data: { costRateOre: 18000 },
+  });
+  // Anna har som utgångspunkt INGEN egen timkostnad. De flesta testerna
+  // handlar om maskinens sats, och en personsats hade tystat in sig i varje
+  // summa de kontrollerar.
+  await unsafeGlobalPrisma.employee.update({
+    where: { id: anna },
+    data: { costRateOre: null },
   });
   await unsafeGlobalPrisma.order.update({
     where: { id: order },
@@ -432,5 +439,121 @@ describe("pågående och ogranskad tid räknas men flaggas", () => {
 
     const calc = await calcFor(order);
     expect(calc.ungradedCount).toBe(1);
+  });
+});
+
+describe("timkostnad per person och maskin", () => {
+  /**
+   * Människan och maskinen kostar samtidigt.
+   *
+   * Det viktiga att skydda: satserna LÄGGS IHOP, de ersätter inte varandra,
+   * och en saknad sats är inte noll kronor. Får någon av de två reglerna fel
+   * blir beloppet på en efterkalkyl fel utan att något ser trasigt ut.
+   */
+
+  const payAnna = (ore: number | null) =>
+    unsafeGlobalPrisma.employee.update({
+      where: { id: anna },
+      data: { costRateOre: ore },
+    });
+
+  it("lägger ihop personens och maskinens sats", async () => {
+    // Anna 350 kr/tim vid en svets som kostar 180. En timme kostar 530.
+    await payAnna(35000);
+    await work(order, svetsning, 60);
+
+    const entry = (await calcFor(order)).groups[0].entries[0];
+
+    expect(entry.employeeCostRateOre).toBe(35000);
+    expect(entry.momentCostRateOre).toBe(18000);
+    expect(entry.costRateOre).toBe(53000);
+    expect(entry.costOre).toBe(53000);
+  });
+
+  it("räknar personen ensam när momentet saknar sats", async () => {
+    await payAnna(35000);
+    await work(order, utanKostnad, 60);
+
+    const entry = (await calcFor(order)).groups[0].entries[0];
+
+    expect(entry.momentCostRateOre).toBeNull();
+    expect(entry.costRateOre).toBe(35000);
+    expect(entry.costOre).toBe(35000);
+  });
+
+  it("räknar maskinen ensam när personen saknar sats", async () => {
+    // Utgångsläget, och det som gällde innan personsatser fanns. Måste
+    // fortsätta ge exakt samma belopp som förut.
+    await work(order, svetsning, 60);
+
+    const entry = (await calcFor(order)).groups[0].entries[0];
+
+    expect(entry.employeeCostRateOre).toBeNull();
+    expect(entry.costRateOre).toBe(18000);
+    expect(entry.costOre).toBe(18000);
+  });
+
+  it("saknas båda satserna är raden utan underlag, inte noll kronor", async () => {
+    await work(order, utanKostnad, 60);
+
+    const calc = await calcFor(order);
+    const entry = calc.groups[0].entries[0];
+
+    expect(entry.costRateOre).toBeNull();
+    expect(entry.costOre).toBeNull();
+    // Tiden finns kvar och redovisas som saknad, i stället för att tyst dra
+    // ner summan genom att bidra med noll.
+    expect(calc.groups[0].minutesWithoutRate).toBe(60);
+    expect(calc.totalCostOre).toBe(0);
+  });
+
+  it("en höjd personsats ändrar inte en post som redan stämplats", async () => {
+    await payAnna(35000);
+    await work(order, svetsning, 60);
+
+    // Anna får påslag. Kalkylen som redan tagits ut ska se likadan ut.
+    await payAnna(40000);
+
+    const entry = (await calcFor(order)).groups[0].entries[0];
+
+    expect(entry.employeeCostRateOre).toBe(35000);
+    expect(entry.costOre).toBe(53000);
+  });
+
+  it("två stämplingar kan bära olika personsats", async () => {
+    await payAnna(35000);
+    await work(order, svetsning, 60, "2026-08-05T06:00:00Z");
+    await payAnna(40000);
+    await work(order, svetsning, 60, "2026-08-06T06:00:00Z");
+
+    const calc = await calcFor(order);
+
+    // 530 + 580 kronor. Varje rad bär sitt eget pris, precis som när
+    // momentets sats ändras.
+    expect(calc.totalCostOre).toBe(53000 + 58000);
+  });
+
+  it("påslaget räknas på den hopslagna självkostnaden", async () => {
+    // Företaget har 140 procent påslag. Priset ska följa den nya, högre
+    // självkostnaden — annars hade personens tid varit gratis för kunden.
+    await payAnna(35000);
+    await work(order, svetsning, 60);
+
+    const calc = await calcFor(order);
+
+    expect(calc.totalCostOre).toBe(53000);
+    expect(calc.priceOre).toBe(Math.round(53000 * 1.4));
+  });
+
+  it("inproduktiv tid får ingen av satserna", async () => {
+    // Kontrolleras i clock.test.ts på posten. Här: en inproduktiv stämpling
+    // syns aldrig i en efterkalkyl överhuvudtaget.
+    await payAnna(35000);
+    await work(order, svetsning, 60);
+
+    const calc = await calcFor(order);
+
+    expect(calc.groups).toHaveLength(1);
+    expect(calc.groups[0].momentName).toBe("Svetsning");
   });
 });

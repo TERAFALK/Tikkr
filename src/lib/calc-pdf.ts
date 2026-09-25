@@ -41,14 +41,21 @@ export interface CalcCompany {
   logo: { data: Buffer; mimeType: string } | null;
 }
 
+// Summan måste bli CONTENT_WIDTH. Anställdkolumnen fick ge plats åt kr/tim:
+// en timkostnad som inte står på raden går inte att kontrollräkna, och det är
+// just kontrollräkningen en efterkalkyl finns för.
 const COLUMNS = [
-  { label: "Anställd", width: 145, align: "left" as const },
-  { label: "Datum", width: 80, align: "left" as const },
-  { label: "Start", width: 52, align: "left" as const },
-  { label: "Stopp", width: 52, align: "left" as const },
+  { label: "Anställd", width: 118, align: "left" as const },
+  { label: "Datum", width: 70, align: "left" as const },
+  { label: "Start", width: 46, align: "left" as const },
+  { label: "Stopp", width: 46, align: "left" as const },
   { label: "Tid (tim:min)", width: 78, align: "right" as const },
-  { label: "Kostnad", width: 88, align: "right" as const },
+  { label: "kr/tim", width: 57, align: "right" as const },
+  { label: "Kostnad", width: 80, align: "right" as const },
 ];
+
+/** Kolumnen som markeras i gult när raden saknar underlag. */
+const COST_COLUMN = 6;
 
 export function buildOrderCalcPdf(
   company: CalcCompany,
@@ -358,6 +365,7 @@ function drawGroup(
       formatTime(entry.clockInAt, company.timezone),
       entry.ongoing ? "pågår" : formatTime(entry.clockOutAt!, company.timezone),
       formatDuration(entry.minutes),
+      entry.costRateOre === null ? "–" : formatCurrency(entry.costRateOre),
       entry.costOre === null ? "saknas" : formatCurrency(entry.costOre),
     ];
 
@@ -368,7 +376,7 @@ function drawGroup(
       // anmärkning längst ner som ögat hoppar över.
       doc.font("Helvetica").fontSize(9);
       doc.fillColor(
-        entry.costOre === null && index === 5 ? "#a16207" : "#404040"
+        entry.costOre === null && index === COST_COLUMN ? "#a16207" : "#404040"
       );
       doc.text(value, x, y + 5, {
         width: COLUMNS[index].width - 12,
@@ -379,6 +387,27 @@ function drawGroup(
     });
 
     y += 18;
+
+    // Uppdelningen står på en egen rad, och BARA när båda satserna finns.
+    //
+    // "850,00" i kolumnen går inte att ifrågasätta; "person 350,00 + maskin
+    // 500,00" går att kontrollera mot vad man själv skrivit in. Har raden bara
+    // en sats finns ingenting att förklara, och då sparas raden in — en
+    // efterkalkyl med hundra stämplingar blir annars dubbelt så lång.
+    if (
+      entry.employeeCostRateOre !== null &&
+      entry.momentCostRateOre !== null
+    ) {
+      doc.font("Helvetica").fontSize(7).fillColor("#737373");
+      doc.text(
+        `person ${formatCurrency(entry.employeeCostRateOre)} + maskin ${formatCurrency(entry.momentCostRateOre)}`,
+        MARGIN + 8,
+        y - 4,
+        { width: 260, lineBreak: false }
+      );
+      y += 9;
+    }
+
     doc
       .moveTo(MARGIN, y)
       .lineTo(A4_WIDTH - MARGIN, y)
@@ -412,11 +441,12 @@ function drawGroup(
     align: "right",
     lineBreak: false,
   });
-  doc.text(formatCurrency(group.costOre), timeX + COLUMNS[4].width, y + 6, {
-    width: COLUMNS[5].width - 12,
-    align: "right",
-    lineBreak: false,
-  });
+  doc.text(
+    formatCurrency(group.costOre),
+    timeX + COLUMNS[4].width + COLUMNS[5].width,
+    y + 6,
+    { width: COLUMNS[6].width - 12, align: "right", lineBreak: false }
+  );
 
   return y + 24;
 }

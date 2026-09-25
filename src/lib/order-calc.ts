@@ -28,9 +28,24 @@ export interface OrderCalcEntry {
   clockInAt: Date;
   clockOutAt: Date | null;
   minutes: number;
-  /** Timkostnaden som gällde vid stämplingen. null när ingen var angiven. */
+  /**
+   * Satserna som gällde vid stämplingen. null när ingen var angiven.
+   *
+   * Redovisas var för sig och inte bara som summa. "850 kr/tim" går inte att
+   * ifrågasätta; "person 350 + maskin 500" går att kontrollera mot vad man
+   * själv skrivit in.
+   */
+  employeeCostRateOre: number | null;
+  momentCostRateOre: number | null;
+  /**
+   * Summan av de satser som FINNS, eller null när ingen av dem finns.
+   *
+   * Saknad sats är inte noll. Har personen ingen sats räknas maskinen ensam,
+   * precis som förut — men saknas båda är raden utan underlag, och den ska
+   * inte tyst bidra med noll kronor till en total.
+   */
   costRateOre: number | null;
-  /** Radens kostnad, eller null när timkostnad saknas. */
+  /** Radens kostnad, eller null när båda satserna saknas. */
   costOre: number | null;
   ongoing: boolean;
   needsReview: boolean;
@@ -113,7 +128,8 @@ export async function getOrderCalcs(
           clockOutAt: true,
           needsReview: true,
           source: true,
-          costRateOre: true,
+          momentCostRateOre: true,
+          employeeCostRateOre: true,
           employee: { select: { name: true, employeeNumber: true } },
           moment: { select: { id: true, name: true } },
         },
@@ -133,13 +149,22 @@ export async function getOrderCalcs(
     for (const entry of order.timeEntries) {
       const minutes = minutesBetween(entry.clockInAt, entry.clockOutAt);
 
+      // Satserna LÄGGS IHOP: människan och maskinen kostar samtidigt. Saknas
+      // en av dem räknas den andra ensam — saknad sats betyder att den inte är
+      // angiven, inte att den är noll.
+      //
+      // Saknas BÅDA är raden utan underlag. Den räknas då inte in i totalen
+      // utan redovisas som saknad tid, i stället för att tyst dra ner summan.
+      const costRateOre =
+        entry.employeeCostRateOre === null && entry.momentCostRateOre === null
+          ? null
+          : (entry.employeeCostRateOre ?? 0) + (entry.momentCostRateOre ?? 0);
+
       // Kostnaden räknas per rad, precis som i den rapport kunden läser idag.
       // Det gör att en enskild rad går att kontrollräkna för hand — vilket är
       // vad man gör när en siffra ser fel ut.
       const costOre =
-        entry.costRateOre === null
-          ? null
-          : costForMinutes(minutes, entry.costRateOre);
+        costRateOre === null ? null : costForMinutes(minutes, costRateOre);
 
       totalMinutes += minutes;
       if (costOre === null) minutesWithoutRate += minutes;
@@ -168,7 +193,9 @@ export async function getOrderCalcs(
         clockInAt: entry.clockInAt,
         clockOutAt: entry.clockOutAt,
         minutes,
-        costRateOre: entry.costRateOre,
+        employeeCostRateOre: entry.employeeCostRateOre,
+        momentCostRateOre: entry.momentCostRateOre,
+        costRateOre,
         costOre,
         ongoing: entry.clockOutAt === null,
         needsReview: entry.needsReview,

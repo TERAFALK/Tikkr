@@ -99,13 +99,14 @@ admin-UI m.m.). Kraftfullt, men det motsäger målet om *ett* enkelt paket.
 
 ```
 companies      — id, name, subscription_status, created_at
-employees      — id, company_id, name, active
+employees      — id, company_id, name, active, cost_rate_ore
 orders         — id, company_id, order_number, customer_name, status
 work_moments   — id, company_id, name, cost_rate_ore
 indirect_moments — id, company_id, name, active
 time_entries   — id, company_id, employee_id, kind,
                  order_id?, moment_id?, indirect_moment_id?,
-                 clock_in_at, clock_out_at, source, cost_rate_ore,
+                 clock_in_at, clock_out_at, source,
+                 moment_cost_rate_ore, employee_cost_rate_ore,
                  needs_review, review_note, kiosk_device_id, source_ip
 admin_users    — id, company_id, email, password_hash, role
 kiosk_devices  — id, company_id, name, device_token, active, last_seen_at
@@ -146,6 +147,24 @@ kiosk_devices  — id, company_id, name, device_token, active, last_seen_at
    får `source = AUTO_CLOSE`, `needs_review = true` och en `review_note` i
    klartext. Systemet gissar aldrig tyst — admin får en lista att rätta.
    Tidszon per företag, annars glider klockslaget mellan sommar- och vintertid.
+
+4. **Självkostnaden är personens sats PLUS momentets** (bestämt 2026-09-25).
+   Momentet är maskinen, `employees.cost_rate_ore` är människan, och en
+   verkstad betalar för båda samtidigt. Svetsar Anna, som kostar 350 kr i
+   timmen, vid en fräs som kostar 500, är raden 850 kr per timme.
+
+   Båda satserna **kopieras till stämplingen** och läses aldrig upp i
+   efterhand. En prishöjning får inte ändra en kalkyl som redan fakturerats.
+   Två fält och inte ett hopslaget, så att efterkalkylen kan skriva
+   "person 350 + maskin 500" — ett belopp som inte går att bryta ned går inte
+   att förklara för den som ifrågasätter fakturan.
+
+   **Saknad sats är inte noll.** Finns bara en av dem räknas den ensam. Saknas
+   båda är raden utan underlag och redovisas som saknad tid, aldrig som noll
+   kronor i en total.
+
+   Satserna visas **aldrig** på stämplingsskärmen. Kiosken visar inga belopp
+   alls, och vad en person kostar företaget hör inte på en skärm i verkstaden.
 
 Multi-tenant-isolering byggs i appens kod: **varje databasfråga går via ett
 gemensamt lager** i Prisma som alltid filtrerar på inloggad användares

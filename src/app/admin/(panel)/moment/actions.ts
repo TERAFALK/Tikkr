@@ -23,7 +23,8 @@ export async function createMoment(formData: FormData) {
  *
  * Timkostnaden slår bara igenom på NY tid. Redan registrerade stämplingar
  * behåller den kostnad som gällde när de gjordes — annars hade en prisändring
- * ändrat en kalkyl som redan fakturerats. Se TimeEntry.costRateOre i schemat.
+ * ändrat en kalkyl som redan fakturerats. Se TimeEntry.momentCostRateOre i
+ * schemat.
  */
 export async function renameMoment(formData: FormData) {
   const { db } = await requireAdmin();

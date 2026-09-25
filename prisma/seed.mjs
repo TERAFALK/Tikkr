@@ -37,10 +37,17 @@ async function main() {
       // 1,4 — samma påslag som pilotkunden räknar med i sitt kalkylark.
       markupPercent: 140,
       employees: {
+        // Timkostnad per person i ören, som LÄGGS TILL momentets. En yrkesvan
+        // svetsare kostar mer per timme än en lärling, och kalkylen ska visa
+        // en skillnad som går att känna igen.
+        //
+        // David saknar sats med flit: kalkylen ska då räkna maskinen ensam och
+        // inte tro att hans tid är gratis. Det läget finns hos varje kund som
+        // inte hunnit fylla i alla.
         create: [
-          { name: "Anna Andersson" },
-          { name: "Björn Bergqvist" },
-          { name: "Carina Cederlund" },
+          { name: "Anna Andersson", costRateOre: 38000 },
+          { name: "Björn Bergqvist", costRateOre: 42000 },
+          { name: "Carina Cederlund", costRateOre: 35000 },
           { name: "David Dahl" },
         ],
       },
@@ -90,7 +97,12 @@ async function main() {
       id: "other-company",
       name: "Grannens Verkstad AB",
       subscriptionStatus: "TRIALING",
-      employees: { create: [{ name: "Erik Ek" }, { name: "Frida Falk" }] },
+      employees: {
+        create: [
+          { name: "Erik Ek", costRateOre: 36000 },
+          { name: "Frida Falk", costRateOre: 36000 },
+        ],
+      },
       workMoments: {
         create: [
           { name: "Svarvning", costRateOre: 21000 },

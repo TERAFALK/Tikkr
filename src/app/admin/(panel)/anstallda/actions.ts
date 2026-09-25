@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { requireAdmin } from "@/lib/admin-session";
+import { parseOre } from "@/lib/money";
 
 // Varje åtgärd börjar med requireAdmin(). Det ger både inloggningskontroll och
 // en databasklient låst till rätt företag — en serveråtgärd är en publik
@@ -144,6 +145,7 @@ export async function createEmployee(
         name,
         companyId,
         employeeNumber: readNumber(formData),
+        costRateOre: parseOre(formData.get("costRate")),
         ...photoFields(photo, false),
       },
     });
@@ -187,6 +189,7 @@ export async function updateEmployee(
       data: {
         name,
         employeeNumber: readNumber(formData),
+        costRateOre: parseOre(formData.get("costRate")),
         ...photoFields(photo, removePhoto),
       },
     });

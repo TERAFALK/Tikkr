@@ -155,6 +155,22 @@ model Employee {
   /// där två personer med samma namn behöver hållas isär.
   employeeNumber String? @map("employee_number")
 
+  /// Vad en timme av PERSONENS tid kostar företaget, i ÖREN. Frivillig.
+  ///
+  /// Läggs TILL arbetsmomentets timkostnad. Svetsar Anna, som kostar 350 kr i
+  /// timmen, vid en fräs som kostar 500, är radens självkostnad 850 kr per
+  /// timme. Momentet är maskinen och den här raden är människan; en verkstad
+  /// betalar för båda samtidigt.
+  ///
+  /// VISAS ALDRIG PÅ STÄMPLINGSSKÄRMEN. Kiosken visar inga belopp alls, och
+  /// det är med flit: vad en person kostar företaget är ingen uppgift att
+  /// hänga på en skärm i verkstaden.
+  ///
+  /// Tomt betyder att kostnaden inte är angiven, vilket är något annat än noll
+  /// kronor. Saknas båda satserna redovisar kalkylen raden som saknat underlag
+  /// i stället för att tyst visa noll.
+  costRateOre Int? @map("cost_rate_ore")
+
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
@@ -327,16 +343,25 @@ model TimeEntry {
 
   source TimeEntrySource @default(KIOSK)
 
-  /// Momentets timkostnad i ören, som den var NÄR STÄMPLINGEN GJORDES.
+  /// SJÄLVKOSTNADEN, SOM DEN VAR NÄR STÄMPLINGEN GJORDES.
   ///
-  /// En kopia, inte en uppslagning. Höjer företaget Svetsning från 180 till
-  /// 200 kr ska en kalkyl som redan tagits ut och fakturerats se likadan ut
-  /// om ett år — annars stämmer underlaget inte längre med fakturan som
-  /// skickades. Nya stämplingar får det nya priset.
+  /// Två fält, inte ett hopslaget. Kalkylen ska kunna skriva "person 350 +
+  /// maskin 500 = 850 kr/tim" i stället för bara 850, eftersom ett belopp som
+  /// inte går att bryta ned inte går att förklara för den som ifrågasätter
+  /// fakturan.
   ///
-  /// Tomt på poster som registrerades innan momentet fått någon kostnad.
-  /// Kalkylen redovisar dem som saknat underlag i stället för som noll.
-  costRateOre Int? @map("cost_rate_ore")
+  /// Kopior, inte uppslagningar. Höjer företaget Svetsning från 180 till 200
+  /// kr ska en kalkyl som redan tagits ut och fakturerats se likadan ut om ett
+  /// år — annars stämmer underlaget inte längre med fakturan som skickades.
+  /// Nya stämplingar får de nya satserna.
+  ///
+  /// Tomt betyder att satsen inte var angiven, inte att den var noll. Radens
+  /// kostnad är summan av de satser som FINNS; saknas båda redovisar kalkylen
+  /// raden som saknat underlag i stället för som noll kronor.
+  ///
+  /// Inproduktiv tid har aldrig några satser. Den kalkyleras inte alls.
+  momentCostRateOre   Int? @map("moment_cost_rate_ore")
+  employeeCostRateOre Int? @map("employee_cost_rate_ore")
 
   /// Sätts när systemet gissat sig till en utstämpling, t.ex. vid det
   /// automatiska klockslaget. Admin får en lista att gå igenom och rätta.
