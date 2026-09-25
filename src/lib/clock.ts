@@ -62,7 +62,7 @@ export interface PunchContext {
  *
  * En diskriminerad union och inte fyra valfria fält. Det gör att man inte kan
  * skapa en post utan att ha bestämt vad den är, och att TypeScript vägrar läsa
- * ett ordernummer på inproduktiv tid.
+ * ett ordernummer på improduktiv tid.
  */
 export type JobRef =
   | { kind: "ORDER"; orderId: string; momentId: string }
@@ -236,7 +236,7 @@ export async function clockOut(
     employeeId: string;
     /** Arbetsmomentet, när det är ordertid som ska stängas. */
     momentId?: string;
-    /** Det inproduktiva momentet, när det är sådan tid som ska stängas. */
+    /** Det improduktiva momentet, när det är sådan tid som ska stängas. */
     indirectMomentId?: string;
   }
 ): Promise<TimeEntry | null> {
@@ -460,7 +460,7 @@ export async function openEntriesOnOrder(
   const db = forCompany(companyId);
 
   const open = await db.timeEntry.findMany({
-    // kind uttryckligen, fastän en inproduktiv post aldrig kan ha en order.
+    // kind uttryckligen, fastän en improduktiv post aldrig kan ha en order.
     // Filtret säger vad frågan handlar om, och kostar ingenting.
     where: { orderId, kind: "ORDER", clockOutAt: null },
     orderBy: { clockInAt: "asc" },
@@ -694,7 +694,7 @@ async function assertNoOverlap(
     `Tiden krockar med en annan stämpling på ${label.text}${pending}. ` +
       (label.billable
         ? "Samma arbetsmoment kan inte köra två jobb samtidigt."
-        : "Samma inproduktiva moment kan inte pågå två gånger samtidigt.")
+        : "Samma improduktiva moment kan inte pågå två gånger samtidigt.")
   );
 }
 
@@ -728,13 +728,13 @@ async function assertBelongsToCompany(
       where: { id: input.indirectMomentId },
     });
 
-    if (!moment) throw new ClockError("Okänt inproduktivt moment.");
+    if (!moment) throw new ClockError("Okänt improduktivt moment.");
 
     if (!moment.active && !options.historical) {
-      throw new ClockError("Det inproduktiva momentet är inte aktivt.");
+      throw new ClockError("Det improduktiva momentet är inte aktivt.");
     }
 
-    // Inproduktiv tid kalkyleras inte. Varken personens eller maskinens sats
+    // Improduktiv tid kalkyleras inte. Varken personens eller maskinens sats
     // kopieras — den tiden når aldrig ett fakturaunderlag, och en sats på
     // raden hade inbjudit till att räkna på den.
     return { momentCostRateOre: null, employeeCostRateOre: null };
@@ -767,7 +767,7 @@ async function assertBelongsToCompany(
  * Fälten som pekar ut jobbet, för skrivning.
  *
  * Nollställer ALLTID den motsatta sidan. Ändrar admin en post från ordertid
- * till inproduktiv ska ordernumret försvinna, inte ligga kvar och göra raden
+ * till improduktiv ska ordernumret försvinna, inte ligga kvar och göra raden
  * till något som varken är det ena eller det andra.
  */
 function jobFields(job: JobRef) {
@@ -792,7 +792,7 @@ function jobFields(job: JobRef) {
   // INGEN TYST GREN HÄR, och det är hela poängen.
   //
   // Stod INDIRECT som else-gren blev en anropare som glömt `kind` tyst
-  // inproduktiv tid: en stämpling på en order som aldrig når ett
+  // improduktiv tid: en stämpling på en order som aldrig når ett
   // fakturaunderlag, utan felmeddelande och utan att någon märker det förrän
   // kunden inte fakturerats. Det är precis tvärtom mot regeln att glömska ska
   // ge fakturerbar tid och aldrig omvänt.
@@ -801,7 +801,7 @@ function jobFields(job: JobRef) {
   // gjorde exakt det här misstaget och gick igenom tills posterna räknades.
   throw new ClockError(
     `Stämplingen saknar giltig typ (kind). Ange antingen order och ` +
-      `arbetsmoment, eller ett inproduktivt moment.`
+      `arbetsmoment, eller ett improduktivt moment.`
   );
 }
 
@@ -809,7 +809,7 @@ function jobFields(job: JobRef) {
  * Nyckeln som skiljer en persons parallella jobb åt.
  *
  * För ordertid är det arbetsmomentet — momentet är maskinen, och en maskin kör
- * ett jobb i taget. För inproduktiv tid är det det inproduktiva momentet: man
+ * ett jobb i taget. För improduktiv tid är det det improduktiva momentet: man
  * städar inte två gånger samtidigt.
  */
 function jobKey(job: JobRef) {

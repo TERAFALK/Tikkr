@@ -255,7 +255,7 @@ describe("omräkning till fakturerbara timmar", () => {
   });
 });
 
-describe("inproduktiv tid hålls utanför fakturaunderlaget", () => {
+describe("improduktiv tid hålls utanför fakturaunderlaget", () => {
   let stadning: string;
 
   beforeAll(async () => {
@@ -300,7 +300,7 @@ describe("inproduktiv tid hålls utanför fakturaunderlaget", () => {
     expect(report.billableMinutes).toBe(0);
   });
 
-  it("summeringen per order innehåller ingen inproduktiv tid", async () => {
+  it("summeringen per order innehåller ingen improduktiv tid", async () => {
     const report = await buildReport(forCompany(companyId), { kind: "ALL" });
 
     // Utan uppdelningen hade en Map-nyckel blivit tom och gett en tyst

@@ -77,6 +77,25 @@ export const IconMoment = (props: IconProps) => (
   </Icon>
 );
 
+/**
+ * Sopkvast — improduktiv tid.
+ *
+ * Hade samma ikon som Arbetsmoment förut, och två identiska ikoner i samma
+ * meny säger att posterna är samma sak. Det är just det de inte är: den ena
+ * tiden hamnar på en faktura, den andra aldrig.
+ *
+ * En kvast för att städning är det improduktiva alla känner igen. Skaftet på
+ * diagonalen, borsten som en trapets nedtill.
+ */
+export const IconBroom = (props: IconProps) => (
+  <Icon {...props}>
+    <path d="M19 3 10.5 11.5" />
+    <path d="M13.5 8.5 5 17l2 2 8.5-8.5Z" />
+    <path d="M5 17 3 21l4-2" />
+    <path d="M15.5 10.5 13 8" />
+  </Icon>
+);
+
 export const IconDevice = (props: IconProps) => (
   <Icon {...props}>
     <rect x="2" y="4" width="20" height="13" rx="2" />

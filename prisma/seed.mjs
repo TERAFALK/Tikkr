@@ -64,7 +64,7 @@ async function main() {
           { name: "Kvalitetskontroll" },
         ],
       },
-      // Inproduktiv tid: eget register, ingen timkostnad, aldrig i ett
+      // Improduktiv tid: eget register, ingen timkostnad, aldrig i ett
       // fakturaunderlag.
       indirectMoments: {
         create: [

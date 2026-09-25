@@ -277,3 +277,18 @@ export function parseLocalDate(value: string, timeZone: string): Date | null {
     timeZone
   );
 }
+
+/**
+ * Sista millisekunden av dygnet på väggen i angiven tidszon.
+ *
+ * Finns för filtren "till och med". Ett datumfält ger en DAG utan klockslag,
+ * och tolkas det som dygnets början faller hela den dagens stämplingar bort —
+ * vilket ser ut som att ingen arbetat den dagen.
+ *
+ * Räknas som nästa dygns början minus en millisekund, och inte som 23:59:59.
+ * Dygnet då klockan ställs om är inte 24 timmar långt, och en sluttid räknad
+ * för hand hamnar då fel just de nätterna.
+ */
+export function endOfDayIn(instant: Date, timeZone: string): Date {
+  return new Date(addDaysInZone(instant, 1, timeZone).getTime() - 1);
+}

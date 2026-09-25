@@ -23,7 +23,7 @@ import {
  * förklaringen till varför rapporterna räknar annorlunda. Översikten använder
  * samma modul, så att båda vyerna svarar likadant på samma dag.
  *
- * Inproduktiv tid räknas med. Städning är tid på jobbet även om den aldrig
+ * Improduktiv tid räknas med. Städning är tid på jobbet även om den aldrig
  * faktureras.
  *
  * Veckan börjar på måndag. Det är den svenska konventionen och den verkstäder

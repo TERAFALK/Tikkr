@@ -7,7 +7,7 @@ import { getOrderCalcs } from "@/lib/order-calc";
 /**
  * Kalkylen per order.
  *
- * Två saker måste hålla. Den ena: inproduktiv avrundning får inte smyga in, så
+ * Två saker måste hålla. Den ena: improduktiv avrundning får inte smyga in, så
  * att totalen skiljer sig från det kunden räknar för hand. Den andra, och
  * viktigare: en höjd timkostnad får ALDRIG ändra en kalkyl som redan tagits
  * ut och fakturerats.
@@ -545,8 +545,8 @@ describe("timkostnad per person och maskin", () => {
     expect(calc.priceOre).toBe(Math.round(53000 * 1.4));
   });
 
-  it("inproduktiv tid får ingen av satserna", async () => {
-    // Kontrolleras i clock.test.ts på posten. Här: en inproduktiv stämpling
+  it("improduktiv tid får ingen av satserna", async () => {
+    // Kontrolleras i clock.test.ts på posten. Här: en improduktiv stämpling
     // syns aldrig i en efterkalkyl överhuvudtaget.
     await payAnna(35000);
     await work(order, svetsning, 60);

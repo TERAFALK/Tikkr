@@ -197,7 +197,7 @@ export default async function OverviewPage() {
                   </Td>
                   <Td>
                     {entry.order?.orderNumber ?? (
-                      <Badge tone="muted">Inproduktiv</Badge>
+                      <Badge tone="muted">Improduktiv</Badge>
                     )}
                     {entry.order?.customerName && (
                       <span className="ml-2 text-neutral-500">

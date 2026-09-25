@@ -16,7 +16,7 @@ import { drawFooter } from "./pdf-footer";
  * den som ska stämma av en månad behöver den andra, och det är samma fråga
  * med två svar — inte två rapporter.
  *
- * Inproduktiv tid får en egen stapel. Den ska synas, men aldrig blandas in i
+ * Improduktiv tid får en egen stapel. Den ska synas, men aldrig blandas in i
  * det som ska faktureras — se avgränsningen i CLAUDE.md.
  */
 
@@ -140,7 +140,7 @@ function render(
 
   const stats: [string, string][] = [
     ["Att fakturera", formatDuration(report.billableMinutes)],
-    ["Inproduktiv", formatDuration(report.indirectMinutes)],
+    ["Improduktiv", formatDuration(report.indirectMinutes)],
     ["Stämplingar", String(report.rows.length)],
     ["Att granska", String(report.needsReviewCount)],
   ];
@@ -182,11 +182,11 @@ function render(
     "#2563eb"
   );
 
-  // Egen stapel, egen färg, egen rubrik. Inproduktiv tid ska synas men aldrig
+  // Egen stapel, egen färg, egen rubrik. Improduktiv tid ska synas men aldrig
   // se ut som en del av det som ska faktureras.
   y = drawGroupChart(
     doc,
-    "Inproduktiv tid",
+    "Improduktiv tid",
     report.byIndirect,
     report.indirectMinutes,
     y,
@@ -511,7 +511,7 @@ function drawEmployeeDetailTable(
           formatDuration(row.minutes),
         ],
         y,
-        // Inproduktiv tid i samma gula som överallt annars. Den ska synas i
+        // Improduktiv tid i samma gula som överallt annars. Den ska synas i
         // listan utan att läsas som något som ska faktureras.
         row.billable ? "#404040" : "#a16207"
       );

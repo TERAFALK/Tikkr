@@ -22,7 +22,7 @@
  * SAMMANRÄKNINGEN SKER ALLTID PER PERSON. Att två personer arbetar samtidigt
  * är inte överlapp — det är två personer.
  *
- * Inproduktiv tid räknas med. Städning är tid på jobbet även om den aldrig
+ * Improduktiv tid räknas med. Städning är tid på jobbet även om den aldrig
  * faktureras, och den är lika mycket en huvudstämpling som svetsning.
  */
 

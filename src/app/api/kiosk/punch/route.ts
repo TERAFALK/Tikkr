@@ -23,7 +23,7 @@ interface PunchBody {
   employeeId: string;
   orderId?: string;
   momentId?: string;
-  /** Ifyllt i stället för order och moment när tiden är inproduktiv. */
+  /** Ifyllt i stället för order och moment när tiden är improduktiv. */
   indirectMomentId?: string;
   clientPunchId?: string;
   /** När personen tryckte — inte när anropet råkade komma fram. */
@@ -123,7 +123,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ ok: true, closed });
     }
 
-    // Antingen order OCH moment, eller ett inproduktivt moment. Aldrig både
+    // Antingen order OCH moment, eller ett improduktivt moment. Aldrig både
     // och, och aldrig ingetdera — se JobRef i src/lib/clock.ts.
     const job = body.indirectMomentId
       ? ({
@@ -142,7 +142,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         {
           error:
-            "Ange antingen order och arbetsmoment, eller ett inproduktivt moment.",
+            "Ange antingen order och arbetsmoment, eller ett improduktivt moment.",
         },
         { status: 400 }
       );

@@ -3,17 +3,17 @@
 import { revalidatePath } from "next/cache";
 import { requireAdmin } from "@/lib/admin-session";
 
-const PATH = "/admin/inproduktivt";
+const PATH = "/admin/improduktivt";
 
 /**
- * Inproduktiv tid: städning, möten, underhåll.
+ * Improduktiv tid: städning, möten, underhåll.
  *
  * Eget register, skilt från arbetsmomenten med flit. Det ska vara omöjligt att
  * råka välja Städning på en kundorder, och lika omöjligt att få med den tiden
  * i ett fakturaunderlag. En bock på arbetsmomenten hade gett båda felen en
  * chans.
  *
- * Ingen timkostnad här. Inproduktiv tid kalkyleras inte — den redovisas.
+ * Ingen timkostnad här. Improduktiv tid kalkyleras inte — den redovisas.
  */
 
 export async function createIndirectMoment(formData: FormData) {

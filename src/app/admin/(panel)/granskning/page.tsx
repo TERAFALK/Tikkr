@@ -84,7 +84,7 @@ export default async function ReviewPage() {
                     </span>
                     {entry.kind === "INDIRECT" && (
                       <span className="mt-1 inline-block">
-                        <Badge tone="muted">Inproduktiv</Badge>
+                        <Badge tone="muted">Improduktiv</Badge>
                       </span>
                     )}
                   </Td>

@@ -28,7 +28,7 @@ export interface ReportFilters {
    * Vilken sorts tid rapporten avser. UTELÄMNAS DEN GÄLLER "ORDER".
    *
    * Standardvärdet är inte godtyckligt. Varje anropare som glömmer tänka på
-   * inproduktiv tid får fakturerbar tid — aldrig tvärtom. Den som vill ha med
+   * improduktiv tid får fakturerbar tid — aldrig tvärtom. Den som vill ha med
    * städtid måste be om det uttryckligen, och skriver då ut ordet i koden.
    *
    * Samma princip som forCompany i tenant.ts bygger på: filtret går inte att
@@ -48,12 +48,12 @@ export interface ReportRow {
    * describeEntry, så att ingen vy behöver stava ut skillnaden själv.
    */
   label: string;
-  /** Ordernumret. null på inproduktiv tid — den hör inte till någon order. */
+  /** Ordernumret. null på improduktiv tid — den hör inte till någon order. */
   orderNumber: string | null;
   customerName: string | null;
-  /** Arbetsmomentet, eller det inproduktiva momentet. */
+  /** Arbetsmomentet, eller det improduktiva momentet. */
   momentName: string;
-  /** true när raden ska faktureras. false för inproduktiv tid. */
+  /** true när raden ska faktureras. false för improduktiv tid. */
   billable: boolean;
   clockInAt: Date;
   clockOutAt: Date | null;
@@ -81,12 +81,12 @@ export interface ReportResult {
   needsReviewCount: number;
   /** Tid som ska faktureras. Summan av raderna med kind ORDER. */
   billableMinutes: number;
-  /** Inproduktiv tid. Ingår ALDRIG i billableMinutes. */
+  /** Improduktiv tid. Ingår ALDRIG i billableMinutes. */
   indirectMinutes: number;
   byOrder: ReportGroup[];
   byEmployee: ReportGroup[];
   byMoment: ReportGroup[];
-  /** Per inproduktivt moment. Tom när rapporten bara gäller ordertid. */
+  /** Per improduktivt moment. Tom när rapporten bara gäller ordertid. */
   byIndirect: ReportGroup[];
 }
 
@@ -143,7 +143,7 @@ export async function buildReport(
     };
   });
 
-  // Grupperingarna per order och per arbetsmoment får ALDRIG se inproduktiv
+  // Grupperingarna per order och per arbetsmoment får ALDRIG se improduktiv
   // tid. Utan den här uppdelningen hade en Map-nyckel blivit undefined och
   // gett en tyst skräpgrupp mitt i ett fakturaunderlag.
   const billable = entries.filter((entry) => entry.kind === "ORDER");
@@ -189,8 +189,8 @@ type Entry = {
   clockInAt: Date;
   clockOutAt: Date | null;
   employee: { id: string; name: string; employeeNumber: string | null };
-  // Nullbara: en inproduktiv post har varken order eller arbetsmoment, och en
-  // orderpost har inget inproduktivt moment. Anroparen filtrerar på kind INNAN
+  // Nullbara: en improduktiv post har varken order eller arbetsmoment, och en
+  // orderpost har inget improduktivt moment. Anroparen filtrerar på kind INNAN
   // den grupperar, så att en nyckel aldrig blir tom.
   order: { id: string; orderNumber: string; customerName: string | null } | null;
   moment: { id: string; name: string } | null;

@@ -55,7 +55,7 @@ export async function addEntry(
 
   try {
     await createManualEntry(companyId, {
-      // Adminpanelen lägger bara in ORDERTID för hand. Inproduktiv tid som
+      // Adminpanelen lägger bara in ORDERTID för hand. Improduktiv tid som
       // glömts stämplas hellre in på skärmen än skrivs in i efterhand — den
       // ska ändå inte faktureras, och en inskriven städtimme är ingen som
       // saknar den.
@@ -87,7 +87,7 @@ export async function editEntry(formData: FormData) {
   if (!id || !input.clockInAt || !input.clockOutAt) return;
 
   // Posten behåller sin sort. Formuläret visar bara fälten som hör till den,
-  // och ändringen får aldrig flytta en post mellan ordertid och inproduktiv
+  // och ändringen får aldrig flytta en post mellan ordertid och improduktiv
   // tid — det hade ändrat vad som hamnar på ett fakturaunderlag.
   const job =
     input.kind === "INDIRECT"

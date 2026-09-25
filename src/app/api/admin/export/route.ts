@@ -37,7 +37,7 @@ export async function GET(request: NextRequest) {
     momentId: params.get("momentId") ?? undefined,
     // Speglar rapportvyns filter. Utelämnat betyder fakturerbar tid, så en
     // export som görs utan att någon tänkt på saken innehåller aldrig
-    // inproduktiv tid.
+    // improduktiv tid.
     kind:
       params.get("kind") === "INDIRECT"
         ? "INDIRECT"
@@ -240,9 +240,9 @@ async function reportAsPdf(
       ? `Period ${from ?? "start"} – ${to ?? "idag"}`
       : "Hela perioden",
     params.get("kind") === "INDIRECT"
-      ? "Inproduktiv tid"
+      ? "Improduktiv tid"
       : params.get("kind") === "ALL"
-        ? "Fakturerbar och inproduktiv tid"
+        ? "Fakturerbar och improduktiv tid"
         : "Fakturerbar tid",
     view === "person"
       ? "Summerat per anställd"

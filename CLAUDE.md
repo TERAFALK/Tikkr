@@ -21,7 +21,7 @@ Konsekvenser att hålla fast vid:
 - En felaktig stämpling är ett fakturafel, inte ett lönefel. Allvarligt, men
   hanteras genom att admin rättar posten i efterhand.
 
-**Undantaget: inproduktiv tid** (ändrat 2026-09-23). Städning, möten och
+**Undantaget: improduktiv tid** (ändrat 2026-09-23). Städning, möten och
 underhåll får registreras, i ett eget register skilt från arbetsmomenten.
 
 Skälet är inte att den tiden ska faktureras — den når aldrig ett
@@ -36,7 +36,7 @@ Den hålls isär på fyra sätt, och alla fyra ska finnas kvar:
 3. Importgrafen: `pdf.ts` och `calc-pdf.ts` ser bara orderdata, aldrig
    rapporttyperna. Ingen fil ser båda.
 4. `order-export.ts` och `order-calc.ts` filtrerar uttryckligen på
-   `kind: "ORDER"`, fastän en inproduktiv post inte kan ha en order.
+   `kind: "ORDER"`, fastän en improduktiv post inte kan ha en order.
 
 ### Kärnflöde (kiosk)
 
@@ -114,12 +114,12 @@ kiosk_devices  — id, company_id, name, device_token, active, last_seen_at
 
 ### Beslutade regler för stämpling (bestämt 2026-08-10)
 
-1. **En stämpling är antingen ordertid eller inproduktiv tid.**
+1. **En stämpling är antingen ordertid eller improduktiv tid.**
    `time_entries.kind` avgör vilket. ORDER har order + arbetsmoment, INDIRECT
-   har ett inproduktivt moment. Aldrig både och, aldrig ingetdera.
+   har ett improduktivt moment. Aldrig både och, aldrig ingetdera.
 
    Ordertid kräver alltid både order OCH moment — det finns inget "Ingen
-   order"-val och inga interna ordrar. Inproduktiv tid går en egen väg, se
+   order"-val och inga interna ordrar. Improduktiv tid går en egen väg, se
    avgränsningen överst.
 
    Villkoret kan inte uttryckas i databasen (`db push` saknar CHECK) och vaktas

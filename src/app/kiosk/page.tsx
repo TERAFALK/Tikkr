@@ -111,7 +111,7 @@ export default async function KioskPage() {
       orderBy: { name: "asc" },
       select: { id: true, name: true },
     }),
-    // Inproduktiv tid: städning, möten, underhåll. Egen lista med flit — det
+    // Improduktiv tid: städning, möten, underhåll. Egen lista med flit — det
     // ska vara omöjligt att råka välja Städning på en kundorder.
     db.indirectMoment.findMany({
       where: { active: true },

@@ -38,8 +38,8 @@ export default async function IndirectMomentsPage() {
 
   const newMoment = (
     <FormDialog
-      trigger="Nytt inproduktivt moment"
-      title="Lägg till inproduktivt moment"
+      trigger="Nytt improduktivt moment"
+      title="Lägg till improduktivt moment"
       description="Tid som läggs ner men inte på någon kundorder."
       action={createIndirectMoment}
       submitLabel="Lägg till"
@@ -53,7 +53,7 @@ export default async function IndirectMomentsPage() {
   return (
     <>
       <PageHeader
-        title="Inproduktiv tid"
+        title="Improduktiv tid"
         description="Städning, möten och underhåll. Väljs för sig på stämplingsskärmen."
         action={newMoment}
       />
@@ -68,8 +68,8 @@ export default async function IndirectMomentsPage() {
 
       {moments.length === 0 ? (
         <EmptyState
-          title="Inga inproduktiva moment upplagda"
-          description="Utan dem visas ingen knapp för inproduktiv tid på stämplingsskärmen."
+          title="Inga improduktiva moment upplagda"
+          description="Utan dem visas ingen knapp för improduktiv tid på stämplingsskärmen."
           action={newMoment}
         />
       ) : (
@@ -110,7 +110,7 @@ export default async function IndirectMomentsPage() {
                       <FormDialog
                         trigger="Ändra"
                         triggerTone="ghost"
-                        title="Ändra inproduktivt moment"
+                        title="Ändra improduktivt moment"
                         action={renameIndirectMoment}
                         submitLabel="Spara"
                       >

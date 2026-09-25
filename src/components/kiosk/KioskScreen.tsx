@@ -3,7 +3,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { enqueue, flush, pending, type QueuedPunch } from "@/lib/offline-queue";
-import { formatDuration } from "@/lib/format";
 import CompanyBadge from "@/components/ui/CompanyBadge";
 import { LogoMark } from "@/components/ui/Logo";
 import NoticeBanner from "@/components/ui/NoticeBanner";
@@ -15,7 +14,7 @@ import KioskSettings from "./KioskSettings";
  *
  * Grundflödet är fyra vyer: namn → in/ut → order → moment. Runt det ligger
  * sidospår för den som hellre slår in ordernumret, lägger upp ett snabbjobb
- * eller stämplar inproduktiv tid. Ett tryck i taget, ingen PIN, ingen
+ * eller stämplar improduktiv tid. Ett tryck i taget, ingen PIN, ingen
  * bekräftelseruta.
  *
  * INGEN VY LÄNGS VÄGEN ÄNDRAR NÅGOT. Byt jobb stämplar inte ut förrän det nya
@@ -63,7 +62,7 @@ interface Moment {
  * Vilket jobb en stämpling gäller.
  *
  * En diskriminerad union: antingen order plus arbetsmoment, eller ett
- * inproduktivt moment. Aldrig något däremellan, och aldrig fyra valfria fält
+ * improduktivt moment. Aldrig något däremellan, och aldrig fyra valfria fält
  * där man får gissa vilka som är ifyllda.
  *
  * Exporterad eftersom både src/app/kiosk/page.tsx och kioskens state-route
@@ -78,6 +77,18 @@ export type KioskJobChoice =
   | { kind: "INDIRECT"; indirectMoment: { id: string; name: string } };
 
 export interface KioskActiveJob {
+  /**
+   * När stämplingen började, som ISO-tid.
+   *
+   * VISAS INTE just nu. Skärmen hade en tickande tidräknare som räknade upp
+   * härifrån; den togs bort på kundens begäran, eftersom order och moment är
+   * det man behöver läsa på håll och tiden trängde undan dem.
+   *
+   * Fältet står kvar med flit. Det är serverns svar på "sedan när", det kostar
+   * ingenting — tiden ligger redan på raden — och det är fältet att använda om
+   * ett starttid-klockslag efterfrågas. Hur länge ett jobb pågått finns i
+   * panelen och i rapporterna.
+   */
   since: string;
   /** "2601 · Svetsning" eller "Städning". Färdig för skärmen. */
   label: string;
@@ -95,7 +106,7 @@ type ActiveJob = KioskActiveJob;
  * Nyckeln som skiljer en persons parallella jobb åt.
  *
  * Arbetsmomentet för ordertid — momentet är maskinen, och en maskin kör ett
- * jobb i taget. Det inproduktiva momentet för resten: man städar inte två
+ * jobb i taget. Det improduktiva momentet för resten: man städar inte två
  * gånger samtidigt.
  */
 function jobKey(choice: KioskJobChoice): string {
@@ -105,7 +116,7 @@ function jobKey(choice: KioskJobChoice): string {
 /**
  * FÄRGEN SOM SÄGER VAD SOM PÅGÅR.
  *
- * Grönt: det löper fakturerbar tid. Gult: allt som pågår är inproduktivt —
+ * Grönt: det löper fakturerbar tid. Gult: allt som pågår är improduktivt —
  * städning, möte, underhåll — och ingenting av det når ett fakturaunderlag.
  *
  * Skillnaden ska gå att läsa tvärs över en verkstad, precis som skillnaden
@@ -118,9 +129,9 @@ const JOB_TONE = {
 } as const;
 
 /**
- * True när ALLT som pågår är inproduktivt.
+ * True när ALLT som pågår är improduktivt.
  *
- * Kör någon både en maskin och något inproduktivt är kortet grönt. Frågan
+ * Kör någon både en maskin och något improduktivt är kortet grönt. Frågan
  * gulmarkeringen besvarar är "går det tid som inte faktureras", och svaret är
  * då att det också går tid som gör det — vilket är det viktigare beskedet.
  */
@@ -793,7 +804,7 @@ export default function KioskScreen({
                 >
                   Slå in ordernummer
                 </button>
-                {/* Ligger här och inte bland ordrarna. Inproduktiv tid hör
+                {/* Ligger här och inte bland ordrarna. Improduktiv tid hör
                     inte till någon kund, och den som letar efter sin order
                     ska inte kunna råka trycka på Städning. */}
                 {indirectMoments.length > 0 && (
@@ -803,7 +814,7 @@ export default function KioskScreen({
                     }
                     className="kiosk-press rounded-xl border border-neutral-200 bg-white px-5 py-4 text-base font-semibold text-neutral-600 active:bg-neutral-50 sm:text-lg"
                   >
-                    Inproduktiv tid
+                    Improduktiv tid
                   </button>
                 )}
               </div>
@@ -913,8 +924,8 @@ export default function KioskScreen({
 
         {view.name === "indirect" && (
           <Chooser
-            title={`${view.employee.name}: inproduktiv tid`}
-            empty="Inga inproduktiva moment upplagda. Kontakta administratören."
+            title={`${view.employee.name}: improduktiv tid`}
+            empty="Inga improduktiva moment upplagda. Kontakta administratören."
             items={indirectMoments.map((moment) => ({
               key: moment.id,
               primary: moment.name,
@@ -946,7 +957,7 @@ const STEPS: Partial<
   quickCustomer: { current: 2, label: "Vilken kund?" },
   quickMoment: { current: 3, label: "Välj arbetsmoment" },
   moment: { current: 3, label: "Välj arbetsmoment" },
-  indirect: { current: 2, label: "Inproduktiv tid" },
+  indirect: { current: 2, label: "Improduktiv tid" },
 };
 
 function Header({
@@ -1170,27 +1181,34 @@ function EmployeeGrid({
             </span>
 
             {job ? (
+              /* ORDER OCH MOMENT ÄR DET STORA HÄR, inte hur länge jobbet
+                 pågått.
+                 
+                 Tidräknaren satt först i en bricka överst och jobbet stod i
+                 liten grå text under. Fel prioritering: den som går fram till
+                 skärmen behöver veta VAD hen är instämplad på — det är svaret
+                 som avgör om hen ska trycka. Hur många timmar och minuter det
+                 varit står i panelen och i rapporten, för den som behöver det.
+                 
+                 Med flera jobb räcker inte utrymmet för alla. Då står antalet
+                 först, eftersom ett dolt jobb är värre än ett förkortat namn. */
               <span className="mt-3 block">
-                <span className="inline-flex items-center gap-2 rounded-md bg-white/15 px-2.5 py-1 text-sm font-semibold text-white ring-1 ring-inset ring-white/25">
-                  <span className="h-2 w-2 rounded-full bg-white" />
-                  {/* Med flera jobb säger en enda tidräknare inget — då är
-                      antalet det man behöver veta på håll. */}
-                  {jobs.length === 1 ? (
-                    <Elapsed since={job.since} />
-                  ) : (
-                    `${jobs.length} jobb igång`
-                  )}
-                </span>
+                {jobs.length > 1 && (
+                  <span className="mb-1.5 inline-flex items-center gap-2 rounded-md bg-white/15 px-2.5 py-1 text-sm font-semibold text-white ring-1 ring-inset ring-white/25">
+                    <span className="h-2 w-2 rounded-full bg-white" />
+                    {jobs.length} jobb igång
+                  </span>
+                )}
                 {jobs.slice(0, 2).map((entry) => (
                   <span
                     key={jobKey(entry.choice)}
-                    className="mt-1.5 block truncate text-sm text-white/80"
+                    className="block truncate text-lg font-semibold leading-snug text-white sm:text-xl"
                   >
                     {entry.label}
                   </span>
                 ))}
                 {jobs.length > 2 && (
-                  <span className="mt-1 block text-sm text-white/60">
+                  <span className="mt-1 block text-base text-white/70">
                     och {jobs.length - 2} till
                   </span>
                 )}
@@ -1260,18 +1278,23 @@ function ActionChoice({
         <h2 className="text-2xl font-semibold sm:text-3xl">{employee.name}</h2>
 
         {single && (
-          <div className="mt-3 flex flex-wrap items-center gap-2 text-[15px] text-neutral-600">
+          /* Jobbet står stort och brickan säger bara att det pågår. Ordningen
+             är omvänd mot förut, där tiden var det största på raden och order
+             och moment stod i liten grå text bredvid. */
+          <div className="mt-3">
+            <span className="block text-2xl font-semibold leading-snug text-neutral-900 sm:text-3xl">
+              {single.label}
+            </span>
             <span
-              className={`inline-flex items-center gap-2 rounded-md px-3 py-1.5 font-semibold text-white ${
+              className={`mt-2 inline-flex items-center gap-2 rounded-md px-3 py-1.5 text-[15px] font-semibold text-white ${
                 single.choice.kind === "INDIRECT"
                   ? "bg-amber-500"
                   : "bg-emerald-600"
               }`}
             >
               <span className="h-2 w-2 rounded-full bg-white" />
-              Pågår sedan <Elapsed since={single.since} />
+              Pågår
             </span>
-            <span>{single.label}</span>
           </div>
         )}
       </div>
@@ -1291,12 +1314,10 @@ function ActionChoice({
               }`}
             >
               <span className="min-w-0 flex-1">
-                <span className="block truncate text-xl font-semibold text-white">
+                <span className="block truncate text-2xl font-semibold leading-snug text-white">
                   {job.label}
                 </span>
-                <span className="mt-1 block text-sm text-white/80">
-                  Pågår sedan <Elapsed since={job.since} />
-                </span>
+                <span className="mt-1 block text-sm text-white/80">Pågår</span>
               </span>
               <button
                 onClick={() => onClockOut(job)}
@@ -1789,22 +1810,4 @@ function Empty({ children }: { children: React.ReactNode }) {
       {children}
     </div>
   );
-}
-
-/** Visar hur länge ett jobb pågått, och räknar uppåt medan skärmen står på. */
-function Elapsed({ since }: { since: string }) {
-  const start = useMemo(() => new Date(since).getTime(), [since]);
-  const [now, setNow] = useState(() => Date.now());
-
-  useEffect(() => {
-    const timer = setInterval(() => setNow(Date.now()), 30_000);
-    return () => clearInterval(timer);
-  }, []);
-
-  // Samma formatering som resten av systemet. Hade den här komponenten haft
-  // en egen skulle kiosken och panelen visa samma tid olika, och då börjar
-  // man tvivla på siffrorna.
-  const minutes = Math.max(0, Math.floor((now - start) / 60_000));
-
-  return <span>{formatDuration(minutes)}</span>;
 }

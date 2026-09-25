@@ -59,7 +59,7 @@ export async function getOrderExports(
       status: true,
       budgetMinutes: true,
       timeEntries: {
-        // Inproduktiv tid kan aldrig ha en order, men filtret sager vad
+        // Improduktiv tid kan aldrig ha en order, men filtret sager vad
         // fragan handlar om och kostar ingenting.
         where: { kind: "ORDER" },
         orderBy: { clockInAt: "asc" },

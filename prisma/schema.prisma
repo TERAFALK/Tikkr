@@ -24,7 +24,7 @@ enum SubscriptionStatus {
 enum TimeEntryKind {
   /// Tid som ska faktureras en kundorder.
   ORDER
-  /// Inproduktiv tid. Når aldrig ett fakturaunderlag.
+  /// Improduktiv tid. Når aldrig ett fakturaunderlag.
   INDIRECT
 }
 
@@ -290,14 +290,14 @@ model WorkMoment {
 }
 
 /// En stämpling. clockOutAt = null betyder "pågår just nu".
-/// Inproduktiv tid: städning, möten, underhåll.
+/// Improduktiv tid: städning, möten, underhåll.
 ///
 /// Eget register, skilt från WorkMoment med flit. Två skäl. Det ska vara
 /// omöjligt att råka välja Städning på en kundorder, och det ska vara lika
 /// omöjligt att råka få med den tiden i ett fakturaunderlag. En bock på
 /// WorkMoment hade gett båda felen en chans.
 ///
-/// Ingen timkostnad här. Inproduktiv tid kalkyleras inte — den redovisas.
+/// Ingen timkostnad här. Improduktiv tid kalkyleras inte — den redovisas.
 model IndirectMoment {
   id        String  @id @default(cuid())
   companyId String  @map("company_id")
@@ -321,7 +321,7 @@ model TimeEntry {
   employeeId String @map("employee_id")
 
   /// Vad stämplingen avser. ORDER är tid som ska faktureras en kundorder,
-  /// INDIRECT är inproduktiv tid som aldrig når ett fakturaunderlag.
+  /// INDIRECT är improduktiv tid som aldrig når ett fakturaunderlag.
   ///
   /// Fältet är diskriminatorn: exakt ett av fältparen nedan är ifyllt. ORDER
   /// har order + moment, INDIRECT har indirectMoment. Databasen kan inte
@@ -359,7 +359,7 @@ model TimeEntry {
   /// kostnad är summan av de satser som FINNS; saknas båda redovisar kalkylen
   /// raden som saknat underlag i stället för som noll kronor.
   ///
-  /// Inproduktiv tid har aldrig några satser. Den kalkyleras inte alls.
+  /// Improduktiv tid har aldrig några satser. Den kalkyleras inte alls.
   momentCostRateOre   Int? @map("moment_cost_rate_ore")
   employeeCostRateOre Int? @map("employee_cost_rate_ore")
 

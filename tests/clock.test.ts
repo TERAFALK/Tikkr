@@ -1058,7 +1058,7 @@ describe("utstämpling när två jobb pågår", () => {
   });
 });
 
-describe("inproduktiv tid", () => {
+describe("improduktiv tid", () => {
   it("stämplar in utan order", async () => {
     const { started } = await clockIn(companyId, {
       kind: "INDIRECT",
@@ -1071,13 +1071,13 @@ describe("inproduktiv tid", () => {
     expect(started.indirectMomentId).toBe(stadning);
     expect(started.orderId).toBeNull();
     expect(started.momentId).toBeNull();
-    // Inproduktiv tid kalkyleras inte. Varken personens eller maskinens sats
+    // Improduktiv tid kalkyleras inte. Varken personens eller maskinens sats
     // kopieras — den tiden når aldrig ett fakturaunderlag.
     expect(started.momentCostRateOre).toBeNull();
     expect(started.employeeCostRateOre).toBeNull();
   });
 
-  it("en orderstämpling har inget inproduktivt moment", async () => {
+  it("en orderstämpling har inget improduktivt moment", async () => {
     const { started } = await clockIn(companyId, {
       kind: "ORDER",
       employeeId: anna,
@@ -1109,7 +1109,7 @@ describe("inproduktiv tid", () => {
     expect(await getOpenEntries(forCompany(companyId), anna)).toHaveLength(2);
   });
 
-  it("instämpling på samma inproduktiva moment stänger det förra", async () => {
+  it("instämpling på samma improduktiva moment stänger det förra", async () => {
     await clockIn(companyId, {
       kind: "INDIRECT",
       employeeId: anna,
@@ -1128,7 +1128,7 @@ describe("inproduktiv tid", () => {
     expect(await getOpenEntries(forCompany(companyId), anna)).toHaveLength(1);
   });
 
-  it("stämplas ut med sitt inproduktiva moment", async () => {
+  it("stämplas ut med sitt improduktiva moment", async () => {
     await clockIn(companyId, {
       kind: "INDIRECT",
       employeeId: anna,
@@ -1156,7 +1156,7 @@ describe("inproduktiv tid", () => {
     expect(kvar[0].kind).toBe("ORDER");
   });
 
-  it("okänt inproduktivt moment avvisas", async () => {
+  it("okänt improduktivt moment avvisas", async () => {
     await expect(
       clockIn(companyId, {
         kind: "INDIRECT",
@@ -1166,7 +1166,7 @@ describe("inproduktiv tid", () => {
     ).rejects.toThrow(ClockError);
   });
 
-  it("avaktiverat inproduktivt moment avvisas", async () => {
+  it("avaktiverat improduktivt moment avvisas", async () => {
     const vilande = await unsafeGlobalPrisma.indirectMoment.create({
       data: { companyId, name: "Utbildning", active: false },
     });
@@ -1182,7 +1182,7 @@ describe("inproduktiv tid", () => {
     await unsafeGlobalPrisma.indirectMoment.delete({ where: { id: vilande.id } });
   });
 
-  it("glömd inproduktiv stämpling stängs vid klockslaget och flaggas", async () => {
+  it("glömd improduktiv stämpling stängs vid klockslaget och flaggas", async () => {
     await clockIn(companyId, {
       kind: "INDIRECT",
       employeeId: anna,

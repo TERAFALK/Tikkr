@@ -36,7 +36,7 @@ export interface QueuedPunch {
   employeeId: string;
   orderId?: string;
   momentId?: string;
-  /** Ifyllt i stället för order och moment när tiden är inproduktiv. */
+  /** Ifyllt i stället för order och moment när tiden är improduktiv. */
   indirectMomentId?: string;
   /** När personen faktiskt tryckte — inte när det råkade skickas. */
   at: string;

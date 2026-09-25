@@ -2,7 +2,7 @@
  * VAD EN STÄMPLING AVSER, I KLARTEXT.
  *
  * En stämpling är antingen ORDER-tid, som ska faktureras en kundorder, eller
- * INDIRECT — inproduktiv tid som aldrig når ett fakturaunderlag. De två har
+ * INDIRECT — improduktiv tid som aldrig når ett fakturaunderlag. De två har
  * olika fält ifyllda, och sex vyer stavade tidigare ut den skillnaden var för
  * sig.
  *
@@ -34,10 +34,10 @@ export interface EntryLabel {
 export function describeEntry(entry: LabelledEntry): EntryLabel {
   if (entry.kind === "INDIRECT") {
     return {
-      // Namnet på det inproduktiva momentet räcker. Det finns ingen order att
-      // sätta framför, och att skriva "Inproduktiv tid · Städning" vore att
+      // Namnet på det improduktiva momentet räcker. Det finns ingen order att
+      // sätta framför, och att skriva "Improduktiv tid · Städning" vore att
       // säga samma sak två gånger.
-      text: entry.indirectMoment?.name ?? "Inproduktiv tid",
+      text: entry.indirectMoment?.name ?? "Improduktiv tid",
       customerName: null,
       billable: false,
     };

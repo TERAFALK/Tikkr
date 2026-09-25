@@ -3,7 +3,11 @@ import FilterForm from "@/components/admin/FilterForm";
 import { requireAdmin } from "@/lib/admin-session";
 import { unsafeGlobalPrisma } from "@/lib/db";
 import { buildReport, type ReportGroup } from "@/lib/report";
-import { wallTimeIn } from "@/lib/time-zone";
+import {
+  endOfDayIn,
+  parseLocalDate,
+  startOfDayIn,
+} from "@/lib/time-zone";
 import {
   Badge,
   Button,
@@ -22,6 +26,7 @@ import {
   Tr,
 } from "@/components/ui";
 import { formatDateTime, formatDuration, formatDecimalHours } from "@/lib/format";
+import { datePresets } from "@/lib/date-presets";
 import type { ReportResult, ReportRow } from "@/lib/report";
 import type { ReportView } from "@/lib/report-pdf";
 
@@ -58,8 +63,8 @@ export default async function ReportsPage({
   // görs varje måndag, och den ska inte kräva fyra val först.
   //
   // kind=ALL med flit: frågan är vad personen gjort i veckan, och då hör
-  // städning och möten dit. Inproduktiva rader står i gult och rubriken säger
-  // "Fakturerbar och inproduktiv tid", så utskriften kan inte förväxlas med
+  // städning och möten dit. Improduktiva rader står i gult och rubriken säger
+  // "Fakturerbar och improduktiv tid", så utskriften kan inte förväxlas med
   // ett orderunderlag.
   const lastWeekHref =
     `/api/admin/export?from=${lastWeek.from}&to=${lastWeek.to}` +
@@ -77,11 +82,15 @@ export default async function ReportsPage({
     }),
   ]);
 
+  // Datumfälten ger ett datum utan klockslag, och tolkas i FÖRETAGETS tidszon.
+  // "Till och med" sträcker sig till dygnets sista millisekund — annars faller
+  // hela den dagens poster bort, vilket ser ut som att ingen arbetat då.
+  const fromDate = params.from ? parseLocalDate(params.from, timeZone) : null;
+  const toDate = params.to ? parseLocalDate(params.to, timeZone) : null;
+
   const report = await buildReport(db, {
-    // Datumfälten ger ett datum utan klockslag. "Till och med" måste därför
-    // sträcka sig till slutet av den dagen, annars faller dagens poster bort.
-    from: params.from ? new Date(`${params.from}T00:00:00`) : undefined,
-    to: params.to ? new Date(`${params.to}T23:59:59`) : undefined,
+    from: fromDate ? startOfDayIn(fromDate, timeZone) : undefined,
+    to: toDate ? endOfDayIn(toDate, timeZone) : undefined,
     employeeId: params.employeeId,
     orderId: params.orderId,
     momentId: params.momentId,
@@ -214,11 +223,11 @@ export default async function ReportsPage({
 
           <Field
             label="Sorts tid"
-            hint="Fakturerbar tid är standard. Inproduktiv tid ingår aldrig i ett orderunderlag."
+            hint="Fakturerbar tid är standard. Improduktiv tid ingår aldrig i ett orderunderlag."
           >
             <Select name="kind" defaultValue={params.kind ?? "ORDER"}>
               <option value="ORDER">Fakturerbar tid</option>
-              <option value="INDIRECT">Inproduktiv tid</option>
+              <option value="INDIRECT">Improduktiv tid</option>
               <option value="ALL">Båda</option>
             </Select>
           </Field>
@@ -276,7 +285,7 @@ export default async function ReportsPage({
             <Summary title="Per anställd" groups={report.byEmployee} />
             <Summary title="Per arbetsmoment" groups={report.byMoment} />
             {report.byIndirect.length > 0 && (
-              <Summary title="Inproduktiv tid" groups={report.byIndirect} />
+              <Summary title="Improduktiv tid" groups={report.byIndirect} />
             )}
           </div>
 
@@ -388,56 +397,6 @@ export default async function ReportsPage({
   );
 }
 
-/**
- * Snabbval för datumintervall, räknade i företagets tidszon.
- *
- * "Idag" måste betyda idag på verkstaden. Räknade vi i serverns tid skulle
- * intervallet hoppa fel timmarna runt midnatt.
- */
-function datePresets(timeZone: string) {
-  const wall = wallTimeIn(new Date(), timeZone);
-  const iso = (year: number, month: number, day: number) =>
-    `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
-
-  const today = iso(wall.year, wall.month, wall.day);
-
-  // Veckan börjar på måndag. UTC används bara för att räkna kalenderdagar —
-  // datumen kommer från väggklockan i företagets tidszon.
-  const asUtc = new Date(Date.UTC(wall.year, wall.month - 1, wall.day));
-  const weekday = (asUtc.getUTCDay() + 6) % 7;
-  const monday = new Date(asUtc);
-  monday.setUTCDate(asUtc.getUTCDate() - weekday);
-
-  // Förra veckan: måndag till söndag, hela veckan som är klar. Ligger här
-  // eftersom kalenderräkningen redan finns i funktionen, men returneras för
-  // sig — det är en utskriftsknapp och inte ett datumfilter bland de andra.
-  const lastMonday = new Date(monday);
-  lastMonday.setUTCDate(monday.getUTCDate() - 7);
-  const lastSunday = new Date(lastMonday);
-  lastSunday.setUTCDate(lastMonday.getUTCDate() + 6);
-
-  const firstOfMonth = iso(wall.year, wall.month, 1);
-
-  const lastMonthEnd = new Date(Date.UTC(wall.year, wall.month - 1, 0));
-  const lastMonthStart = new Date(
-    Date.UTC(lastMonthEnd.getUTCFullYear(), lastMonthEnd.getUTCMonth(), 1)
-  );
-  const toIso = (date: Date) => date.toISOString().slice(0, 10);
-
-  return {
-    presets: [
-      { label: "Idag", from: today, to: today },
-      { label: "Denna vecka", from: toIso(monday), to: today },
-      { label: "Denna månad", from: firstOfMonth, to: today },
-      {
-        label: "Förra månaden",
-        from: toIso(lastMonthStart),
-        to: toIso(lastMonthEnd),
-      },
-    ],
-    lastWeek: { from: toIso(lastMonday), to: toIso(lastSunday) },
-  };
-}
 
 function Summary({ title, groups }: { title: string; groups: ReportGroup[] }) {
   return (
@@ -498,7 +457,7 @@ function EntryRow({
         </Td>
       )}
       <Td>
-        {row.orderNumber ?? <Badge tone="muted">Inproduktiv</Badge>}
+        {row.orderNumber ?? <Badge tone="muted">Improduktiv</Badge>}
         {row.customerName && (
           <span className="ml-2 text-neutral-500">{row.customerName}</span>
         )}

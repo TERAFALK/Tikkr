@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { requireAdmin } from "@/lib/admin-session";
 import { companyTimeZone } from "@/lib/company";
 import NewEntryDialog from "@/components/admin/NewEntryDialog";
@@ -24,11 +25,13 @@ import { formatDateTime, formatDuration, minutesBetween } from "@/lib/format";
 import { describeEntry } from "@/lib/entry-label";
 import {
   addDaysInZone,
+  endOfDayIn,
   parseLocalDate,
   startOfDayIn,
   toDateInput,
   toLocalDateTimeInput,
 } from "@/lib/time-zone";
+import { datePresets } from "@/lib/date-presets";
 import { deleteEntry, editEntry } from "./actions";
 
 export const dynamic = "force-dynamic";
@@ -36,6 +39,7 @@ export const dynamic = "force-dynamic";
 interface SearchParams {
   employeeId?: string;
   from?: string;
+  to?: string;
 }
 
 export default async function EntriesPage({
@@ -59,6 +63,18 @@ export default async function EntriesPage({
     (params.from ? parseLocalDate(params.from, timeZone) : null) ?? defaultFrom;
   const fromDayStart = startOfDayIn(from, timeZone);
 
+  // "Till och med" sträcker sig till dygnets sista millisekund. Utan det faller
+  // hela den sista dagens stämplingar bort, vilket ser ut som att ingen
+  // arbetade den dagen.
+  //
+  // Utelämnat betyder ingen övre gräns, så pågående jobb syns alltid. Ett
+  // filter som tyst klipper bort dem hade gjort listan opålitlig just när man
+  // letar efter någon som står instämplad.
+  const toDate = params.to ? parseLocalDate(params.to, timeZone) : null;
+  const toDayEnd = toDate ? endOfDayIn(toDate, timeZone) : null;
+
+  const { presets } = datePresets(timeZone);
+
   const [employees, orders, moments, indirectMoments, entries] =
     await Promise.all([
       db.employee.findMany({
@@ -80,7 +96,7 @@ export default async function EntriesPage({
       db.timeEntry.findMany({
         where: {
           employeeId: params.employeeId || undefined,
-          clockInAt: { gte: fromDayStart },
+          clockInAt: { gte: fromDayStart, ...(toDayEnd ? { lte: toDayEnd } : {}) },
         },
         orderBy: { clockInAt: "desc" },
         take: 200,
@@ -137,14 +153,48 @@ export default async function EntriesPage({
       />
 
       <Card className="mb-6">
-        <CardHeader title="Filter" />
-        <FilterForm className="grid gap-4 p-5 sm:grid-cols-3">
+        <CardHeader
+          title="Filter"
+          action={
+            // Samma snabbval som i rapportvyn, av samma skäl: två datumfält per
+            // gång blir många knapptryck för det man gör oftast.
+            <div className="flex flex-wrap gap-1">
+              {presets.map((preset) => {
+                const active =
+                  params.from === preset.from && params.to === preset.to;
+
+                return (
+                  <Link
+                    key={preset.label}
+                    href={`/admin/stamplingar?from=${preset.from}&to=${preset.to}${
+                      params.employeeId
+                        ? `&employeeId=${params.employeeId}`
+                        : ""
+                    }`}
+                    className={`rounded-md px-2.5 py-1 text-xs font-medium transition-colors ${
+                      active
+                        ? "bg-neutral-900 text-white"
+                        : "bg-neutral-100 text-neutral-600 hover:bg-neutral-200"
+                    }`}
+                  >
+                    {preset.label}
+                  </Link>
+                );
+              })}
+            </div>
+          }
+        />
+        <FilterForm className="grid gap-4 p-5 sm:grid-cols-2 lg:grid-cols-4">
           <Field label="Från och med">
             <Input
               type="date"
               name="from"
               defaultValue={params.from ?? toDateInput(defaultFrom, timeZone)}
             />
+          </Field>
+
+          <Field label="Till och med" hint="Lämna tomt för att se allt framåt.">
+            <Input type="date" name="to" defaultValue={params.to ?? ""} />
           </Field>
 
           <Field label="Anställd">
@@ -261,7 +311,7 @@ export default async function EntriesPage({
                               value={entry.employeeId}
                             />
 
-                            {/* Posten behåller sin sort. En inproduktiv
+                            {/* Posten behåller sin sort. En improduktiv
                                 stämpling har varken order eller arbetsmoment,
                                 och visades den i orderformuläret skulle ett
                                 sparat formulär göra en städtimme till
@@ -273,7 +323,7 @@ export default async function EntriesPage({
                             />
 
                             {entry.kind === "INDIRECT" ? (
-                              <Field label="Inproduktivt moment">
+                              <Field label="Improduktivt moment">
                                 <Select
                                   name="indirectMomentId"
                                   defaultValue={entry.indirectMomentId ?? ""}
