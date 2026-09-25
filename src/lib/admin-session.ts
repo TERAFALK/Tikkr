@@ -56,29 +56,35 @@ export interface SupportContext {
   visitId: string;
 }
 
-/** Kastas när en åtgärd som ändrar data körs i supportläge. */
-export class SupportReadOnlyError extends Error {
-  constructor() {
-    super(
-      "Supportläget får bara läsa. Be kunden göra ändringen själv, eller logga " +
-        "in som dem med deras medgivande."
-    );
-    this.name = "SupportReadOnlyError";
-  }
-}
+/** Sidan som förklarar att supportläget bara får läsa. */
+export const READ_ONLY_PATH = "/admin/lasage";
 
 /**
- * VAKTEN FÖR SKRIVNINGAR UTANFÖR FILTRERINGSLAGRET.
+ * VAKTEN FÖR SKRIVNINGAR I SUPPORTLÄGE.
  *
- * `session.db` vägrar redan skriva i supportläge, så det mesta är täckt utan
- * att någon behöver tänka på det. Men `Company` kan inte filtreras på sig själv
- * och nås därför via `unsafeGlobalPrisma` — de skrivningarna ser inte läsläget.
+ * `session.db` vägrar redan skriva, så det mesta är täckt utan att någon behöver
+ * tänka på det. Men två vägar går runt den:
  *
- * Varje sådan åtgärd måste börja med den här raden. Att det inte glöms bevisas
- * av tests/support-coverage.test.ts, som läser källfilerna.
+ *   - `Company` kan inte filtreras på sig själv och nås via `unsafeGlobalPrisma`.
+ *   - `clock.ts`, `admin-users.ts` och `quick-order.ts` tar ett companyId och
+ *     bygger sin EGEN klient.
+ *
+ * Därför ska VARJE serveråtgärd i panelen börja med den här raden. Att det inte
+ * glöms bevisas av tests/support-coverage.test.ts, som läser källfilerna.
+ *
+ * OMDIRIGERAR, KASTAR INTE.
+ *
+ * Först kastade den ett undantag. Adminpanelen saknade felgräns, så resultatet
+ * blev ramverkets råa felsida — engelsk text och ett spårnings-id, i praktiken
+ * "något gick sönder". Men ingenting gick sönder: systemet gjorde precis det det
+ * skulle. Ett VÄNTAT nej hör inte till felhanteringen.
+ *
+ * redirect() fungerar i alla åtgärder oavsett form, både de som returnerar ett
+ * tillstånd till useActionState och de som inte returnerar något. Ett svar per
+ * åtgärdsform hade blivit fjorton olika sätt att säga samma sak.
  */
 export function assertWritable(session: AdminSession): void {
-  if (session.support) throw new SupportReadOnlyError();
+  if (session.support) redirect(READ_ONLY_PATH);
 }
 
 /**

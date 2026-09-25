@@ -55,7 +55,7 @@ vi.mock("next/headers", () => ({
   }),
 }));
 
-const { currentAdmin, assertWritable, SupportReadOnlyError } = await import(
+const { currentAdmin, assertWritable, READ_ONLY_PATH } = await import(
   "@/lib/admin-session"
 );
 const { __internals } = await import("@/lib/support-session");
@@ -263,7 +263,10 @@ describe("supportläge", () => {
 
     const session = await currentAdmin();
 
-    expect(() => assertWritable(session!)).toThrow(SupportReadOnlyError);
+    // Omdirigerar, kastar inte. Ett väntat nej ska inte bli ramverkets råa
+    // felsida. Mocken av next/navigation kastar med adressen i meddelandet,
+    // vilket är hur omdirigeringen går att kontrollera här.
+    expect(() => assertWritable(session!)).toThrow(READ_ONLY_PATH);
   });
 
   it("assertWritable släpper igenom kundens egen inloggning", async () => {

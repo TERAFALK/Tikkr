@@ -31,9 +31,12 @@ vi.mock("next/cache", () => ({ revalidatePath: () => {} }));
 // dragit in support-session.ts, som läser cookies och kräver en pågående
 // förfrågan — den finns inte här.
 //
-// assertWritable måste därför finnas med, och den måste bete sig som den
-// riktiga: en mock som alltid släpper igenom hade gjort testet blint för att
-// vakten togs bort ur åtgärden.
+// assertWritable måste därför finnas med, och den måste NEKA när sessionen är
+// ett supportbesök. En mock som alltid släpper igenom hade gjort testet blint
+// för att vakten togs bort ur åtgärden.
+//
+// Den riktiga omdirigerar; här kastas i stället, eftersom en omdirigering
+// kräver next/navigation. Det som prövas är att åtgärden inte fortsätter.
 vi.mock("@/lib/admin-session", () => ({
   requireAdmin: async () => ({
     userId: "test-admin",
