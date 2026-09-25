@@ -27,6 +27,13 @@ let email = "admin@demo.se";
 // administratör och Next:s cache; här räcker ett företag och en tom funktion.
 vi.mock("next/cache", () => ({ revalidatePath: () => {} }));
 
+// Hela modulen ersätts, inte bara requireAdmin. Att importera originalet hade
+// dragit in support-session.ts, som läser cookies och kräver en pågående
+// förfrågan — den finns inte här.
+//
+// assertWritable måste därför finnas med, och den måste bete sig som den
+// riktiga: en mock som alltid släpper igenom hade gjort testet blint för att
+// vakten togs bort ur åtgärden.
 vi.mock("@/lib/admin-session", () => ({
   requireAdmin: async () => ({
     userId: "test-admin",
@@ -35,7 +42,11 @@ vi.mock("@/lib/admin-session", () => ({
     companyName: "Granskningstest AB",
     role: "OWNER",
     db: forCompany(companyId),
+    support: undefined,
   }),
+  assertWritable: (session: { support?: unknown }) => {
+    if (session.support) throw new Error("Supportläget får bara läsa.");
+  },
 }));
 
 const { reviewEntry } = await import("@/app/admin/(panel)/granskning/actions");

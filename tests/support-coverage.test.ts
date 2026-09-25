@@ -50,7 +50,10 @@ function actionFiles(dir: string): string[] {
 }
 
 const files = actionFiles(PANEL_ROOT).map((file) => ({
-  file: path.relative(path.resolve(__dirname, ".."), file).replace(/\/g, "/"),
+  file: path
+    .relative(path.resolve(__dirname, ".."), file)
+    .split(path.sep)
+    .join("/"),
   source: readFileSync(file, "utf8"),
 }));
 

@@ -124,9 +124,31 @@ export async function endSupportSession(): Promise<void> {
   (await cookies()).delete(COOKIE);
 }
 
-/** Det pågående supportbesöket, eller null. */
+/**
+ * Det pågående supportbesöket, eller null.
+ *
+ * UTANFÖR ETT REQUEST-SAMMANHANG ger den null i stället för att kasta.
+ *
+ * `cookies()` kräver en pågående förfrågan och kastar annars. Eftersom den här
+ * funktionen anropas från `currentAdmin()` — som i sin tur är grinden till hela
+ * adminpanelen — skulle ett kast här göra att grinden slutar fungera överallt
+ * där det inte finns någon förfrågan att läsa cookies ur. Det upptäcktes av
+ * admin-session.test.ts, som anropar currentAdmin() rakt av.
+ *
+ * Semantiken är rätt: finns ingen förfrågan finns ingen cookie, alltså inget
+ * besök. Alla ANDRA skäl att avvisa en cookie hanteras redan av decode(), som
+ * returnerar null för allt som inte är en giltig, signerad och opasserad
+ * session — så det här fångar inte något som borde synas.
+ */
 export async function readSupportSession(): Promise<SupportSession | null> {
-  const token = (await cookies()).get(COOKIE)?.value;
+  let token: string | undefined;
+
+  try {
+    token = (await cookies()).get(COOKIE)?.value;
+  } catch {
+    return null;
+  }
+
   if (!token) return null;
 
   return decode(token);

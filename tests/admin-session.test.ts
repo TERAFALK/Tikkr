@@ -15,6 +15,10 @@ import { unsafeGlobalPrisma } from "@/lib/db";
  * next-auth mockas bort helt. Dels för att en riktig session kräver ett
  * inkommande anrop, dels för att modulen drar in next/server som inte går att
  * ladda utanför en Next-miljö.
+ *
+ * SUPPORTLÄGET går genom samma grind, och prövas längst ner. Cookien ersätts
+ * med en burk i minnet — det är innehållet grinden ska svara på, inte hur
+ * webbläsaren bär det.
  */
 
 /** Vad den påhittade sessionen ska svara. Ändras per test. */
@@ -39,7 +43,22 @@ vi.mock("next/navigation", () => ({
   },
 }));
 
-const { currentAdmin } = await import("@/lib/admin-session");
+/** Supportcookien, eller null när inget besök pågår. Ändras per test. */
+let supportCookie: string | null = null;
+
+vi.mock("next/headers", () => ({
+  cookies: async () => ({
+    get: (name: string) =>
+      name === "tikkr_support" && supportCookie
+        ? { name, value: supportCookie }
+        : undefined,
+  }),
+}));
+
+const { currentAdmin, assertWritable, SupportReadOnlyError } = await import(
+  "@/lib/admin-session"
+);
+const { __internals } = await import("@/lib/support-session");
 
 let companyId: string;
 let otherCompanyId: string;
@@ -48,6 +67,8 @@ let unique: string;
 
 beforeEach(async () => {
   unique = Math.random().toString(36).slice(2, 10);
+  supportCookie = null;
+  process.env.AUTH_SECRET ??= "testhemlighet-for-sessionstestet";
 
   const [company, other] = await Promise.all([
     unsafeGlobalPrisma.company.create({
@@ -78,6 +99,9 @@ beforeEach(async () => {
 afterEach(async () => {
   sessionUserId = null;
   sessionIssuedAt = undefined;
+  // Städas på båda hållen. En kvarglömd supportcookie hade gjort nästa test
+  // till ett supportbesök utan att testet nämnde något om det.
+  supportCookie = null;
   await unsafeGlobalPrisma.company.deleteMany({
     where: { name: { startsWith: "Sessionstest " } },
   });
@@ -180,5 +204,109 @@ describe("företagsnamnet läses ur databasen", () => {
     const admin = await currentAdmin();
 
     expect(admin?.companyName).toBe(`Sessionstest ${unique} omdöpt`);
+  });
+});
+
+describe("supportläge", () => {
+  /**
+   * Leverantören ser kundens panel utan kundens lösenord. Grinden måste då
+   * lämna en session för KUNDENS företag men med LEVERANTÖRENS adress, och en
+   * databasklient som inte kan skriva.
+   *
+   * Går något av det fel blir felet tyst: panelen ser ut att fungera, och
+   * antingen skrivs kundens data av någon utifrån, eller så står leverantörens
+   * ändringar som kundens egna i loggen.
+   */
+
+  /** Sätter en giltig supportcookie för ett företag. */
+  async function enterSupport(target = companyId) {
+    const visit = await unsafeGlobalPrisma.supportVisit.create({
+      data: { companyId: target, email: "adi@terafalk.se" },
+    });
+
+    supportCookie = __internals.encode({
+      companyId: target,
+      email: "adi@terafalk.se",
+      visitId: visit.id,
+      exp: Math.floor(Date.now() / 1000) + 600,
+    });
+
+    return visit;
+  }
+
+  it("ger en session för kundens företag med leverantörens adress", async () => {
+    await enterSupport();
+
+    const session = await currentAdmin();
+
+    expect(session?.companyId).toBe(companyId);
+    // Inget kundkonto lånas. Står kundens adress här skulle allt som skrivs
+    // ner under besöket påstå att de gjorde det.
+    expect(session?.email).toBe("adi@terafalk.se");
+    expect(session?.role).toBe("SUPPORT");
+    expect(session?.support).toBeTruthy();
+  });
+
+  it("databasklienten kan läsa men inte skriva", async () => {
+    await enterSupport();
+
+    const session = await currentAdmin();
+
+    expect(await session!.db.employee.count()).toBe(0);
+    await expect(
+      session!.db.employee.create({ data: { companyId, name: "Ny" } })
+    ).rejects.toThrow();
+  });
+
+  it("assertWritable stoppar åtgärder som ändrar data", async () => {
+    await enterSupport();
+
+    const session = await currentAdmin();
+
+    expect(() => assertWritable(session!)).toThrow(SupportReadOnlyError);
+  });
+
+  it("assertWritable släpper igenom kundens egen inloggning", async () => {
+    sessionUserId = ownerId;
+
+    const session = await currentAdmin();
+
+    expect(session?.support).toBeUndefined();
+    expect(() => assertWritable(session!)).not.toThrow();
+  });
+
+  it("supportcookien vinner över en samtidig kundsession", async () => {
+    // Att låta kundsessionen vinna hade gett SKRIVRÄTT i ett läge som ser ut
+    // som läsläge — det värsta av de två utfallen.
+    sessionUserId = ownerId;
+    await enterSupport(otherCompanyId);
+
+    const session = await currentAdmin();
+
+    expect(session?.companyId).toBe(otherCompanyId);
+    expect(session?.support).toBeTruthy();
+  });
+
+  it("ett besök hos ett raderat företag ger ingen session", async () => {
+    const visit = await enterSupport();
+    await unsafeGlobalPrisma.company.delete({ where: { id: companyId } });
+
+    expect(await currentAdmin()).toBeNull();
+    expect(visit.id).toBeTruthy();
+  });
+
+  it("en utgången cookie ger ingen session", async () => {
+    const visit = await unsafeGlobalPrisma.supportVisit.create({
+      data: { companyId, email: "adi@terafalk.se" },
+    });
+
+    supportCookie = __internals.encode({
+      companyId,
+      email: "adi@terafalk.se",
+      visitId: visit.id,
+      exp: Math.floor(Date.now() / 1000) - 1,
+    });
+
+    expect(await currentAdmin()).toBeNull();
   });
 });
