@@ -430,7 +430,7 @@ describe("pågående och ogranskad tid räknas men flaggas", () => {
     expect(calc.totalMinutes).toBeGreaterThanOrEqual(0);
   });
 
-  it("rapporterar poster som systemet gissat sluttiden på", async () => {
+  it("rapporterar poster där systemet räknat fram sluttiden", async () => {
     await work(order, svetsning, 60);
     await unsafeGlobalPrisma.timeEntry.updateMany({
       where: { companyId, orderId: order },

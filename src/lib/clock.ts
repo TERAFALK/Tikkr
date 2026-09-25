@@ -379,8 +379,8 @@ export async function clockOutAll(
  * tidpunkten passerat stängs posten där.
  *
  * Posten flaggas ALLTID för granskning. Systemet vet inte när personen
- * verkligen slutade; det gissar för att fakturaunderlaget ska bli användbart,
- * och talar om att det gissat.
+ * verkligen slutade; det räknar fram en tid för att fakturaunderlaget ska bli
+ * användbart, och talar om att tiden är räknad och inte stämplad.
  */
 export async function autoCloseForgottenEntries(
   companyId: string,
@@ -411,7 +411,7 @@ export async function autoCloseForgottenEntries(
 
     // `clockOutAt: null` i villkoret: hinner personen stämpla ut själv mellan
     // uppslaget och skrivningen ska DERAS tid gälla. Utan villkoret skriver
-    // jobbet över en riktig utstämpling med sin gissning och flaggar posten
+    // jobbet över en riktig utstämpling med sin beräknade tid och flaggar posten
     // för granskning — alltså gör bra data till ett ärende för kontoret.
     const { count } = await db.timeEntry.updateMany({
       where: { id: entry.id, clockOutAt: null },
@@ -486,7 +486,7 @@ export async function openEntriesOnOrder(
  * Posterna flaggas för granskning. Systemet vet inte när arbetet faktiskt
  * slutade — det vet bara att ordern avslutades — och ska därför inte låtsas
  * att tiden är färdig att fakturera. Samma hållning som vid automatisk
- * utstämpling: gissa hellre öppet än tyst.
+ * utstämpling: räkna hellre fram en tid öppet än tyst.
  *
  * `source` rörs inte. Det fältet beskriver hur posten SKAPADES, inte hur den
  * stängdes.
@@ -586,7 +586,7 @@ export async function createManualEntry(
       clockOutAt: input.clockOutAt,
       // Satserna som de är NU. En tid som skrivs in i efterhand saknar egen
       // historia — det enda systemet vet är vad personen och momentet kostar
-      // idag, och att gissa något annat vore att hitta på.
+      // idag, och att anta något annat vore att hitta på.
       ...rates,
       source: "ADMIN_MANUAL",
       needsReview: false,

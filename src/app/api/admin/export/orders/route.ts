@@ -281,7 +281,7 @@ async function buildWorkbook(
     for (const row of order.rows) {
       const notes: string[] = [];
       if (row.ongoing) notes.push("Pågår");
-      if (row.needsReview) notes.push("Gissad sluttid");
+      if (row.needsReview) notes.push("Beräknad sluttid");
       if (row.manual) notes.push("Inlagd för hand");
 
       sheet.addRow([

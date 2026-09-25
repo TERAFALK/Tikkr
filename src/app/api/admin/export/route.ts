@@ -17,7 +17,7 @@ import type { ReportResult } from "@/lib/report";
  *  - riktiga datum- och tidsceller, så sortering och filtrering fungerar
  *  - en flik per sammanställning, plus en med alla rader
  *  - en tydlig kolumn som markerar poster som ännu inte granskats, så att
- *    ingen råkar fakturera en gissad tid utan att veta om det
+ *    ingen råkar fakturera en beräknad tid utan att veta om det
  */
 
 export const runtime = "nodejs";
@@ -78,7 +78,7 @@ export async function GET(request: NextRequest) {
   for (const row of report.rows) {
     const notes: string[] = [];
     if (row.ongoing) notes.push("Pågår — ej avslutad");
-    if (row.needsReview) notes.push("Gissad sluttid, ej granskad");
+    if (row.needsReview) notes.push("Beräknad sluttid, ej granskad");
     if (row.manual) notes.push("Tid inskriven av administratör");
 
     details.addRow({

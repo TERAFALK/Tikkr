@@ -145,7 +145,8 @@ kiosk_devices  — id, company_id, name, device_token, active, last_seen_at
 3. **Glömd utstämpling stängs vid ett fast klockslag OCH flaggas.**
    `companies.auto_close_at` (standard "18:00", per företag) styr när. Posten
    får `source = AUTO_CLOSE`, `needs_review = true` och en `review_note` i
-   klartext. Systemet gissar aldrig tyst — admin får en lista att rätta.
+   klartext. Systemet fyller aldrig i en tid i tysthet — admin får en lista
+   att rätta.
    Tidszon per företag, annars glider klockslaget mellan sommar- och vintertid.
 
 4. **Självkostnaden är personens sats PLUS momentets** (bestämt 2026-09-25).

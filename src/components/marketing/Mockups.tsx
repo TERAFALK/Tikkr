@@ -388,7 +388,7 @@ export function ReportMockup({ className = "" }: { className?: string }) {
 /**
  * Posten där utstämplingen saknas.
  *
- * Visar det som skiljer Tikkr från ett system som gissar tyst: sluttiden är
+ * Visar det som skiljer Tikkr från ett system som fyller i tyst: sluttiden är
  * beräknad, den är märkt som beräknad, och den ligger i en lista som ska
  * gås igenom före fakturering.
  */

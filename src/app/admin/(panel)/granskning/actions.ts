@@ -8,7 +8,7 @@ import { instantFromWallTime } from "@/lib/time-zone";
 const PATH = "/admin/granskning";
 
 /**
- * Rättar sluttiden på en post systemet gissat.
+ * Rättar sluttiden på en post systemet räknat fram.
  *
  * Posten märks som ADMIN_MANUAL. Det är viktigt: en tid någon skrivit in för
  * hand ska aldrig gå att förväxla med en riktig stämpling, varken i rapporter
@@ -63,7 +63,7 @@ export async function correctEntry(formData: FormData) {
   revalidatePath(PATH);
 }
 
-/** Godkänner systemets gissning som den är. */
+/** Godkänner den beräknade sluttiden som den är. */
 export async function approveEntry(formData: FormData) {
   const { db, email } = await requireAdmin();
 

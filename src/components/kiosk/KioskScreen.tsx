@@ -625,7 +625,7 @@ export default function KioskScreen({
    *
    * Jobbet skickas med i stället för att slås upp: personen kan ha flera
    * igång, och skärmen vet vilket knappen satt på. Momentet följer med till
-   * servern — utan det måste den gissa, och en gissning flaggas.
+   * servern — utan det måste den välja åt oss, och då flaggas posten.
    */
   const punchOut = useCallback(
     (employee: Employee, job: ActiveJob) => {
@@ -1300,8 +1300,8 @@ function ActionChoice({
       </div>
 
       {/* Flera jobb får varsin rad med egen utstämplingsknapp. En gemensam
-          knapp hade tvingat servern att gissa vilket som avsågs, och en
-          gissning i ett fakturaunderlag är en rad någon måste rätta. */}
+          knapp hade tvingat servern att välja vilket som avsågs, och ett
+          godtyckligt val i ett fakturaunderlag är en rad någon måste rätta. */}
       {jobs.length > 1 && (
         <div className="mt-3 space-y-3">
           {jobs.map((job) => (

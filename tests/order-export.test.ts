@@ -105,7 +105,7 @@ describe("underlag för en order", () => {
     expect(order.lastEntryAt?.toISOString()).toBe("2026-08-04T06:00:00.000Z");
   });
 
-  it("markerar poster med gissad sluttid", async () => {
+  it("markerar poster med beräknad sluttid", async () => {
     const [order] = await getOrderExports(forCompany(companyId), [orderB]);
 
     expect(order.ungradedCount).toBe(1);

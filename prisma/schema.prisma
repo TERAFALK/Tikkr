@@ -87,7 +87,7 @@ model Company {
   subscriptionInterval String? @map("subscription_interval")
 
   /// Klockslag då glömda stämplingar stängs automatiskt, "HH:MM".
-  /// Posten stängs men flaggas för granskning — systemet gissar aldrig tyst.
+  /// Posten stängs men flaggas för granskning — aldrig en tid i tysthet.
   autoCloseAt String @default("18:00") @map("auto_close_at")
 
   /// Behövs för att veta när "18:00" inträffar. Sommartid hanteras av
@@ -363,7 +363,7 @@ model TimeEntry {
   momentCostRateOre   Int? @map("moment_cost_rate_ore")
   employeeCostRateOre Int? @map("employee_cost_rate_ore")
 
-  /// Sätts när systemet gissat sig till en utstämpling, t.ex. vid det
+  /// Sätts när systemet räknat fram en utstämpling, t.ex. vid det
   /// automatiska klockslaget. Admin får en lista att gå igenom och rätta.
   needsReview Boolean @default(false) @map("needs_review")
 

@@ -203,7 +203,7 @@ function renderOrder(
       x += COLUMNS[index].width;
     });
 
-    // Markering för tid systemet gissat eller någon skrivit in för hand.
+    // Markering för tid systemet räknat fram eller någon skrivit in för hand.
     // Mottagaren har rätt att veta vilka rader som inte kommer från en riktig
     // stämpling — att dölja det vore att lura någon som betalar.
     if (row.needsReview || row.manual) {

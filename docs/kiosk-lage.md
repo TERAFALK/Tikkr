@@ -106,5 +106,5 @@ Systemet stänger posten vid företagets inställda klockslag — standard **18:
 ändras per företag — och **flaggar den för granskning**. Admin ser en lista över
 sådana poster och rättar tiden innan fakturering.
 
-Systemet gissar alltså för att underlaget ska gå att använda, men talar alltid
-om att det gissat.
+Systemet räknar alltså fram en tid för att underlaget ska gå att använda, men
+talar alltid om att tiden är räknad och inte stämplad.

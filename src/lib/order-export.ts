@@ -35,7 +35,7 @@ export interface OrderExport {
   budgetMinutes: number | null;
   rows: OrderExportRow[];
   totalMinutes: number;
-  /** Poster där sluttiden är gissad av systemet och ännu inte granskad. */
+  /** Poster där sluttiden är beräknad av systemet och ännu inte granskad. */
   ungradedCount: number;
   /** Poster som fortfarande pågår. Tiden fortsätter räknas upp. */
   ongoingCount: number;

@@ -153,7 +153,7 @@ describe("automatisk utstämpling vid byte av jobb på samma maskin", () => {
     expect(autoClosed).not.toBeNull();
     expect(autoClosed!.orderId).toBe(orderA);
     expect(autoClosed!.clockOutAt?.toISOString()).toBe(lunch.toISOString());
-    // Jobbyte är ingen systemgissning — personen stämplade själv. Posten
+    // Jobbyte är inte räknat fram — personen stämplade själv. Posten
     // behåller sitt ursprung och flaggas inte för granskning.
     expect(autoClosed!.source).toBe("KIOSK");
     expect(autoClosed!.needsReview).toBe(false);
