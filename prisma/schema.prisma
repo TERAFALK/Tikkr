@@ -127,10 +127,11 @@ model Company {
   orders          Order[]
   workMoments     WorkMoment[]
   indirectMoments IndirectMoment[]
-  timeEntries  TimeEntry[]
-  adminUsers   AdminUser[]
-  adminInvites AdminInvite[]
-  kioskDevices KioskDevice[]
+  timeEntries     TimeEntry[]
+  adminUsers      AdminUser[]
+  adminInvites    AdminInvite[]
+  kioskDevices    KioskDevice[]
+  supportVisits   SupportVisit[]
 
   @@map("companies")
 }
@@ -536,6 +537,38 @@ model RevenueSnapshot {
 ///
 /// Exempelvis när schemajobbet senast kördes. Ett fält per rad, så att ett
 /// nytt värde inte kräver en schemaändring.
+/// ETT SUPPORTBESÖK — när någon hos leverantören sett en kunds panel.
+///
+/// Åtkomsten sker i LÄSLÄGE och kringgår kundens lösenord, vilket är precis
+/// därför den måste lämna ett spår. Utan den här tabellen finns ingenting som
+/// visar att en utomstående läst kundens anställda, tider och kunduppgifter.
+///
+/// Står MEDVETET utanför tenant-filtreringen trots company_id: raden gäller
+/// leverantörens åtkomst till kunden, inte kundens egen data, och läses bara i
+/// plattformspanelen. Därför registreras den inte i TENANT_SCOPED_MODELS —
+/// undantaget som testet `alla kundnära modeller är registrerade` måste känna.
+model SupportVisit {
+  id        String @id @default(cuid())
+  companyId String @map("company_id")
+
+  /// Plattformskontots adress. Inte ett kundkonto — inget sådant lånas.
+  email String
+
+  startedAt DateTime @default(now()) @map("started_at")
+
+  /// Senaste sidladdningen under besöket. Ger längden utan att kräva att någon
+  /// kommer ihåg att trycka "avsluta" — en stängd flik lämnar aldrig ett slut.
+  /// Uppdateras högst en gång per minut, annars blir en halvtimme trettio
+  /// skrivningar.
+  lastSeenAt DateTime @default(now()) @map("last_seen_at")
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@index([companyId, startedAt])
+  @@index([startedAt])
+  @@map("support_visits")
+}
+
 model PlatformState {
   key       String   @id
   value     String

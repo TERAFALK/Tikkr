@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { requireAdmin } from "@/lib/admin-session";
+import { assertWritable, requireAdmin } from "@/lib/admin-session";
 
 const PATH = "/admin/kom-igang";
 
@@ -27,7 +27,9 @@ function readLines(value: FormDataEntryValue | null): string[] {
  * upp halvvägs. Här klistrar man in listan man ändå har.
  */
 export async function addEmployees(formData: FormData) {
-  const { db, companyId } = await requireAdmin();
+  const session = await requireAdmin();
+  assertWritable(session);
+  const { db, companyId } = session;
 
   const names = readLines(formData.get("names"));
   if (names.length === 0) return;
@@ -46,7 +48,9 @@ export async function addEmployees(formData: FormData) {
 }
 
 export async function addMoments(formData: FormData) {
-  const { db, companyId } = await requireAdmin();
+  const session = await requireAdmin();
+  assertWritable(session);
+  const { db, companyId } = session;
 
   // Både förvalda förslag och egna rader hamnar i samma lista.
   const picked = formData.getAll("suggested").map(String);
@@ -68,7 +72,9 @@ export async function addMoments(formData: FormData) {
 }
 
 export async function addOrder(formData: FormData) {
-  const { db, companyId } = await requireAdmin();
+  const session = await requireAdmin();
+  assertWritable(session);
+  const { db, companyId } = session;
 
   const orderNumber = String(formData.get("orderNumber") ?? "").trim();
   const customerName = String(formData.get("customerName") ?? "").trim();

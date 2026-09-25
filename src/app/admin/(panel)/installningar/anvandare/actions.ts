@@ -2,7 +2,7 @@
 
 import { headers } from "next/headers";
 import { revalidatePath } from "next/cache";
-import { requireAdmin } from "@/lib/admin-session";
+import { assertWritable, requireAdmin } from "@/lib/admin-session";
 import {
   AdminUserError,
   INVITE_DAYS,
@@ -29,6 +29,7 @@ export async function createInvite(
   formData: FormData
 ): Promise<InviteState> {
   const session = await requireAdmin();
+  assertWritable(session);
 
   const email = String(formData.get("email") ?? "");
   const asRole = String(formData.get("role") ?? "ADMIN") === "OWNER"
@@ -86,6 +87,7 @@ export async function createInvite(
 
 export async function deleteAdmin(formData: FormData) {
   const session = await requireAdmin();
+  assertWritable(session);
 
   try {
     await removeAdmin({
@@ -104,6 +106,7 @@ export async function deleteAdmin(formData: FormData) {
 
 export async function cancelInvite(formData: FormData) {
   const session = await requireAdmin();
+  assertWritable(session);
 
   await revokeInvite({
     companyId: session.companyId,

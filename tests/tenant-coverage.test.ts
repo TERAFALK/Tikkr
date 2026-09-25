@@ -16,6 +16,21 @@ const schema = readFileSync(
   "utf8"
 );
 
+/**
+ * Modeller som har company_id men INTE ska tenant-filtreras.
+ *
+ * Varje rad här är ett hål i det automatiska skyddet och måste därför ha ett
+ * skäl som håller. Listan är med flit kort och svår att utöka av slarv: den som
+ * lägger till ett namn får skriva varför.
+ *
+ * SupportVisit: raden beskriver LEVERANTÖRENS åtkomst till en kund, inte
+ * kundens egen data. Den skapas av plattformspanelen och läses bara där. Låg
+ * den i filtreringslagret skulle en supportsession kunna läsa sina egna
+ * besöksrader genom kundens klient — och i läsläge inte kunna skapa dem alls,
+ * vilket är just det spår besöket måste lämna.
+ */
+const DELIBERATELY_UNSCOPED = ["SupportVisit"];
+
 function modelsInSchema(): string[] {
   return [...schema.matchAll(/^model\s+(\w+)\s*\{/gm)].map((m) => m[1]);
 }
@@ -31,7 +46,8 @@ describe("multi-tenant: alla kundnära modeller är registrerade", () => {
     const unprotected = modelsInSchema().filter(
       (name) =>
         /companyId\s+String/.test(bodyOfModel(name)) &&
-        !TENANT_SCOPED_MODELS.includes(name as never)
+        !TENANT_SCOPED_MODELS.includes(name as never) &&
+        !DELIBERATELY_UNSCOPED.includes(name)
     );
 
     expect(
@@ -54,5 +70,20 @@ describe("multi-tenant: alla kundnära modeller är registrerade", () => {
 
   it("Company är inte registrerad — den är tenanten, inte en tenant-ägd tabell", () => {
     expect(TENANT_SCOPED_MODELS).not.toContain("Company" as never);
+  });
+
+  it("varje undantag finns i schemat och är inte registrerat", () => {
+    // Ett undantag som pekar på en borttagen modell är ett hål som står kvar
+    // och väntar på nästa modell med samma namn. Ett som ÄR registrerat är
+    // bara vilseledande.
+    const existing = modelsInSchema();
+
+    for (const name of DELIBERATELY_UNSCOPED) {
+      expect(existing, `${name} finns inte i schema.prisma`).toContain(name);
+      expect(
+        TENANT_SCOPED_MODELS,
+        `${name} står både som undantag och som registrerad`
+      ).not.toContain(name as never);
+    }
   });
 });

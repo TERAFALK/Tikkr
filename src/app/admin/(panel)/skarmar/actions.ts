@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { requireAdmin } from "@/lib/admin-session";
+import { assertWritable, requireAdmin } from "@/lib/admin-session";
 import { createKioskDevice, startPairing } from "@/lib/kiosk-auth";
 import { assertLicenseAvailable, LicenseError } from "@/lib/licenses";
 
@@ -27,7 +27,9 @@ export async function addDevice(
   _previous: PairingFormState,
   formData: FormData
 ): Promise<PairingFormState> {
-  const { companyId } = await requireAdmin();
+  const session = await requireAdmin();
+  assertWritable(session);
+  const { companyId } = session;
 
   const name = String(formData.get("name") ?? "").trim();
   if (!name) return { error: "Ge skärmen ett namn." };
@@ -64,7 +66,9 @@ export async function repairDevice(
   _previous: PairingFormState,
   formData: FormData
 ): Promise<PairingFormState> {
-  const { db } = await requireAdmin();
+  const session = await requireAdmin();
+  assertWritable(session);
+  const { db } = session;
 
   const id = String(formData.get("id") ?? "");
   if (!id) return { error: "Okänd skärm." };
@@ -96,7 +100,9 @@ export async function repairDevice(
  * Att radera frigör licensen.
  */
 export async function deleteDevice(formData: FormData) {
-  const { db } = await requireAdmin();
+  const session = await requireAdmin();
+  assertWritable(session);
+  const { db } = session;
 
   const id = String(formData.get("id") ?? "");
   if (!id) return;

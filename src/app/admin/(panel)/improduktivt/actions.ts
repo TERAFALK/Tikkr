@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { requireAdmin } from "@/lib/admin-session";
+import { assertWritable, requireAdmin } from "@/lib/admin-session";
 
 const PATH = "/admin/improduktivt";
 
@@ -17,7 +17,9 @@ const PATH = "/admin/improduktivt";
  */
 
 export async function createIndirectMoment(formData: FormData) {
-  const { db, companyId } = await requireAdmin();
+  const session = await requireAdmin();
+  assertWritable(session);
+  const { db, companyId } = session;
 
   const name = String(formData.get("name") ?? "").trim();
   if (!name) return;
@@ -27,7 +29,9 @@ export async function createIndirectMoment(formData: FormData) {
 }
 
 export async function renameIndirectMoment(formData: FormData) {
-  const { db } = await requireAdmin();
+  const session = await requireAdmin();
+  assertWritable(session);
+  const { db } = session;
 
   const id = String(formData.get("id") ?? "");
   const name = String(formData.get("name") ?? "").trim();
@@ -38,7 +42,9 @@ export async function renameIndirectMoment(formData: FormData) {
 }
 
 export async function toggleIndirectMoment(formData: FormData) {
-  const { db } = await requireAdmin();
+  const session = await requireAdmin();
+  assertWritable(session);
+  const { db } = session;
 
   const id = String(formData.get("id") ?? "");
   const active = formData.get("active") === "true";

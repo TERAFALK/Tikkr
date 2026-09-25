@@ -22,6 +22,12 @@ import { unsafeGlobalPrisma } from "./db";
  * ser till att du inte anger fel. Kompilatorn och säkerheten drar åt samma håll.
  *
  * Bevisas av tests/tenant-isolation.test.ts.
+ *
+ * LÄSLÄGE. Klienten kan också begäras utan skrivrätt, se `readOnly` nedan. Det
+ * används av supportläget, där leverantören ser en kunds panel. Spärren ligger
+ * här och inte i gränssnittet av samma skäl som företagsfiltret: en gömd knapp
+ * är ingen spärr, och den som skriver en ny sida ska inte kunna öppna ett hål
+ * genom att glömma en kontroll.
  */
 
 /**
@@ -103,12 +109,49 @@ function stampCompanyOnData(data: unknown, companyId: string): unknown {
   return data;
 }
 
+/** Kastas när något försöker skriva genom en klient som bara får läsa. */
+export class ReadOnlyError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "ReadOnlyError";
+  }
+}
+
+/**
+ * Operationer som ändrar data. Listan är uttrycklig och inte en gissning ur
+ * namnet: en ny Prisma-operation ska behöva läggas till här med flit, inte
+ * släppas igenom för att den råkade heta något som inte matchade ett mönster.
+ */
+const WRITE_OPERATIONS = new Set([
+  "create",
+  "createMany",
+  "createManyAndReturn",
+  "update",
+  "updateMany",
+  "updateManyAndReturn",
+  "upsert",
+  "delete",
+  "deleteMany",
+]);
+
+export interface CompanyDbOptions {
+  /**
+   * true ger en klient som vägrar skriva. Används av supportläget.
+   *
+   * Gäller ALLA modeller klienten når, inte bara de företagsfiltrerade —
+   * `Company` är inte tenant-scopad men ska inte heller gå att ändra av en
+   * supportsession.
+   */
+  readOnly?: boolean;
+}
+
 /**
  * Ger en databasklient som är permanent låst till ett företag.
  *
  * @param companyId id:t för det inloggade företaget (eller kioskens företag)
+ * @param options `readOnly` ger en klient utan skrivrätt
  */
-export function forCompany(companyId: string) {
+export function forCompany(companyId: string, options: CompanyDbOptions = {}) {
   if (!companyId || typeof companyId !== "string") {
     throw new TenantIsolationError(
       "forCompany() anropades utan giltigt companyId. Detta är alltid en bugg — " +
@@ -116,12 +159,16 @@ export function forCompany(companyId: string) {
     );
   }
 
+  const readOnly = options.readOnly === true;
+
   return unsafeGlobalPrisma.$extends({
-    name: `tenant:${companyId}`,
+    name: readOnly ? `tenant:${companyId}:ro` : `tenant:${companyId}`,
 
     client: {
       /** Företaget den här klienten är låst till. Bra vid felsökning. */
       $companyId: companyId,
+      /** true när klienten bara får läsa. Bra vid felsökning. */
+      $readOnly: readOnly,
     },
 
     // OBS: Prisma tillåter inte att inbyggda metoder skrivs över i en
@@ -135,6 +182,19 @@ export function forCompany(companyId: string) {
     query: {
       $allModels: {
         async $allOperations({ model, operation, args, query }) {
+          // LÄSLÄGET PRÖVAS FÖRST, före allt annat och för varje modell.
+          //
+          // Kastar i stället för att tysta ner skrivningen. En åtgärd som
+          // verkar spara men inte gör det är värre än ett fel: den som sitter
+          // i supportläget skulle tro att kundens problem var åtgärdat.
+          if (readOnly && WRITE_OPERATIONS.has(operation)) {
+            throw new ReadOnlyError(
+              `Supportläget får bara läsa. Försökte köra "${operation}" på ` +
+                `modellen "${model}". Be kunden göra ändringen, eller logga in ` +
+                `som dem själva med deras medgivande.`
+            );
+          }
+
           // Company-tabellen och allt utanför listan lämnas orört.
           if (!TENANT_MODEL_SET.has(model)) {
             return query(args);

@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { requireAdmin } from "@/lib/admin-session";
+import { assertWritable, requireAdmin } from "@/lib/admin-session";
 import { unsafeGlobalPrisma } from "@/lib/db";
 import { instantFromWallTime } from "@/lib/time-zone";
 
@@ -28,7 +28,9 @@ const PATH = "/admin/granskning";
  * slutade arbetet?
  */
 export async function reviewEntry(formData: FormData) {
-  const { db, companyId, email } = await requireAdmin();
+  const session = await requireAdmin();
+  assertWritable(session);
+  const { db, companyId, email } = session;
 
   const id = String(formData.get("id") ?? "");
   const value = String(formData.get("clockOutAt") ?? "");

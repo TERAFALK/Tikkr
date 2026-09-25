@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { requireAdmin } from "@/lib/admin-session";
+import { assertWritable, requireAdmin } from "@/lib/admin-session";
 import { unsafeGlobalPrisma } from "@/lib/db";
 import { parseMarkupPercent } from "@/lib/money";
 import { parseTimeOfDay } from "@/lib/time-zone";
@@ -13,7 +13,9 @@ import { parseTimeOfDay } from "@/lib/time-zone";
  */
 
 export async function saveCompany(formData: FormData) {
-  const { companyId } = await requireAdmin();
+  const session = await requireAdmin();
+  assertWritable(session);
+  const { companyId } = session;
 
   const name = String(formData.get("name") ?? "").trim();
   if (!name) return;
@@ -47,7 +49,9 @@ export async function saveMarkup(
   _previous: MarkupState,
   formData: FormData
 ): Promise<MarkupState> {
-  const { companyId } = await requireAdmin();
+  const session = await requireAdmin();
+  assertWritable(session);
+  const { companyId } = session;
 
   const raw = String(formData.get("markup") ?? "").trim();
   const percent = raw === "" ? 100 : parseMarkupPercent(raw);
@@ -97,7 +101,9 @@ export async function uploadLogo(
   _previous: LogoState,
   formData: FormData
 ): Promise<LogoState> {
-  const { companyId } = await requireAdmin();
+  const session = await requireAdmin();
+  assertWritable(session);
+  const { companyId } = session;
 
   const wide = String(formData.get("variant")) === "wide";
   const file = formData.get("logo");
@@ -144,7 +150,9 @@ export async function uploadLogo(
 }
 
 export async function removeLogo(formData: FormData) {
-  const { companyId } = await requireAdmin();
+  const session = await requireAdmin();
+  assertWritable(session);
+  const { companyId } = session;
   const wide = String(formData.get("variant")) === "wide";
 
   await unsafeGlobalPrisma.company.update({
@@ -158,7 +166,9 @@ export async function removeLogo(formData: FormData) {
 }
 
 export async function saveTimeSettings(formData: FormData) {
-  const { companyId } = await requireAdmin();
+  const session = await requireAdmin();
+  assertWritable(session);
+  const { companyId } = session;
 
   const autoCloseAt = String(formData.get("autoCloseAt") ?? "").trim();
   const timezone = String(formData.get("timezone") ?? "").trim();
@@ -194,7 +204,9 @@ export async function saveTimeSettings(formData: FormData) {
  * lagarna samtidigt.
  */
 export async function anonymizeEmployee(formData: FormData) {
-  const { db } = await requireAdmin();
+  const session = await requireAdmin();
+  assertWritable(session);
+  const { db } = session;
 
   const id = String(formData.get("employeeId") ?? "");
   const confirmation = String(formData.get("confirm") ?? "").trim();

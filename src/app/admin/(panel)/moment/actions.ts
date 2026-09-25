@@ -1,13 +1,15 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { requireAdmin } from "@/lib/admin-session";
+import { assertWritable, requireAdmin } from "@/lib/admin-session";
 import { parseOre } from "@/lib/money";
 
 const PATH = "/admin/moment";
 
 export async function createMoment(formData: FormData) {
-  const { db, companyId } = await requireAdmin();
+  const session = await requireAdmin();
+  assertWritable(session);
+  const { db, companyId } = session;
 
   const name = String(formData.get("name") ?? "").trim();
   if (!name) return;
@@ -27,7 +29,9 @@ export async function createMoment(formData: FormData) {
  * schemat.
  */
 export async function renameMoment(formData: FormData) {
-  const { db } = await requireAdmin();
+  const session = await requireAdmin();
+  assertWritable(session);
+  const { db } = session;
 
   const id = String(formData.get("id") ?? "");
   const name = String(formData.get("name") ?? "").trim();
@@ -41,7 +45,9 @@ export async function renameMoment(formData: FormData) {
 }
 
 export async function toggleMoment(formData: FormData) {
-  const { db } = await requireAdmin();
+  const session = await requireAdmin();
+  assertWritable(session);
+  const { db } = session;
 
   const id = String(formData.get("id") ?? "");
   const active = formData.get("active") === "true";

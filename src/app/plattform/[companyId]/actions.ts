@@ -2,6 +2,12 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { unsafeGlobalPrisma } from "@/lib/db";
+import {
+  endSupportSession,
+  readSupportSession,
+  startSupportSession,
+} from "@/lib/support-session";
 import {
   deleteCompany,
   PlatformActionError,
@@ -156,4 +162,63 @@ export async function removeCompany(
 
   // Ligger utanför try-blocket: redirect() avbryter genom att kasta.
   redirect("/plattform");
+}
+
+/**
+ * STARTAR ETT SUPPORTBESÖK och skickar vidare till kundens panel.
+ *
+ * Åtkomsten är LÄSNING. Spärren ligger i databaslagret — se
+ * forCompany(..., { readOnly: true }) — och inte i vilka knappar som visas.
+ *
+ * Besöket skrivs ner FÖRE cookien sätts. Ordningen spelar roll: går skrivningen
+ * fel finns ingen session, och alternativet vore en åtkomst utan spår.
+ */
+export async function startSupport(formData: FormData) {
+  const { email } = await requirePlatformAdmin();
+
+  const companyId = String(formData.get("companyId") ?? "");
+  if (!companyId) return;
+
+  const company = await unsafeGlobalPrisma.company.findUnique({
+    where: { id: companyId },
+    select: { id: true },
+  });
+  if (!company) return;
+
+  const visit = await unsafeGlobalPrisma.supportVisit.create({
+    data: { companyId, email: email.toLowerCase() },
+  });
+
+  await startSupportSession({ companyId, email, visitId: visit.id });
+
+  redirect("/admin");
+}
+
+/**
+ * Avslutar besöket.
+ *
+ * Ligger här och inte bland adminpanelens åtgärder, eftersom det är
+ * plattformens session som är den riktiga inloggningen — kundens panel var bara
+ * något vi tittade på.
+ *
+ * lastSeenAt sätts en sista gång, så att loggen får rätt längd även när någon
+ * avslutar snabbare än minutspärren i touchVisit hinner uppdatera.
+ */
+export async function endSupport(formData: FormData) {
+  const session = await readSupportSession();
+  const back = String(formData.get("back") ?? "/plattform");
+
+  if (session) {
+    try {
+      await unsafeGlobalPrisma.supportVisit.update({
+        where: { id: session.visitId },
+        data: { lastSeenAt: new Date() },
+      });
+    } catch {
+      // Besöket kan ha städats bort med kunden. Sessionen ska bort ändå.
+    }
+  }
+
+  await endSupportSession();
+  redirect(back);
 }

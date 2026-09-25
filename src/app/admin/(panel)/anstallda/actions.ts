@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { requireAdmin } from "@/lib/admin-session";
+import { assertWritable, requireAdmin } from "@/lib/admin-session";
 import { parseOre } from "@/lib/money";
 
 // Varje åtgärd börjar med requireAdmin(). Det ger både inloggningskontroll och
@@ -131,7 +131,9 @@ export async function createEmployee(
   _previous: EmployeeState,
   formData: FormData
 ): Promise<EmployeeState> {
-  const { db, companyId } = await requireAdmin();
+  const session = await requireAdmin();
+  assertWritable(session);
+  const { db, companyId } = session;
 
   const name = String(formData.get("name") ?? "").trim();
   if (!name) return { error: "Ange ett namn." };
@@ -167,7 +169,9 @@ export async function updateEmployee(
   _previous: EmployeeState,
   formData: FormData
 ): Promise<EmployeeState> {
-  const { db } = await requireAdmin();
+  const session = await requireAdmin();
+  assertWritable(session);
+  const { db } = session;
 
   const id = String(formData.get("id") ?? "");
   const name = String(formData.get("name") ?? "").trim();
@@ -211,7 +215,9 @@ export async function updateEmployee(
  * Riktig radering finns i inställningarna, för GDPR-fallet.
  */
 export async function toggleEmployee(formData: FormData) {
-  const { db } = await requireAdmin();
+  const session = await requireAdmin();
+  assertWritable(session);
+  const { db } = session;
 
   const id = String(formData.get("id") ?? "");
   const active = formData.get("active") === "true";

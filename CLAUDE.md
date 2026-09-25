@@ -110,6 +110,7 @@ time_entries   — id, company_id, employee_id, kind,
                  needs_review, review_note, kiosk_device_id, source_ip
 admin_users    — id, company_id, email, password_hash, role
 kiosk_devices  — id, company_id, name, device_token, active, last_seen_at
+support_visits — id, company_id, email, started_at, last_seen_at
 ```
 
 ### Beslutade regler för stämpling (bestämt 2026-08-10)
@@ -185,12 +186,38 @@ gemensamt lager** i Prisma som alltid filtrerar på inloggad användares
    som pågått orimligt länge, eller en person med fler parallella jobb än hen
    rimligen hinner sköta. Däremot INTE "instämplad på två ställen samtidigt" —
    det är numera ett giltigt läge, se regel 2 i § 3.
-5. **Fysisk säkerhet är en förutsättning** — modellen bygger på att skärmen
+5. **Supportläge är LÄSNING, och lämnar spår** (beslutat 2026-09-25).
+   Plattformspanelen har en knapp som öppnar en kunds adminpanel utan kundens
+   lösenord. Tre saker gör det försvarbart, och alla tre ska finnas kvar:
+
+   - **Egen cookie, eget namn.** `tikkr_support` bär plattformskontots adress,
+     aldrig ett lånat `adminUser`-konto. Annars skulle kundens egen logg påstå
+     att *de* gjorde något. Trettio minuters livslängd.
+   - **Läsläget vaktas i koden, inte i gränssnittet.** `forCompany(..., {
+     readOnly: true })` avvisar varje skrivande operation. Men det räcker inte
+     ensamt: `clock.ts`, `admin-users.ts` och `quick-order.ts` bygger egna
+     klienter ur ett `companyId`, och `Company` nås via `unsafeGlobalPrisma`.
+     Därför gäller regeln att **varje serveråtgärd i panelen som kallar
+     `requireAdmin()` också ska kalla `assertWritable(session)`**. Bevisas av
+     `tests/support-coverage.test.ts`.
+   - **Varje besök skrivs ner** i `support_visits` innan cookien sätts, och
+     visas på kundens sida i plattformspanelen.
+
+   Supportläget släpps igenom prenumerationslåset — en obetald faktura är
+   oftast precis varför kunden ringer.
+
+   Kvarstående glapp, uttryckligen: `$queryRaw`/`$executeRaw` går inte att
+   blockera i en Prisma-extension. Ingen adminåtgärd använder rå SQL.
+
+   **Utanför koden:** även läsning av en kunds anställda är behandling av
+   personuppgifter. Integritetspolicyn och PUB-avtalet ska nämna att support
+   kan se data.
+6. **Fysisk säkerhet är en förutsättning** — modellen bygger på att skärmen
    sitter på arbetsplatsen, precis som en fysisk stämpelklocka. Var transparent
    om detta mot kunden.
-6. **HTTPS + kort request-timeout** — stämpling ska kännas omedelbar men gå
+7. **HTTPS + kort request-timeout** — stämpling ska kännas omedelbar men gå
    krypterat.
-7. **GDPR** — adminpanelen ska stödja export och radering av en anställds data
+8. **GDPR** — adminpanelen ska stödja export och radering av en anställds data
    (rätt att bli glömd). PUB-avtal hanteras utanför koden, men bygg
    funktionaliteten.
 

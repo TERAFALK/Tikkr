@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { requireAdmin } from "@/lib/admin-session";
+import { assertWritable, requireAdmin } from "@/lib/admin-session";
 import { ClockError, closeOrder, openEntriesOnOrder } from "@/lib/clock";
 import { parseMarkupPercent, parseOre } from "@/lib/money";
 
@@ -27,7 +27,9 @@ function parseHours(raw: FormDataEntryValue | null): number | null {
 }
 
 export async function createOrder(formData: FormData) {
-  const { db, companyId } = await requireAdmin();
+  const session = await requireAdmin();
+  assertWritable(session);
+  const { db, companyId } = session;
 
   const orderNumber = String(formData.get("orderNumber") ?? "").trim();
   const customerName = String(formData.get("customerName") ?? "").trim();
@@ -62,7 +64,9 @@ export async function updateOrder(
   _previous: OrderFormState,
   formData: FormData
 ): Promise<OrderFormState> {
-  const { db } = await requireAdmin();
+  const session = await requireAdmin();
+  assertWritable(session);
+  const { db } = session;
 
   const id = String(formData.get("id") ?? "");
   const orderNumber = String(formData.get("orderNumber") ?? "").trim();
@@ -150,7 +154,9 @@ export async function toggleOrder(
   _previous: OrderToggleState,
   formData: FormData
 ): Promise<OrderToggleState> {
-  const { db, companyId, email } = await requireAdmin();
+  const session = await requireAdmin();
+  assertWritable(session);
+  const { db, companyId, email } = session;
 
   const id = String(formData.get("id") ?? "");
   const status = String(formData.get("status") ?? "");

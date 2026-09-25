@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { requireAdmin } from "@/lib/admin-session";
+import { assertWritable, requireAdmin } from "@/lib/admin-session";
 import { companyTimeZone } from "@/lib/company";
 import {
   ClockError,
@@ -42,7 +42,9 @@ export async function addEntry(
   _previous: EntryFormState,
   formData: FormData
 ): Promise<EntryFormState> {
-  const { companyId, email } = await requireAdmin();
+  const session = await requireAdmin();
+  assertWritable(session);
+  const { companyId, email } = session;
   const timeZone = await companyTimeZone(companyId);
   const input = readForm(formData, timeZone);
 
@@ -79,7 +81,9 @@ export async function addEntry(
 }
 
 export async function editEntry(formData: FormData) {
-  const { companyId, email } = await requireAdmin();
+  const session = await requireAdmin();
+  assertWritable(session);
+  const { companyId, email } = session;
   const timeZone = await companyTimeZone(companyId);
 
   const id = String(formData.get("id") ?? "");
@@ -132,7 +136,9 @@ export async function editEntry(formData: FormData) {
  * tillbaka och det är fakturaunderlag som försvinner.
  */
 export async function deleteEntry(formData: FormData) {
-  const { db } = await requireAdmin();
+  const session = await requireAdmin();
+  assertWritable(session);
+  const { db } = session;
 
   const id = String(formData.get("id") ?? "");
   if (!id) return;

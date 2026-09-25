@@ -10,6 +10,7 @@ import {
 import { activeNotices } from "@/lib/notices";
 import AdminSidebar from "@/components/admin/AdminSidebar";
 import NoticeBanner from "@/components/ui/NoticeBanner";
+import SupportBanner from "@/components/admin/SupportBanner";
 import ReloadOnDeploy from "@/components/ui/ReloadOnDeploy";
 import SubscriptionLocked from "@/components/admin/SubscriptionLocked";
 
@@ -72,6 +73,10 @@ export default async function PanelLayout({
       />
 
       <div className="min-w-0 flex-1">
+        {/* Bannern ligger ÖVER prenumerationsvarningen och över allt innehåll.
+            Vilket läge man är i avgör hur allt annat på sidan ska läsas. */}
+        {session.support && <SupportBanner companyName={session.companyName} />}
+
         {access.level === "warning" && (
           <div className="border-b border-amber-200 bg-amber-50 px-4 py-2.5 sm:px-6 lg:px-8">
             <p className="mx-auto max-w-7xl text-[13px] text-amber-900">
@@ -93,7 +98,11 @@ export default async function PanelLayout({
           {/* Vid låst prenumeration visas ingen adminsida alls. Inget kan
               då råka nås via en direktlänk, vilket hade varit fallet om vi
               istället gömt menyn och litat på att ingen gissar adresser. */}
-          {access.level === "locked" ? (
+          {/* SUPPORTLÄGET SLÄPPS IGENOM PRENUMERATIONSLÅSET. En obetald faktura
+              är oftast precis varför kunden ringer, och en supportvy som visar
+              samma låsta sida som kunden ser hjälper ingen. Läget är läsning, så
+              ingenting kan ändras medan låset är på. */}
+          {access.level === "locked" && !session.support ? (
             <SubscriptionLocked
               state={access}
               companyName={session.companyName}

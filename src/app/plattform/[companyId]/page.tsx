@@ -18,11 +18,18 @@ import {
   Th,
   Tr,
 } from "@/components/ui";
-import { formatDate, formatDateTime } from "@/lib/format";
+import {
+  formatDate,
+  formatDateTime,
+  formatDuration,
+  minutesBetween,
+} from "@/lib/format";
 import SubscriptionOverrideForm from "@/components/admin/SubscriptionOverrideForm";
 import PlatformShell from "@/components/platform/PlatformShell";
 import ManualLicenseForm from "@/components/platform/ManualLicenseForm";
 import DeleteCompanyForm from "@/components/platform/DeleteCompanyForm";
+import { startSupport } from "./actions";
+import { unsafeGlobalPrisma } from "@/lib/db";
 import ActivityTable from "@/components/platform/ActivityTable";
 import { monthlyRevenueFor } from "@/lib/platform-admin";
 import { getScreenPricing } from "@/lib/stripe";
@@ -45,6 +52,16 @@ export default async function CompanyPage({
     detail;
   const monthlyRevenue = monthlyRevenueFor(company, await getScreenPricing());
 
+  // Senaste tjugo besöken. Går utanför tenant-filtreringen med flit: raden
+  // gäller LEVERANTÖRENS åtkomst till kunden, inte kundens egen data, och läses
+  // bara här. Se SupportVisit i schemat.
+  const visits = await unsafeGlobalPrisma.supportVisit.findMany({
+    where: { companyId },
+    orderBy: { startedAt: "desc" },
+    take: 20,
+    select: { id: true, email: true, startedAt: true, lastSeenAt: true },
+  });
+
   const inactiveDays = stats.lastActivityAt
     ? Math.floor(
         (Date.now() - stats.lastActivityAt.getTime()) / (24 * 60 * 60 * 1000)
@@ -64,6 +81,17 @@ export default async function CompanyPage({
         <PageHeader
           title={company.name}
           description={`Upplagt ${formatDate(company.createdAt)} · tidszon ${company.timezone} · stänger glömda stämplingar ${company.autoCloseAt}`}
+          action={
+            /* Vägen in i kundens panel, i läsläge. Ligger i rubriken och inte
+               längst ner: när kunden ringer är det första man vill göra att se
+               vad de ser. */
+            <form action={startSupport}>
+              <input type="hidden" name="companyId" value={company.id} />
+              <Button type="submit" tone="secondary">
+                Öppna kundens panel
+              </Button>
+            </form>
+          }
         />
 
         {inactiveDays !== null && inactiveDays >= 14 && (
@@ -280,7 +308,45 @@ export default async function CompanyPage({
         {/* Raderingen ligger sist och avskild. Den ska gå att hitta av den
             som söker den, och aldrig råkas ut för av den som skummar. */}
         <div className="mt-10 border-t border-neutral-200 pt-6">
-          <DeleteCompanyForm
+          <Card className="mt-6">
+          <CardHeader
+            title="Supportbesök"
+            description="När någon hos oss sett den här kundens panel. Åtkomsten är läsning."
+          />
+          {visits.length === 0 ? (
+            <p className="px-5 py-4 text-[13px] text-neutral-500">
+              Ingen har öppnat kundens panel.
+            </p>
+          ) : (
+            <Table>
+              <thead>
+                <tr>
+                  <Th>Startade</Th>
+                  <Th>Vem</Th>
+                  <Th numeric>Längd</Th>
+                </tr>
+              </thead>
+              <tbody>
+                {visits.map((visit) => (
+                  <Tr key={visit.id}>
+                    <Td muted>{formatDateTime(visit.startedAt)}</Td>
+                    <Td>{visit.email}</Td>
+                    <Td numeric muted>
+                      {/* Räknas ur lastSeenAt, inte ur en utloggning. En stängd
+                          flik lämnar aldrig ett slut, och ett tomt fält hade
+                          sett ut som ett fel i loggen. */}
+                      {formatDuration(
+                        minutesBetween(visit.startedAt, visit.lastSeenAt)
+                      )}
+                    </Td>
+                  </Tr>
+                ))}
+              </tbody>
+            </Table>
+          )}
+        </Card>
+
+        <DeleteCompanyForm
             companyId={company.id}
             companyName={company.name}
             managedByStripe={Boolean(company.stripeSubscriptionId)}
