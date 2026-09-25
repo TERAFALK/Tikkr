@@ -43,7 +43,7 @@ export async function addEntry(
   formData: FormData
 ): Promise<EntryFormState> {
   const session = await requireAdmin();
-  assertWritable(session);
+  await assertWritable(session);
   const { companyId, email } = session;
   const timeZone = await companyTimeZone(companyId);
   const input = readForm(formData, timeZone);
@@ -82,7 +82,7 @@ export async function addEntry(
 
 export async function editEntry(formData: FormData) {
   const session = await requireAdmin();
-  assertWritable(session);
+  await assertWritable(session);
   const { companyId, email } = session;
   const timeZone = await companyTimeZone(companyId);
 
@@ -137,7 +137,7 @@ export async function editEntry(formData: FormData) {
  */
 export async function deleteEntry(formData: FormData) {
   const session = await requireAdmin();
-  assertWritable(session);
+  await assertWritable(session);
   const { db } = session;
 
   const id = String(formData.get("id") ?? "");

@@ -1,4 +1,5 @@
-import { requireAdmin } from "@/lib/admin-session";
+import { cookies } from "next/headers";
+import { READ_ONLY_COOKIE, requireAdmin } from "@/lib/admin-session";
 import { unsafeGlobalPrisma } from "@/lib/db";
 import { getOnboardingState } from "@/lib/onboarding";
 import { evaluateAccess } from "@/lib/subscription";
@@ -11,6 +12,7 @@ import { activeNotices } from "@/lib/notices";
 import AdminSidebar from "@/components/admin/AdminSidebar";
 import NoticeBanner from "@/components/ui/NoticeBanner";
 import SupportBanner from "@/components/admin/SupportBanner";
+import ReadOnlyToast from "@/components/admin/ReadOnlyToast";
 import ReloadOnDeploy from "@/components/ui/ReloadOnDeploy";
 import SubscriptionLocked from "@/components/admin/SubscriptionLocked";
 
@@ -32,6 +34,11 @@ export default async function PanelLayout({
   children: React.ReactNode;
 }) {
   const session = await requireAdmin();
+
+  // Flaggan som assertWritable() satte när en ändring nekades. Läses här och
+  // slängs av komponenten i webbläsaren — en cookie går inte att ta bort
+  // under en rendering.
+  const deniedWrite = (await cookies()).get(READ_ONLY_COOKIE)?.value === "1";
 
   const [reviewCount, onboarding, notices, company] = await Promise.all([
     session.db.timeEntry.count({ where: { needsReview: true } }),
@@ -76,6 +83,7 @@ export default async function PanelLayout({
         {/* Bannern ligger ÖVER prenumerationsvarningen och över allt innehåll.
             Vilket läge man är i avgör hur allt annat på sidan ska läsas. */}
         {session.support && <SupportBanner companyName={session.companyName} />}
+        <ReadOnlyToast show={deniedWrite} />
 
         {access.level === "warning" && (
           <div className="border-b border-amber-200 bg-amber-50 px-4 py-2.5 sm:px-6 lg:px-8">

@@ -29,7 +29,7 @@ export async function createInvite(
   formData: FormData
 ): Promise<InviteState> {
   const session = await requireAdmin();
-  assertWritable(session);
+  await assertWritable(session);
 
   const email = String(formData.get("email") ?? "");
   const asRole = String(formData.get("role") ?? "ADMIN") === "OWNER"
@@ -87,7 +87,7 @@ export async function createInvite(
 
 export async function deleteAdmin(formData: FormData) {
   const session = await requireAdmin();
-  assertWritable(session);
+  await assertWritable(session);
 
   try {
     await removeAdmin({
@@ -106,7 +106,7 @@ export async function deleteAdmin(formData: FormData) {
 
 export async function cancelInvite(formData: FormData) {
   const session = await requireAdmin();
-  assertWritable(session);
+  await assertWritable(session);
 
   await revokeInvite({
     companyId: session.companyId,

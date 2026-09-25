@@ -14,7 +14,7 @@ import { parseTimeOfDay } from "@/lib/time-zone";
 
 export async function saveCompany(formData: FormData) {
   const session = await requireAdmin();
-  assertWritable(session);
+  await assertWritable(session);
   const { companyId } = session;
 
   const name = String(formData.get("name") ?? "").trim();
@@ -50,7 +50,7 @@ export async function saveMarkup(
   formData: FormData
 ): Promise<MarkupState> {
   const session = await requireAdmin();
-  assertWritable(session);
+  await assertWritable(session);
   const { companyId } = session;
 
   const raw = String(formData.get("markup") ?? "").trim();
@@ -102,7 +102,7 @@ export async function uploadLogo(
   formData: FormData
 ): Promise<LogoState> {
   const session = await requireAdmin();
-  assertWritable(session);
+  await assertWritable(session);
   const { companyId } = session;
 
   const wide = String(formData.get("variant")) === "wide";
@@ -151,7 +151,7 @@ export async function uploadLogo(
 
 export async function removeLogo(formData: FormData) {
   const session = await requireAdmin();
-  assertWritable(session);
+  await assertWritable(session);
   const { companyId } = session;
   const wide = String(formData.get("variant")) === "wide";
 
@@ -167,7 +167,7 @@ export async function removeLogo(formData: FormData) {
 
 export async function saveTimeSettings(formData: FormData) {
   const session = await requireAdmin();
-  assertWritable(session);
+  await assertWritable(session);
   const { companyId } = session;
 
   const autoCloseAt = String(formData.get("autoCloseAt") ?? "").trim();
@@ -205,7 +205,7 @@ export async function saveTimeSettings(formData: FormData) {
  */
 export async function anonymizeEmployee(formData: FormData) {
   const session = await requireAdmin();
-  assertWritable(session);
+  await assertWritable(session);
   const { db } = session;
 
   const id = String(formData.get("employeeId") ?? "");

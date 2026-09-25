@@ -29,7 +29,7 @@ const PATH = "/admin/granskning";
  */
 export async function reviewEntry(formData: FormData) {
   const session = await requireAdmin();
-  assertWritable(session);
+  await assertWritable(session);
   const { db, companyId, email } = session;
 
   const id = String(formData.get("id") ?? "");

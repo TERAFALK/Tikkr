@@ -1,6 +1,9 @@
 import { Card, CardHeader } from "@/components/ui";
 import type { MonthPoint } from "@/lib/revenue-history";
 
+/** Ritytans höjd i pixlar. Staplarna räknas mot den. */
+const PLOT_HEIGHT = 160;
+
 /**
  * MÅNADSINTÄKTEN ÖVER TID.
  *
@@ -53,11 +56,11 @@ export default function RevenueChart({ points }: { points: MonthPoint[] }) {
       />
 
       <div className="p-5">
-        <div className="flex h-40 items-end gap-1.5">
+        <div className="flex items-end gap-1.5">
           {points.map((point) => (
             <div
               key={point.month}
-              className="group flex min-w-0 flex-1 flex-col items-center justify-end"
+              className="group flex min-w-0 flex-1 flex-col items-center"
             >
               {/* Beloppet syns vid hovring. Tolv siffror utskrivna samtidigt
                   gör grafen oläslig, och formen är det som ska läsas. */}
@@ -65,13 +68,31 @@ export default function RevenueChart({ points }: { points: MonthPoint[] }) {
                 {point.mrr.toLocaleString("sv-SE")}
               </span>
 
+              {/* Ritytan har en bestämd höjd i PIXLAR, och staplarna räknas i
+                  pixlar mot den.
+                  
+                  Höjden var förut angiven i procent. En procentuell höjd löses
+                  mot förälderns höjd, och föräldern var en flex-kolumn utan
+                  bestämd höjd — `items-end` på raden krymper varje kolumn till
+                  sitt innehåll. Höjden blev alltså cirkulär och landade på noll:
+                  månadsetiketterna syntes, men inga staplar. */}
               <div
-                className="w-full rounded-t bg-blue-600/85 transition-colors group-hover:bg-blue-600"
-                style={{
-                  height: `${Math.max(2, (point.mrr / peak) * 100)}%`,
-                }}
-                title={`${point.label}: ${point.mrr.toLocaleString("sv-SE")} kr, ${point.payingCompanies} betalande`}
-              />
+                className="flex w-full items-end"
+                style={{ height: PLOT_HEIGHT }}
+              >
+                <div
+                  className="w-full rounded-t bg-blue-600/85 transition-colors group-hover:bg-blue-600"
+                  style={{
+                    // Minst två pixlar, så att en månad utan intäkt syns som en
+                    // rad och inte som ett hål i grafen.
+                    height: Math.max(
+                      2,
+                      Math.round((point.mrr / peak) * PLOT_HEIGHT)
+                    ),
+                  }}
+                  title={`${point.label}: ${point.mrr.toLocaleString("sv-SE")} kr, ${point.payingCompanies} betalande`}
+                />
+              </div>
 
               <span className="mt-1.5 truncate text-[10px] text-neutral-400">
                 {point.label}

@@ -132,7 +132,7 @@ export async function createEmployee(
   formData: FormData
 ): Promise<EmployeeState> {
   const session = await requireAdmin();
-  assertWritable(session);
+  await assertWritable(session);
   const { db, companyId } = session;
 
   const name = String(formData.get("name") ?? "").trim();
@@ -170,7 +170,7 @@ export async function updateEmployee(
   formData: FormData
 ): Promise<EmployeeState> {
   const session = await requireAdmin();
-  assertWritable(session);
+  await assertWritable(session);
   const { db } = session;
 
   const id = String(formData.get("id") ?? "");
@@ -216,7 +216,7 @@ export async function updateEmployee(
  */
 export async function toggleEmployee(formData: FormData) {
   const session = await requireAdmin();
-  assertWritable(session);
+  await assertWritable(session);
   const { db } = session;
 
   const id = String(formData.get("id") ?? "");

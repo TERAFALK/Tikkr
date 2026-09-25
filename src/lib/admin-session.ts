@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { cookies, headers } from "next/headers";
 import { auth } from "./auth";
 import { unsafeGlobalPrisma } from "./db";
 import { forCompany, type CompanyDb } from "./tenant";
@@ -46,7 +47,7 @@ export interface AdminSession {
    * Satt när detta är ett SUPPORTBESÖK och inte kundens egen inloggning.
    *
    * `db` vägrar då skriva. Sidor som skriver utanför det lagret — alltså via
-   * `unsafeGlobalPrisma` — måste kalla `assertWritable()` först.
+   * `unsafeGlobalPrisma` — måste börja med `await assertWritable(session)`.
    */
   support?: SupportContext;
 }
@@ -56,8 +57,16 @@ export interface SupportContext {
   visitId: string;
 }
 
-/** Sidan som förklarar att supportläget bara får läsa. */
-export const READ_ONLY_PATH = "/admin/lasage";
+/**
+ * Flaggan som säger att en ändring nekades.
+ *
+ * Inte httpOnly: toasten i panelen städar bort den själv när den visats. Den
+ * bär inget hemligt — bara att något nekades, vilket den som tryckte redan vet.
+ *
+ * Kort livslängd, så att en flagga som av någon anledning inte hinner städas
+ * inte dyker upp som ett meddelande en kvart senare.
+ */
+export const READ_ONLY_COOKIE = "tikkr_nekad";
 
 /**
  * VAKTEN FÖR SKRIVNINGAR I SUPPORTLÄGE.
@@ -69,22 +78,54 @@ export const READ_ONLY_PATH = "/admin/lasage";
  *   - `clock.ts`, `admin-users.ts` och `quick-order.ts` tar ett companyId och
  *     bygger sin EGEN klient.
  *
- * Därför ska VARJE serveråtgärd i panelen börja med den här raden. Att det inte
- * glöms bevisas av tests/support-coverage.test.ts, som läser källfilerna.
+ * Därför ska VARJE serveråtgärd i panelen börja med `await assertWritable(...)`.
+ * Att det inte glöms bevisas av tests/support-coverage.test.ts.
  *
- * OMDIRIGERAR, KASTAR INTE.
+ * **`await` ÄR INTE VALFRITT.** Utan det kastas omdirigeringen inuti ett löfte
+ * ingen väntar på: åtgärden fortsätter och skriver, och det enda spåret blir en
+ * ohanterad avvisning i loggen. Täckningstestet kräver därför ordet `await`.
  *
- * Först kastade den ett undantag. Adminpanelen saknade felgräns, så resultatet
- * blev ramverkets råa felsida — engelsk text och ett spårnings-id, i praktiken
- * "något gick sönder". Men ingenting gick sönder: systemet gjorde precis det det
- * skulle. Ett VÄNTAT nej hör inte till felhanteringen.
+ * SKICKAR TILLBAKA DIT MAN KOM IFRÅN, med en flagga som blir ett meddelande.
  *
- * redirect() fungerar i alla åtgärder oavsett form, både de som returnerar ett
- * tillstånd till useActionState och de som inte returnerar något. Ett svar per
- * åtgärdsform hade blivit fjorton olika sätt att säga samma sak.
+ * Först kastade den ett undantag, vilket gav ramverkets råa felsida. Sedan ledde
+ * den till en egen sida, vilket var läsbart men onödigt: man vill stanna i samma
+ * vy och få veta att det inte gick, inte flyttas någon annanstans för ett besked
+ * som ryms på en rad.
  */
-export function assertWritable(session: AdminSession): void {
-  if (session.support) redirect(READ_ONLY_PATH);
+export async function assertWritable(session: AdminSession): Promise<void> {
+  if (!session.support) return;
+
+  (await cookies()).set(READ_ONLY_COOKIE, "1", {
+    httpOnly: false,
+    sameSite: "lax",
+    secure: process.env.NODE_ENV === "production",
+    path: "/",
+    maxAge: 30,
+  });
+
+  redirect(await previousPath());
+}
+
+/**
+ * Sidan anropet kom ifrån, som en relativ adress.
+ *
+ * BARA SÖKVÄGEN plockas ut, aldrig värdnamnet. En referer kommer utifrån och
+ * får inte kunna styra vart vi skickar någon — en fullständig adress rakt in i
+ * redirect() vore en öppen vidarebefordran.
+ *
+ * Saknas den eller går den inte att tolka blir det översikten.
+ */
+async function previousPath(): Promise<string> {
+  const referer = (await headers()).get("referer");
+  if (!referer) return "/admin";
+
+  try {
+    const url = new URL(referer);
+    const path = `${url.pathname}${url.search}`;
+    return path.startsWith("/admin") ? path : "/admin";
+  } catch {
+    return "/admin";
+  }
 }
 
 /**

@@ -22,9 +22,10 @@ import { useEffect } from "react";
  *   2. Spårnings-id:t, men som en detalj längst ner och inte som huvudsaken.
  *      Det behövs bara när någon ska leta i serverloggen.
  *
- * Väntade nekanden hör INTE hit. Ett supportbesök som försöker spara leds till
- * /admin/lasage, eftersom systemet då gjorde precis det det skulle. Den här
- * sidan är för det som faktiskt gick fel.
+ * Väntade nekanden hör INTE hit. Ett supportbesök som försöker spara skickas
+ * tillbaka till sidan det kom ifrån och får ett meddelande nere till höger — se
+ * assertWritable och ReadOnlyToast. Systemet gjorde då precis det det skulle.
+ * Den här sidan är för det som faktiskt gick fel.
  */
 export default function AdminError({
   error,

@@ -28,7 +28,7 @@ function parseHours(raw: FormDataEntryValue | null): number | null {
 
 export async function createOrder(formData: FormData) {
   const session = await requireAdmin();
-  assertWritable(session);
+  await assertWritable(session);
   const { db, companyId } = session;
 
   const orderNumber = String(formData.get("orderNumber") ?? "").trim();
@@ -65,7 +65,7 @@ export async function updateOrder(
   formData: FormData
 ): Promise<OrderFormState> {
   const session = await requireAdmin();
-  assertWritable(session);
+  await assertWritable(session);
   const { db } = session;
 
   const id = String(formData.get("id") ?? "");
@@ -155,7 +155,7 @@ export async function toggleOrder(
   formData: FormData
 ): Promise<OrderToggleState> {
   const session = await requireAdmin();
-  assertWritable(session);
+  await assertWritable(session);
   const { db, companyId, email } = session;
 
   const id = String(formData.get("id") ?? "");

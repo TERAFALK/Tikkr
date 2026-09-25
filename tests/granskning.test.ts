@@ -47,7 +47,7 @@ vi.mock("@/lib/admin-session", () => ({
     db: forCompany(companyId),
     support: undefined,
   }),
-  assertWritable: (session: { support?: unknown }) => {
+  assertWritable: async (session: { support?: unknown }) => {
     if (session.support) throw new Error("Supportläget får bara läsa.");
   },
 }));

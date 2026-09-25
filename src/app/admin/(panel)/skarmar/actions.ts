@@ -28,7 +28,7 @@ export async function addDevice(
   formData: FormData
 ): Promise<PairingFormState> {
   const session = await requireAdmin();
-  assertWritable(session);
+  await assertWritable(session);
   const { companyId } = session;
 
   const name = String(formData.get("name") ?? "").trim();
@@ -67,7 +67,7 @@ export async function repairDevice(
   formData: FormData
 ): Promise<PairingFormState> {
   const session = await requireAdmin();
-  assertWritable(session);
+  await assertWritable(session);
   const { db } = session;
 
   const id = String(formData.get("id") ?? "");
@@ -101,7 +101,7 @@ export async function repairDevice(
  */
 export async function deleteDevice(formData: FormData) {
   const session = await requireAdmin();
-  assertWritable(session);
+  await assertWritable(session);
   const { db } = session;
 
   const id = String(formData.get("id") ?? "");

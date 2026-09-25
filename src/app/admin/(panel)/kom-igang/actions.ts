@@ -28,7 +28,7 @@ function readLines(value: FormDataEntryValue | null): string[] {
  */
 export async function addEmployees(formData: FormData) {
   const session = await requireAdmin();
-  assertWritable(session);
+  await assertWritable(session);
   const { db, companyId } = session;
 
   const names = readLines(formData.get("names"));
@@ -49,7 +49,7 @@ export async function addEmployees(formData: FormData) {
 
 export async function addMoments(formData: FormData) {
   const session = await requireAdmin();
-  assertWritable(session);
+  await assertWritable(session);
   const { db, companyId } = session;
 
   // Både förvalda förslag och egna rader hamnar i samma lista.
@@ -73,7 +73,7 @@ export async function addMoments(formData: FormData) {
 
 export async function addOrder(formData: FormData) {
   const session = await requireAdmin();
-  assertWritable(session);
+  await assertWritable(session);
   const { db, companyId } = session;
 
   const orderNumber = String(formData.get("orderNumber") ?? "").trim();

@@ -18,7 +18,7 @@ const PATH = "/admin/improduktivt";
 
 export async function createIndirectMoment(formData: FormData) {
   const session = await requireAdmin();
-  assertWritable(session);
+  await assertWritable(session);
   const { db, companyId } = session;
 
   const name = String(formData.get("name") ?? "").trim();
@@ -30,7 +30,7 @@ export async function createIndirectMoment(formData: FormData) {
 
 export async function renameIndirectMoment(formData: FormData) {
   const session = await requireAdmin();
-  assertWritable(session);
+  await assertWritable(session);
   const { db } = session;
 
   const id = String(formData.get("id") ?? "");
@@ -43,7 +43,7 @@ export async function renameIndirectMoment(formData: FormData) {
 
 export async function toggleIndirectMoment(formData: FormData) {
   const session = await requireAdmin();
-  assertWritable(session);
+  await assertWritable(session);
   const { db } = session;
 
   const id = String(formData.get("id") ?? "");

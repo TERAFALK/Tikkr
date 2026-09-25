@@ -23,6 +23,12 @@ import path from "node:path";
  * kostar alltså ingenting, och den är lätt att kontrollera: lika många vakter
  * som anrop. Glömmer någon en i en ny fil går det här testet sönder.
  *
+ * ORDET `await` KONTROLLERAS OCKSÅ, och det är inte petighet. Vakten är async,
+ * och utan await kastas omdirigeringen inuti ett löfte ingen väntar på:
+ * åtgärden fortsätter och SKRIVER, medan det enda spåret blir en ohanterad
+ * avvisning i serverloggen. En glömd vakt syns direkt; en glömd await ser ut
+ * att fungera.
+ *
  * Behöver ingen databas.
  */
 
@@ -67,12 +73,12 @@ describe("supportläget kan inte skriva", () => {
     expect(files.length).toBeGreaterThan(5);
   });
 
-  it("varje requireAdmin i panelen följs av en assertWritable", () => {
+  it("varje requireAdmin i panelen följs av en await assertWritable", () => {
     const wrong = files
       .map(({ file, source }) => ({
         file,
         calls: count(source, /await requireAdmin\(\)/g),
-        guards: count(source, /assertWritable\(session\)/g),
+        guards: count(source, /await assertWritable\(session\)/g),
       }))
       .filter(({ calls, guards }) => calls !== guards);
 
@@ -81,7 +87,8 @@ describe("supportläget kan inte skriva", () => {
       `Dessa filer har olika många requireAdmin() och assertWritable(session). ` +
         `En åtgärd utan vakt kan skriva i supportläge — läsläget på session.db ` +
         `räcker inte, eftersom clock.ts och admin-users.ts bygger egna klienter ` +
-        `ur companyId. Lägg assertWritable(session) direkt efter requireAdmin().`
+        `ur companyId. Lägg "await assertWritable(session);" direkt efter ` +
+        `requireAdmin(). Kontrollen räknar bara med ordet await.`
     ).toEqual([]);
   });
 
@@ -97,7 +104,7 @@ describe("supportläget kan inte skriva", () => {
         const name = block.slice(0, block.indexOf("(")).trim();
         if (READ_ONLY_ACTIONS.includes(name)) continue;
         if (!/await requireAdmin\(\)/.test(block)) continue;
-        if (/assertWritable\(session\)/.test(block)) continue;
+        if (/await assertWritable\(session\)/.test(block)) continue;
 
         unguarded.push(`${file}: ${name}`);
       }

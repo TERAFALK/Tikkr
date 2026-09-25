@@ -52,12 +52,18 @@ vi.mock("next/headers", () => ({
       name === "tikkr_support" && supportCookie
         ? { name, value: supportCookie }
         : undefined,
+    // assertWritable sätter en flagga innan den omdirigerar. Den läses av
+    // panelens layout, inte här, så det räcker att den går att anropa.
+    set: () => {},
+  }),
+  headers: async () => ({
+    // Ingen referer i testet, vilket är ett av fallen vakten ska tåla: då
+    // blir det översikten.
+    get: () => null,
   }),
 }));
 
-const { currentAdmin, assertWritable, READ_ONLY_PATH } = await import(
-  "@/lib/admin-session"
-);
+const { currentAdmin, assertWritable } = await import("@/lib/admin-session");
 const { __internals } = await import("@/lib/support-session");
 
 let companyId: string;
@@ -263,10 +269,11 @@ describe("supportläge", () => {
 
     const session = await currentAdmin();
 
-    // Omdirigerar, kastar inte. Ett väntat nej ska inte bli ramverkets råa
-    // felsida. Mocken av next/navigation kastar med adressen i meddelandet,
-    // vilket är hur omdirigeringen går att kontrollera här.
-    expect(() => assertWritable(session!)).toThrow(READ_ONLY_PATH);
+    // Omdirigerar tillbaka dit anropet kom ifrån i stället för att kasta ett
+    // fel. Mocken av next/navigation kastar med adressen i meddelandet, vilket
+    // är hur omdirigeringen går att kontrollera här. Utan referer blir det
+    // översikten.
+    await expect(assertWritable(session!)).rejects.toThrow("/admin");
   });
 
   it("assertWritable släpper igenom kundens egen inloggning", async () => {
@@ -275,7 +282,7 @@ describe("supportläge", () => {
     const session = await currentAdmin();
 
     expect(session?.support).toBeUndefined();
-    expect(() => assertWritable(session!)).not.toThrow();
+    await expect(assertWritable(session!)).resolves.toBeUndefined();
   });
 
   it("supportcookien vinner över en samtidig kundsession", async () => {

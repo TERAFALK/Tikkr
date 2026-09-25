@@ -8,7 +8,7 @@ const PATH = "/admin/moment";
 
 export async function createMoment(formData: FormData) {
   const session = await requireAdmin();
-  assertWritable(session);
+  await assertWritable(session);
   const { db, companyId } = session;
 
   const name = String(formData.get("name") ?? "").trim();
@@ -30,7 +30,7 @@ export async function createMoment(formData: FormData) {
  */
 export async function renameMoment(formData: FormData) {
   const session = await requireAdmin();
-  assertWritable(session);
+  await assertWritable(session);
   const { db } = session;
 
   const id = String(formData.get("id") ?? "");
@@ -46,7 +46,7 @@ export async function renameMoment(formData: FormData) {
 
 export async function toggleMoment(formData: FormData) {
   const session = await requireAdmin();
-  assertWritable(session);
+  await assertWritable(session);
   const { db } = session;
 
   const id = String(formData.get("id") ?? "");

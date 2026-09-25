@@ -24,7 +24,7 @@ async function baseUrl(): Promise<string> {
 
 export async function startCheckout(formData: FormData) {
   const session = await requireAdmin();
-  assertWritable(session);
+  await assertWritable(session);
 
   const url = await createCheckoutSession({
     companyId: session.companyId,
@@ -53,7 +53,7 @@ export async function changeLicenses(
   _previous: LicenseFormState
 ): Promise<LicenseFormState> {
   const session = await requireAdmin();
-  assertWritable(session);
+  await assertWritable(session);
 
   let url: string;
 
@@ -84,7 +84,7 @@ export async function changeLicenses(
 
 export async function openBillingPortal() {
   const session = await requireAdmin();
-  assertWritable(session);
+  await assertWritable(session);
 
   const url = await createPortalSession({
     companyId: session.companyId,
