@@ -65,19 +65,11 @@ export default async function SchedulePage() {
 
   return (
     <div className="space-y-6">
-      {initial.length === 0 && (
-        <Alert tone="info">
-          Utan schema finns ingen planerad tid, och flexsaldot blir då lika med
-          all arbetad tid.
-        </Alert>
-      )}
-
       <ScheduleForm action={saveSchedule} initial={initial} />
 
       <Card>
         <CardHeader
           title="Raster"
-          description="Väljs på stämplingsskärmen när någon tar rast."
           action={
             <FormDialog
               trigger="Ny rast"
@@ -94,7 +86,7 @@ export default async function SchedulePage() {
 
         {breakTypes.length === 0 ? (
           <p className="px-5 py-6 text-[13px] text-neutral-500">
-            Utan raster visas ingen rastknapp på stämplingsskärmen.
+            Inga raster upplagda.
           </p>
         ) : (
           <Table>

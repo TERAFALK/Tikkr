@@ -69,9 +69,7 @@ export async function saveSchedule(
 
     if (start === null || end === null) {
       return {
-        error:
-          "Skriv tiderna som klockslag, till exempel 06:30. Bocka ur dagen " +
-          "om den är arbetsfri.",
+        error: "Skriv tiderna som klockslag, till exempel 06:30.",
       };
     }
 
@@ -88,9 +86,7 @@ export async function saveSchedule(
 
     if (breakMinutes >= end - start) {
       return {
-        error:
-          "Rasterna är längre än arbetsdagen. Kontrollera klockslagen på " +
-          dayName(weekday) + ".",
+        error: `Rasterna är längre än arbetsdagen på ${dayName(weekday)}.`,
       };
     }
 

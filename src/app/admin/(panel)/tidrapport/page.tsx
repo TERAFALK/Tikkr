@@ -126,7 +126,6 @@ export default async function TimesheetPage({
         <PageHeader title="Tidrapport" />
         <EmptyState
           title="Inga anställda upplagda"
-          description="Tidrapporten visar tid per person."
         />
       </>
     );
@@ -197,8 +196,7 @@ export default async function TimesheetPage({
       {!period.schedule && (
         <div className="mb-4">
           <Alert tone="warning">
-            {period.employee.name} har inget arbetstidsschema, så planerad tid
-            räknas som noll och hela arbetstiden blir flex.{" "}
+            {period.employee.name} har inget arbetstidsschema.{" "}
             <Link
               href="/admin/installningar/schema"
               className="font-medium underline"
@@ -242,7 +240,6 @@ export default async function TimesheetPage({
         <Stat
           label="Produktiv tid"
           value={formatDecimalHours(period.totals.productive)}
-          hint="på kundorder"
         />
         <Stat
           label="Improduktiv tid"

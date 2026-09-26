@@ -74,9 +74,7 @@ export async function saveAbsence(
   const minutes = parseHours(formData.get("hours"));
   if (minutes === "error") {
     return {
-      error:
-        "Skriv antalet timmar som ett tal, till exempel 4 eller 3,5. Lämna " +
-        "tomt för hela dagen.",
+      error: "Skriv antalet timmar som ett tal, till exempel 4 eller 3,5.",
     };
   }
 

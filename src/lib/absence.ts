@@ -88,9 +88,7 @@ export async function markAbsence(
 
   if (input.minutes !== null && input.minutes !== undefined) {
     if (!Number.isFinite(input.minutes) || input.minutes <= 0) {
-      throw new AbsenceError(
-        "Antalet timmar måste vara större än noll. Lämna tomt för hela dagen."
-      );
+      throw new AbsenceError("Antalet timmar måste vara större än noll.");
     }
     if (input.minutes > 24 * 60) {
       throw new AbsenceError("En frånvarodag kan inte vara längre än ett dygn.");

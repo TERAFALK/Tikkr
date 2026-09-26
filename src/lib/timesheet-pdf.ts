@@ -34,6 +34,9 @@ const FOOTER_Y = 800;
 const MARGIN = 50;
 const CONTENT_WIDTH = A4_WIDTH - MARGIN * 2;
 
+/** Höjden underskriftsraden behöver: texten plus linjen under den. */
+const SIGNATURE_HEIGHT = 34;
+
 export interface TimesheetCompany {
   name: string;
   timezone: string;
@@ -294,26 +297,43 @@ function renderPeriod(
 
   /* --- Underskrifter ------------------------------------------------------ */
 
-  y += 24;
+  // RADEN RITAS ALLTID, och det är hela poängen med att räkna på höjden här.
+  //
+  // Första versionen hoppade över den när innehållet nådde förbi y = 720. En
+  // vecka landar på 739, alltså exakt i glappet: raden föll bort tyst på varje
+  // normal tidrapport, och det syntes först när dokumentet renderades på
+  // riktigt. En underskriftsrad som ibland saknas är värre än en sida till —
+  // det är den raden förmannen skriver på.
+  y += 20;
 
-  if (y < 720) {
-    doc.font("Helvetica").fontSize(9).fillColor("#525252");
-
-    const fields = ["Spara ___ tim", "Ta ut ___ tim", "Datum", "Tidrapport ok"];
-    const width = CONTENT_WIDTH / fields.length;
-
-    fields.forEach((field, index) => {
-      const x = MARGIN + width * index;
-      doc.text(field, x, y, { width: width - 10, lineBreak: false });
-      doc
-        .moveTo(x, y + 26)
-        .lineTo(x + width - 16, y + 26)
-        .strokeColor("#a3a3a3")
-        .stroke();
-    });
+  if (y + SIGNATURE_HEIGHT > FOOTER_Y - 16) {
+    doc.addPage();
+    y = MARGIN;
   }
 
-  drawFooter(doc, "Tidrapport från Tikkr. Löneunderlag — skickas inte till kund.", {
+  doc.font("Helvetica").fontSize(9).fillColor("#525252");
+
+  // Fälten är kundens egna, från blanketten de använt i tio år.
+  const fields = [
+    "Spara ___ tim",
+    "Ta ut ___ tim",
+    "Datum",
+    "Övertid ok",
+    "Tidrapport ok",
+  ];
+  const width = CONTENT_WIDTH / fields.length;
+
+  fields.forEach((field, index) => {
+    const x = MARGIN + width * index;
+    doc.text(field, x, y, { width: width - 10, lineBreak: false });
+    doc
+      .moveTo(x, y + 26)
+      .lineTo(x + width - 16, y + 26)
+      .strokeColor("#a3a3a3")
+      .stroke();
+  });
+
+  drawFooter(doc, "Tidrapport från Tikkr. Internt löneunderlag.", {
     marginLeft: MARGIN,
     contentWidth: CONTENT_WIDTH,
     y: FOOTER_Y,
@@ -329,8 +349,10 @@ function drawRowHeader(doc: PDFKit.PDFDocument, y: number): number {
   // P och I i stället för orden. Kolumnen är smal, och förkortningen förklaras
   // i foten på sammanställningen.
   doc.text("P/I", MARGIN + 408, y, { width: 20, lineBreak: false });
-  doc.text("Tim", A4_WIDTH - MARGIN - 64, y, {
-    width: 60,
+  // Enheten i rubriken och inte i en fotnot, av samma skäl som pdf.ts skriver
+  // "Tid (tim:min)": 33,75 läses annars som ett klockslag.
+  doc.text("Tim (decimal)", A4_WIDTH - MARGIN - 74, y, {
+    width: 70,
     align: "right",
     lineBreak: false,
   });
@@ -408,14 +430,13 @@ function drawSummary(
 
   y += height + 6;
 
+  // Teckenförklaring, inte en förklaring av räkningen. Två bokstäver i en smal
+  // kolumn är inte självförklarande; hur flexen räknas fram hör hemma i
+  // payroll.ts och i CLAUDE.md, inte på kundens papper.
   doc.font("Helvetica").fontSize(7).fillColor("#a3a3a3");
-  doc.text(
-    "Tid i decimaltimmar. P = produktiv tid på kundorder, I = improduktiv tid. " +
-      "Flextid = närvarotid + frånvaro − planerad tid − intjänad komp.",
-    MARGIN,
-    y,
-    { width: CONTENT_WIDTH }
-  );
+  doc.text("P = produktiv, I = improduktiv", MARGIN, y, {
+    width: CONTENT_WIDTH,
+  });
 
   return doc.y + 4;
 }
