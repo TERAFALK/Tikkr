@@ -52,7 +52,9 @@ export default async function OverviewPage() {
         clockInAt: true,
         employee: { select: { name: true } },
         kind: true,
-        order: { select: { orderNumber: true, customerName: true } },
+        order: {
+          select: { orderNumber: true, customer: { select: { name: true } } },
+        },
         moment: { select: { name: true } },
         indirectMoment: { select: { name: true } },
       },
@@ -223,9 +225,9 @@ export default async function OverviewPage() {
                     {entry.order?.orderNumber ?? (
                       <Badge tone="muted">Improduktiv</Badge>
                     )}
-                    {entry.order?.customerName && (
+                    {entry.order?.customer && (
                       <span className="ml-2 text-neutral-500">
-                        {entry.order.customerName}
+                        {entry.order.customer.name}
                       </span>
                     )}
                   </Td>

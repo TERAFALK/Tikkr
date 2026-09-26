@@ -57,12 +57,20 @@ beforeAll(async () => {
 
   orderA = (
     await unsafeGlobalPrisma.order.create({
-      data: { companyId, orderNumber: "5001", customerName: "Kund A" },
+      data: {
+        companyId,
+        orderNumber: "5001",
+        customer: { create: { companyId: companyId, name: "Kund A" } },
+      },
     })
   ).id;
   orderB = (
     await unsafeGlobalPrisma.order.create({
-      data: { companyId, orderNumber: "5002", customerName: "Kund B" },
+      data: {
+        companyId,
+        orderNumber: "5002",
+        customer: { create: { companyId: companyId, name: "Kund B" } },
+      },
     })
   ).id;
   stangdOrder = (
@@ -684,7 +692,7 @@ describe("avsluta en order med pågående stämplingar", () => {
         data: {
           companyId,
           orderNumber: `9${String(counter).padStart(3, "0")}`,
-          customerName: "Kund C",
+          customer: { create: { companyId, name: `Kund C ${counter}` } },
         },
       })
     ).id;

@@ -115,7 +115,14 @@ export async function buildReport(
       source: true,
       kind: true,
       employee: { select: { id: true, name: true, employeeNumber: true } },
-      order: { select: { id: true, orderNumber: true, customerName: true } },
+      order: {
+        select: {
+          id: true,
+          orderNumber: true,
+          customerId: true,
+          customer: { select: { name: true } },
+        },
+      },
       moment: { select: { id: true, name: true } },
       indirectMoment: { select: { id: true, name: true } },
     },
@@ -164,7 +171,7 @@ export async function buildReport(
     byOrder: groupBy(billable, (entry) => ({
       key: entry.order?.id ?? "",
       label: entry.order?.orderNumber ?? "",
-      sublabel: entry.order?.customerName ?? undefined,
+      sublabel: entry.order?.customer?.name ?? undefined,
     })),
     byEmployee: groupBy(entries, (entry) => ({
       key: entry.employee.id,
@@ -192,7 +199,12 @@ type Entry = {
   // Nullbara: en improduktiv post har varken order eller arbetsmoment, och en
   // orderpost har inget improduktivt moment. Anroparen filtrerar på kind INNAN
   // den grupperar, så att en nyckel aldrig blir tom.
-  order: { id: string; orderNumber: string; customerName: string | null } | null;
+  order: {
+    id: string;
+    orderNumber: string;
+    customerId: string | null;
+    customer: { name: string } | null;
+  } | null;
   moment: { id: string; name: string } | null;
   indirectMoment: { id: string; name: string } | null;
 };

@@ -6,6 +6,7 @@ import type {
   OrderToggleState,
 } from "@/app/admin/(panel)/ordrar/actions";
 import OrderActions from "./OrderActions";
+import type { SearchSelectOption } from "./SearchSelect";
 import BudgetBar from "./BudgetBar";
 import {
   Badge,
@@ -33,6 +34,7 @@ import { formatDuration } from "@/lib/format";
 export interface OrderRow {
   id: string;
   orderNumber: string;
+  customerId: string | null;
   customerName: string | null;
   status: string;
   entries: number;
@@ -51,8 +53,11 @@ export default function OrdersTable({
   orders,
   updateAction,
   toggleAction,
+  customers,
 }: {
   orders: OrderRow[];
+  /** Kunderna som går att välja i ändra-rutan. */
+  customers: SearchSelectOption[];
   updateAction: (
     state: OrderFormState,
     formData: FormData
@@ -187,6 +192,7 @@ export default function OrdersTable({
                   ) : (
                     <OrderActions
                       order={order}
+                      customers={customers}
                       updateAction={updateAction}
                       toggleAction={toggleAction}
                     />

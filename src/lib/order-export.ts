@@ -55,7 +55,7 @@ export async function getOrderExports(
     select: {
       id: true,
       orderNumber: true,
-      customerName: true,
+      customer: { select: { name: true } },
       status: true,
       budgetMinutes: true,
       timeEntries: {
@@ -91,7 +91,7 @@ export async function getOrderExports(
     return {
       orderId: order.id,
       orderNumber: order.orderNumber,
-      customerName: order.customerName,
+      customerName: order.customer?.name ?? null,
       status: order.status,
       budgetMinutes: order.budgetMinutes,
       rows,

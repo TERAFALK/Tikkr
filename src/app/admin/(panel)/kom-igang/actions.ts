@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { assertWritable, requireAdmin } from "@/lib/admin-session";
+import { resolveCustomerId } from "@/lib/customers";
 
 const PATH = "/admin/kom-igang";
 
@@ -77,14 +78,17 @@ export async function addOrder(formData: FormData) {
   const { db, companyId } = session;
 
   const orderNumber = String(formData.get("orderNumber") ?? "").trim();
-  const customerName = String(formData.get("customerName") ?? "").trim();
   if (!orderNumber) return;
 
   const clash = await db.order.findFirst({ where: { orderNumber } });
   if (clash) return;
 
   await db.order.create({
-    data: { companyId, orderNumber, customerName: customerName || null },
+    data: {
+      companyId,
+      orderNumber,
+      customerId: await resolveCustomerId(db, formData.get("customerId")),
+    },
   });
 
   revalidateAll();

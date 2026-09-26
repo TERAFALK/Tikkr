@@ -679,7 +679,9 @@ async function assertNoOverlap(
       kind: true,
       clockInAt: true,
       clockOutAt: true,
-      order: { select: { orderNumber: true, customerName: true } },
+      order: {
+        select: { orderNumber: true, customer: { select: { name: true } } },
+      },
       moment: { select: { name: true } },
       indirectMoment: { select: { name: true } },
     },

@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { assertWritable, requireAdmin } from "@/lib/admin-session";
+import { resolveCustomerId } from "@/lib/customers";
 import { ClockError, closeOrder, openEntriesOnOrder } from "@/lib/clock";
 import { parseMarkupPercent, parseOre } from "@/lib/money";
 
@@ -32,14 +33,13 @@ export async function createOrder(formData: FormData) {
   const { db, companyId } = session;
 
   const orderNumber = String(formData.get("orderNumber") ?? "").trim();
-  const customerName = String(formData.get("customerName") ?? "").trim();
   if (!orderNumber) return;
 
   await db.order.create({
     data: {
       companyId,
       orderNumber,
-      customerName: customerName || null,
+      customerId: await resolveCustomerId(db, formData.get("customerId")),
       budgetMinutes: parseHours(formData.get("budgetHours")),
     },
   });
@@ -70,7 +70,6 @@ export async function updateOrder(
 
   const id = String(formData.get("id") ?? "");
   const orderNumber = String(formData.get("orderNumber") ?? "").trim();
-  const customerName = String(formData.get("customerName") ?? "").trim();
   if (!id) return { error: "Ingen order angiven." };
   if (!orderNumber) return { error: "Ange ett ordernummer." };
 
@@ -106,7 +105,7 @@ export async function updateOrder(
     where: { id },
     data: {
       orderNumber,
-      customerName: customerName || null,
+      customerId: await resolveCustomerId(db, formData.get("customerId")),
       budgetMinutes: parseHours(formData.get("budgetHours")),
       markupPercent,
       fixedPriceOre,

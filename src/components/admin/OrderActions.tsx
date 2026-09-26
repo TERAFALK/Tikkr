@@ -9,6 +9,7 @@ import type {
 import { Alert, Button, Field, Input } from "@/components/ui";
 import { formatDuration, minutesBetween } from "@/lib/format";
 import BudgetBar from "./BudgetBar";
+import SearchSelect, { type SearchSelectOption } from "./SearchSelect";
 import { IconOrder, IconReport } from "@/components/ui/icons";
 
 /**
@@ -22,10 +23,14 @@ export default function OrderActions({
   order,
   updateAction,
   toggleAction,
+  customers,
 }: {
+  /** Kunderna som går att välja. Skickas ner så att väljaren kan söka lokalt. */
+  customers: SearchSelectOption[];
   order: {
     id: string;
     orderNumber: string;
+    customerId: string | null;
     customerName: string | null;
     status: string;
     entries: number;
@@ -242,11 +247,13 @@ export default function OrderActions({
                 required
               />
             </Field>
-            <Field label="Kund">
-              <Input
-                name="customerName"
-                defaultValue={order.customerName ?? ""}
-                placeholder="Valfritt"
+            <Field label="Kund" hint="Sök på namn eller kundnummer.">
+              <SearchSelect
+                name="customerId"
+                options={customers}
+                defaultValue={order.customerId}
+                emptyLabel="Ingen kund"
+                placeholder="Sök kund…"
               />
             </Field>
             <Field

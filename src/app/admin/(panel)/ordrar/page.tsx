@@ -1,8 +1,10 @@
 import { requireAdmin } from "@/lib/admin-session";
 import FormDialog from "@/components/admin/FormDialog";
+import SearchSelect from "@/components/admin/SearchSelect";
 import OrdersTable from "@/components/admin/OrdersTable";
 import { Alert, EmptyState, Field, Input, PageHeader } from "@/components/ui";
 import { minutesBetween } from "@/lib/format";
+import { customerOptions } from "@/lib/customers";
 import { createOrder, toggleOrder, updateOrder } from "./actions";
 
 export const dynamic = "force-dynamic";
@@ -10,12 +12,17 @@ export const dynamic = "force-dynamic";
 export default async function OrdersPage() {
   const { db } = await requireAdmin();
 
-  const orders = await db.order.findMany({
+  // Hämtas parallellt: kundväljaren behöver hela registret, och en fråga till
+  // kostar mindre än att sidan väntar på två i följd.
+  const [customerList, orders] = await Promise.all([
+    customerOptions(db),
+    db.order.findMany({
     orderBy: [{ status: "asc" }, { orderNumber: "asc" }],
     select: {
       id: true,
       orderNumber: true,
-      customerName: true,
+      customerId: true,
+      customer: { select: { name: true } },
       status: true,
       budgetMinutes: true,
       markupPercent: true,
@@ -23,12 +30,14 @@ export default async function OrdersPage() {
       isQuickJob: true,
       timeEntries: { select: { clockInAt: true, clockOutAt: true } },
     },
-  });
+    }),
+  ]);
 
   const rows = orders.map((order) => ({
     id: order.id,
     orderNumber: order.orderNumber,
-    customerName: order.customerName,
+    customerId: order.customerId,
+    customerName: order.customer?.name ?? null,
     status: order.status,
     budgetMinutes: order.budgetMinutes,
     markupPercent: order.markupPercent,
@@ -54,9 +63,14 @@ export default async function OrdersPage() {
       </Field>
       <Field
         label="Kund"
-        hint="Valfritt. Visas som rubrik på underlag som skickas vidare."
+        hint="Valfritt. Sök på namn, kundnummer eller org.nr."
       >
-        <Input name="customerName" placeholder="Volvo Lastvagnar" />
+        <SearchSelect
+          name="customerId"
+          options={customerList}
+          emptyLabel="Ingen kund"
+          placeholder="Sök kund…"
+        />
       </Field>
       <Field
         label="Beräknad tid"
@@ -101,6 +115,7 @@ export default async function OrdersPage() {
       ) : (
         <OrdersTable
           orders={rows}
+          customers={customerList}
           updateAction={updateOrder}
           toggleAction={toggleOrder}
         />

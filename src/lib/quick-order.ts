@@ -36,7 +36,8 @@ export interface QuickOrderInput {
    * hittar systemet på ett, märkt så att det syns att det är påhittat.
    */
   orderNumber?: string;
-  customerName?: string;
+  /** Kunden ur registret. Skärmen skickar aldrig ett namn, bara ett id. */
+  customerId?: string;
 }
 
 export interface QuickOrder {
@@ -52,19 +53,43 @@ export interface QuickOrder {
  * nummer inom samma minut, och den andra ska stämpla på samma order som den
  * första — inte få ett felmeddelande eller en dubblett.
  */
+/** Fälten skärmen behöver. Samlat så att de fyra uppslagen inte glider isär. */
+const QUICK_ORDER_SELECT = {
+  id: true,
+  orderNumber: true,
+  customerId: true,
+  customer: { select: { name: true } },
+} as const;
+
+function toQuickOrder(order: {
+  id: string;
+  orderNumber: string;
+  customer: { name: string } | null;
+}): QuickOrder {
+  return {
+    id: order.id,
+    orderNumber: order.orderNumber,
+    customerName: order.customer?.name ?? null,
+  };
+}
+
 export async function createQuickOrder(
   companyId: string,
   input: QuickOrderInput
 ): Promise<QuickOrder> {
   const db = forCompany(companyId);
 
-  const customerName = input.customerName?.trim() || null;
   const orderNumber = input.orderNumber?.trim();
+
+  // Kunden slås upp genom det filtrerade lagret, inte litas på rakt av. Id:t
+  // kommer från en skärm, och en skärm ska inte kunna peka på en annan kunds
+  // kundregister ens av misstag.
+  const customerId = await resolveCustomer(db, input.customerId);
 
   if (orderNumber) {
     const existing = await db.order.findFirst({
       where: { orderNumber },
-      select: { id: true, orderNumber: true, customerName: true, status: true },
+      select: { ...QUICK_ORDER_SELECT, status: true },
     });
 
     if (existing) {
@@ -74,13 +99,33 @@ export async function createQuickOrder(
             `öppna den igen.`
         );
       }
-      return existing;
+
+      // KUNDEN PÅ DEN BEFINTLIGA ORDERN RÖRS INTE, även om den här
+      // stämplingen pekar ut en annan. Kontoret kan ha rättat den, och en
+      // skärm ska inte skriva över det.
+      //
+      // Saknar ordern kund och den här stämplingen har en, fylls den i — det
+      // är ny uppgift, inte en ändrad. Ordern flaggas som snabbjobb igen så
+      // att kontoret tittar på den.
+      if (customerId && !existing.customerId) {
+        return toQuickOrder(
+          await db.order.update({
+            where: { id: existing.id },
+            data: { customerId, isQuickJob: true },
+            select: QUICK_ORDER_SELECT,
+          })
+        );
+      }
+
+      return toQuickOrder(existing);
     }
 
-    return db.order.create({
-      data: { companyId, orderNumber, customerName, isQuickJob: true },
-      select: { id: true, orderNumber: true, customerName: true },
-    });
+    return toQuickOrder(
+      await db.order.create({
+        data: { companyId, orderNumber, customerId, isQuickJob: true },
+        select: QUICK_ORDER_SELECT,
+      })
+    );
   }
 
   // Inget nummer angivet: hitta på ett. Numret räknas fram ur hur många som
@@ -95,15 +140,17 @@ export async function createQuickOrder(
     const candidate = `${GENERATED_PREFIX}${taken + attempt + 1}`;
 
     try {
-      return await db.order.create({
-        data: {
-          companyId,
-          orderNumber: candidate,
-          customerName,
-          isQuickJob: true,
-        },
-        select: { id: true, orderNumber: true, customerName: true },
-      });
+      return toQuickOrder(
+        await db.order.create({
+          data: {
+            companyId,
+            orderNumber: candidate,
+            customerId,
+            isQuickJob: true,
+          },
+          select: QUICK_ORDER_SELECT,
+        })
+      );
     } catch (error) {
       // Numret hann tas av en annan skärm. Prova nästa.
       if (!isUniqueViolation(error)) throw error;
@@ -116,31 +163,47 @@ export async function createQuickOrder(
 }
 
 /**
- * Kundnamnen företaget använt, senast använda först.
+ * Kunderna skärmen får välja mellan.
  *
- * Underlaget för rutnätet i kiosken. Skärmen ska kunna erbjuda ett tryck i
- * stället för ett tangentbord — namnen finns ju redan.
+ * Kommer ur KUNDREGISTRET, inte ur ordrarnas historik. Före registret
+ * plockades namnen ur de senaste ~480 ordrarna och dedupades med ett `Set` på
+ * trimmad text — vilket gjorde "Volvo" och "volvo" till två kunder, och lät en
+ * kund vars ordrar låg längre bak falla bort tyst.
+ *
+ * Avaktiverade kunder utelämnas. De behåller sina gamla ordrar, men ska inte
+ * gå att stämpla på nytt.
  */
-export async function recentCustomerNames(
+export async function pickableCustomers(
+  db: ReturnType<typeof forCompany>
+): Promise<{ id: string; name: string }[]> {
+  return db.customer.findMany({
+    where: { active: true },
+    orderBy: { name: "asc" },
+    select: { id: true, name: true },
+  });
+}
+
+/**
+ * Kontrollerar att kunden finns och är aktiv.
+ *
+ * Ett id från en skärm får aldrig användas rakt av. Filtreringslagret hindrar
+ * visserligen att en annan kunds rad nås, men en order som pekar på en
+ * avaktiverad eller borttagen kund vore ändå skräp i underlaget.
+ *
+ * Okand kund ger null och inte ett fel: stämplingen ska gå igenom ändå.
+ * Arbetstid som inte registreras går inte att rekonstruera, en saknad kund
+ * fyller kontoret i.
+ */
+async function resolveCustomer(
   db: ReturnType<typeof forCompany>,
-  limit = 60
-): Promise<string[]> {
-  const orders = await db.order.findMany({
-    where: { customerName: { not: null } },
-    orderBy: { createdAt: "desc" },
-    select: { customerName: true },
-    // Fler rader än namn: samma kund har många ordrar, och dubbletterna
-    // rensas nedan.
-    take: limit * 8,
+  customerId: string | undefined
+): Promise<string | null> {
+  if (!customerId) return null;
+
+  const customer = await db.customer.findFirst({
+    where: { id: customerId, active: true },
+    select: { id: true },
   });
 
-  const seen = new Set<string>();
-
-  for (const order of orders) {
-    const name = order.customerName?.trim();
-    if (name) seen.add(name);
-    if (seen.size >= limit) break;
-  }
-
-  return [...seen];
+  return customer?.id ?? null;
 }

@@ -40,12 +40,20 @@ beforeAll(async () => {
 
   order = (
     await unsafeGlobalPrisma.order.create({
-      data: { companyId, orderNumber: "7001", customerName: "Kund A" },
+      data: {
+        companyId,
+        orderNumber: "7001",
+        customer: { create: { companyId: companyId, name: "Kund A" } },
+      },
     })
   ).id;
   annanOrder = (
     await unsafeGlobalPrisma.order.create({
-      data: { companyId, orderNumber: "7002", customerName: "Kund B" },
+      data: {
+        companyId,
+        orderNumber: "7002",
+        customer: { create: { companyId: companyId, name: "Kund B" } },
+      },
     })
   ).id;
 

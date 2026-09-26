@@ -39,7 +39,9 @@ export default async function ReviewPage() {
       reviewNote: true,
       employee: { select: { name: true } },
       kind: true,
-      order: { select: { orderNumber: true, customerName: true } },
+      order: {
+        select: { orderNumber: true, customer: { select: { name: true } } },
+      },
       moment: { select: { name: true } },
       indirectMoment: { select: { name: true } },
     },
@@ -79,8 +81,8 @@ export default async function ReviewPage() {
                     <span className="font-medium">{entry.employee.name}</span>
                     <span className="mt-0.5 block text-sm text-neutral-500">
                       {describeEntry(entry).text}
-                      {entry.order?.customerName &&
-                        ` · ${entry.order.customerName}`}
+                      {entry.order?.customer &&
+                        ` · ${entry.order.customer.name}`}
                     </span>
                     {entry.kind === "INDIRECT" && (
                       <span className="mt-1 inline-block">

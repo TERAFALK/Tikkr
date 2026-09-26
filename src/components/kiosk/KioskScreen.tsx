@@ -53,6 +53,17 @@ interface Order {
   customerName: string | null;
 }
 
+/**
+ * En kund ur registret, som skärmen får välja mellan.
+ *
+ * Id och namn, inget mer. Skärmen skickar id:t vidare och visar namnet — org.nr
+ * och adress hör hemma på kontoret, inte på en knapp i verkstaden.
+ */
+export interface KioskCustomer {
+  id: string;
+  name: string;
+}
+
 interface Moment {
   id: string;
   name: string;
@@ -197,8 +208,8 @@ interface Props {
   activeByEmployee: Record<string, ActiveJob[]>;
   /** Senast avslutade jobb per anställd. Underlaget för "Fortsätt". */
   recentByEmployee: Record<string, RecentJob>;
-  /** Kundnamn företaget använt förut. Underlaget för snabbjobbets kundval. */
-  customers: string[];
+  /** Kunderna ur registret. Underlaget för snabbjobbets kundval. */
+  customers: KioskCustomer[];
   /** Text om prenumerationen, eller null. Stoppar aldrig stämplingen. */
   subscriptionWarning: string | null;
   /** true om företaget laddat upp en egen logotyp. */
@@ -217,7 +228,7 @@ type View =
       name: "quickMoment";
       employee: Employee;
       orderNumber: string;
-      customerName: string | null;
+      customer: KioskCustomer | null;
     }
   | { name: "moment"; employee: Employee; order: Order }
   | { name: "indirect"; employee: Employee };
@@ -524,7 +535,7 @@ export default function KioskScreen({
   const createQuickOrder = useCallback(
     async (
       orderNumber: string,
-      customerName: string | null
+      customer: KioskCustomer | null
     ): Promise<Order | null> => {
       creatingOrder.current = true;
 
@@ -532,7 +543,7 @@ export default function KioskScreen({
         const response = await fetch("/api/kiosk/quick-order", {
           method: "POST",
           headers: { "content-type": "application/json" },
-          body: JSON.stringify({ orderNumber, customerName }),
+          body: JSON.stringify({ orderNumber, customerId: customer?.id }),
           signal: AbortSignal.timeout(8000),
         });
 
@@ -853,14 +864,14 @@ export default function KioskScreen({
           <CustomerPicker
             orderNumber={view.orderNumber}
             customers={customers}
-            onPick={(customerName) =>
+            onPick={(customer) =>
               // Ingenting skapas här. Kunden är ett val på vägen, och den som
               // backar ur ska inte lämna en order efter sig.
               setView({
                 name: "quickMoment",
                 employee: view.employee,
                 orderNumber: view.orderNumber,
-                customerName,
+                customer,
               })
             }
             onBack={() =>
@@ -872,7 +883,9 @@ export default function KioskScreen({
         {view.name === "quickMoment" && (
           <Chooser
             title={`${
-              [view.orderNumber, view.customerName].filter(Boolean).join(" · ") ||
+              [view.orderNumber, view.customer?.name]
+                .filter(Boolean)
+                .join(" · ") ||
               "Nytt snabbjobb"
             }: välj arbetsmoment`}
             empty="Inga arbetsmoment upplagda. Kontakta administratören."
@@ -888,7 +901,7 @@ export default function KioskScreen({
                 void (async () => {
                   const order = await createQuickOrder(
                     view.orderNumber,
-                    view.customerName
+                    view.customer
                   );
 
                   // Gick det inte står felet i rutan och skärmen väntar kvar.
@@ -1444,17 +1457,15 @@ function CustomerPicker({
   onBack,
 }: {
   orderNumber: string;
-  customers: string[];
-  onPick: (customerName: string | null) => void;
+  customers: KioskCustomer[];
+  onPick: (customer: KioskCustomer | null) => void;
   onBack: () => void;
 }) {
   const [letter, setLetter] = useState<string | null>(null);
-  const [typing, setTyping] = useState(false);
-  const [typed, setTyped] = useState("");
 
   const letters = useMemo(() => {
     const found = new Set(
-      customers.map((name) => name.trim().charAt(0).toUpperCase())
+      customers.map((customer) => customer.name.trim().charAt(0).toUpperCase())
     );
     return [...found].sort((a, b) => a.localeCompare(b, "sv"));
   }, [customers]);
@@ -1462,7 +1473,7 @@ function CustomerPicker({
   const shown = useMemo(() => {
     if (!letter) return customers;
     return customers.filter(
-      (name) => name.trim().charAt(0).toUpperCase() === letter
+      (customer) => customer.name.trim().charAt(0).toUpperCase() === letter
     );
   }, [customers, letter]);
 
@@ -1479,100 +1490,74 @@ function CustomerPicker({
           : "Ordern får ett tillfälligt nummer och märks för kontoret."}
       </p>
 
-      {typing ? (
-        <div className="rounded-xl border border-neutral-200 bg-white p-5">
-          <input
-            autoFocus
-            value={typed}
-            onChange={(event) => setTyped(event.target.value)}
-            placeholder="Kundens namn"
-            className="w-full rounded-xl border-2 border-neutral-200 px-5 py-4 text-2xl text-neutral-900 focus:border-blue-600 focus:outline-none"
-          />
+      {useAlphabet && (
+        <div className="mb-3 flex flex-wrap gap-2">
+          <button
+            onClick={() => setLetter(null)}
+            className={`kiosk-press min-h-14 min-w-14 rounded-lg px-4 text-lg font-semibold ${
+              letter === null
+                ? "bg-neutral-900 text-white"
+                : "border border-neutral-200 bg-white text-neutral-900 active:bg-neutral-50"
+            }`}
+          >
+            Alla
+          </button>
+          {letters.map((option) => (
+            <button
+              key={option}
+              onClick={() => setLetter(option)}
+              className={`kiosk-press min-h-14 min-w-14 rounded-lg text-lg font-semibold ${
+                letter === option
+                  ? "bg-neutral-900 text-white"
+                  : "border border-neutral-200 bg-white text-neutral-900 active:bg-neutral-50"
+              }`}
+            >
+              {option}
+            </button>
+          ))}
+        </div>
+      )}
 
-          <div className="mt-3 grid gap-3 sm:grid-cols-2">
+      {shown.length > 0 ? (
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4">
+          {shown.map((customer) => (
             <button
-              onClick={() => onPick(typed.trim() || null)}
-              className="kiosk-press min-h-20 rounded-xl bg-blue-600 p-5 text-xl font-semibold text-white active:bg-blue-700"
+              key={customer.id}
+              onClick={() => onPick(customer)}
+              className="kiosk-press flex min-h-24 items-center rounded-xl border border-neutral-200 bg-white p-5 text-left text-xl font-semibold text-neutral-900 active:bg-neutral-50"
             >
-              Klar
+              <span className="line-clamp-2">{customer.name}</span>
             </button>
-            <button
-              onClick={() => setTyping(false)}
-              className="kiosk-press min-h-20 rounded-xl border border-neutral-200 bg-white p-5 text-xl font-semibold text-neutral-900 active:bg-neutral-50"
-            >
-              Tillbaka till listan
-            </button>
-          </div>
+          ))}
         </div>
       ) : (
-        <>
-          {useAlphabet && (
-            <div className="mb-3 flex flex-wrap gap-2">
-              <button
-                onClick={() => setLetter(null)}
-                className={`kiosk-press min-h-14 min-w-14 rounded-lg px-4 text-lg font-semibold ${
-                  letter === null
-                    ? "bg-neutral-900 text-white"
-                    : "border border-neutral-200 bg-white text-neutral-900 active:bg-neutral-50"
-                }`}
-              >
-                Alla
-              </button>
-              {letters.map((option) => (
-                <button
-                  key={option}
-                  onClick={() => setLetter(option)}
-                  className={`kiosk-press min-h-14 min-w-14 rounded-lg text-lg font-semibold ${
-                    letter === option
-                      ? "bg-neutral-900 text-white"
-                      : "border border-neutral-200 bg-white text-neutral-900 active:bg-neutral-50"
-                  }`}
-                >
-                  {option}
-                </button>
-              ))}
-            </div>
-          )}
-
-          {shown.length > 0 && (
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4">
-              {shown.map((name) => (
-                <button
-                  key={name}
-                  onClick={() => onPick(name)}
-                  className="kiosk-press flex min-h-24 items-center rounded-xl border border-neutral-200 bg-white p-5 text-left text-xl font-semibold text-neutral-900 active:bg-neutral-50"
-                >
-                  <span className="line-clamp-2">{name}</span>
-                </button>
-              ))}
-            </div>
-          )}
-
-          <div className="mt-3 grid gap-3 sm:grid-cols-3">
-            <button
-              onClick={() => setTyping(true)}
-              className="kiosk-press min-h-20 rounded-xl border border-neutral-200 bg-white p-5 text-lg font-semibold text-neutral-900 active:bg-neutral-50"
-            >
-              Annan kund
-            </button>
-            {/* Att hoppa över är tillåtet. Ordern flaggas ändå för kontoret,
-                och att stå fast vid skärmen för att man inte vet kundens namn
-                vore att förlora timmen man försökte rädda. */}
-            <button
-              onClick={() => onPick(null)}
-              className="kiosk-press min-h-20 rounded-xl border border-neutral-200 bg-white p-5 text-lg font-semibold text-neutral-500 active:bg-neutral-50"
-            >
-              Vet inte
-            </button>
-            <button
-              onClick={onBack}
-              className="kiosk-press min-h-20 rounded-xl border border-neutral-200 bg-white p-5 text-lg font-semibold text-neutral-900 active:bg-neutral-50"
-            >
-              Avbryt
-            </button>
-          </div>
-        </>
+        /* Tomt register. Skärmen kan inte lägga upp en kund — det görs på
+           kontoret — så det enda ärliga är att säga det och låta "Vet inte"
+           vara vägen vidare. Jobbet ska aldrig stoppas av ett saknat namn. */
+        <p className="rounded-xl border border-neutral-200 bg-white p-5 text-lg text-neutral-500">
+          {letter
+            ? "Ingen kund börjar på den bokstaven."
+            : "Inga kunder upplagda än. Välj ”Vet inte” — kontoret fyller i kunden."}
+        </p>
       )}
+
+      <div className="mt-3 grid gap-3 sm:grid-cols-2">
+        {/* Att hoppa över är tillåtet. Ordern flaggas ändå för kontoret,
+            och att stå fast vid skärmen för att man inte vet vilken kund det
+            är vore att förlora timmen man försökte rädda. */}
+        <button
+          onClick={() => onPick(null)}
+          className="kiosk-press min-h-20 rounded-xl border border-neutral-200 bg-white p-5 text-lg font-semibold text-neutral-500 active:bg-neutral-50"
+        >
+          Vet inte
+        </button>
+        <button
+          onClick={onBack}
+          className="kiosk-press min-h-20 rounded-xl border border-neutral-200 bg-white p-5 text-lg font-semibold text-neutral-900 active:bg-neutral-50"
+        >
+          Avbryt
+        </button>
+      </div>
     </div>
   );
 }

@@ -74,7 +74,11 @@ export default async function ReportsPage({
     db.employee.findMany({ orderBy: { name: "asc" }, select: { id: true, name: true } }),
     db.order.findMany({
       orderBy: { orderNumber: "asc" },
-      select: { id: true, orderNumber: true, customerName: true },
+      select: {
+        id: true,
+        orderNumber: true,
+        customer: { select: { name: true } },
+      },
     }),
     db.workMoment.findMany({
       orderBy: { name: "asc" },
@@ -191,7 +195,7 @@ export default async function ReportsPage({
               {orders.map((order) => (
                 <option key={order.id} value={order.id}>
                   {order.orderNumber}
-                  {order.customerName ? `, ${order.customerName}` : ""}
+                  {order.customer ? `, ${order.customer.name}` : ""}
                 </option>
               ))}
             </Select>

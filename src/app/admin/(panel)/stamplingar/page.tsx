@@ -83,7 +83,11 @@ export default async function EntriesPage({
       }),
       db.order.findMany({
         orderBy: { orderNumber: "asc" },
-        select: { id: true, orderNumber: true, customerName: true },
+        select: {
+          id: true,
+          orderNumber: true,
+          customer: { select: { name: true } },
+        },
       }),
       db.workMoment.findMany({
         orderBy: { name: "asc" },
@@ -112,7 +116,12 @@ export default async function EntriesPage({
           indirectMomentId: true,
           employee: { select: { name: true } },
           kind: true,
-          order: { select: { orderNumber: true, customerName: true } },
+          order: {
+            select: {
+              orderNumber: true,
+              customer: { select: { name: true } },
+            },
+          },
           moment: { select: { name: true } },
           indirectMoment: { select: { name: true } },
         },
@@ -125,8 +134,8 @@ export default async function EntriesPage({
   }));
   const orderOptions = orders.map((order) => ({
     id: order.id,
-    label: order.customerName
-      ? `${order.orderNumber}, ${order.customerName}`
+    label: order.customer
+      ? `${order.orderNumber}, ${order.customer.name}`
       : order.orderNumber,
   }));
   const momentOptions = moments.map((moment) => ({
@@ -263,9 +272,9 @@ export default async function EntriesPage({
 
                     <Td muted>
                       {describeEntry(entry).text}
-                      {entry.order?.customerName && (
+                      {entry.order?.customer && (
                         <span className="mt-0.5 block text-xs text-neutral-400">
-                          {entry.order.customerName}
+                          {entry.order.customer.name}
                         </span>
                       )}
                     </Td>

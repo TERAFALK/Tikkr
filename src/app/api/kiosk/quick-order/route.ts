@@ -19,14 +19,12 @@ export const runtime = "nodejs";
 
 interface Body {
   orderNumber?: string;
-  customerName?: string;
+  /** Kunden ur registret. Skärmen skickar ett id, aldrig ett namn. */
+  customerId?: string;
 }
 
 /** Så långt ett inslaget ordernummer får vara. Speglar kioskens knappsats. */
 const MAX_ORDER_NUMBER = 20;
-
-/** Så långt ett kundnamn får vara. Rymmer vilket företagsnamn som helst. */
-const MAX_CUSTOMER_NAME = 120;
 
 export async function POST(request: NextRequest) {
   const session = await getKioskSession();
@@ -46,7 +44,7 @@ export async function POST(request: NextRequest) {
   }
 
   const orderNumber = String(body?.orderNumber ?? "").trim();
-  const customerName = String(body?.customerName ?? "").trim();
+  const customerId = String(body?.customerId ?? "").trim();
 
   if (orderNumber.length > MAX_ORDER_NUMBER) {
     return NextResponse.json(
@@ -55,17 +53,10 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  if (customerName.length > MAX_CUSTOMER_NAME) {
-    return NextResponse.json(
-      { error: "Kundnamnet är för långt." },
-      { status: 400 }
-    );
-  }
-
   try {
     const order = await createQuickOrder(session.companyId, {
       orderNumber: orderNumber || undefined,
-      customerName: customerName || undefined,
+      customerId: customerId || undefined,
     });
 
     await Promise.all([touchDevice(session.deviceId), refreshKioskCookie()]);

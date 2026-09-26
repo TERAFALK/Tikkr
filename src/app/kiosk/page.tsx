@@ -3,7 +3,7 @@ import { unsafeGlobalPrisma } from "@/lib/db";
 import { forCompany } from "@/lib/tenant";
 import { evaluateAccess } from "@/lib/subscription";
 import { activeNotices } from "@/lib/notices";
-import { recentCustomerNames } from "@/lib/quick-order";
+import { pickableCustomers } from "@/lib/quick-order";
 import { describeEntry } from "@/lib/entry-label";
 import type {
   KioskActiveJob,
@@ -104,7 +104,11 @@ export default async function KioskPage() {
     db.order.findMany({
       where: { status: "OPEN" },
       orderBy: { orderNumber: "asc" },
-      select: { id: true, orderNumber: true, customerName: true },
+      select: {
+        id: true,
+        orderNumber: true,
+        customer: { select: { name: true } },
+      },
     }),
     db.workMoment.findMany({
       where: { active: true },
@@ -152,9 +156,9 @@ export default async function KioskPage() {
     }),
     activeNotices("kiosk"),
     // Underlaget för kundvalet när en anställd skapar en order på plats.
-    // Namnen finns redan — skärmen ska kunna erbjuda ett tryck i stället
-    // för ett tangentbord man knappt kan skriva på med handskar.
-    recentCustomerNames(db),
+    // Kunderna finns i registret — skärmen erbjuder ett tryck i stället för
+    // ett tangentbord man knappt kan skriva på med handskar.
+    pickableCustomers(db),
   ]);
 
   // En LISTA per person. En operatör kan köra två maskiner samtidigt, och
@@ -208,7 +212,11 @@ export default async function KioskPage() {
         name: employee.name,
         hasPhoto: Boolean(employee.photoMimeType),
       }))}
-      orders={orders}
+      orders={orders.map((order) => ({
+        id: order.id,
+        orderNumber: order.orderNumber,
+        customerName: order.customer?.name ?? null,
+      }))}
       moments={moments}
       indirectMoments={indirectMoments}
       activeByEmployee={activeByEmployee}

@@ -115,7 +115,7 @@ export async function getOrderCalcs(
     select: {
       id: true,
       orderNumber: true,
-      customerName: true,
+      customer: { select: { name: true } },
       markupPercent: true,
       fixedPriceOre: true,
       timeEntries: {
@@ -223,7 +223,7 @@ export async function getOrderCalcs(
     return {
       orderId: order.id,
       orderNumber: order.orderNumber,
-      customerName: order.customerName,
+      customerName: order.customer?.name ?? null,
       groups: sorted,
       entryCount: order.timeEntries.length,
       totalMinutes,

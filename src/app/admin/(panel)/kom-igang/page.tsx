@@ -11,6 +11,8 @@ import {
   Input,
   PageHeader,
 } from "@/components/ui";
+import SearchSelect from "@/components/admin/SearchSelect";
+import { customerOptions } from "@/lib/customers";
 import { addEmployees, addMoments, addOrder } from "./actions";
 
 export const dynamic = "force-dynamic";
@@ -19,7 +21,7 @@ export default async function OnboardingPage() {
   const { db, companyName } = await requireAdmin();
   const state = await getOnboardingState(db);
 
-  const [employees, moments, orders] = await Promise.all([
+  const [employees, moments, orders, customerList] = await Promise.all([
     db.employee.findMany({
       where: { active: true },
       orderBy: { name: "asc" },
@@ -33,8 +35,13 @@ export default async function OnboardingPage() {
     db.order.findMany({
       where: { status: "OPEN" },
       orderBy: { orderNumber: "asc" },
-      select: { id: true, orderNumber: true, customerName: true },
+      select: {
+        id: true,
+        orderNumber: true,
+        customer: { select: { name: true } },
+      },
     }),
+    customerOptions(db),
   ]);
 
   const alreadySuggested = new Set(moments.map((moment) => moment.name));
@@ -156,7 +163,12 @@ export default async function OnboardingPage() {
           </div>
           <div className="min-w-56 flex-1">
             <Field label="Kund" hint="Valfritt">
-              <Input name="customerName" placeholder="Volvo Lastvagnar" />
+              <SearchSelect
+                name="customerId"
+                options={customerList}
+                emptyLabel="Ingen kund"
+                placeholder="Sök kund…"
+              />
             </Field>
           </div>
           <Button type="submit">Lägg till</Button>
@@ -166,8 +178,8 @@ export default async function OnboardingPage() {
           <ChipList
             label={`${orders.length} öppna`}
             items={orders.map((order) =>
-              order.customerName
-                ? `${order.orderNumber} · ${order.customerName}`
+              order.customer
+                ? `${order.orderNumber} · ${order.customer.name}`
                 : order.orderNumber
             )}
             href="/admin/ordrar"

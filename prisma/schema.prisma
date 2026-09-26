@@ -131,6 +131,7 @@ model Company {
   adminUsers      AdminUser[]
   adminInvites    AdminInvite[]
   kioskDevices    KioskDevice[]
+  customers       Customer[]
   supportVisits   SupportVisit[]
 
   @@map("companies")
@@ -197,12 +198,82 @@ model Employee {
   @@map("employees")
 }
 
+/// EN KUND. Skapas en gång, väljs sedan.
+///
+/// Ersätter fritextfältet `Order.customerName`. Tre saker blev möjliga med
+/// bytet: kunden går att fråga om ("vad har vi gjort åt Teltek i år"), namnet
+/// stavas likadant överallt, och uppgifterna behöver inte skrivas för hand på
+/// varje underlag som bifogas en faktura.
+model Customer {
+  id        String @id @default(cuid())
+  companyId String @map("company_id")
+  name      String
+
+  /// Kundens nummer hos ER. Frivilligt, men unikt när det finns — två kunder
+  /// med samma nummer går inte att skilja åt i efterhand.
+  customerNumber String? @map("customer_number")
+  orgNumber      String? @map("org_number")
+
+  contactName String? @map("contact_name")
+  email       String?
+  phone       String?
+
+  addressLine String? @map("address_line")
+  postalCode  String? @map("postal_code")
+  city        String?
+
+  /// Påslag för kundens ordrar, i procent. Tomt = företagets standard.
+  ///
+  /// Ordningen är order → kund → företag, första ifyllda vinner. Se
+  /// src/lib/order-price.ts, som äger hela räkningen.
+  markupPercent Int? @map("markup_percent")
+
+  /// Stående rabatt i procent, dras av EFTER påslaget.
+  ///
+  /// Skild från påslaget med flit, fast båda påverkar priset: påslaget är
+  /// internt och räknar fram vad jobbet ska ge, rabatten är det kunden ser och
+  /// har kommit överens om. Kalkylen skriver ut båda på var sin rad, aldrig
+  /// bara resultatet — ett pris som inte går att bryta ned går inte att
+  /// försvara för den som ifrågasätter fakturan.
+  discountPercent Int? @map("discount_percent")
+
+  /// Fritext för kontoret. Når aldrig ett underlag som går till kunden.
+  notes String?
+
+  /// Avaktiverad kund syns inte i väljarna men behåller sina ordrar.
+  active Boolean @default(true)
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  orders  Order[]
+
+  // Numret är unikt per företag, inte globalt. Två kunder till Tikkr ska kunna
+  // ha varsin kund nummer 1. Flera utan nummer är tillåtet — Postgres räknar
+  // inte tomma värden som dubbletter.
+  @@unique([companyId, customerNumber])
+  @@index([companyId, active])
+  @@index([companyId, name])
+  @@map("customers")
+}
+
 model Order {
   id           String      @id @default(cuid())
   companyId    String      @map("company_id")
   orderNumber  String      @map("order_number")
-  customerName String?     @map("customer_name")
   status       OrderStatus @default(OPEN)
+
+  /// Kunden ordern görs åt. Frivillig.
+  ///
+  /// Var fritext fram till 2026-09-26. Då blev "Volvo", "volvo lastvagnar" och
+  /// "VOLVO AB" tre kunder i varje rapport, och ingenting gick att fråga om en
+  /// kund — den fanns inte som något systemet kände till.
+  ///
+  /// Tomt är tillåtet: ett snabbjobb från skärmen skapas ibland av någon som
+  /// inte vet vem kunden är, och att tvinga fram ett val då hade gett FEL kund
+  /// i stället för ingen kund.
+  customerId String? @map("customer_id")
 
   /// Beräknad tid för ordern, i minuter. Frivillig.
   ///
@@ -250,6 +321,11 @@ model Order {
 
   company     Company     @relation(fields: [companyId], references: [id], onDelete: Cascade)
   timeEntries TimeEntry[]
+
+  // Restrict och inte Cascade: en kund med ordrar ska inte gå att radera, bara
+  // avaktiveras. Samma regel som redan gäller ordrar och arbetsmoment med
+  // registrerad tid — underlaget får inte försvinna under händerna på någon.
+  customer Customer? @relation(fields: [customerId], references: [id], onDelete: Restrict)
 
   // Ordernummer är unikt per företag — inte globalt. Två olika kunder ska
   // kunna ha varsin order "1001" utan att krocka.

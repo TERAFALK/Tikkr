@@ -73,17 +73,42 @@ async function main() {
           { name: "Underhåll" },
         ],
       },
-      orders: {
+      // Kundregistret. Ordrarna kopplas till det nedan, efter att företaget
+      // skapats — kundernas id behövs först.
+      //
+      // Tre kunder med olika prisläge, så att kalkylen har något att visa:
+      // en med eget påslag, en med rabatt, en på företagets standard.
+      customers: {
         create: [
-          { orderNumber: "2601", customerName: "Volvo Lastvagnar" },
-          // Fastprisorder, så kalkylen har något att räkna vinst på.
-          // 7 350 kr, samma siffra som i kundens eget kalkylark.
           {
-            orderNumber: "2602",
-            customerName: "Sandvik Coromant",
-            fixedPriceOre: 735000,
+            name: "Volvo Lastvagnar",
+            customerNumber: "1001",
+            orgNumber: "556013-9700",
+            contactName: "Anna Svensson",
+            email: "anna.svensson@example.com",
+            phone: "0520-123 45",
+            addressLine: "Verkstadsgatan 4",
+            postalCode: "462 35",
+            city: "Vänersborg",
+            // Lägre påslag än företagets 140 — en stor kund som förhandlat.
+            markupPercent: 130,
           },
-          { orderNumber: "2603", customerName: "Atlas Copco" },
+          {
+            name: "Sandvik Coromant",
+            customerNumber: "1002",
+            orgNumber: "556234-6362",
+            contactName: "Björn Lind",
+            email: "bjorn.lind@example.com",
+            city: "Sandviken",
+            // Stående rabatt, dras EFTER påslaget. Finns här för att visa att
+            // de två rattarna räknas i rätt ordning.
+            discountPercent: 10,
+          },
+          {
+            name: "Atlas Copco",
+            customerNumber: "1003",
+            city: "Nacka",
+          },
         ],
       },
     },
@@ -109,10 +134,41 @@ async function main() {
           { name: "Slipning", costRateOre: 14000 },
         ],
       },
-      // Samma ordernummer som demoföretaget — helt tillåtet, de ska inte krocka.
-      orders: { create: [{ orderNumber: "2601", customerName: "Egen kund" }] },
+      customers: { create: [{ name: "Egen kund", customerNumber: "1" }] },
     },
   });
+
+  // ORDRARNA SKAPAS EFTER FÖRETAGEN, eftersom de pekar på kunder som inte har
+  // något id förrän de finns. Upsert på (companyId, orderNumber) gör att en
+  // omkörning inte skapar dubbletter.
+  const customerId = async (companyId, name) =>
+    (
+      await prisma.customer.findFirstOrThrow({
+        where: { companyId, name },
+        select: { id: true },
+      })
+    ).id;
+
+  const order = async (companyId, orderNumber, customerName, extra = {}) =>
+    prisma.order.upsert({
+      where: { companyId_orderNumber: { companyId, orderNumber } },
+      update: {},
+      create: {
+        companyId,
+        orderNumber,
+        customerId: await customerId(companyId, customerName),
+        ...extra,
+      },
+    });
+
+  await order(demo.id, "2601", "Volvo Lastvagnar");
+  // Fastprisorder, så kalkylen har något att räkna vinst på. 7 350 kr, samma
+  // siffra som i kundens eget kalkylark.
+  await order(demo.id, "2602", "Sandvik Coromant", { fixedPriceOre: 735000 });
+  await order(demo.id, "2603", "Atlas Copco");
+
+  // Samma ordernummer som demoföretaget — helt tillåtet, de ska inte krocka.
+  await order(other.id, "2601", "Egen kund");
 
   // Testskärm för demoföretaget, i väntande läge med en fast kod. Koden
   // sparas som fingeravtryck, precis som en riktig — bara att den här är
@@ -159,6 +215,7 @@ async function main() {
   const ids = [demo.id, other.id];
   const counts = {
     anstallda: await prisma.employee.count({ where: { companyId: { in: ids } } }),
+    kunder: await prisma.customer.count({ where: { companyId: { in: ids } } }),
     ordrar: await prisma.order.count({ where: { companyId: { in: ids } } }),
     moment: await prisma.workMoment.count({ where: { companyId: { in: ids } } }),
   };
@@ -167,7 +224,8 @@ async function main() {
   console.log(`  ${demo.name} (id: ${demo.id})`);
   console.log(`  ${other.name} (id: ${other.id})`);
   console.log(
-    `  Totalt: ${counts.anstallda} anställda, ${counts.ordrar} ordrar, ${counts.moment} moment`
+    `  Totalt: ${counts.anstallda} anställda, ${counts.kunder} kunder, ` +
+      `${counts.ordrar} ordrar, ${counts.moment} moment`
   );
   console.log("");
   console.log("Koppla testskärmen: öppna /kiosk och knappa in koden");

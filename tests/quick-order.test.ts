@@ -3,7 +3,7 @@ import { unsafeGlobalPrisma } from "@/lib/db";
 import { forCompany } from "@/lib/tenant";
 import {
   createQuickOrder,
-  recentCustomerNames,
+  pickableCustomers,
   QuickOrderError,
 } from "@/lib/quick-order";
 
@@ -17,6 +17,8 @@ import {
 
 let companyId: string;
 let otherCompanyId: string;
+let teltek: string;
+let annanKund: string;
 
 beforeAll(async () => {
   companyId = (
@@ -24,6 +26,17 @@ beforeAll(async () => {
   ).id;
   otherCompanyId = (
     await unsafeGlobalPrisma.company.create({ data: { name: "Grannen AB" } })
+  ).id;
+
+  teltek = (
+    await unsafeGlobalPrisma.customer.create({
+      data: { companyId, name: "Teltek" },
+    })
+  ).id;
+  annanKund = (
+    await unsafeGlobalPrisma.customer.create({
+      data: { companyId, name: "Någon annan" },
+    })
   ).id;
 });
 
@@ -44,7 +57,7 @@ describe("skapa med ett inslaget nummer", () => {
   it("lägger upp ordern och märker den", async () => {
     const order = await createQuickOrder(companyId, {
       orderNumber: "36401",
-      customerName: "Teltek",
+      customerId: teltek,
     });
 
     expect(order.orderNumber).toBe("36401");
@@ -61,15 +74,17 @@ describe("skapa med ett inslaget nummer", () => {
     // Två personer kan slå in samma nummer inom samma minut. Den andra ska
     // stämpla på samma order som den första, inte få ett fel.
     const first = await unsafeGlobalPrisma.order.create({
-      data: { companyId, orderNumber: "36401", customerName: "Teltek" },
+      data: { companyId, orderNumber: "36401", customerId: teltek },
     });
 
     const second = await createQuickOrder(companyId, {
       orderNumber: "36401",
-      customerName: "Någon annan",
+      customerId: annanKund,
     });
 
     expect(second.id).toBe(first.id);
+    // Kunden på den befintliga ordern rörs INTE. Kontoret kan ha rättat den,
+    // och en skärm ska inte skriva över det.
     expect(second.customerName).toBe("Teltek");
 
     expect(
@@ -100,10 +115,46 @@ describe("skapa med ett inslaget nummer", () => {
     ).rejects.toThrow(QuickOrderError);
   });
 
-  it("tomt kundnamn blir null, inte tom sträng", async () => {
+  it("fyller i kunden när ordern saknar en", async () => {
+    // Ny uppgift, inte en ändrad. Ordern flaggas som snabbjobb igen så att
+    // kontoret tittar på den.
+    const existing = await unsafeGlobalPrisma.order.create({
+      data: { companyId, orderNumber: "36401" },
+    });
+
     const order = await createQuickOrder(companyId, {
       orderNumber: "36401",
-      customerName: "   ",
+      customerId: teltek,
+    });
+
+    expect(order.id).toBe(existing.id);
+    expect(order.customerName).toBe("Teltek");
+
+    const saved = await unsafeGlobalPrisma.order.findUniqueOrThrow({
+      where: { id: existing.id },
+    });
+    expect(saved.isQuickJob).toBe(true);
+  });
+
+  it("en okänd kund ger ingen kund, inte ett fel", async () => {
+    // Stämplingen ska gå igenom ändå. Arbetstid som inte registreras går inte
+    // att rekonstruera; en saknad kund fyller kontoret i.
+    const order = await createQuickOrder(companyId, {
+      orderNumber: "36401",
+      customerId: "finns-inte",
+    });
+
+    expect(order.customerName).toBeNull();
+  });
+
+  it("en annan kunds kundregister går inte att peka på", async () => {
+    const grannens = await unsafeGlobalPrisma.customer.create({
+      data: { companyId: otherCompanyId, name: "Grannens kund" },
+    });
+
+    const order = await createQuickOrder(companyId, {
+      orderNumber: "36401",
+      customerId: grannens.id,
     });
 
     expect(order.customerName).toBeNull();
@@ -112,7 +163,7 @@ describe("skapa med ett inslaget nummer", () => {
 
 describe("skapa utan nummer", () => {
   it("hittar på ett märkt nummer", async () => {
-    const order = await createQuickOrder(companyId, { customerName: "Teltek" });
+    const order = await createQuickOrder(companyId, { customerId: teltek });
 
     expect(order.orderNumber).toBe("SNABB-1");
   });
@@ -170,44 +221,44 @@ describe("isolering mellan företag", () => {
   });
 });
 
-describe("kundnamnen till rutnätet", () => {
-  it("ger varje namn en gång, utan dubbletter", async () => {
-    for (const [orderNumber, customerName] of [
-      ["1", "Volvo"],
-      ["2", "Teltek"],
-      ["3", "Volvo"],
-    ]) {
-      await unsafeGlobalPrisma.order.create({
-        data: { companyId, orderNumber, customerName },
-      });
-    }
+describe("kunderna till rutnätet", () => {
+  it("kommer ur registret, inte ur ordrarnas historik", async () => {
+    // Före registret plockades namnen ur de senaste ordrarna och dedupades på
+    // trimmad text. En kund utan ordrar fanns då inte att välja.
+    const names = (await pickableCustomers(forCompany(companyId))).map(
+      (customer) => customer.name
+    );
 
-    const names = await recentCustomerNames(forCompany(companyId));
-
-    expect(names).toHaveLength(2);
-    expect(new Set(names)).toEqual(new Set(["Volvo", "Teltek"]));
+    expect(names).toEqual(["Någon annan", "Teltek"]);
   });
 
-  it("hoppar över ordrar utan kund", async () => {
-    await unsafeGlobalPrisma.order.create({
-      data: { companyId, orderNumber: "1" },
-    });
-    await unsafeGlobalPrisma.order.create({
-      data: { companyId, orderNumber: "2", customerName: "Teltek" },
+  it("utelämnar avaktiverade kunder", async () => {
+    await unsafeGlobalPrisma.customer.update({
+      where: { id: annanKund },
+      data: { active: false },
     });
 
-    expect(await recentCustomerNames(forCompany(companyId))).toEqual(["Teltek"]);
+    const names = (await pickableCustomers(forCompany(companyId))).map(
+      (customer) => customer.name
+    );
+
+    expect(names).toEqual(["Teltek"]);
+
+    await unsafeGlobalPrisma.customer.update({
+      where: { id: annanKund },
+      data: { active: true },
+    });
   });
 
   it("ser inte ett annat företags kunder", async () => {
-    await unsafeGlobalPrisma.order.create({
-      data: {
-        companyId: otherCompanyId,
-        orderNumber: "1",
-        customerName: "Grannens kund",
-      },
+    await unsafeGlobalPrisma.customer.create({
+      data: { companyId: otherCompanyId, name: "Grannens kund" },
     });
 
-    expect(await recentCustomerNames(forCompany(companyId))).toEqual([]);
+    expect(await pickableCustomers(forCompany(otherCompanyId))).toHaveLength(1);
+    const names = (await pickableCustomers(forCompany(companyId))).map(
+      (customer) => customer.name
+    );
+    expect(names).not.toContain("Grannens kund");
   });
 });

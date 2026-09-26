@@ -13,11 +13,17 @@
 export interface LabelledEntry {
   kind: "ORDER" | "INDIRECT";
   /**
-   * customerName är VALFRITT. Kiosken hämtar aldrig kundnamnet — det tar
-   * plats på en knapp utan att hjälpa den som ska stämpla — och ska ändå
-   * kunna använda samma etikettlogik som adminpanelen.
+   * `customer` är VALFRITT. Kiosken hämtar aldrig kunden — namnet tar plats på
+   * en knapp utan att hjälpa den som ska stämpla — och ska ändå kunna använda
+   * samma etikettlogik som adminpanelen.
+   *
+   * Två lager valfrihet, och båda behövs: `customer` saknas när anroparen inte
+   * bett om den, och är null när ordern inte har någon kund.
    */
-  order: { orderNumber: string; customerName?: string | null } | null;
+  order: {
+    orderNumber: string;
+    customer?: { name: string } | null;
+  } | null;
   moment: { name: string } | null;
   indirectMoment: { name: string } | null;
 }
@@ -50,7 +56,7 @@ export function describeEntry(entry: LabelledEntry): EntryLabel {
 
   return {
     text: parts.length > 0 ? parts.join(" · ") : "Uppgift saknas",
-    customerName: entry.order?.customerName ?? null,
+    customerName: entry.order?.customer?.name ?? null,
     billable: true,
   };
 }

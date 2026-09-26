@@ -39,6 +39,7 @@ import { unsafeGlobalPrisma } from "./db";
  */
 export const TENANT_SCOPED_MODELS = [
   "Employee",
+  "Customer",
   "Order",
   "WorkMoment",
   "IndirectMoment",
