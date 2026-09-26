@@ -48,7 +48,9 @@ export async function GET(request: NextRequest) {
 
   const requested = params.get("visning");
   const view: ReportView =
-    requested === "person" || requested === "persondetalj"
+    requested === "person" ||
+    requested === "persondetalj" ||
+    requested === "kund"
       ? requested
       : "detalj";
 
@@ -117,6 +119,11 @@ export async function GET(request: NextRequest) {
   /* --- Flik 2–4: sammanställningar ---------------------------------------- */
 
   addSummarySheet(workbook, "Per order", "Order", report.byOrder, true);
+  // Fliken läggs bara till när någon order i urvalet har en kund. En tom flik
+  // som heter "Per kund" ser ut som att uppgifterna saknas i systemet.
+  if (report.byCustomer.length > 0) {
+    addSummarySheet(workbook, "Per kund", "Kund", report.byCustomer, false);
+  }
   addSummarySheet(workbook, "Per anställd", "Anställd", report.byEmployee, false);
   addSummarySheet(workbook, "Per moment", "Arbetsmoment", report.byMoment, false);
 
@@ -246,9 +253,11 @@ async function reportAsPdf(
         : "Fakturerbar tid",
     view === "person"
       ? "Summerat per anställd"
-      : view === "persondetalj"
-        ? "Varje stämpling, grupperad per anställd"
-        : "Varje stämpling",
+      : view === "kund"
+        ? "Summerat per kund"
+        : view === "persondetalj"
+          ? "Varje stämpling, grupperad per anställd"
+          : "Varje stämpling",
   ];
 
   try {

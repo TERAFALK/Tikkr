@@ -1,5 +1,6 @@
 import Link from "next/link";
 import FilterForm from "@/components/admin/FilterForm";
+import SearchSelect from "@/components/admin/SearchSelect";
 import { requireAdmin } from "@/lib/admin-session";
 import { unsafeGlobalPrisma } from "@/lib/db";
 import { buildReport, type ReportGroup } from "@/lib/report";
@@ -27,6 +28,7 @@ import {
 } from "@/components/ui";
 import { formatDateTime, formatDuration, formatDecimalHours } from "@/lib/format";
 import { datePresets } from "@/lib/date-presets";
+import { customerOptions } from "@/lib/customers";
 import type { ReportResult, ReportRow } from "@/lib/report";
 import type { ReportView } from "@/lib/report-pdf";
 
@@ -37,6 +39,7 @@ interface SearchParams {
   to?: string;
   employeeId?: string;
   orderId?: string;
+  customerId?: string;
   momentId?: string;
   /** "ORDER" (standard), "INDIRECT" eller "ALL". */
   kind?: string;
@@ -70,7 +73,7 @@ export default async function ReportsPage({
     `/api/admin/export?from=${lastWeek.from}&to=${lastWeek.to}` +
     `&visning=persondetalj&kind=ALL&format=pdf`;
 
-  const [employees, orders, moments] = await Promise.all([
+  const [employees, orders, moments, customers] = await Promise.all([
     db.employee.findMany({ orderBy: { name: "asc" }, select: { id: true, name: true } }),
     db.order.findMany({
       orderBy: { orderNumber: "asc" },
@@ -84,6 +87,7 @@ export default async function ReportsPage({
       orderBy: { name: "asc" },
       select: { id: true, name: true },
     }),
+    customerOptions(db),
   ]);
 
   // Datumfälten ger ett datum utan klockslag, och tolkas i FÖRETAGETS tidszon.
@@ -97,6 +101,7 @@ export default async function ReportsPage({
     to: toDate ? endOfDayIn(toDate, timeZone) : undefined,
     employeeId: params.employeeId,
     orderId: params.orderId,
+    customerId: params.customerId,
     momentId: params.momentId,
     // Utelämnad betyder fakturerbar tid. Se ReportFilters.kind — glömska ska
     // ge det som hör hemma i en faktura, aldrig tvärtom.
@@ -108,7 +113,9 @@ export default async function ReportsPage({
 
   // "detalj" är standard: den som öppnar en rapport vill oftast se raderna.
   const view: ReportView =
-    params.visning === "person" || params.visning === "persondetalj"
+    params.visning === "person" ||
+    params.visning === "persondetalj" ||
+    params.visning === "kund"
       ? params.visning
       : "detalj";
 
@@ -190,15 +197,27 @@ export default async function ReportsPage({
           </Field>
 
           <Field label="Order">
-            <Select name="orderId" defaultValue={params.orderId ?? ""}>
-              <option value="">Alla ordrar</option>
-              {orders.map((order) => (
-                <option key={order.id} value={order.id}>
-                  {order.orderNumber}
-                  {order.customer ? `, ${order.customer.name}` : ""}
-                </option>
-              ))}
-            </Select>
+            <SearchSelect
+              name="orderId"
+              options={orders.map((order) => ({
+                id: order.id,
+                label: order.orderNumber,
+                hint: order.customer?.name,
+              }))}
+              defaultValue={params.orderId}
+              placeholder="Sök order…"
+              emptyLabel="Alla ordrar"
+            />
+          </Field>
+
+          <Field label="Kund">
+            <SearchSelect
+              name="customerId"
+              options={customers}
+              defaultValue={params.customerId}
+              placeholder="Sök kund…"
+              emptyLabel="Alla kunder"
+            />
           </Field>
 
           <Field label="Anställd">
@@ -222,6 +241,7 @@ export default async function ReportsPage({
                 Varje stämpling, per anställd
               </option>
               <option value="person">Summerat per anställd</option>
+              <option value="kund">Summerat per kund</option>
             </Select>
           </Field>
 
@@ -286,6 +306,9 @@ export default async function ReportsPage({
         <>
           <div className="mb-6 grid gap-4 lg:grid-cols-3">
             <Summary title="Per order" groups={report.byOrder} />
+            {report.byCustomer.length > 0 && (
+              <Summary title="Per kund" groups={report.byCustomer} />
+            )}
             <Summary title="Per anställd" groups={report.byEmployee} />
             <Summary title="Per arbetsmoment" groups={report.byMoment} />
             {report.byIndirect.length > 0 && (
@@ -293,7 +316,51 @@ export default async function ReportsPage({
             )}
           </div>
 
-          {view === "person" ? (
+          {view === "kund" ? (
+            <Card>
+              <CardHeader
+                title="Summerat per kund"
+                description={`${report.byCustomer.length} kunder i perioden. Ordrar utan kund utelämnas.`}
+              />
+              {report.byCustomer.length === 0 ? (
+                <p className="px-5 py-6 text-[13px] text-neutral-500">
+                  Ingen av stämplingarna hör till en order med kund. Välj kund
+                  på ordern, så samlas tiden här.
+                </p>
+              ) : (
+                <Table>
+                  <thead>
+                    <tr>
+                      <Th>Kund</Th>
+                      <Th numeric>Stämplingar</Th>
+                      <Th numeric>Tid (tim:min)</Th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {report.byCustomer.map((group) => (
+                      <Tr key={group.key}>
+                        <Td>
+                          {/* Namnet leder till kundsidan. Den som just sett
+                              att en kund tagit mycket tid vill oftast veta
+                              vad den tiden gick till. */}
+                          <Link
+                            href={`/admin/kunder/${group.key}`}
+                            className="font-medium text-blue-600 hover:underline"
+                          >
+                            {group.label}
+                          </Link>
+                        </Td>
+                        <Td numeric muted>
+                          {group.entries}
+                        </Td>
+                        <Td numeric>{formatDuration(group.minutes)}</Td>
+                      </Tr>
+                    ))}
+                  </tbody>
+                </Table>
+              )}
+            </Card>
+          ) : view === "person" ? (
             <Card>
               <CardHeader
                 title="Summerat per anställd"

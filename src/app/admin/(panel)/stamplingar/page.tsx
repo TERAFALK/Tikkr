@@ -1,4 +1,5 @@
 import Link from "next/link";
+import SearchSelect from "@/components/admin/SearchSelect";
 import { requireAdmin } from "@/lib/admin-session";
 import { companyTimeZone } from "@/lib/company";
 import NewEntryDialog from "@/components/admin/NewEntryDialog";
@@ -134,9 +135,8 @@ export default async function EntriesPage({
   }));
   const orderOptions = orders.map((order) => ({
     id: order.id,
-    label: order.customer
-      ? `${order.orderNumber}, ${order.customer.name}`
-      : order.orderNumber,
+    label: order.orderNumber,
+    hint: order.customer?.name,
   }));
   const momentOptions = moments.map((moment) => ({
     id: moment.id,
@@ -347,16 +347,14 @@ export default async function EntriesPage({
                             ) : (
                               <>
                                 <Field label="Order">
-                                  <Select
+                                  <SearchSelect
                                     name="orderId"
-                                    defaultValue={entry.orderId ?? ""}
-                                  >
-                                    {orderOptions.map((option) => (
-                                      <option key={option.id} value={option.id}>
-                                        {option.label}
-                                      </option>
-                                    ))}
-                                  </Select>
+                                    options={orderOptions}
+                                    defaultValue={entry.orderId}
+                                    placeholder="Sök order…"
+                                    emptyLabel="Välj order…"
+                                    required
+                                  />
                                 </Field>
 
                                 <Field label="Arbetsmoment">

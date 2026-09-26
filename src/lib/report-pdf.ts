@@ -26,7 +26,7 @@ const CONTENT_WIDTH = A4_WIDTH - MARGIN * 2;
 const FOOTER_Y = 800;
 const PAGE_BREAK_Y = 720;
 
-export type ReportView = "detalj" | "person" | "persondetalj";
+export type ReportView = "detalj" | "person" | "persondetalj" | "kund";
 
 export interface ReportPdfCompany {
   name: string;
@@ -195,8 +195,10 @@ function render(
 
   /* --- Tabellen ------------------------------------------------------------ */
 
-  if (options.view === "person") {
-    y = drawPersonTable(doc, report.byEmployee, y);
+  if (options.view === "kund") {
+    y = drawGroupTable(doc, "Kund", report.byCustomer, y);
+  } else if (options.view === "person") {
+    y = drawGroupTable(doc, "Anställd", report.byEmployee, y);
   } else if (options.view === "persondetalj") {
     y = drawEmployeeDetailTable(doc, company, report, y);
   } else {
@@ -243,11 +245,24 @@ function drawGroupChart(
 }
 
 /** Summerat per anställd. Svaret på "hur mycket har var och en lagt ner". */
-function drawPersonTable(
+/**
+ * En summerad tabell: en rad per grupp, med antal och tid.
+ *
+ * Tar rubriken som argument i stället för att ha "Anställd" inbakad — samma
+ * form duger till både personer och kunder, och två nästan lika tabeller är
+ * två ställen att rätta nästa gång något ska ändras.
+ */
+function drawGroupTable(
   doc: PDFKit.PDFDocument,
+  heading: string,
   groups: ReportGroup[],
   startY: number
 ): number {
+  const columns = [
+    { ...PERSON_COLUMNS[0], label: heading },
+    ...PERSON_COLUMNS.slice(1),
+  ];
+
   let y = startY + 6;
 
   if (groups.length === 0) {
@@ -256,7 +271,7 @@ function drawPersonTable(
     return doc.y + 10;
   }
 
-  y = drawHead(doc, PERSON_COLUMNS, y);
+  y = drawHead(doc, columns, y);
   doc.font("Helvetica").fontSize(9);
 
   let totalMinutes = 0;
@@ -265,7 +280,7 @@ function drawPersonTable(
   for (const group of groups) {
     if (y + 20 > PAGE_BREAK_Y) {
       doc.addPage();
-      y = drawHead(doc, PERSON_COLUMNS, MARGIN);
+      y = drawHead(doc, columns, MARGIN);
       doc.font("Helvetica").fontSize(9);
     }
 
@@ -274,7 +289,7 @@ function drawPersonTable(
 
     drawRow(
       doc,
-      PERSON_COLUMNS,
+      columns,
       [
         group.sublabel ? `${group.label} (${group.sublabel})` : group.label,
         String(group.entries),
@@ -289,7 +304,7 @@ function drawPersonTable(
 
   return drawTotal(
     doc,
-    PERSON_COLUMNS,
+    columns,
     ["TOTALT", String(totalEntries), formatDuration(totalMinutes)],
     y
   );

@@ -7,10 +7,13 @@ import {
   type EntryFormState,
 } from "@/app/admin/(panel)/stamplingar/actions";
 import { Alert, Button, Field, Input, Select } from "@/components/ui";
+import SearchSelect from "./SearchSelect";
 
 interface Option {
   id: string;
   label: string;
+  /** Extra text i sökbara väljare. Söks i, men syns dämpat. */
+  hint?: string;
 }
 
 /**
@@ -76,17 +79,18 @@ export default function NewEntryDialog({
             </Field>
 
             <div className="grid gap-4 sm:grid-cols-2">
+              {/* Sökbar, till skillnad från de andra två. Ordrar samlas fortare
+                  än både anställda och arbetsmoment — efter ett års drift är
+                  listan hundratals rader, och man vet vilket nummer man letar
+                  efter. Att skrolla till det är fel verktyg. */}
               <Field label="Order">
-                <Select name="orderId" required defaultValue="">
-                  <option value="" disabled>
-                    Välj…
-                  </option>
-                  {orders.map((option) => (
-                    <option key={option.id} value={option.id}>
-                      {option.label}
-                    </option>
-                  ))}
-                </Select>
+                <SearchSelect
+                  name="orderId"
+                  options={orders}
+                  placeholder="Sök order…"
+                  emptyLabel="Välj order…"
+                  required
+                />
               </Field>
 
               <Field label="Arbetsmoment">

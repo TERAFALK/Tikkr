@@ -25,6 +25,13 @@ export interface ReportFilters {
   orderId?: string;
   momentId?: string;
   /**
+   * Kunden rapporten avser.
+   *
+   * Gick inte att fråga om före kundregistret — kunden var fritext på ordern,
+   * och "vad har vi gjort åt Teltek i september" hade inget svar.
+   */
+  customerId?: string;
+  /**
    * Vilken sorts tid rapporten avser. UTELÄMNAS DEN GÄLLER "ORDER".
    *
    * Standardvärdet är inte godtyckligt. Varje anropare som glömmer tänka på
@@ -84,6 +91,11 @@ export interface ReportResult {
   /** Improduktiv tid. Ingår ALDRIG i billableMinutes. */
   indirectMinutes: number;
   byOrder: ReportGroup[];
+  /**
+   * Per kund. Tom när rapporten bara gäller improduktiv tid — den har ingen
+   * order och därmed ingen kund.
+   */
+  byCustomer: ReportGroup[];
   byEmployee: ReportGroup[];
   byMoment: ReportGroup[];
   /** Per improduktivt moment. Tom när rapporten bara gäller ordertid. */
@@ -99,6 +111,10 @@ export async function buildReport(
       employeeId: filters.employeeId || undefined,
       orderId: filters.orderId || undefined,
       momentId: filters.momentId || undefined,
+      // Går genom ordern, eftersom kunden sitter där och inte på stämplingen.
+      // Improduktiv tid har ingen order och faller därmed bort av sig själv,
+      // vilket är rätt: städning hör inte till en kund.
+      order: filters.customerId ? { customerId: filters.customerId } : undefined,
       // Utelämnat filter betyder fakturerbar tid. Se ReportFilters.kind.
       kind: filters.kind === "ALL" ? undefined : (filters.kind ?? "ORDER"),
       clockInAt:
@@ -173,6 +189,17 @@ export async function buildReport(
       label: entry.order?.orderNumber ?? "",
       sublabel: entry.order?.customer?.name ?? undefined,
     })),
+    // Ordrar UTAN kund utelämnas, i stället för att samlas i en grupp med tom
+    // rubrik. En sådan grupp ser ut som ett fel i en rapport, och tiden finns
+    // kvar i totalen och i byOrder — den har inte försvunnit, den hör bara
+    // inte till någon kund än.
+    byCustomer: groupBy(
+      billable.filter((entry) => entry.order?.customerId),
+      (entry) => ({
+        key: entry.order?.customerId ?? "",
+        label: entry.order?.customer?.name ?? "",
+      })
+    ),
     byEmployee: groupBy(entries, (entry) => ({
       key: entry.employee.id,
       label: entry.employee.name,

@@ -48,6 +48,8 @@ export default function SearchSelect({
 }) {
   const listId = useId();
   const wrapper = useRef<HTMLDivElement>(null);
+  const hidden = useRef<HTMLInputElement>(null);
+  const mounted = useRef(false);
 
   const [selected, setSelected] = useState<string | null>(defaultValue ?? null);
   const [query, setQuery] = useState("");
@@ -81,6 +83,26 @@ export default function SearchSelect({
     return () => document.removeEventListener("mousedown", close);
   }, [open]);
 
+  /**
+   * SKICKAR EN change-HÄNDELSE NÄR VALET ÄNDRAS.
+   *
+   * En dold input som React sätter skickar ingen händelse av sig själv.
+   * Filterformulären i rapport- och stämplingsvyn lyssnar på `change` och
+   * tillämpar filtret direkt — utan den här raden händer ingenting när man
+   * väljer, och man står och undrar varför listan inte ändras.
+   *
+   * Hoppar över första renderingen. Ett defaultValue är inte ett val någon
+   * gjort, och skulle annars skicka iväg formuläret när sidan laddas.
+   */
+  useEffect(() => {
+    if (!mounted.current) {
+      mounted.current = true;
+      return;
+    }
+
+    hidden.current?.dispatchEvent(new Event("change", { bubbles: true }));
+  }, [selected]);
+
   const pick = (id: string | null) => {
     setSelected(id);
     setQuery("");
@@ -89,7 +111,7 @@ export default function SearchSelect({
 
   return (
     <div ref={wrapper} className="relative">
-      <input type="hidden" name={name} value={selected ?? ""} />
+      <input ref={hidden} type="hidden" name={name} value={selected ?? ""} />
 
       {/* Knappen visar valet. Klick öppnar sökfältet — samma yta, två lägen,
           så att raden inte hoppar till i höjd när listan öppnas. */}
