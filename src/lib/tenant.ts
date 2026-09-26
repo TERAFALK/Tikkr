@@ -41,6 +41,7 @@ export const TENANT_SCOPED_MODELS = [
   "Employee",
   "Customer",
   "Order",
+  "OrderBudget",
   "WorkMoment",
   "IndirectMoment",
   "TimeEntry",

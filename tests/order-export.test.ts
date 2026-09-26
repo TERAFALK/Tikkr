@@ -15,6 +15,8 @@ let companyId: string;
 let orderA: string;
 let orderB: string;
 let tomOrder: string;
+let svetsId: string;
+let monteringId: string;
 
 beforeAll(async () => {
   const company = await unsafeGlobalPrisma.company.create({
@@ -34,6 +36,8 @@ beforeAll(async () => {
   const montering = await unsafeGlobalPrisma.workMoment.create({
     data: { companyId, name: "Montering" },
   });
+  svetsId = svets.id;
+  monteringId = montering.id;
 
   orderA = (
     await unsafeGlobalPrisma.order.create({
@@ -176,10 +180,12 @@ describe("filnamn", () => {
 });
 
 describe("beräknad tid följer med i underlaget", () => {
-  it("finns med när en angetts", async () => {
-    await unsafeGlobalPrisma.order.update({
-      where: { id: orderA },
-      data: { budgetMinutes: 40 * 60 },
+  it("är summan av beräkningen per arbetsmoment", async () => {
+    await unsafeGlobalPrisma.orderBudget.createMany({
+      data: [
+        { companyId, orderId: orderA, momentId: svetsId, minutes: 25 * 60 },
+        { companyId, orderId: orderA, momentId: monteringId, minutes: 15 * 60 },
+      ],
     });
 
     const [order] = await getOrderExports(forCompany(companyId), [orderA]);

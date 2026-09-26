@@ -7,6 +7,7 @@ import type {
 } from "@/app/admin/(panel)/ordrar/actions";
 import OrderActions from "./OrderActions";
 import type { SearchSelectOption } from "./SearchSelect";
+import type { BudgetMomentOption } from "./BudgetMoments";
 import BudgetBar from "./BudgetBar";
 import {
   Badge,
@@ -31,6 +32,16 @@ import { formatDuration } from "@/lib/format";
  * den man vill titta på: "hur lång tid tog ett liknande jobb förra gången".
  */
 
+/** Beräknad tid för ett arbetsmoment, med utfallet bredvid. */
+export interface OrderBudgetRow {
+  momentId: string;
+  momentName: string;
+  /** Beräknad tid i minuter. */
+  minutes: number;
+  /** Upparbetad tid på just det här momentet, i minuter. */
+  usedMinutes: number;
+}
+
 export interface OrderRow {
   id: string;
   orderNumber: string;
@@ -39,8 +50,13 @@ export interface OrderRow {
   status: string;
   entries: number;
   minutes: number;
-  /** Beräknad tid i minuter, eller null när ingen angetts. */
+  /**
+   * Orderns beräknade tid i minuter: summan av raderna nedan, eller null när
+   * ingen beräkning gjorts. Lagras inte — se src/lib/order-budget.ts.
+   */
   budgetMinutes: number | null;
+  /** Beräkningen uppdelad per arbetsmoment. Tom när ingen gjorts. */
+  budgets: OrderBudgetRow[];
   /** Orderns eget påslag i procent, eller null för företagets standard. */
   markupPercent: number | null;
   /** Avtalat fast pris i ören, eller null för löpande räkning. */
@@ -54,10 +70,13 @@ export default function OrdersTable({
   updateAction,
   toggleAction,
   customers,
+  moments,
 }: {
   orders: OrderRow[];
   /** Kunderna som går att välja i ändra-rutan. */
   customers: SearchSelectOption[];
+  /** Arbetsmomenten som går att beräkna tid på. */
+  moments: BudgetMomentOption[];
   updateAction: (
     state: OrderFormState,
     formData: FormData
@@ -193,6 +212,7 @@ export default function OrdersTable({
                     <OrderActions
                       order={order}
                       customers={customers}
+                      moments={moments}
                       updateAction={updateAction}
                       toggleAction={toggleAction}
                     />

@@ -9,6 +9,8 @@ import type {
 import { Alert, Button, Field, Input } from "@/components/ui";
 import { formatDuration, minutesBetween } from "@/lib/format";
 import BudgetBar from "./BudgetBar";
+import BudgetMoments, { type BudgetMomentOption } from "./BudgetMoments";
+import type { OrderBudgetRow } from "./OrdersTable";
 import SearchSelect, { type SearchSelectOption } from "./SearchSelect";
 import { IconOrder, IconReport } from "@/components/ui/icons";
 
@@ -24,9 +26,12 @@ export default function OrderActions({
   updateAction,
   toggleAction,
   customers,
+  moments,
 }: {
   /** Kunderna som går att välja. Skickas ner så att väljaren kan söka lokalt. */
   customers: SearchSelectOption[];
+  /** Arbetsmomenten som går att beräkna tid på. */
+  moments: BudgetMomentOption[];
   order: {
     id: string;
     orderNumber: string;
@@ -36,6 +41,7 @@ export default function OrderActions({
     entries: number;
     minutes: number;
     budgetMinutes: number | null;
+    budgets: OrderBudgetRow[];
     markupPercent: number | null;
     fixedPriceOre: number | null;
   };
@@ -125,6 +131,33 @@ export default function OrderActions({
                 budgetMinutes={order.budgetMinutes}
                 usedMinutes={order.minutes}
               />
+
+              {/* Uppdelningen under totalen, inte istället för den. Totalen
+                  svarar på om ordern håller; raderna på vilket moment som
+                  drar över — och det är den frågan nästa beräkning behöver
+                  svar på. */}
+              <ul className="mt-3 space-y-1.5">
+                {order.budgets.map((budget) => (
+                  <li
+                    key={budget.momentId}
+                    className="flex items-baseline justify-between gap-3"
+                  >
+                    <span className="truncate text-[13px] text-neutral-600">
+                      {budget.momentName}
+                    </span>
+                    <span className="shrink-0 text-xs tabular-nums text-neutral-500">
+                      {formatDuration(budget.usedMinutes)} av{" "}
+                      {formatDuration(budget.minutes)}
+                      {budget.usedMinutes > budget.minutes && (
+                        <span className="ml-1.5 font-medium text-amber-700">
+                          {formatDuration(budget.usedMinutes - budget.minutes)}{" "}
+                          över
+                        </span>
+                      )}
+                    </span>
+                  </li>
+                ))}
+              </ul>
             </div>
           )}
         </div>
@@ -285,17 +318,14 @@ export default function OrderActions({
             </Field>
             <Field
               label="Beräknad tid"
-              hint="Timmar. Lämna tomt för ingen beräkning."
+              hint="Ett arbetsmoment i taget, i timmar. Totalen är orderns beräknade tid. Ta bort alla rader för ingen beräkning."
             >
-              <Input
-                name="budgetHours"
-                inputMode="decimal"
-                defaultValue={
-                  order.budgetMinutes
-                    ? String(order.budgetMinutes / 60).replace(".", ",")
-                    : ""
-                }
-                placeholder="40"
+              <BudgetMoments
+                moments={moments}
+                defaultRows={order.budgets.map((budget) => ({
+                  momentId: budget.momentId,
+                  minutes: budget.minutes,
+                }))}
               />
             </Field>
             <Field

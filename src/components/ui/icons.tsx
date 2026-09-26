@@ -136,3 +136,15 @@ export const IconBuilding = (props: IconProps) => (
     <path d="M9 8h.01M15 8h.01M9 12h.01M15 12h.01M10 21v-4h4v4" />
   </Icon>
 );
+
+export const IconPlus = (props: IconProps) => (
+  <Icon {...props}>
+    <path d="M12 5v14M5 12h14" />
+  </Icon>
+);
+
+export const IconClose = (props: IconProps) => (
+  <Icon {...props}>
+    <path d="M6 6l12 12M18 6L6 18" />
+  </Icon>
+);

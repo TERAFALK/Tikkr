@@ -125,6 +125,7 @@ model Company {
 
   employees       Employee[]
   orders          Order[]
+  orderBudgets    OrderBudget[]
   workMoments     WorkMoment[]
   indirectMoments IndirectMoment[]
   timeEntries     TimeEntry[]
@@ -275,17 +276,6 @@ model Order {
   /// i stället för ingen kund.
   customerId String? @map("customer_id")
 
-  /// Beräknad tid för ordern, i minuter. Frivillig.
-  ///
-  /// Lagras i minuter och inte i timmar, av samma skäl som all annan tid i
-  /// systemet: 7,5 timmar går inte att spara exakt som decimaltal, och en
-  /// avrundning som upprepas hundra gånger blir en timme fel i en rapport.
-  ///
-  /// Systemet stoppar aldrig stämpling för att tiden överskrids. Ordern får
-  /// kosta mer än beräknat — det är information till den som fakturerar, inte
-  /// en spärr mot att arbeta.
-  budgetMinutes Int? @map("budget_minutes")
-
   /// Skapad från stämplingsskärmen av en anställd, inte av admin.
   ///
   /// Finns för att arbetet ibland börjar innan kontoret hunnit lägga upp
@@ -321,6 +311,9 @@ model Order {
 
   company     Company     @relation(fields: [companyId], references: [id], onDelete: Cascade)
   timeEntries TimeEntry[]
+
+  /// Den beräknade tiden, uppdelad per arbetsmoment. Se OrderBudget.
+  budgets OrderBudget[]
 
   // Restrict och inte Cascade: en kund med ordrar ska inte gå att radera, bara
   // avaktiveras. Samma regel som redan gäller ordrar och arbetsmoment med
@@ -360,10 +353,59 @@ model WorkMoment {
 
   company     Company     @relation(fields: [companyId], references: [id], onDelete: Cascade)
   timeEntries TimeEntry[]
+  budgets     OrderBudget[]
 
   @@unique([companyId, name])
   @@index([companyId, active])
   @@map("work_moments")
+}
+
+/// BERÄKNAD TID FÖR ETT ARBETSMOMENT PÅ EN ORDER.
+///
+/// Var en enda siffra på ordern fram till 2026-09-26. Den siffran gick att
+/// jämföra med utfallet men inte att förklara: en order som gått över sin
+/// beräkning sa ingenting om VAR tiden tog vägen, och nästa kalkyl gissade
+/// lika illa som den förra. Nu beräknas tiden där den uppstår — svetsningen
+/// för sig, fräsningen för sig.
+///
+/// Orderns totala beräkning är summan av raderna. Den lagras aldrig som ett
+/// eget fält: två ställen som säger samma sak hinner alltid sluta göra det.
+///
+/// Minuter och inte timmar, av samma skäl som all annan tid i systemet: 7,5
+/// timmar går inte att spara exakt som decimaltal, och en avrundning som
+/// upprepas hundra gånger blir en timme fel i en rapport.
+///
+/// Systemet stoppar aldrig stämpling för att tiden överskrids. Ordern får
+/// kosta mer än beräknat — det är information till den som fakturerar, inte
+/// en spärr mot att arbeta.
+model OrderBudget {
+  id        String @id @default(cuid())
+  companyId String @map("company_id")
+  orderId   String @map("order_id")
+  momentId  String @map("moment_id")
+
+  /// Beräknad tid för momentet, i minuter. Alltid större än noll — en rad som
+  /// inte fyllts i sparas inte, eftersom "noll timmar" och "ingen beräkning"
+  /// är två olika svar.
+  minutes Int
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  company Company    @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  order   Order      @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  // Restrict, som för registrerad tid: ett arbetsmoment som någon räknat med
+  // ska inte kunna försvinna under en pågående order. Moment avslutas ändå
+  // genom att de avaktiveras, aldrig genom radering.
+  moment WorkMoment @relation(fields: [momentId], references: [id], onDelete: Restrict)
+
+  // Ett moment får bara beräknas en gång per order. Två rader för samma
+  // moment vore två svar på samma fråga, och summan skulle bero på vilken
+  // rad man råkade titta på.
+  @@unique([orderId, momentId])
+  @@index([companyId, orderId])
+  @@map("order_budgets")
 }
 
 /// En stämpling. clockOutAt = null betyder "pågår just nu".

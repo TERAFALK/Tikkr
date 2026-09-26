@@ -1,5 +1,6 @@
 import type { CompanyDb } from "./tenant";
 import { minutesBetween } from "./format";
+import { budgetTotal } from "./order-budget";
 import { getOrderPrices, type OrderPrice } from "./order-price";
 
 /**
@@ -55,7 +56,13 @@ export interface OrderExport {
    */
   price: OrderPrice | null;
   status: string;
-  /** Beräknad tid i minuter, eller null. Visas i underlaget för jämförelse. */
+  /**
+   * Beräknad tid i minuter, eller null. Visas i underlaget för jämförelse.
+   *
+   * Summan av orderns beräkning per arbetsmoment. Uppdelningen stannar i
+   * adminpanelen — kunden ska se vad jobbet tog och vad det var beräknat till,
+   * inte hur verkstaden fördelat timmarna internt.
+   */
   budgetMinutes: number | null;
   rows: OrderExportRow[];
   totalMinutes: number;
@@ -110,7 +117,7 @@ export async function getOrderExports(
         },
       },
       status: true,
-      budgetMinutes: true,
+      budgets: { select: { minutes: true } },
       timeEntries: {
         // Improduktiv tid kan aldrig ha en order, men filtret sager vad
         // fragan handlar om och kostar ingenting.
@@ -148,7 +155,7 @@ export async function getOrderExports(
       customer: order.customer,
       price: prices?.get(order.id) ?? null,
       status: order.status,
-      budgetMinutes: order.budgetMinutes,
+      budgetMinutes: budgetTotal(order.budgets),
       rows,
       totalMinutes: rows.reduce((sum, row) => sum + row.minutes, 0),
       ungradedCount: rows.filter((row) => row.needsReview).length,

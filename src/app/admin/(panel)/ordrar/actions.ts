@@ -5,27 +5,9 @@ import { assertWritable, requireAdmin } from "@/lib/admin-session";
 import { resolveCustomerId } from "@/lib/customers";
 import { ClockError, closeOrder, openEntriesOnOrder } from "@/lib/clock";
 import { parseMarkupPercent, parseOre } from "@/lib/money";
+import { readBudgetRows, saveOrderBudgets } from "@/lib/order-budget";
 
 const PATH = "/admin/ordrar";
-
-/**
- * Läser ett timfält och ger minuter.
- *
- * Administratören tänker i timmar, systemet räknar i minuter. Både punkt och
- * komma godtas som decimaltecken — ett svenskt tangentbord ger komma, och att
- * avvisa "7,5" hade varit att kräva att kunden skriver som datorn vill.
- *
- * Tomt fält betyder ingen beräknad tid, vilket är något annat än noll timmar.
- */
-function parseHours(raw: FormDataEntryValue | null): number | null {
-  const text = String(raw ?? "").trim().replace(",", ".");
-  if (!text) return null;
-
-  const hours = Number(text);
-  if (!Number.isFinite(hours) || hours <= 0) return null;
-
-  return Math.round(hours * 60);
-}
 
 export async function createOrder(formData: FormData) {
   const session = await requireAdmin();
@@ -35,14 +17,17 @@ export async function createOrder(formData: FormData) {
   const orderNumber = String(formData.get("orderNumber") ?? "").trim();
   if (!orderNumber) return;
 
-  await db.order.create({
+  const order = await db.order.create({
     data: {
       companyId,
       orderNumber,
       customerId: await resolveCustomerId(db, formData.get("customerId")),
-      budgetMinutes: parseHours(formData.get("budgetHours")),
     },
   });
+
+  // Efter ordern och inte i samma anrop: raderna pekar på ordern, som får sitt
+  // id först när den finns. Se src/lib/order-budget.ts.
+  await saveOrderBudgets(db, companyId, order.id, readBudgetRows(formData));
 
   revalidatePath(PATH);
 }
@@ -66,7 +51,7 @@ export async function updateOrder(
 ): Promise<OrderFormState> {
   const session = await requireAdmin();
   await assertWritable(session);
-  const { db } = session;
+  const { db, companyId } = session;
 
   const id = String(formData.get("id") ?? "");
   const orderNumber = String(formData.get("orderNumber") ?? "").trim();
@@ -106,7 +91,6 @@ export async function updateOrder(
     data: {
       orderNumber,
       customerId: await resolveCustomerId(db, formData.get("customerId")),
-      budgetMinutes: parseHours(formData.get("budgetHours")),
       markupPercent,
       fixedPriceOre,
       // Att spara uppgifterna ÄR kvittot på att någon tittat. Ett snabbjobb
@@ -115,6 +99,11 @@ export async function updateOrder(
       isQuickJob: false,
     },
   });
+
+  // Ligger utanför updateMany eftersom beräkningen är egna rader, inte fält på
+  // ordern. Hör ordern till ett annat företag skrev updateMany ingenting, och
+  // saveOrderBudgets hittar den av samma skäl inte heller.
+  await saveOrderBudgets(db, companyId, id, readBudgetRows(formData));
 
   revalidatePath(PATH);
   return { savedAt: Date.now() };

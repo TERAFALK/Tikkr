@@ -105,6 +105,7 @@ customers      — id, company_id, name, customer_number, org_number,
                  address_line, postal_code, city,
                  markup_percent, discount_percent, notes, active
 orders         — id, company_id, order_number, customer_id?, status
+order_budgets  — id, company_id, order_id, moment_id, minutes
 work_moments   — id, company_id, name, cost_rate_ore
 indirect_moments — id, company_id, name, active
 time_entries   — id, company_id, employee_id, kind,
@@ -194,6 +195,25 @@ support_visits — id, company_id, email, started_at, last_seen_at
 
    Belopp på kundens underlag är ett **val vid uttaget** (kryssruta), inte ett
    läge på kunden. Utan kryss visas bara tid, som förut.
+
+6. **Beräknad tid anges per arbetsmoment** (ändrat 2026-09-26).
+
+   Var ett enda timfält på ordern. Den siffran gick att jämföra med utfallet
+   men inte att förklara: en order som spruckit sa ingenting om vilket moment
+   som drog över, och nästa beräkning blev lika grov som den förra. Nu läggs
+   raderna till en i taget — moment och timmar — i `order_budgets`.
+
+   **Orderns totala beräkning är summan av raderna och lagras aldrig.** Ett
+   cachat totalfält och en uppsättning rader är två ställen som säger samma
+   sak, och de hinner alltid sluta göra det. `src/lib/order-budget.ts` äger
+   både läsningen av formuläret och skrivningen.
+
+   Totalen är det som visas i orderlistan och i kundens underlag, precis som
+   förut. **Uppdelningen stannar i adminpanelen** — kunden ska se vad jobbet
+   tog och vad det var beräknat till, inte hur verkstaden fördelat timmarna
+   internt.
+
+   Systemet stoppar aldrig stämpling för att en beräkning överskrids.
 
 Multi-tenant-isolering byggs i appens kod: **varje databasfråga går via ett
 gemensamt lager** i Prisma som alltid filtrerar på inloggad användares
