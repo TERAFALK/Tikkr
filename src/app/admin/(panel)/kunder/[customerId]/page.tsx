@@ -1,9 +1,12 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireAdmin } from "@/lib/admin-session";
-import { customerStats, getCustomer } from "@/lib/customers";
+import { customerMoney, customerStats, getCustomer } from "@/lib/customers";
+import { companyTimeZone } from "@/lib/company";
+import { unsafeGlobalPrisma } from "@/lib/db";
 import { formatDuration } from "@/lib/format";
-import { formatMarkup } from "@/lib/money";
+import { formatCurrency, formatMarkup } from "@/lib/money";
+import MarginChart from "@/components/admin/MarginChart";
 import CustomerDialog from "@/components/admin/CustomerDialog";
 import {
   Badge,
@@ -39,13 +42,30 @@ export default async function CustomerPage({
 }: {
   params: Promise<{ customerId: string }>;
 }) {
-  const { db } = await requireAdmin();
+  const { db, companyId } = await requireAdmin();
   const { customerId } = await params;
 
   const customer = await getCustomer(db, customerId);
   if (!customer) notFound();
 
-  const stats = await customerStats(db, customerId);
+  // Företagets standardpåslag och tidszon behövs för pengarna: påslaget när
+  // varken ordern eller kunden har ett eget, tidszonen för att månadsgränserna
+  // ska gå på verkstadsgolvet och inte i UTC.
+  const company = await unsafeGlobalPrisma.company.findUnique({
+    where: { id: companyId },
+    select: { markupPercent: true },
+  });
+  const timeZone = await companyTimeZone(companyId);
+
+  const [stats, money] = await Promise.all([
+    customerStats(db, customerId),
+    customerMoney(
+      db,
+      customerId,
+      company?.markupPercent ?? 100,
+      timeZone
+    ),
+  ]);
 
   const address = [
     customer.addressLine,
@@ -102,6 +122,32 @@ export default async function CustomerPage({
             hint="tim:min på kundens ordrar"
           />
           <Stat
+            label="Marginal i år"
+            value={formatCurrency(money.thisYearOre)}
+            hint={`förra året ${formatCurrency(money.lastYearOre)}`}
+          />
+          <Stat
+            label="Marginal totalt"
+            value={formatCurrency(money.marginOre)}
+            hint={`av ${formatCurrency(money.priceOre)} i pris`}
+          />
+        </div>
+
+        {/* PENGARNA ÄR INTERNA. Självkostnad och marginal når aldrig ett
+            dokument som går till kunden — den gränsen vaktas i order-price.ts.
+            Här, i panelen, är de precis vad man kommit för. */}
+        <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <Stat
+            label="Självkostnad"
+            value={formatCurrency(money.costOre)}
+            hint="person och maskin"
+          />
+          <Stat
+            label="Pris"
+            value={formatCurrency(money.priceOre)}
+            hint="efter påslag och rabatt"
+          />
+          <Stat
             label="Påslag"
             value={
               customer.markupPercent === null
@@ -123,6 +169,26 @@ export default async function CustomerPage({
             }
             hint="dras av efter påslaget"
           />
+        </div>
+
+        {money.minutesWithoutRate > 0 && (
+          /* Ofullständig kalkyl sagt rakt ut. En summa som ser färdig ut men
+             saknar timmar är värre än en som säger att den saknar dem. */
+          <p className="mt-4 rounded-lg border border-amber-200 bg-amber-50/60 px-4 py-2.5 text-[13px] text-amber-900">
+            {formatDuration(money.minutesWithoutRate)} av tiden saknar
+            timkostnad och ingår inte i beloppen. Sätt timkostnad på
+            arbetsmomentet eller på personen.
+          </p>
+        )}
+
+        <div className="mt-6">
+          <Card>
+            <CardHeader
+              title="Marginal per månad"
+              description="Tolv månader bakåt. Fastprisordrar fördelas efter kostnaden varje månad."
+            />
+            <MarginChart months={money.months} />
+          </Card>
         </div>
 
         <div className="mt-6 grid gap-6 lg:grid-cols-3">

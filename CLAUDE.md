@@ -100,7 +100,11 @@ admin-UI m.m.). Kraftfullt, men det motsäger målet om *ett* enkelt paket.
 ```
 companies      — id, name, subscription_status, created_at
 employees      — id, company_id, name, active, cost_rate_ore
-orders         — id, company_id, order_number, customer_name, status
+customers      — id, company_id, name, customer_number, org_number,
+                 contact_name, email, phone,
+                 address_line, postal_code, city,
+                 markup_percent, discount_percent, notes, active
+orders         — id, company_id, order_number, customer_id?, status
 work_moments   — id, company_id, name, cost_rate_ore
 indirect_moments — id, company_id, name, active
 time_entries   — id, company_id, employee_id, kind,
@@ -167,6 +171,29 @@ support_visits — id, company_id, email, started_at, last_seen_at
 
    Satserna visas **aldrig** på stämplingsskärmen. Kiosken visar inga belopp
    alls, och vad en person kostar företaget hör inte på en skärm i verkstaden.
+
+5. **Priset räknas på ETT ställe, och kunden får se en del av det**
+   (beslutat 2026-09-26).
+
+   ```
+   självkostnad   (person + maskin, ögonblicksbild på stämplingen)
+     × påslag      order → kund → företag, första ifyllda vinner
+     − rabatt      kundens procent
+     = pris
+   ```
+
+   Fast pris (`orders.fixed_price_ore`) går före allt, och rabatten tillämpas
+   då inte — det avtalade beloppet är vad kunden ska betala.
+
+   **Gränsen mellan de två dokumenten är flyttad, inte riven.** Kunden får se
+   priset och rabatten; kunden ser ALDRIG er självkostnad eller marginal.
+   `src/lib/order-price.ts` äger hela räkningen och lyder ut bara det kunden
+   får se — typen `OrderPrice` har inga kostnads- eller marginalfält, så en
+   läcka blir ett **typfel**. `order-export.ts` och `pdf.ts` importerar bara
+   den, aldrig `order-calc.ts`.
+
+   Belopp på kundens underlag är ett **val vid uttaget** (kryssruta), inte ett
+   läge på kunden. Utan kryss visas bara tid, som förut.
 
 Multi-tenant-isolering byggs i appens kod: **varje databasfråga går via ett
 gemensamt lager** i Prisma som alltid filtrerar på inloggad användares

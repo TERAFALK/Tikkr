@@ -1,5 +1,8 @@
 import type { CompanyDb } from "./tenant";
 import { minutesBetween } from "./format";
+import { costForMinutes } from "./money";
+import { priceForOrder } from "./order-price";
+import { wallTimeIn } from "./time-zone";
 
 /**
  * KUNDREGISTRET.
@@ -279,4 +282,197 @@ export async function customerStats(
       .map(([name, minutes]) => ({ name, minutes }))
       .sort((a, b) => b.minutes - a.minutes),
   };
+}
+
+export interface CustomerMonth {
+  /** "sep", för grafens etikett. */
+  label: string;
+  marginOre: number;
+}
+
+export interface CustomerMoney {
+  costOre: number;
+  priceOre: number;
+  marginOre: number;
+  /** Marginal i år och förra året, i företagets tidszon. */
+  thisYearOre: number;
+  lastYearOre: number;
+  /** Tid utan timkostnad. Är den större än noll är siffrorna ofullständiga. */
+  minutesWithoutRate: number;
+  /** Tolv månader bakåt, äldst först. */
+  months: CustomerMonth[];
+}
+
+/**
+ * VAD KUNDEN KOSTAT OCH GETT.
+ *
+ * Internt, som efterkalkylen. Når aldrig ett dokument som går till kunden —
+ * den gränsen vaktas i order-price.ts.
+ *
+ * FASTPRISORDRAR FÖRDELAS EFTER KOSTNADEN varje månad. Ett avtalat pris hör
+ * inte till en enskild månad, och att lägga hela beloppet på månaden då sista
+ * stämplingen gjordes hade gett en graf med en pik och elva tomma staplar.
+ * Andelen kostnad är det vanliga sättet att redovisa en fastprisorder, och för
+ * löpande ordrar blir det exakt proportionellt ändå — priset är linjärt i
+ * kostnaden.
+ *
+ * Rader utan timkostnad räknas inte som gratis arbete. De redovisas som saknad
+ * tid, så att en ofullständig kalkyl syns i stället för att se färdig ut.
+ */
+export async function customerMoney(
+  db: CompanyDb,
+  customerId: string,
+  companyMarkupPercent: number,
+  timeZone: string,
+  now: Date = new Date()
+): Promise<CustomerMoney> {
+  const customer = await db.customer.findFirst({
+    where: { id: customerId },
+    select: { markupPercent: true, discountPercent: true },
+  });
+
+  const orders = await db.order.findMany({
+    where: { customerId },
+    select: {
+      id: true,
+      markupPercent: true,
+      fixedPriceOre: true,
+      timeEntries: {
+        where: { kind: "ORDER" },
+        select: {
+          clockInAt: true,
+          clockOutAt: true,
+          momentCostRateOre: true,
+          employeeCostRateOre: true,
+        },
+      },
+    },
+  });
+
+  // Tolv månader bakåt, äldst först. Nycklarna är år-månad i företagets
+  // tidszon — inte serverns, som kör UTC och skulle lägga en kvällsstämpling
+  // i nästa månad den sista i månaden.
+  const buckets = monthBuckets(now, timeZone);
+  const marginByMonth = new Map<string, number>();
+
+  const wall = wallTimeIn(now, timeZone);
+  let costOre = 0;
+  let priceOre = 0;
+  let thisYearOre = 0;
+  let lastYearOre = 0;
+  let minutesWithoutRate = 0;
+
+  for (const order of orders) {
+    const costByMonth = new Map<string, number>();
+    const costByYear = new Map<number, number>();
+    let orderCost = 0;
+
+    for (const entry of order.timeEntries) {
+      const minutes = minutesBetween(entry.clockInAt, entry.clockOutAt);
+
+      const rate =
+        entry.employeeCostRateOre === null && entry.momentCostRateOre === null
+          ? null
+          : (entry.employeeCostRateOre ?? 0) + (entry.momentCostRateOre ?? 0);
+
+      if (rate === null) {
+        minutesWithoutRate += minutes;
+        continue;
+      }
+
+      const cost = costForMinutes(minutes, rate);
+      orderCost += cost;
+
+      const when = wallTimeIn(entry.clockInAt, timeZone);
+      const key = monthKey(when.year, when.month);
+      costByMonth.set(key, (costByMonth.get(key) ?? 0) + cost);
+      costByYear.set(when.year, (costByYear.get(when.year) ?? 0) + cost);
+    }
+
+    const price = priceForOrder({
+      costOre: orderCost,
+      orderMarkupPercent: order.markupPercent,
+      customerMarkupPercent: customer?.markupPercent ?? null,
+      companyMarkupPercent,
+      customerDiscountPercent: customer?.discountPercent ?? null,
+      fixedPriceOre: order.fixedPriceOre,
+    });
+
+    costOre += orderCost;
+    priceOre += price.priceOre;
+
+    // Utan kostnad finns ingen andel att fördela efter. En fastprisorder som
+    // ingen stämplat på hör inte till någon månad än.
+    if (orderCost === 0) continue;
+
+    const margin = price.priceOre - orderCost;
+
+    for (const [key, cost] of costByMonth) {
+      marginByMonth.set(
+        key,
+        (marginByMonth.get(key) ?? 0) + (margin * cost) / orderCost
+      );
+    }
+
+    for (const [year, cost] of costByYear) {
+      const share = (margin * cost) / orderCost;
+      if (year === wall.year) thisYearOre += share;
+      else if (year === wall.year - 1) lastYearOre += share;
+    }
+  }
+
+  return {
+    costOre,
+    priceOre,
+    marginOre: priceOre - costOre,
+    thisYearOre: Math.round(thisYearOre),
+    lastYearOre: Math.round(lastYearOre),
+    minutesWithoutRate,
+    months: buckets.map(({ key, label }) => ({
+      label,
+      marginOre: Math.round(marginByMonth.get(key) ?? 0),
+    })),
+  };
+}
+
+const MONTH_LABELS = [
+  "jan",
+  "feb",
+  "mar",
+  "apr",
+  "maj",
+  "jun",
+  "jul",
+  "aug",
+  "sep",
+  "okt",
+  "nov",
+  "dec",
+];
+
+function monthKey(year: number, month: number): string {
+  return `${year}-${String(month).padStart(2, "0")}`;
+}
+
+/** De tolv senaste månaderna, äldst först. Räknat på väggen. */
+function monthBuckets(
+  now: Date,
+  timeZone: string
+): { key: string; label: string }[] {
+  const wall = wallTimeIn(now, timeZone);
+  const buckets: { key: string; label: string }[] = [];
+
+  for (let back = 11; back >= 0; back -= 1) {
+    // Via UTC för att slippa hantera års- och månadsskiften för hand.
+    const at = new Date(Date.UTC(wall.year, wall.month - 1 - back, 1));
+    const year = at.getUTCFullYear();
+    const month = at.getUTCMonth() + 1;
+
+    buckets.push({
+      key: monthKey(year, month),
+      label: MONTH_LABELS[month - 1],
+    });
+  }
+
+  return buckets;
 }
