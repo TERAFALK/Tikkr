@@ -1972,7 +1972,7 @@ function OrderNumberPad({
       <button
         onClick={() => match && onPick(match)}
         disabled={!match}
-        className="kiosk-frame-cta kiosk-press mt-3 min-h-14 w-full rounded-xl bg-blue-600 p-5 text-2xl font-semibold text-white active:bg-blue-700 disabled:bg-neutral-200 disabled:text-neutral-400"
+        className="kiosk-frame-cta kiosk-press mt-2 min-h-14 w-full shrink-0 rounded-xl bg-blue-600 px-4 py-3.5 text-2xl font-semibold text-white active:bg-blue-700 disabled:bg-neutral-200 disabled:text-neutral-400"
       >
         {!match ? (
           "Slå in ett ordernummer"
@@ -2000,20 +2000,20 @@ function OrderNumberPad({
       {!match && (
         <button
           onClick={() => onCreate(typed)}
-          className="kiosk-press mt-3 min-h-12 w-full rounded-xl border-2 border-amber-300 bg-amber-50 p-5 text-xl font-semibold text-amber-900 active:bg-amber-100"
+          className="kiosk-press mt-2 min-h-12 w-full shrink-0 rounded-xl border-2 border-amber-300 bg-amber-50 px-4 py-3 text-xl font-semibold text-amber-900 active:bg-amber-100"
         >
           {typed ? `Skapa order ${typed}` : "Snabbjobb utan ordernummer"}
-          <span className="mt-1 block text-base font-normal text-amber-800/80">
-            Läggs upp direkt och märks för kontoret att komplettera
+          <span className="ml-2 text-base font-normal text-amber-800/80">
+            märks för kontoret
           </span>
         </button>
       )}
 
       <button
         onClick={onBrowse}
-        className="kiosk-press mt-3 min-h-11 w-full rounded-xl border border-neutral-200 bg-white text-lg font-semibold text-neutral-900 active:bg-neutral-50"
+        className="kiosk-press mt-2 min-h-11 w-full shrink-0 rounded-xl border border-neutral-200 bg-white py-2.5 text-lg font-semibold text-neutral-900 active:bg-neutral-50"
       >
-        Visa öppna ordrar i stället
+        Visa öppna ordrar
       </button>
     </div>
   );
