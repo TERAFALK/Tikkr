@@ -22,7 +22,7 @@ export default function SupportBanner({
   return (
     <div className="flex flex-wrap items-center justify-between gap-3 bg-red-600 px-4 py-2.5 text-white">
       <p className="text-[13px]">
-        <span className="font-semibold">Supportläge</span> — du ser{" "}
+        <span className="font-semibold">Supportläge.</span> Du ser{" "}
         <span className="font-semibold">{companyName}</span> som läsning.
         Ingenting du gör sparas, och besöket loggas.
       </p>

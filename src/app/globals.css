@@ -195,3 +195,45 @@ dialog {
     transform: none;
   }
 }
+
+/*
+  KOMPAKT LÄGE PÅ LÅGA SKÄRMAR.
+
+  Stämplingsskärmen får aldrig behöva skrollas — det som ligger under kanten
+  finns i praktiken inte för den som står framför den med handskar på. Men
+  lösningen får inte heller bli att knapparna krymper till något man missar:
+  sifferknappsatsen blev 48 px hög på en liggande surfplatta, vilket är mindre
+  än ett finger.
+
+  Därför tas höjden från RAMEN i stället för från knapparna. Rubrik, marginaler
+  och display är det som ger vika när skärmen är låg; tryckytorna behåller sin
+  storlek så länge det går.
+
+  Gränsen 860 px är vald för att träffa de vanliga kioskformaten — 1024×768 och
+  1280×720 — men lämna en stående surfplatta i fred, där höjden räcker ändå.
+*/
+@media (max-height: 860px) {
+  .kiosk-frame {
+    padding: 0.75rem;
+  }
+
+  .kiosk-frame-title {
+    font-size: 1.125rem;
+    line-height: 1.5rem;
+    margin-bottom: 0.375rem;
+  }
+
+  .kiosk-frame-display {
+    height: 4.5rem;
+  }
+
+  .kiosk-frame-hint {
+    height: 2rem;
+  }
+
+  /* Bekräftelseknappen behåller sin textstorlek men tappar luften runt den. */
+  .kiosk-frame-cta {
+    padding-top: 0.625rem;
+    padding-bottom: 0.625rem;
+  }
+}

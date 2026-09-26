@@ -81,7 +81,7 @@ export default async function TimesheetPage({
               <option key={employee.id} value={employee.id}>
                 {employee.name}
                 {employee.employeeNumber ? ` (${employee.employeeNumber})` : ""}
-                {employee.active ? "" : " — avaktiverad"}
+                {employee.active ? "" : " (avaktiverad)"}
               </option>
             ))}
           </Select>

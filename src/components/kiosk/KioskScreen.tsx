@@ -137,6 +137,10 @@ function jobKey(choice: KioskJobChoice): string {
 const JOB_TONE = {
   order: "border-emerald-600 bg-emerald-600 active:bg-emerald-700",
   indirect: "border-amber-500 bg-amber-500 active:bg-amber-600",
+  // Rast är BLÅ och inte grå eller vit. Under rasten finns ingen öppen
+  // stämpling, och kortet såg därför ut precis som för den som gått hem —
+  // vilket är fel svar på den enda fråga skärmen finns för att besvara.
+  break: "border-sky-600 bg-sky-600 active:bg-sky-700",
 } as const;
 
 /**
@@ -839,7 +843,15 @@ export default function KioskScreen({
   );
 
   return (
-    <main className="kiosk-surface flex min-h-screen flex-col bg-neutral-50">
+    /* h-[100dvh] och inte min-h-screen. Skärmen ska ALDRIG skrollas: den
+       används stående i en verkstad, ofta med handskar, och det som ligger
+       under kanten finns i praktiken inte. Med min-h-screen växte sidan i
+       stället förbi kanten så fort en vy hade många knappar.
+
+       dvh och inte vh, eftersom en surfplatta i webbläsarläge har ett fält
+       som kommer och går; vh räknar på det största läget och ger då en sida
+       som är några tiotal punkter för hög precis hela tiden. */
+    <main className="kiosk-surface flex h-[100dvh] flex-col overflow-hidden bg-neutral-50">
       <Header
         companyName={companyName}
         deviceName={deviceName}
@@ -894,15 +906,28 @@ export default function KioskScreen({
 
       {/* Nyckeln byter när vyn byter, vilket startar om övergången. Utan den
           skulle innehållet bytas ut utan att något syntes hända. */}
-      <div key={view.name} className="animate-view flex-1 p-4 sm:p-6 lg:p-8">
+      {/* min-h-0 är det som får flex-1 att verkligen begränsa höjden. Utan
+          den växer barnet till sitt innehåll och skjuter ut underkanten, vilket
+          är just det som gjorde att skärmen behövde skrollas.
+
+          overflow-y-auto står kvar som skyddsnät för namnrutnätet: femtio
+          anställda ryms inte på någon skärm, och där är skrollning rätt svar.
+          Vyerna nedan är däremot byggda för att alltid få plats. */}
+      <div
+        key={view.name}
+        className="kiosk-frame animate-view flex min-h-0 flex-1 flex-col overflow-y-auto p-4 sm:p-6 lg:p-8"
+      >
         {view.name === "employees" && (
           <EmployeeGrid
             employees={employees}
             active={active}
             recent={recent}
+            breaks={breaks}
             onPick={(employee) =>
               setView(
-                active[employee.id]?.length || recent[employee.id]
+                active[employee.id]?.length ||
+                recent[employee.id] ||
+                breaks[employee.id]
                   ? { name: "action", employee }
                   : { name: "order", employee }
               )
@@ -1288,11 +1313,13 @@ function EmployeeGrid({
   employees,
   active,
   recent,
+  breaks,
   onPick,
 }: {
   employees: Employee[];
   active: Record<string, ActiveJob[]>;
   recent: Record<string, RecentJob>;
+  breaks: Record<string, KioskBreak>;
   onPick: (employee: Employee) => void;
 }) {
   if (employees.length === 0) {
@@ -1305,6 +1332,11 @@ function EmployeeGrid({
         const jobs = active[employee.id] ?? [];
         const job = jobs[0];
         const last = recent[employee.id];
+        const onBreak = breaks[employee.id];
+
+        // Fylld knapp betyder "du är här": arbetar eller på rast. Vit betyder
+        // utstämplad.
+        const filled = Boolean(job) || Boolean(onBreak);
 
         return (
           <button
@@ -1323,7 +1355,9 @@ function EmployeeGrid({
                 ? onlyIndirect(jobs)
                   ? JOB_TONE.indirect
                   : JOB_TONE.order
-                : "border-neutral-200 bg-white active:bg-neutral-50"
+                : onBreak
+                  ? JOB_TONE.break
+                  : "border-neutral-200 bg-white active:bg-neutral-50"
             }`}
           >
             <span className="flex items-center gap-3">
@@ -1335,11 +1369,11 @@ function EmployeeGrid({
                 name={employee.name}
                 hasPhoto={employee.hasPhoto}
                 size={52}
-                onDark={Boolean(job)}
+                onDark={filled}
               />
               <span
                 className={`min-w-0 text-xl font-semibold leading-tight sm:text-2xl ${
-                  job ? "text-white" : "text-neutral-900"
+                  filled ? "text-white" : "text-neutral-900"
                 }`}
               >
                 {employee.name}
@@ -1378,6 +1412,19 @@ function EmployeeGrid({
                     och {jobs.length - 2} till
                   </span>
                 )}
+              </span>
+            ) : onBreak ? (
+              /* VILKEN rast, inte bara att det är rast. Den som ser "Lunch"
+                 tvärs över verkstaden vet om personen är tillbaka om tio
+                 minuter eller om fyrtio. */
+              <span className="mt-3 block">
+                <span className="inline-flex items-center gap-2 rounded-md bg-white/15 px-2.5 py-1 text-sm font-semibold text-white ring-1 ring-inset ring-white/25">
+                  <span className="h-2 w-2 rounded-full bg-white" />
+                  Rast
+                </span>
+                <span className="mt-1.5 block truncate text-lg font-semibold leading-snug text-white sm:text-xl">
+                  {onBreak.name}
+                </span>
               </span>
             ) : last ? (
               // Vad som står här är skillnaden mellan tre tryck och ett. Den
@@ -1449,8 +1496,11 @@ function ActionChoice({
   const single = jobs.length === 1 ? jobs[0] : null;
 
   return (
-    <div className="mx-auto max-w-2xl">
-      <div className="rounded-xl border border-neutral-200 bg-white p-6">
+    /* Kortet överst tar den plats det behöver; knapparna delar på resten.
+       Måtten är alltså inte fasta längre — en liten skärm får lite lägre
+       knappar i stället för en sida man måste skrolla. */
+    <div className="mx-auto flex min-h-0 w-full max-w-2xl flex-1 flex-col">
+      <div className="shrink-0 rounded-xl border border-neutral-200 bg-white p-4 sm:p-6">
         <h2 className="text-2xl font-semibold sm:text-3xl">{employee.name}</h2>
 
         {/* Rasten står överst och med egen färg. Den som kommer tillbaka från
@@ -1520,7 +1570,7 @@ function ActionChoice({
         </div>
       )}
 
-      <div className="mt-3 grid gap-3 sm:grid-cols-2">
+      <div className="mt-3 grid min-h-0 flex-1 auto-rows-fr gap-3 sm:grid-cols-2">
         {/* PÅ RAST. Då är det bara två vägar vidare: tillbaka till jobbet,
             eller avsluta rasten utan att börja på något. Utstämpling och
             jobbval göms — personen har redan lämnat sina jobb, och att visa
@@ -1530,7 +1580,7 @@ function ActionChoice({
             {recent ? (
               <button
                 onClick={onResume}
-                className="kiosk-press min-h-32 rounded-xl bg-blue-600 p-6 text-2xl font-semibold text-white active:bg-blue-700"
+                className="kiosk-press min-h-20 rounded-xl bg-blue-600 p-6 text-2xl font-semibold text-white active:bg-blue-700"
               >
                 Fortsätt
                 <span className="mt-1.5 block truncate text-base font-normal text-white/80">
@@ -1540,14 +1590,14 @@ function ActionChoice({
             ) : (
               <button
                 onClick={onAdd}
-                className="kiosk-press min-h-32 rounded-xl bg-blue-600 p-6 text-2xl font-semibold text-white active:bg-blue-700"
+                className="kiosk-press min-h-20 rounded-xl bg-blue-600 p-6 text-2xl font-semibold text-white active:bg-blue-700"
               >
                 Välj jobb
               </button>
             )}
             <button
               onClick={onEndBreak}
-              className="kiosk-press min-h-32 rounded-xl border border-neutral-200 bg-white p-6 text-2xl font-semibold text-neutral-900 active:bg-neutral-50"
+              className="kiosk-press min-h-20 rounded-xl border border-neutral-200 bg-white p-6 text-2xl font-semibold text-neutral-900 active:bg-neutral-50"
             >
               Avsluta rasten
               <span className="mt-1.5 block text-base font-normal text-neutral-500">
@@ -1563,13 +1613,13 @@ function ActionChoice({
           <>
             <button
               onClick={() => onClockOut(single)}
-              className="kiosk-press min-h-32 rounded-xl bg-blue-600 p-6 text-2xl font-semibold text-white active:bg-blue-700"
+              className="kiosk-press min-h-20 rounded-xl bg-blue-600 p-6 text-2xl font-semibold text-white active:bg-blue-700"
             >
               Stämpla ut
             </button>
             <button
               onClick={() => onSwitchFrom(single)}
-              className="kiosk-press min-h-32 rounded-xl border border-neutral-200 bg-white p-6 text-2xl font-semibold text-neutral-900 active:bg-neutral-50"
+              className="kiosk-press min-h-20 rounded-xl border border-neutral-200 bg-white p-6 text-2xl font-semibold text-neutral-900 active:bg-neutral-50"
             >
               Byt jobb
               <span className="mt-1.5 block text-base font-normal text-neutral-500">
@@ -1578,11 +1628,11 @@ function ActionChoice({
             </button>
             <button
               onClick={onAdd}
-              className="kiosk-press min-h-28 rounded-xl border border-neutral-200 bg-white p-6 text-xl font-semibold text-neutral-900 active:bg-neutral-50 sm:col-span-2"
+              className="kiosk-press min-h-20 rounded-xl border border-neutral-200 bg-white p-6 text-xl font-semibold text-neutral-900 active:bg-neutral-50 sm:col-span-2"
             >
               Lägg till jobb
               <span className="mt-1.5 block text-base font-normal text-neutral-500">
-                För dig som kör två maskiner — det pågående fortsätter
+                Det pågående jobbet fortsätter
               </span>
             </button>
           </>
@@ -1592,13 +1642,13 @@ function ActionChoice({
           <>
             <button
               onClick={onAdd}
-              className="kiosk-press min-h-28 rounded-xl border border-neutral-200 bg-white p-6 text-xl font-semibold text-neutral-900 active:bg-neutral-50"
+              className="kiosk-press min-h-20 rounded-xl border border-neutral-200 bg-white p-6 text-xl font-semibold text-neutral-900 active:bg-neutral-50"
             >
               Lägg till jobb
             </button>
             <button
               onClick={() => onClockOutAll(jobs)}
-              className="kiosk-press min-h-28 rounded-xl bg-blue-600 p-6 text-xl font-semibold text-white active:bg-blue-700"
+              className="kiosk-press min-h-20 rounded-xl bg-blue-600 p-6 text-xl font-semibold text-white active:bg-blue-700"
             >
               Stämpla ut allt
               <span className="mt-1.5 block text-base font-normal text-white/80">
@@ -1616,7 +1666,7 @@ function ActionChoice({
           <>
             <button
               onClick={onResume}
-              className="kiosk-press min-h-32 rounded-xl bg-blue-600 p-6 text-2xl font-semibold text-white active:bg-blue-700"
+              className="kiosk-press min-h-20 rounded-xl bg-blue-600 p-6 text-2xl font-semibold text-white active:bg-blue-700"
             >
               Fortsätt
               <span className="mt-1.5 block truncate text-base font-normal text-white/80">
@@ -1625,7 +1675,7 @@ function ActionChoice({
             </button>
             <button
               onClick={onAdd}
-              className="kiosk-press min-h-32 rounded-xl border border-neutral-200 bg-white p-6 text-2xl font-semibold text-neutral-900 active:bg-neutral-50"
+              className="kiosk-press min-h-20 rounded-xl border border-neutral-200 bg-white p-6 text-2xl font-semibold text-neutral-900 active:bg-neutral-50"
             >
               Välj annat jobb
             </button>
@@ -1641,7 +1691,7 @@ function ActionChoice({
         {!onBreak && hasBreaks && jobs.length > 0 && (
           <button
             onClick={onTakeBreak}
-            className="kiosk-press min-h-28 rounded-xl border border-sky-200 bg-sky-50 p-6 text-xl font-semibold text-sky-900 active:bg-sky-100 sm:col-span-2"
+            className="kiosk-press min-h-20 rounded-xl border border-sky-200 bg-sky-50 p-6 text-xl font-semibold text-sky-900 active:bg-sky-100 sm:col-span-2"
           >
             Rast
             <span className="mt-1.5 block text-base font-normal text-sky-700">
@@ -1653,7 +1703,7 @@ function ActionChoice({
         {!onBreak && jobs.length === 0 && !recent && (
           <button
             onClick={onAdd}
-            className="kiosk-press min-h-32 rounded-xl bg-blue-600 p-6 text-2xl font-semibold text-white active:bg-blue-700 sm:col-span-2"
+            className="kiosk-press min-h-20 rounded-xl bg-blue-600 p-6 text-2xl font-semibold text-white active:bg-blue-700 sm:col-span-2"
           >
             Välj jobb
           </button>
@@ -1837,20 +1887,24 @@ function OrderNumberPad({
   }
 
   return (
-    <div className="mx-auto max-w-xl">
-      <h2 className="mb-4 text-xl font-semibold text-neutral-900 sm:text-2xl">
+    /* Den högsta vyn i kiosken, och den som gjorde att skärmen måste skrollas:
+       displayen, tolv siffertangenter och tre knappar under dem summerade till
+       mer än en surfplattas höjd. Nu delar knappsatsen och knapparna på den
+       plats som blir över, i stället för att var och en kräva sitt mått. */
+    <div className="mx-auto flex min-h-0 w-full max-w-xl flex-1 flex-col">
+      <h2 className="kiosk-frame-title mb-2 shrink-0 text-xl font-semibold text-neutral-900 sm:mb-4 sm:text-2xl">
         {employee.name}: slå in ordernummer
       </h2>
 
       {/* Fast höjd på både ruta och besked. Utan den hoppar knappsatsen nedåt
           i samma stund som första siffran trycks in. */}
-      <div className="flex h-24 items-center justify-center rounded-xl border-2 border-neutral-200 bg-white">
+      <div className="kiosk-frame-display flex h-16 shrink-0 items-center justify-center rounded-xl border-2 border-neutral-200 bg-white sm:h-24">
         <span className="text-4xl font-semibold tabular-nums tracking-[0.2em] text-neutral-900">
           {typed || <span className="text-neutral-300">—</span>}
         </span>
       </div>
 
-      <div className="flex h-12 items-center justify-center">
+      <div className="kiosk-frame-hint flex h-9 shrink-0 items-center justify-center sm:h-12">
         {match ? (
           <span className="text-lg font-semibold text-emerald-700">
             {match.customerName ?? "Kund saknas på ordern"}
@@ -1866,12 +1920,12 @@ function OrderNumberPad({
         )}
       </div>
 
-      <div className="grid grid-cols-3 gap-3">
+      <div className="grid min-h-0 flex-1 auto-rows-fr grid-cols-3 gap-2 sm:gap-3">
         {["1", "2", "3", "4", "5", "6", "7", "8", "9"].map((digit) => (
           <button
             key={digit}
             onClick={() => press(digit)}
-            className="kiosk-press min-h-20 rounded-xl border border-neutral-200 bg-white text-3xl font-semibold text-neutral-900 active:bg-neutral-50"
+            className="kiosk-press min-h-12 rounded-xl border border-neutral-200 bg-white text-3xl font-semibold text-neutral-900 active:bg-neutral-50"
           >
             {digit}
           </button>
@@ -1883,7 +1937,7 @@ function OrderNumberPad({
         <button
           onClick={() => setTyped((current) => current.slice(0, -1))}
           aria-label="Ta bort sista siffran"
-          className="kiosk-press flex min-h-20 items-center justify-center rounded-xl border border-neutral-200 bg-white text-neutral-500 active:bg-neutral-50"
+          className="kiosk-press flex min-h-12 items-center justify-center rounded-xl border border-neutral-200 bg-white text-neutral-500 active:bg-neutral-50"
         >
           <svg
             viewBox="0 0 24 24"
@@ -1901,13 +1955,13 @@ function OrderNumberPad({
         </button>
         <button
           onClick={() => press("0")}
-          className="kiosk-press min-h-20 rounded-xl border border-neutral-200 bg-white text-3xl font-semibold text-neutral-900 active:bg-neutral-50"
+          className="kiosk-press min-h-12 rounded-xl border border-neutral-200 bg-white text-3xl font-semibold text-neutral-900 active:bg-neutral-50"
         >
           0
         </button>
         <button
           onClick={() => setTyped("")}
-          className="kiosk-press min-h-20 rounded-xl border border-neutral-200 bg-white text-lg font-semibold text-neutral-500 active:bg-neutral-50"
+          className="kiosk-press min-h-12 rounded-xl border border-neutral-200 bg-white text-lg font-semibold text-neutral-500 active:bg-neutral-50"
         >
           Rensa
         </button>
@@ -1918,7 +1972,7 @@ function OrderNumberPad({
       <button
         onClick={() => match && onPick(match)}
         disabled={!match}
-        className="kiosk-press mt-3 min-h-24 w-full rounded-xl bg-blue-600 p-5 text-2xl font-semibold text-white active:bg-blue-700 disabled:bg-neutral-200 disabled:text-neutral-400"
+        className="kiosk-frame-cta kiosk-press mt-3 min-h-14 w-full rounded-xl bg-blue-600 p-5 text-2xl font-semibold text-white active:bg-blue-700 disabled:bg-neutral-200 disabled:text-neutral-400"
       >
         {!match ? (
           "Slå in ett ordernummer"
@@ -1946,7 +2000,7 @@ function OrderNumberPad({
       {!match && (
         <button
           onClick={() => onCreate(typed)}
-          className="kiosk-press mt-3 min-h-20 w-full rounded-xl border-2 border-amber-300 bg-amber-50 p-5 text-xl font-semibold text-amber-900 active:bg-amber-100"
+          className="kiosk-press mt-3 min-h-12 w-full rounded-xl border-2 border-amber-300 bg-amber-50 p-5 text-xl font-semibold text-amber-900 active:bg-amber-100"
         >
           {typed ? `Skapa order ${typed}` : "Snabbjobb utan ordernummer"}
           <span className="mt-1 block text-base font-normal text-amber-800/80">
@@ -1957,7 +2011,7 @@ function OrderNumberPad({
 
       <button
         onClick={onBrowse}
-        className="kiosk-press mt-3 min-h-16 w-full rounded-xl border border-neutral-200 bg-white text-lg font-semibold text-neutral-900 active:bg-neutral-50"
+        className="kiosk-press mt-3 min-h-11 w-full rounded-xl border border-neutral-200 bg-white text-lg font-semibold text-neutral-900 active:bg-neutral-50"
       >
         Visa öppna ordrar i stället
       </button>

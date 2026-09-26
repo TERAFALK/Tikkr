@@ -80,6 +80,40 @@ function filesIn(dir: string): string[] {
  * som ritas ut. KODKOMMENTARER LÄSES INTE: de är för utvecklaren och får
  * gärna vara utförliga, vilket § 7.1 säger uttryckligen.
  */
+/**
+ * Platshållaren för tomt värde i en tabellcell.
+ *
+ * Skrivs antingen som strängen "—" eller som ett ensamt streck mellan två
+ * taggar. Den är inte en mening och har ingen eftertanke att lägga till — den
+ * säger bara att rutan är tom.
+ */
+const PLACEHOLDER = /"—"|>—</g;
+
+/**
+ * Raderna i en fil som innehåller ett tankstreck i löpande text.
+ *
+ * Läser HELA filen och inte bara hint och description. Första versionen av det
+ * här testet tittade bara på attributen, och missade därför
+ *
+ *   "För dig som kör två maskiner — det pågående fortsätter"
+ *
+ * som står som ren JSX-text i en knapp i kiosken. Ett skydd som bara täcker
+ * halva ytan är värre än inget, eftersom man slutar titta själv.
+ *
+ * KODKOMMENTARER LÄSES INTE. De är för utvecklaren och får gärna vara
+ * utförliga, vilket § 7.1 säger uttryckligen.
+ */
+function prosaDashesIn(file: string): string[] {
+  const source = readFileSync(file, "utf8")
+    .replace(/\/\*[\s\S]*?\*\//g, "")
+    .replace(/^\s*\/\/.*$/gm, "");
+
+  return source
+    .split("\n")
+    .map((line) => line.replace(PLACEHOLDER, "").trim())
+    .filter((line) => line.includes("—") && !ALLOWED.some((a) => line.includes(a)));
+}
+
 function userTextsIn(file: string, includePlainStrings: boolean): string[] {
   const source = readFileSync(file, "utf8")
     // Bort med kommentarerna först, annars flaggas varje förklaring i koden.
@@ -119,8 +153,8 @@ describe("inga tankstreck i texten användaren ser", () => {
     const found: string[] = [];
 
     for (const file of uiFiles) {
-      for (const text of offendersIn(file, false)) {
-        found.push(`${path.relative(ROOT, file)}: "${text}"`);
+      for (const line of prosaDashesIn(file)) {
+        found.push(`${path.relative(ROOT, file)}: ${line}`);
       }
     }
 

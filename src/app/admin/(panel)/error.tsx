@@ -46,8 +46,7 @@ export default function AdminError({
         </h1>
 
         <p className="mt-3 text-sm leading-relaxed text-neutral-600">
-          Sidan kunde inte visas. Ingen halvfärdig ändring har sparats — en
-          åtgärd som avbryts skriver ingenting.
+          Sidan kunde inte visas. Ingen halvfärdig ändring har sparats.
         </p>
 
         <p className="mt-3 text-sm leading-relaxed text-neutral-600">
