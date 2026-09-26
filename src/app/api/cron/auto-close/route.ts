@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { timingSafeEqual } from "node:crypto";
 import { unsafeGlobalPrisma } from "@/lib/db";
 import { autoCloseForgottenEntries } from "@/lib/clock";
+import { autoCloseForgottenBreaks } from "@/lib/breaks";
 import { noteCronRun } from "@/lib/platform-health";
 import { recordSnapshot } from "@/lib/revenue-history";
 
@@ -40,13 +41,25 @@ export async function POST(request: NextRequest) {
   });
 
   const now = new Date();
-  const result: { company: string; closed: number }[] = [];
+  const result: { company: string; closed: number; breaks: number }[] = [];
 
   for (const company of companies) {
     try {
-      const closed = await autoCloseForgottenEntries(company.id, now);
-      if (closed.length > 0) {
-        result.push({ company: company.name, closed: closed.length });
+      // Rasterna stängs också. En rast som står öppen över natten är inte en
+      // fjortontimmarslunch utan en person som glömde trycka — och till
+      // skillnad från en glömd utstämpling syns den inte ens som en orimlig
+      // order, bara som en dag som blev för kort i tidrapporten.
+      const [closed, breaks] = await Promise.all([
+        autoCloseForgottenEntries(company.id, now),
+        autoCloseForgottenBreaks(company.id, now),
+      ]);
+
+      if (closed.length > 0 || breaks.length > 0) {
+        result.push({
+          company: company.name,
+          closed: closed.length,
+          breaks: breaks.length,
+        });
       }
     } catch (error) {
       // Ett företag med trasig inställning ska inte stoppa de andra.

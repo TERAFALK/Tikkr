@@ -48,6 +48,14 @@ export const TENANT_SCOPED_MODELS = [
   "AdminUser",
   "AdminInvite",
   "KioskDevice",
+  // Löneunderlaget.
+  "WorkSchedule",
+  "ScheduleDay",
+  "ScheduleBreak",
+  "BreakType",
+  "BreakEntry",
+  "Absence",
+  "CompAdjustment",
 ] as const;
 
 const TENANT_MODEL_SET: ReadonlySet<string> = new Set(TENANT_SCOPED_MODELS);

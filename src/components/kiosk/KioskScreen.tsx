@@ -210,6 +210,10 @@ interface Props {
   recentByEmployee: Record<string, RecentJob>;
   /** Kunderna ur registret. Underlaget för snabbjobbets kundval. */
   customers: KioskCustomer[];
+  /** Frukost, lunch, fika. Tom lista döljer rastknappen helt. */
+  breakTypes: KioskBreakType[];
+  /** Vilka som är på rast just nu. */
+  breaksByEmployee: Record<string, KioskBreak>;
   /** Text om prenumerationen, eller null. Stoppar aldrig stämplingen. */
   subscriptionWarning: string | null;
   /** true om företaget laddat upp en egen logotyp. */
@@ -218,9 +222,22 @@ interface Props {
   notices: KioskNotice[];
 }
 
+/** En rast som går att välja på skärmen. */
+export interface KioskBreakType {
+  id: string;
+  name: string;
+}
+
+/** Den pågående rasten för en person. */
+export interface KioskBreak {
+  since: string;
+  name: string;
+}
+
 type View =
   | { name: "employees" }
   | { name: "action"; employee: Employee }
+  | { name: "break"; employee: Employee }
   | { name: "order"; employee: Employee }
   | { name: "orderNumber"; employee: Employee }
   | { name: "quickCustomer"; employee: Employee; orderNumber: string }
@@ -278,6 +295,8 @@ export default function KioskScreen({
   activeByEmployee,
   recentByEmployee,
   customers,
+  breakTypes,
+  breaksByEmployee,
   subscriptionWarning,
   hasLogo,
   notices,
@@ -295,6 +314,14 @@ export default function KioskScreen({
   // ersätts av serverns bild när sidan hämtats om.
   const [active, setActive] = useState(activeByEmployee);
   useEffect(() => setActive(activeByEmployee), [activeByEmployee]);
+
+  // Vilka som är på rast. Samma optimistiska mönster som stämplingarna: sätts
+  // direkt vid trycket och ersätts av serverns bild vid nästa hämtning.
+  const [breaks, setBreaks] = useState(breaksByEmployee);
+  useEffect(() => setBreaks(breaksByEmployee), [breaksByEmployee]);
+
+  // Flexsaldot efter dagens sista utstämpling. Visas en kort stund som kvitto.
+  const [flexMinutes, setFlexMinutes] = useState<number | null>(null);
 
   // Senaste jobb hämtas bara vid omladdning av sidan, inte i femsekunders-
   // pollningen. Det ändras ju först när någon stämplar ut, och den skärm som
@@ -396,9 +423,23 @@ export default function KioskScreen({
       );
     }
 
+    // Flexsaldot efter dagens sista utstämpling. Kommer med svaret på trycket
+    // och visas som ett eget kvitto — tid, aldrig kronor.
+    if (result.flexMinutes) setFlexMinutes(result.flexMinutes.minutes);
+
     // Hämtar serverns bild, så att optimistiska gissningar rättas.
     if (result.sent > 0) router.refresh();
   }, [router]);
+
+  // Saldot står kvar några sekunder och försvinner sedan av sig själv. Ingen
+  // ska behöva trycka bort det, och nästa person vid skärmen ska inte se
+  // föregående persons siffra.
+  useEffect(() => {
+    if (flexMinutes === null) return;
+
+    const timer = setTimeout(() => setFlexMinutes(null), 6000);
+    return () => clearTimeout(timer);
+  }, [flexMinutes]);
 
   /**
    * Registrerar ett tryck.
@@ -467,9 +508,11 @@ export default function KioskScreen({
 
       const data = (await response.json()) as {
         active: Record<string, ActiveJob[]>;
+        breaks?: Record<string, KioskBreak>;
       };
 
       setActive(data.active);
+      setBreaks(data.breaks ?? {});
       setLastSyncedAt(new Date());
     } catch {
       // Nätet är nere. Skärmen fortsätter visa det den vet, och kön tar hand
@@ -608,6 +651,13 @@ export default function KioskScreen({
         }));
       }
 
+      // Att börja jobba avslutar rasten, både här och på servern.
+      setBreaks((current) => {
+        const next = { ...current };
+        delete next[employee.id];
+        return next;
+      });
+
       setReceipt(`${employee.name}: ${label}`);
       setReceiptVisible(true);
       goHome();
@@ -714,6 +764,80 @@ export default function KioskScreen({
     [goHome, send]
   );
 
+  /**
+   * Börjar en rast.
+   *
+   * Trycket stänger ALLA pågående jobb — en lunch är inte arbete, och den som
+   * kör två maskiner lämnar båda när hen går och äter. Servern gör samma sak,
+   * se src/lib/breaks.ts; det som sker här är bara att skärmen visar det
+   * direkt i stället för att vänta på svaret.
+   */
+  const punchBreak = useCallback(
+    (employee: Employee, breakType: KioskBreakType) => {
+      const jobs = active[employee.id] ?? [];
+      const last = jobs[0];
+
+      if (last) {
+        // Jobbet blir förslaget när personen kommer tillbaka från rasten.
+        setRecent((current) => ({
+          ...current,
+          [employee.id]: { label: last.label, choice: last.choice },
+        }));
+      }
+
+      setActive((current) => {
+        const next = { ...current };
+        delete next[employee.id];
+        return next;
+      });
+
+      setBreaks((current) => ({
+        ...current,
+        [employee.id]: { since: new Date().toISOString(), name: breakType.name },
+      }));
+
+      setReceipt(`${employee.name}: ${breakType.name}`);
+      setReceiptVisible(true);
+      goHome();
+
+      void send({
+        action: "break",
+        employeeId: employee.id,
+        breakTypeId: breakType.id,
+        label: `${employee.name}, ${breakType.name}`,
+      });
+    },
+    [active, goHome, send]
+  );
+
+  /**
+   * Avslutar rasten utan att börja på något.
+   *
+   * Den som trycker "Fortsätt" på ett jobb behöver inte den här vägen —
+   * instämplingen avslutar rasten av sig själv på servern. Knappen finns för
+   * den som kommer tillbaka men ska göra något annat först.
+   */
+  const punchBreakEnd = useCallback(
+    (employee: Employee) => {
+      setBreaks((current) => {
+        const next = { ...current };
+        delete next[employee.id];
+        return next;
+      });
+
+      setReceipt(`${employee.name}: rasten slut`);
+      setReceiptVisible(true);
+      goHome();
+
+      void send({
+        action: "break-end",
+        employeeId: employee.id,
+        label: `${employee.name}, rasten slut`,
+      });
+    },
+    [goHome, send]
+  );
+
   return (
     <main className="kiosk-surface flex min-h-screen flex-col bg-neutral-50">
       <Header
@@ -751,6 +875,16 @@ export default function KioskScreen({
           </Toast>
         )}
 
+        {/* Flexsaldot efter dagens sista utstämpling.
+            TID, aldrig kronor: kiosken visar inga belopp, och vad en person
+            kostar företaget hör inte på en skärm i verkstaden. Ett saldo är
+            personens egen arbetstid och är något annat. */}
+        {flexMinutes !== null && (
+          <Toast tone="ok" visible>
+            Flexsaldo {formatFlex(flexMinutes)}
+          </Toast>
+        )}
+
         {error && (
           <Toast tone="error" visible onDismiss={() => setError(null)}>
             {error}
@@ -781,6 +915,12 @@ export default function KioskScreen({
             employee={view.employee}
             jobs={active[view.employee.id] ?? []}
             recent={recent[view.employee.id]}
+            onBreak={breaks[view.employee.id] ?? null}
+            hasBreaks={breakTypes.length > 0}
+            onTakeBreak={() =>
+              setView({ name: "break", employee: view.employee })
+            }
+            onEndBreak={() => punchBreakEnd(view.employee)}
             onClockOut={(job) => punchOut(view.employee, job)}
             // Stämplar INTE ut här. Bara ihågkommet vilket jobb som ska
             // lämnas, så att den som ångrar sig står kvar på sitt jobb.
@@ -794,6 +934,18 @@ export default function KioskScreen({
               const last = recent[view.employee.id];
               if (last) punchIn(view.employee, last.choice);
             }}
+          />
+        )}
+
+        {view.name === "break" && (
+          <Chooser
+            title={`${view.employee.name}: rast`}
+            empty="Inga raster upplagda. Kontakta kontoret."
+            items={breakTypes.map((type) => ({
+              key: type.id,
+              primary: type.name,
+              onPick: () => punchBreak(view.employee, type),
+            }))}
           />
         )}
 
@@ -971,6 +1123,7 @@ const STEPS: Partial<
   quickMoment: { current: 3, label: "Välj arbetsmoment" },
   moment: { current: 3, label: "Välj arbetsmoment" },
   indirect: { current: 2, label: "Improduktiv tid" },
+  break: { current: 2, label: "Välj rast" },
 };
 
 function Header({
@@ -1268,6 +1421,10 @@ function ActionChoice({
   employee,
   jobs,
   recent,
+  onBreak,
+  hasBreaks,
+  onTakeBreak,
+  onEndBreak,
   onClockOut,
   onSwitchFrom,
   onClockOutAll,
@@ -1277,6 +1434,12 @@ function ActionChoice({
   employee: Employee;
   jobs: ActiveJob[];
   recent?: RecentJob;
+  /** Den pågående rasten, eller null. */
+  onBreak: KioskBreak | null;
+  /** false döljer rastknappen — företaget stämplar inte raster. */
+  hasBreaks: boolean;
+  onTakeBreak: () => void;
+  onEndBreak: () => void;
   onClockOut: (job: ActiveJob) => void;
   onSwitchFrom: (job: ActiveJob) => void;
   onClockOutAll: (jobs: ActiveJob[]) => void;
@@ -1289,6 +1452,20 @@ function ActionChoice({
     <div className="mx-auto max-w-2xl">
       <div className="rounded-xl border border-neutral-200 bg-white p-6">
         <h2 className="text-2xl font-semibold sm:text-3xl">{employee.name}</h2>
+
+        {/* Rasten står överst och med egen färg. Den som kommer tillbaka från
+            lunch ska se att skärmen vet om det, annars trycker hen på nytt. */}
+        {onBreak && (
+          <div className="mt-3">
+            <span className="block text-2xl font-semibold leading-snug text-neutral-900 sm:text-3xl">
+              {onBreak.name}
+            </span>
+            <span className="mt-2 inline-flex items-center gap-2 rounded-md bg-sky-600 px-3 py-1.5 text-[15px] font-semibold text-white">
+              <span className="h-2 w-2 rounded-full bg-white" />
+              Rast pågår
+            </span>
+          </div>
+        )}
 
         {single && (
           /* Jobbet står stort och brickan säger bara att det pågår. Ordningen
@@ -1344,9 +1521,45 @@ function ActionChoice({
       )}
 
       <div className="mt-3 grid gap-3 sm:grid-cols-2">
+        {/* PÅ RAST. Då är det bara två vägar vidare: tillbaka till jobbet,
+            eller avsluta rasten utan att börja på något. Utstämpling och
+            jobbval göms — personen har redan lämnat sina jobb, och att visa
+            "Stämpla ut" för någon som inte är instämplad är en fälla. */}
+        {onBreak && (
+          <>
+            {recent ? (
+              <button
+                onClick={onResume}
+                className="kiosk-press min-h-32 rounded-xl bg-blue-600 p-6 text-2xl font-semibold text-white active:bg-blue-700"
+              >
+                Fortsätt
+                <span className="mt-1.5 block truncate text-base font-normal text-white/80">
+                  {recent.label}
+                </span>
+              </button>
+            ) : (
+              <button
+                onClick={onAdd}
+                className="kiosk-press min-h-32 rounded-xl bg-blue-600 p-6 text-2xl font-semibold text-white active:bg-blue-700"
+              >
+                Välj jobb
+              </button>
+            )}
+            <button
+              onClick={onEndBreak}
+              className="kiosk-press min-h-32 rounded-xl border border-neutral-200 bg-white p-6 text-2xl font-semibold text-neutral-900 active:bg-neutral-50"
+            >
+              Avsluta rasten
+              <span className="mt-1.5 block text-base font-normal text-neutral-500">
+                Utan att börja på ett jobb
+              </span>
+            </button>
+          </>
+        )}
+
         {/* Ett jobb: samma två knappar som förut, plus vägen till en andra
             maskin. */}
-        {single && (
+        {!onBreak && single && (
           <>
             <button
               onClick={() => onClockOut(single)}
@@ -1375,7 +1588,7 @@ function ActionChoice({
           </>
         )}
 
-        {jobs.length > 1 && (
+        {!onBreak && jobs.length > 1 && (
           <>
             <button
               onClick={onAdd}
@@ -1399,7 +1612,7 @@ function ActionChoice({
             samma plats som Stämpla ut gör när man är inne — den handling man
             kom hit för står alltid till vänster, så handen lär sig var den
             ska. */}
-        {jobs.length === 0 && recent && (
+        {!onBreak && jobs.length === 0 && recent && (
           <>
             <button
               onClick={onResume}
@@ -1422,7 +1635,22 @@ function ActionChoice({
         {/* Varken pågående eller senaste jobb. Kan inträffa om ordern hunnit
             stängas medan någon stod kvar i vyn. Skärmen ska leda vidare, inte
             visa en tom ruta man måste backa ur. */}
-        {jobs.length === 0 && !recent && (
+        {/* RAST. Ligger sist och i en egen ton: den är inte ett jobb, och den
+            får inte kunna tryckas av misstag när man siktade på Stämpla ut.
+            Trycket stänger alla pågående jobb — en lunch är inte arbete. */}
+        {!onBreak && hasBreaks && jobs.length > 0 && (
+          <button
+            onClick={onTakeBreak}
+            className="kiosk-press min-h-28 rounded-xl border border-sky-200 bg-sky-50 p-6 text-xl font-semibold text-sky-900 active:bg-sky-100 sm:col-span-2"
+          >
+            Rast
+            <span className="mt-1.5 block text-base font-normal text-sky-700">
+              Stämplar ut från {jobs.length === 1 ? "jobbet" : "alla jobb"}
+            </span>
+          </button>
+        )}
+
+        {!onBreak && jobs.length === 0 && !recent && (
           <button
             onClick={onAdd}
             className="kiosk-press min-h-32 rounded-xl bg-blue-600 p-6 text-2xl font-semibold text-white active:bg-blue-700 sm:col-span-2"
@@ -1795,4 +2023,21 @@ function Empty({ children }: { children: React.ReactNode }) {
       {children}
     </div>
   );
+}
+
+/**
+ * Flexsaldot som text: "+2:15" eller "−0:45".
+ *
+ * Tecknet skrivs alltid ut, så att noll inte läses som plus, och timmar och
+ * minuter i stället för decimaltimmar — den som ska veta om hen kan gå hem
+ * tidigt läser "+2:15" snabbare än "+2,25".
+ */
+function formatFlex(minutes: number): string {
+  const rounded = Math.round(minutes);
+  if (rounded === 0) return "0:00";
+
+  const sign = rounded > 0 ? "+" : "−";
+  const abs = Math.abs(rounded);
+
+  return `${sign}${Math.floor(abs / 60)}:${String(abs % 60).padStart(2, "0")}`;
 }

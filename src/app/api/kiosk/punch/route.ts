@@ -5,6 +5,10 @@ import {
   touchDevice,
 } from "@/lib/kiosk-auth";
 import { clockIn, clockOut, clockOutAll, ClockError } from "@/lib/clock";
+import { startBreak, endBreak } from "@/lib/breaks";
+import { currentFlexMinutes } from "@/lib/payroll";
+import { forCompany } from "@/lib/tenant";
+import { unsafeGlobalPrisma } from "@/lib/db";
 
 // Tar emot en stämpling från kioskskärmen.
 //
@@ -19,8 +23,10 @@ interface PunchBody {
    * "out" stämplar ut från ETT jobb och bör ange momentId — se clockOut om
    * vad som händer utan. "out-all" stämplar ut från allt personen har igång.
    */
-  action: "in" | "out" | "out-all";
+  action: "in" | "out" | "out-all" | "break" | "break-end";
   employeeId: string;
+  /** Vilken rast som tas. Krävs för "break". */
+  breakTypeId?: string;
   orderId?: string;
   momentId?: string;
   /** Ifyllt i stället för order och moment när tiden är improduktiv. */
@@ -76,7 +82,11 @@ export async function POST(request: NextRequest) {
   }
 
   const knownAction =
-    body?.action === "in" || body?.action === "out" || body?.action === "out-all";
+    body?.action === "in" ||
+    body?.action === "out" ||
+    body?.action === "out-all" ||
+    body?.action === "break" ||
+    body?.action === "break-end";
 
   if (!body?.employeeId || !knownAction) {
     return NextResponse.json({ error: "Ofullständigt anrop." }, { status: 400 });
@@ -99,13 +109,54 @@ export async function POST(request: NextRequest) {
   };
 
   try {
+    if (body.action === "break") {
+      if (!body.breakTypeId) {
+        return NextResponse.json({ error: "Ingen rast vald." }, { status: 400 });
+      }
+
+      // Rasten stänger alla pågående jobb. Se src/lib/breaks.ts.
+      const result = await startBreak(session.companyId, {
+        ...context,
+        employeeId: body.employeeId,
+        breakTypeId: body.breakTypeId,
+      });
+
+      await Promise.all([touchDevice(session.deviceId), refreshKioskCookie()]);
+      return NextResponse.json({ ok: true, ...result });
+    }
+
+    if (body.action === "break-end") {
+      const ended = await endBreak(session.companyId, {
+        ...context,
+        employeeId: body.employeeId,
+      });
+
+      await Promise.all([touchDevice(session.deviceId), refreshKioskCookie()]);
+      return NextResponse.json({ ok: true, ended });
+    }
+
     if (body.action === "out-all") {
       const closed = await clockOutAll(session.companyId, {
         ...context,
         employeeId: body.employeeId,
       });
       await Promise.all([touchDevice(session.deviceId), refreshKioskCookie()]);
-      return NextResponse.json({ ok: true, closed });
+
+      // Flexsaldot följer med svaret på dagens sista tryck. Skärmen visar det
+      // en kort stund som kvitto. TID, aldrig kronor — kiosken visar inga
+      // belopp, se CLAUDE.md § 3 regel 4.
+      //
+      // Misslyckas räkningen svarar vi ändå ok: utstämplingen är gjord, och
+      // ett saldo som inte gick att räkna fram får aldrig se ut som att
+      // stämplingen inte gick igenom.
+      let flexMinutes: number | null = null;
+      try {
+        flexMinutes = await flexFor(session.companyId, body.employeeId);
+      } catch (error) {
+        console.error("Kunde inte räkna fram flexsaldot", error);
+      }
+
+      return NextResponse.json({ ok: true, closed, flexMinutes });
     }
 
     if (body.action === "out") {
@@ -179,4 +230,27 @@ function clientIp(request: NextRequest): string | undefined {
   const forwarded = request.headers.get("x-forwarded-for");
   if (forwarded) return forwarded.split(",")[0]?.trim();
   return request.headers.get("x-real-ip") ?? undefined;
+}
+
+/**
+ * Flexsaldot för en anställd, räknat på samma sätt som i tidrapporten.
+ *
+ * Går via payroll.ts och inte via en egen räkning. Skärmen och kontoret måste
+ * visa samma tal — ett saldo som skiljer sig mellan verkstaden och lönelistan
+ * är en diskussion ingen vinner.
+ */
+async function flexFor(
+  companyId: string,
+  employeeId: string
+): Promise<number | null> {
+  const company = await unsafeGlobalPrisma.company.findUnique({
+    where: { id: companyId },
+    select: { timezone: true },
+  });
+
+  return currentFlexMinutes(
+    forCompany(companyId),
+    company?.timezone ?? "Europe/Stockholm",
+    employeeId
+  );
 }

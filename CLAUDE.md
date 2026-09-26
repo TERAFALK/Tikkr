@@ -11,18 +11,39 @@ tillverkningsföretag använder för att registrera arbetstid per **order** och
 
 ### Avgränsning — läs denna först
 
-**Tikkr är underlag för FAKTURERING. Inte för lön.** Systemet ska aldrig
-utökas med lönearter, övertidsregler, frånvaro eller semester — den tiden hör
-inte hemma här överhuvudtaget.
+**Tikkr lämnar TVÅ underlag: ett för fakturering och ett för lön.**
+(Ändrat 2026-09-26. Tidigare gällde "aldrig för lön". Pilotkunden behövde
+tidrapporter, och beslutet fattades av produktägaren.)
+
+**Gränsen går vid pengar till lön, inte vid tid.** Tikkr räknar timmar:
+planerad tid, närvarotid, flex, komp och frånvaro. Vad timmarna är värda i lön
+avgörs av kollektivavtalet, i lönesystemet. Lägg därför ALDRIG till lönearter,
+OB-tillägg, övertidsersättning, karensavdrag eller semesterlön — de reglerna
+ändras med varje avtalsrörelse, och ett system som har dem fel betalar fel lön
+till riktiga människor.
+
+**De två underlagen räknar samma timme olika, och det är avsiktligt.**
+
+> En operatör kör två maskiner 08–12. Fakturaunderlaget visar ÅTTA
+> maskintimmar — båda ordrarna ska betala sin. Tidrapporten visar FYRA timmar,
+> för så länge var personen på jobbet.
+
+Det är därför de aldrig får dela kod. `payroll.ts`, `schedule.ts`,
+`absence.ts`, `breaks.ts` och `timesheet-pdf.ts` importeras ALDRIG av
+`order-export.ts`, `pdf.ts`, `order-calc.ts`, `report.ts` eller
+exportrutterna. Bevisas av `tests/payroll-boundary.test.ts`. Skulle
+fakturasidan börja läsa löneunderlaget vore det en tidsfråga innan någon
+"förenklade" till en siffra, och kunden skulle faktureras för halva arbetet.
 
 Konsekvenser att hålla fast vid:
-- Rapporterna svarar på "hur mycket ska kunden faktureras", inte "hur mycket
-  har personen jobbat".
-- En felaktig stämpling är ett fakturafel, inte ett lönefel. Allvarligt, men
-  hanteras genom att admin rättar posten i efterhand.
+- Rapporterna svarar på "hur mycket ska kunden faktureras". Tidrapporten
+  svarar på "hur mycket har personen arbetat". Blanda dem inte.
+- En felaktig stämpling är numera BÅDE ett fakturafel och ett lönefel.
+  Allvarligare än förut, och skälet till att varje beräknad tid är märkt som
+  beräknad.
 
-**Undantaget: improduktiv tid** (ändrat 2026-09-23). Städning, möten och
-underhåll får registreras, i ett eget register skilt från arbetsmomenten.
+**Improduktiv tid** (ändrat 2026-09-23). Städning, möten och underhåll får
+registreras, i ett eget register skilt från arbetsmomenten.
 
 Skälet är inte att den tiden ska faktureras — den når aldrig ett
 fakturaunderlag. Skälet är att den annars göms i närmaste order och förstör
@@ -116,6 +137,18 @@ time_entries   — id, company_id, employee_id, kind,
 admin_users    — id, company_id, email, password_hash, role
 kiosk_devices  — id, company_id, name, device_token, active, last_seen_at
 support_visits — id, company_id, email, started_at, last_seen_at
+
+  — löneunderlaget, se regel 7 —
+work_schedules   — id, company_id, name, is_default
+schedule_days    — id, company_id, schedule_id, weekday, start_minute, end_minute
+schedule_breaks  — id, company_id, schedule_day_id, start_minute, end_minute
+break_types      — id, company_id, name, active, sort_order
+break_entries    — id, company_id, employee_id, break_type_id,
+                   started_at, ended_at, source, needs_review
+absences         — id, company_id, employee_id, date, type, minutes,
+                   note, created_by_email
+comp_adjustments — id, company_id, employee_id, date, minutes,
+                   note, created_by_email, absence_id
 ```
 
 ### Beslutade regler för stämpling (bestämt 2026-08-10)
@@ -215,6 +248,54 @@ support_visits — id, company_id, email, started_at, last_seen_at
 
    Systemet stoppar aldrig stämpling för att en beräkning överskrids.
 
+7. **Löneunderlaget: schema, raster, flex, komp och frånvaro**
+   (tillagt 2026-09-26).
+
+   **Schemat ger PLANERAD tid**, netto efter schemats raster. Kundens vardag
+   är 06:30–16:00 minus 20 minuters frukost och 40 minuters lunch, alltså 8,5
+   timmar. Utan schema finns ingen planerad tid, och allt arbete blir flex.
+
+   **Rasterna STÄMPLAS** (kundens val), och ett rasttryck stänger ALLA
+   pågående jobb. Därmed faller rasten bort ur närvarotiden av sig själv, och
+   varken rapporterna eller fakturaunderlaget behöver veta att raster finns.
+
+   Rasterna har ett EGET register, `break_entries`, av samma skäl som
+   improduktiv tid fick ett: improduktiv tid är arbete som inte faktureras,
+   en lunch är inte arbete alls. En rastpost har varken order, moment eller
+   timkostnad och kan därför inte faktureras ens av misstag.
+
+   **Flexformeln, som bara räknas i `src/lib/payroll.ts`:**
+
+   ```
+   flex(dag) = arbetad tid + frånvarotid − planerad tid − intjänad komp
+   ```
+
+   | Fall | Arbetad | Frånvaro | Planerad | Komp | Flex |
+   |---|---|---|---|---|---|
+   | Normal dag | 8,5 | 0 | 8,5 | 0 | 0 |
+   | Sjuk hel dag | 0 | 8,5 | 8,5 | 0 | 0 |
+   | Övertid, 2 h godkänd komp | 10,5 | 0 | 8,5 | 2 | 0 |
+   | Tar ut komp hel dag | 0 | 8,5 | 8,5 | 0 | 0 |
+
+   Frånvaron TÄCKER den planerade tiden — annars gav en sjukvecka minus
+   fyrtio timmar. Intjänad komp dras bort, annars räknades samma övertid två
+   gånger.
+
+   **Arbetad tid är HUVUDSTÄMPLINGEN** (`mainMinutes` i `spans.ts`), aldrig
+   råsumman. Det är här de två underlagen skiljer sig, se avgränsningen överst.
+
+   **Intjänad komp uppstår aldrig av sig själv.** Tid utöver schemat är flex
+   till dess att en människa beslutat att den är övertid. Uttagen komp är en
+   frånvarotyp som också drar på komptidssaldot.
+
+   **Saldon lagras aldrig, de härleds.** Ett cachat saldo och en uppsättning
+   poster är två ställen som säger samma sak. `employees.flex_opening_minutes`
+   finns bara för kunder som flyttar in med befintliga timmar.
+
+   Facit för hela räkningen är kundens egen tidrapport från Monitor, avskriven
+   som fixtur i `tests/payroll.test.ts`: 33,75 närvaro mot 34,00 planerat ger
+   −0,25 i flex, varav 0,17 produktivt och 33,58 improduktivt.
+
 Multi-tenant-isolering byggs i appens kod: **varje databasfråga går via ett
 gemensamt lager** i Prisma som alltid filtrerar på inloggad användares
 `company_id`. Ett enda ställe i koden, inte utspritt — och testat automatiskt.
@@ -267,6 +348,15 @@ gemensamt lager** i Prisma som alltid filtrerar på inloggad användares
 8. **GDPR** — adminpanelen ska stödja export och radering av en anställds data
    (rätt att bli glömd). PUB-avtal hanteras utanför koden, men bygg
    funktionaliteten.
+9. **Frånvaro är känsliga personuppgifter** (tillagt 2026-09-26). Att någon är
+   sjuk eller vabbar säger något om hälsa och familj. Därför:
+   - Registreras BARA i adminpanelen, aldrig på stämplingsskärmen. En skärm i
+     verkstaden är fel plats att uppge varför man är borta.
+   - Varje post bär `created_by_email`, så att den går att spåra till en
+     administratör.
+   - Tidrapporten är ett internt dokument och får aldrig skickas till en kund.
+     PDF:en säger det i foten.
+   - Anonymisering enligt punkt 8 ska ta med frånvaro, raster och komprader.
 
 ## 5. Drift
 

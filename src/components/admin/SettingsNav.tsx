@@ -41,6 +41,12 @@ const pages: SettingsPage[] = [
     icon: IconClock,
   },
   {
+    href: "/admin/installningar/schema",
+    label: "Arbetstider",
+    description: "Schema och raster",
+    icon: IconClock,
+  },
+  {
     href: "/admin/installningar/prenumeration",
     label: "Prenumeration",
     description: "Betalning och skärmar",

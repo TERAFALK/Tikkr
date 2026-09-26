@@ -52,6 +52,26 @@ enum TimeEntrySource {
   AUTO_CLOSE
 }
 
+/// Varför en anställd inte var på plats.
+///
+/// Tikkr räknar TIMMAR, aldrig kronor. Typen finns för att timmarna ska kunna
+/// redovisas var för sig i tidrapporten och för att en frånvarodag inte ska
+/// straffa flexsaldot — vad frånvaron är värd i lön avgörs i lönesystemet, av
+/// kollektivavtalet. Se CLAUDE.md § 3 regel 7.
+enum AbsenceType {
+  SJUK
+  VAB
+  SEMESTER
+  FORALDRALEDIG
+  TJANSTLEDIG
+  PERMISSION
+
+  /// Uttagen komptid. Drar även på komptidssaldot, se comp_adjustments.
+  KOMP_UTTAG
+
+  OVRIGT
+}
+
 /// Ett kundföretag. Detta är den enda tabellen utan company_id — den ÄR tenanten.
 model Company {
   id                 String             @id @default(cuid())
@@ -113,8 +133,8 @@ model Company {
   logoSquareData     Bytes?  @map("logo_square_data")
   logoSquareMimeType String? @map("logo_square_mime_type")
   /// Bred — överst på underlag som skickas vidare till kundens kund.
-  logoWideData     Bytes?  @map("logo_wide_data")
-  logoWideMimeType String? @map("logo_wide_mime_type")
+  logoWideData       Bytes?  @map("logo_wide_data")
+  logoWideMimeType   String? @map("logo_wide_mime_type")
 
   /// När någon av dem senast ändrades. Används för att webbläsaren ska sluta
   /// visa den gamla bilden efter en uppladdning.
@@ -135,6 +155,15 @@ model Company {
   customers       Customer[]
   supportVisits   SupportVisit[]
 
+  // Löneunderlaget. Se avsnittet längst ner i filen.
+  workSchedules   WorkSchedule[]
+  scheduleDays    ScheduleDay[]
+  scheduleBreaks  ScheduleBreak[]
+  breakTypes      BreakType[]
+  breakEntries    BreakEntry[]
+  absences        Absence[]
+  compAdjustments CompAdjustment[]
+
   @@map("companies")
 }
 
@@ -145,10 +174,10 @@ model Employee {
   /// Anders Andersson, och att tvinga fram ett påhittat särskiljande namn vore
   /// att lösa ett datorproblem med människors namn. Anställningsnumret nedan
   /// finns för att kunna skilja dem åt på ett sätt kunden känner igen.
-  id        String   @id @default(cuid())
-  companyId String   @map("company_id")
+  id        String  @id @default(cuid())
+  companyId String  @map("company_id")
   name      String
-  active    Boolean  @default(true)
+  active    Boolean @default(true)
 
   /// Kundens eget nummer på personen. Frivilligt.
   ///
@@ -188,8 +217,33 @@ model Employee {
   photoMimeType  String?   @map("photo_mime_type")
   photoUpdatedAt DateTime? @map("photo_updated_at")
 
+  /// Schemat personen går på. Tomt betyder företagets standardschema, vilket
+  /// är det normala — en verkstad har oftast ett enda schema som alla följer.
+  scheduleId String? @map("schedule_id")
+
+  /// Flexsaldot när Tikkr togs i bruk, i minuter. Kan vara negativt.
+  ///
+  /// Finns för att en kund som byter system har saldon sedan tidigare. Utan
+  /// det skulle alla börja om på noll, och personalen skulle förlora timmar de
+  /// arbetat in.
+  flexOpeningMinutes Int @default(0) @map("flex_opening_minutes")
+
+  /// Komptidssaldot när Tikkr togs i bruk, i minuter.
+  compOpeningMinutes Int @default(0) @map("comp_opening_minutes")
+
+  /// Dagen saldona ovan gällde. Tikkr räknar från och med denna dag och
+  /// framåt; allt före den ligger i ingående saldo.
+  ///
+  /// Tomt betyder att personen räknas från sin första stämpling.
+  balanceOpeningDate DateTime? @map("balance_opening_date")
+
   company     Company     @relation(fields: [companyId], references: [id], onDelete: Cascade)
   timeEntries TimeEntry[]
+
+  schedule        WorkSchedule?    @relation(fields: [scheduleId], references: [id], onDelete: SetNull)
+  breakEntries    BreakEntry[]
+  absences        Absence[]
+  compAdjustments CompAdjustment[]
 
   // Numret är unikt per företag, inte globalt. Två olika kunder ska kunna ha
   // varsin anställd med nummer 1 utan att krocka. Flera personer utan nummer
@@ -260,10 +314,10 @@ model Customer {
 }
 
 model Order {
-  id           String      @id @default(cuid())
-  companyId    String      @map("company_id")
-  orderNumber  String      @map("order_number")
-  status       OrderStatus @default(OPEN)
+  id          String      @id @default(cuid())
+  companyId   String      @map("company_id")
+  orderNumber String      @map("order_number")
+  status      OrderStatus @default(OPEN)
 
   /// Kunden ordern görs åt. Frivillig.
   ///
@@ -305,9 +359,9 @@ model Order {
   /// Finns för den order där kunden förhandlat — annars hade man fått ändra
   /// företagets påslag fram och tillbaka och råkat fakturera fel på allt
   /// annat under tiden.
-  markupPercent Int? @map("markup_percent")
-  createdAt    DateTime    @default(now()) @map("created_at")
-  updatedAt    DateTime    @updatedAt @map("updated_at")
+  markupPercent Int?     @map("markup_percent")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
 
   company     Company     @relation(fields: [companyId], references: [id], onDelete: Cascade)
   timeEntries TimeEntry[]
@@ -351,7 +405,7 @@ model WorkMoment {
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
-  company     Company     @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  company     Company       @relation(fields: [companyId], references: [id], onDelete: Cascade)
   timeEntries TimeEntry[]
   budgets     OrderBudget[]
 
@@ -392,8 +446,8 @@ model OrderBudget {
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
-  company Company    @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  order   Order      @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  order   Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
 
   // Restrict, som för registrerad tid: ett arbetsmoment som någon räknat med
   // ska inte kunna försvinna under en pågående order. Moment avslutas ändå
@@ -530,6 +584,8 @@ model TimeEntry {
 
   kioskDevice KioskDevice? @relation(fields: [kioskDeviceId], references: [id], onDelete: SetNull)
 
+  // Skyddet mot dubbletter från offline-kön. Unikt per företag, inte globalt.
+  @@unique([companyId, clientPunchId])
   // Snabbar upp den vanligaste frågan: "har den här personen en öppen stämpling?"
   @@index([companyId, employeeId, clockOutAt])
   @@index([companyId, clockInAt])
@@ -541,8 +597,6 @@ model TimeEntry {
   @@index([companyId, needsReview])
   // Bär dubblettkontrollen vid varje utstämpling från offline-kön.
   @@index([companyId, clockOutPunchId])
-  // Skyddet mot dubbletter från offline-kön. Unikt per företag, inte globalt.
-  @@unique([companyId, clientPunchId])
   @@map("time_entries")
 }
 
@@ -846,4 +900,244 @@ model KioskDevice {
 
   @@index([companyId])
   @@map("kiosk_devices")
+}
+
+/**
+ * ==========================================================================
+ * LÖNEUNDERLAG
+ * ==========================================================================
+ * Allt nedanför den här raden hör till tidrapporten, inte till
+ * fakturaunderlaget. Gränsen är hård och vaktas av
+ * tests/payroll-boundary.test.ts: ingen av lönemodulerna får importeras av
+ * order-export.ts, pdf.ts, order-calc.ts eller report.ts.
+ * Tikkr räknar TID. Vad tiden är värd i lön avgörs av kollektivavtalet, i
+ * lönesystemet. Här finns därför inga lönearter, inga OB-tillägg och ingen
+ * övertidsersättning. Se CLAUDE.md § 1.
+ */
+
+/// Ett arbetstidsschema. Ger PLANERAD tid, som flexsaldot mäts mot.
+///
+/// Ett företag har normalt ett enda schema som alla går på — därför
+/// `isDefault`. Den som avviker får ett eget, kopplat via
+/// `Employee.scheduleId`.
+model WorkSchedule {
+  id        String @id @default(cuid())
+  companyId String @map("company_id")
+  name      String
+
+  /// Schemat som gäller för den som inte har ett eget. Högst ett per företag.
+  isDefault Boolean @default(false) @map("is_default")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  company   Company       @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  days      ScheduleDay[]
+  employees Employee[]
+
+  @@unique([companyId, name])
+  @@index([companyId, isDefault])
+  @@map("work_schedules")
+}
+
+/// En veckodag i ett schema. Saknas raden är dagen arbetsfri.
+///
+/// Tiderna lagras som MINUTER FRÅN MIDNATT och inte som klockslag i text.
+/// Ett schema ska gå att räkna på, och "06:30" är inte ett tal. Minuter av
+/// samma skäl som all annan tid i systemet lagras i minuter: 6,5 timmar går
+/// inte att spara exakt som decimaltal.
+model ScheduleDay {
+  id         String @id @default(cuid())
+  companyId  String @map("company_id")
+  scheduleId String @map("schedule_id")
+
+  /// 1 = måndag … 7 = söndag. ISO-8601, samma som veckovyn räknar med.
+  weekday Int
+
+  startMinute Int @map("start_minute")
+  endMinute   Int @map("end_minute")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  company  Company         @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  schedule WorkSchedule    @relation(fields: [scheduleId], references: [id], onDelete: Cascade)
+  breaks   ScheduleBreak[]
+
+  @@unique([scheduleId, weekday])
+  @@index([companyId, scheduleId])
+  @@map("schedule_days")
+}
+
+/// En schemalagd rast. DRAS AV från den planerade tiden.
+///
+/// Schemats raster och de stämplade rasterna svarar på olika frågor. Den här
+/// säger hur lång dagen är PLANERAD att vara: mån–tors 06:30–16:00 minus 20
+/// minuters frukost och 40 minuters lunch är 8,5 timmar. Vad personen sedan
+/// faktiskt tog står i break_entries, och skillnaden syns i flexsaldot.
+model ScheduleBreak {
+  id            String @id @default(cuid())
+  companyId     String @map("company_id")
+  scheduleDayId String @map("schedule_day_id")
+
+  startMinute Int @map("start_minute")
+  endMinute   Int @map("end_minute")
+
+  /// Vilken rast det är tänkt att vara. Frivillig — avdraget görs ändå.
+  breakTypeId String? @map("break_type_id")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  company     Company     @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  scheduleDay ScheduleDay @relation(fields: [scheduleDayId], references: [id], onDelete: Cascade)
+  breakType   BreakType?  @relation(fields: [breakTypeId], references: [id], onDelete: SetNull)
+
+  @@index([companyId, scheduleDayId])
+  @@map("schedule_breaks")
+}
+
+/// En sorts rast: Frukost, Lunch, Fika.
+///
+/// EGET REGISTER, skilt från både arbetsmoment och improduktiva moment — och
+/// det är med flit. Improduktiv tid är ARBETE som inte faktureras; en lunch är
+/// inte arbete alls. Låg rasterna bland de improduktiva momenten skulle en
+/// lunch räknas som närvarotid, och tidrapporten skulle visa 40 timmar där
+/// personen arbetat 36.
+model BreakType {
+  id        String  @id @default(cuid())
+  companyId String  @map("company_id")
+  name      String
+  active    Boolean @default(true)
+
+  /// Ordningen på stämplingsskärmen. Lägst först.
+  sortOrder Int @default(0) @map("sort_order")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  company        Company         @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  breakEntries   BreakEntry[]
+  scheduleBreaks ScheduleBreak[]
+
+  @@unique([companyId, name])
+  @@index([companyId, active])
+  @@map("break_types")
+}
+
+/// En stämplad rast.
+///
+/// Ett rasttryck stänger ALLA pågående jobb. Därmed blir närvarotiden summan
+/// av arbetspassen och rasten faller bort av sig själv — ingen befintlig
+/// beräkning behöver veta att rasten finns. Posten här är kvittot på att
+/// rasten togs, och underlaget för att se att den höll sin längd.
+///
+/// Ingen order, inget arbetsmoment, ingen timkostnad. Rasttid kan därför inte
+/// nå ett fakturaunderlag ens av misstag.
+model BreakEntry {
+  id          String @id @default(cuid())
+  companyId   String @map("company_id")
+  employeeId  String @map("employee_id")
+  breakTypeId String @map("break_type_id")
+
+  startedAt DateTime  @map("started_at")
+  endedAt   DateTime? @map("ended_at")
+
+  source TimeEntrySource @default(KIOSK)
+
+  /// Sattes av den automatiska stängningen, eller rättades för hand.
+  needsReview Boolean @default(false) @map("needs_review")
+  reviewNote  String? @map("review_note")
+
+  /// Samma dubbelskydd som stämplingarna: offline-kön skickar om ett tryck
+  /// den inte fått svar på, och utan nyckeln blir det två raster.
+  clientPunchId String? @map("client_punch_id")
+
+  kioskDeviceId String?  @map("kiosk_device_id")
+  sourceIp      String?  @map("source_ip")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  company   Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  employee  Employee  @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  breakType BreakType @relation(fields: [breakTypeId], references: [id], onDelete: Restrict)
+
+  @@unique([companyId, clientPunchId])
+  @@index([companyId, employeeId, endedAt])
+  @@index([companyId, startedAt])
+  @@map("break_entries")
+}
+
+/// En frånvarodag. Registreras av administratören, aldrig av kiosken.
+///
+/// Frånvaron TÄCKER den planerade tiden, vilket är hela poängen: en sjukdag
+/// ska ge noll i flex, inte minus 8,5 timmar. Se flexformeln i payroll.ts.
+model Absence {
+  id         String @id @default(cuid())
+  companyId  String @map("company_id")
+  employeeId String @map("employee_id")
+
+  /// Dagen frånvaron gäller, vid dygnets början i företagets tidszon.
+  date DateTime
+
+  type AbsenceType
+
+  /// Antal minuter, för halvdagar. Tomt betyder hela den schemalagda dagen —
+  /// vilket är något annat än noll, och det vanliga fallet.
+  minutes Int?
+
+  note String?
+
+  /// Vem som registrerade den. Frånvaro är en känslig uppgift om en person,
+  /// och den ska gå att spåra till en administratör.
+  createdByEmail String @map("created_by_email")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  company  Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  employee Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  // En person kan inte vara sjuk och sjuk samma dag. Två OLIKA sorter samma
+  // dag är däremot rimligt: halva dagen semester, halva dagen VAB.
+  @@unique([employeeId, date, type])
+  @@index([companyId, employeeId, date])
+  @@index([companyId, date])
+  @@map("absences")
+}
+
+/// En post i komptidsboken. Plus är intjänat, minus är uttaget.
+///
+/// Intjänad komp skrivs in av administratören när övertid godkänts — den
+/// uppstår aldrig av sig själv. Skälet: tid utöver schemat är flex till dess
+/// att någon BESLUTAT att den är övertid, och det beslutet fattas av en
+/// människa, inte av en stämplingsklocka.
+///
+/// Uttaget skrivs automatiskt när en frånvaro av typen KOMP_UTTAG registreras.
+model CompAdjustment {
+  id         String @id @default(cuid())
+  companyId  String @map("company_id")
+  employeeId String @map("employee_id")
+
+  date DateTime
+
+  /// Positivt = intjänat, negativt = uttaget. Aldrig noll.
+  minutes Int
+
+  note String?
+
+  createdByEmail String @map("created_by_email")
+
+  /// Frånvaroposten uttaget hör till, när det kommer därifrån. Låter
+  /// borttagen frånvaro städa bort sin egen komprad.
+  absenceId String? @unique @map("absence_id")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  company  Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  employee Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@index([companyId, employeeId, date])
+  @@map("comp_adjustments")
 }

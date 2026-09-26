@@ -236,9 +236,35 @@ export async function anonymizeEmployee(formData: FormData) {
       photoData: null,
       photoMimeType: null,
       photoUpdatedAt: new Date(),
+
+      // Saldona pekar inte ut någon, men de är personens egna och saknar
+      // mening utan hen. Nollställs för att inte ligga kvar som skräp.
+      flexOpeningMinutes: 0,
+      compOpeningMinutes: 0,
     },
+  });
+
+  // FRÅNVARON RADERAS HELT, och det är en annan sorts beslut än ovan.
+  //
+  // Stämplingarna står kvar: de är fakturaunderlag mot kundens kund, och det
+  // underlaget får inte förändras i efterhand. En frånvaropost är inget
+  // underlag mot någon — den säger bara att en namngiven person var sjuk en
+  // tisdag, alltså en uppgift om hälsa. Den har inget skäl att finnas kvar när
+  // personen bett om att bli glömd.
+  //
+  // Komptidsboken följer med av samma skäl: den är personens eget saldo och
+  // dess anteckningar är fritext som kan innehålla vad som helst.
+  await db.compAdjustment.deleteMany({ where: { employeeId: id } });
+  await db.absence.deleteMany({ where: { employeeId: id } });
+
+  // Rasterna står kvar — de är en del av närvaron, precis som stämplingarna —
+  // men granskningsanteckningen är fritext och kan bära ett namn.
+  await db.breakEntry.updateMany({
+    where: { employeeId: id },
+    data: { reviewNote: null },
   });
 
   revalidatePath("/admin/installningar/dataskydd");
   revalidatePath("/admin/anstallda");
+  revalidatePath("/admin/tidrapport");
 }

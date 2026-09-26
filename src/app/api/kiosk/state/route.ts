@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getKioskSession } from "@/lib/kiosk-auth";
 import { forCompany } from "@/lib/tenant";
 import { describeEntry } from "@/lib/entry-label";
+import { getOpenBreaks } from "@/lib/breaks";
 import type { KioskActiveJob } from "@/components/kiosk/KioskScreen";
 
 /**
@@ -39,6 +40,11 @@ export async function GET() {
 
   const db = forCompany(session.companyId);
 
+  // Rasterna hämtas samtidigt. En person på lunch har inga öppna stämplingar
+  // och skulle annars se ledig ut på de andra skärmarna — och någon skulle
+  // stämpla in dem på ett jobb de inte står vid.
+  const openBreaks = await getOpenBreaks(db);
+
   const open = await db.timeEntry.findMany({
     where: { clockOutAt: null },
     // Senast påbörjad först, och uttryckligen sorterad: utan ordning avgör
@@ -60,6 +66,12 @@ export async function GET() {
   // En LISTA per person. Att en operatör kör två maskiner samtidigt är numera
   // ett giltigt läge, och Object.fromEntries hade behållit den sista posten
   // tyst — skärmen hade då visat ett jobb som pågick och dolt det andra.
+  const breakTypes = new Map(
+    (
+      await db.breakType.findMany({ select: { id: true, name: true } })
+    ).map((type) => [type.id, type.name])
+  );
+
   const active: Record<string, KioskActiveJob[]> = {};
 
   for (const entry of open) {
@@ -93,8 +105,18 @@ export async function GET() {
     });
   }
 
+  const breaks: Record<string, { since: string; name: string }> = {};
+
+  for (const rest of openBreaks) {
+    const type = breakTypes.get(rest.breakTypeId);
+    breaks[rest.employeeId] = {
+      since: rest.startedAt.toISOString(),
+      name: type ?? "Rast",
+    };
+  }
+
   return NextResponse.json(
-    { active },
+    { active, breaks },
     // Får aldrig mellanlagras. En cachad bild av vem som arbetar är exakt det
     // problem som funktionen finns för att lösa.
     { headers: { "cache-control": "no-store" } }

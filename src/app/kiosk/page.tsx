@@ -92,6 +92,8 @@ export default async function KioskPage() {
     recentEntries,
     notices,
     customers,
+    breakTypes,
+    openBreaks,
   ] = await Promise.all([
     db.employee.findMany({
       where: { active: true },
@@ -159,7 +161,34 @@ export default async function KioskPage() {
     // Kunderna finns i registret — skärmen erbjuder ett tryck i stället för
     // ett tangentbord man knappt kan skriva på med handskar.
     pickableCustomers(db),
+    // Rasterna. Tom lista döljer rastknappen helt — en verkstad som inte
+    // stämplar raster ska inte få en knapp som inte leder någonstans.
+    db.breakType.findMany({
+      where: { active: true },
+      orderBy: { sortOrder: "asc" },
+      select: { id: true, name: true },
+    }),
+    db.breakEntry.findMany({
+      where: { endedAt: null },
+      orderBy: { startedAt: "desc" },
+      select: {
+        employeeId: true,
+        startedAt: true,
+        breakType: { select: { name: true } },
+      },
+    }),
   ]);
+
+  // Vilka som är på rast. En person på lunch har inga öppna stämplingar och
+  // skulle annars se ledig ut.
+  const breaksByEmployee: Record<string, { since: string; name: string }> = {};
+
+  for (const rest of openBreaks) {
+    breaksByEmployee[rest.employeeId] = {
+      since: rest.startedAt.toISOString(),
+      name: rest.breakType.name,
+    };
+  }
 
   // En LISTA per person. En operatör kan köra två maskiner samtidigt, och
   // Object.fromEntries hade behållit den sista posten tyst — skärmen hade då
@@ -222,6 +251,8 @@ export default async function KioskPage() {
       activeByEmployee={activeByEmployee}
       recentByEmployee={recentByEmployee}
       customers={customers}
+      breakTypes={breakTypes}
+      breaksByEmployee={breaksByEmployee}
       // Stämplingen fungerar oavsett. Varningen finns för att någon i
       // verkstaden ska se den och fråga chefen — den som kan betala står
       // sällan vid skärmen.

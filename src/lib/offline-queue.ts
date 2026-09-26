@@ -32,10 +32,12 @@ export interface QueuedPunch {
    * momentId. Servern tar hand om det fallet i stället för att avvisa det —
    * ett avvisat tryck plockas bort ur kön, och då är arbetstiden borta.
    */
-  action: "in" | "out" | "out-all";
+  action: "in" | "out" | "out-all" | "break" | "break-end";
   employeeId: string;
   orderId?: string;
   momentId?: string;
+  /** Vilken rast som togs. Bärs av "break". */
+  breakTypeId?: string;
   /** Ifyllt i stället för order och moment när tiden är improduktiv. */
   indirectMomentId?: string;
   /** När personen faktiskt tryckte — inte när det råkade skickas. */
@@ -99,6 +101,15 @@ export interface FlushResult {
   waiting: number;
   /** Tryck servern avvisade permanent. De ligger inte kvar och försöks om. */
   rejected: { punch: QueuedPunch; reason: string }[];
+  /**
+   * Flexsaldot servern räknade fram, i minuter, för den sist skickade
+   * utstämplingen för dagen.
+   *
+   * Följer med här och inte via ett eget anrop, eftersom skärmen ofta är
+   * offline när trycket görs: saldot finns först när trycket når fram, och då
+   * är det ändå det här svaret som kommer.
+   */
+  flexMinutes?: { employeeId: string; minutes: number } | null;
 }
 
 /**
@@ -130,6 +141,7 @@ export function flush(): Promise<FlushResult> {
     const queue = await pending();
     const rejected: FlushResult["rejected"] = [];
     let sent = 0;
+    let flexMinutes: FlushResult["flexMinutes"] = null;
 
     for (const punch of queue) {
       let response: Response;
@@ -144,18 +156,36 @@ export function flush(): Promise<FlushResult> {
       } catch {
         // Ingen kontakt, eller för långsamt svar. Avbryt — resten ligger kvar
         // orörd och skickas om vid nästa försök.
-        return { sent, waiting: queue.length - sent, rejected };
+        return { sent, waiting: queue.length - sent, rejected, flexMinutes };
       }
 
       if (response.ok) {
         await remove(punch.clientPunchId);
         sent++;
+
+        // Saldot följer med utstämplingen för dagen. Ett trasigt svar får
+        // aldrig fälla tömningen — trycket ÄR levererat, och det är det
+        // viktiga.
+        if (punch.action === "out-all") {
+          try {
+            const data = (await response.json()) as { flexMinutes?: number | null };
+            if (typeof data.flexMinutes === "number") {
+              flexMinutes = {
+                employeeId: punch.employeeId,
+                minutes: data.flexMinutes,
+              };
+            }
+          } catch {
+            // Inget saldo att visa. Utstämplingen gick ändå igenom.
+          }
+        }
+
         continue;
       }
 
       // 5xx är oftast tillfälligt: låt trycket ligga kvar och försök igen.
       if (response.status >= 500) {
-        return { sent, waiting: queue.length - sent, rejected };
+        return { sent, waiting: queue.length - sent, rejected, flexMinutes };
       }
 
       const data = await response.json().catch(() => ({}));
@@ -163,7 +193,7 @@ export function flush(): Promise<FlushResult> {
       rejected.push({ punch, reason: data.error ?? "Avvisad av servern." });
     }
 
-    return { sent, waiting: 0, rejected };
+    return { sent, waiting: 0, rejected, flexMinutes };
   })().finally(() => {
     flushing = null;
   });

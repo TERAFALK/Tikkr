@@ -3,6 +3,7 @@ import { unsafeGlobalPrisma } from "./db";
 import { forCompany, type CompanyDb } from "./tenant";
 import { nextOccurrenceOf } from "./time-zone";
 import { describeEntry } from "./entry-label";
+import { endOpenBreak } from "./break-close";
 
 /**
  * STÄMPLINGSLOGIKEN.
@@ -151,6 +152,15 @@ export async function clockIn(
   }
 
   const rates = await assertBelongsToCompany(db, input);
+
+  // Att börja jobba avslutar rasten. Personen som kommer tillbaka från lunchen
+  // och trycker på sin order ska inte behöva trycka "rast slut" först — det är
+  // ett tryck som bara finns för datorns skull, och det skulle glömmas.
+  //
+  // Ligger före transaktionen med flit: rasten och stämplingen är två olika
+  // register, och att blanda in ett annat register i jobbets transaktion vore
+  // att låta en rast kunna fälla en instämpling.
+  await endOpenBreak(db, input.employeeId, at);
 
   return db.$transaction(async (tx) => {
     // Bara samma moment. Ett pågående jobb på en ANNAN maskin ska stå kvar —
