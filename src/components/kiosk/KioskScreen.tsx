@@ -983,7 +983,10 @@ export default function KioskScreen({
             }
             empty="Inga öppna ordrar. Kontakta kontoret."
             action={
-              <div className="flex shrink-0 gap-2">
+              /* flex-wrap: tre knappar plus rubriken ryms inte bredvid
+                 varandra på en smal skärm, och utan den trycks de utanför
+                 kanten i stället för att hamna på en rad under. */
+              <div className="flex shrink-0 flex-wrap gap-2">
                 <button
                   onClick={() =>
                     setView({ name: "orderNumber", employee: view.employee })
@@ -991,6 +994,26 @@ export default function KioskScreen({
                   className="kiosk-press rounded-xl border border-neutral-200 bg-white px-5 py-4 text-base font-semibold text-neutral-900 active:bg-neutral-50 sm:text-lg"
                 >
                   Slå in ordernummer
+                </button>
+
+                {/* Vägen till en order som inte finns upplagd än. Låg tidigare
+                    i knappsatsen, men hör hemma här bredvid de andra sätten att
+                    välja vad man ska jobba på.
+
+                    Amber och inte vit: den som letar efter sin order ska inte
+                    råka lägga upp en ny. */}
+                <button
+                  onClick={() =>
+                    setView({
+                      name: "quickCustomer",
+                      employee: view.employee,
+                      // Tomt nummer betyder att ordern får ett tillfälligt.
+                      orderNumber: "",
+                    })
+                  }
+                  className="kiosk-press rounded-xl border border-amber-300 bg-amber-50 px-5 py-4 text-base font-semibold text-amber-900 active:bg-amber-100 sm:text-lg"
+                >
+                  Snabbjobb
                 </button>
                 {/* Ligger här och inte bland ordrarna. Improduktiv tid hör
                     inte till någon kund, och den som letar efter sin order
@@ -1904,6 +1927,9 @@ function OrderNumberPad({
         </span>
       </div>
 
+      {/* Tom när inget slagits in, men raden står kvar och behåller sin höjd.
+          Utan den hoppar knappsatsen uppåt i samma stund som första siffran
+          trycks in och beskedet dyker upp. */}
       <div className="kiosk-frame-hint flex h-9 shrink-0 items-center justify-center sm:h-12">
         {match ? (
           <span className="text-lg font-semibold text-emerald-700">
@@ -1913,11 +1939,7 @@ function OrderNumberPad({
           <span className="text-lg font-medium text-amber-700">
             Okänt ordernummer
           </span>
-        ) : (
-          <span className="text-base text-neutral-400">
-            Numret står på ritningen eller följesedeln
-          </span>
-        )}
+        ) : null}
       </div>
 
       <div className="grid min-h-0 flex-1 auto-rows-fr grid-cols-3 gap-2 sm:gap-3">
@@ -1967,15 +1989,42 @@ function OrderNumberPad({
         </button>
       </div>
 
-      {/* Knappen bär kundens namn. Det är hela poängen: den som trycker
-          bekräftar vilken kund arbetet ska faktureras, inte en sifferrad. */}
+      {/* EN KNAPP MED TRE LÄGEN.
+          
+          Tom  → släckt, det finns inget att bekräfta.
+          Känt → kundens namn. Den som trycker bekräftar vilken kund arbetet
+                 ska faktureras, inte en sifferrad.
+          Okänt → skapar ordern med det inslagna numret.
+          
+          Det tredje läget satt tidigare i en egen gul knapp under den här.
+          Vägen måste finnas: arbetet börjar ibland innan kontoret hunnit lägga
+          upp ordern, och utan den stämplar folk på fel order eller inte alls —
+          den timmen går inte att rekonstruera efteråt. Men den behöver ingen
+          egen knapp, för när numret är okänt står den här ändå släckt och
+          oanvänd.
+          
+          Färgen byter till amber i det läget. Att välja en befintlig order och
+          att lägga upp en ny är olika saker, och skillnaden ska synas innan
+          man trycker — en order som skapas av misstag blir en rad kontoret
+          får rätta. */}
       <button
-        onClick={() => match && onPick(match)}
-        disabled={!match}
-        className="kiosk-frame-cta kiosk-press mt-2 min-h-14 w-full shrink-0 rounded-xl bg-blue-600 px-4 py-3.5 text-2xl font-semibold text-white active:bg-blue-700 disabled:bg-neutral-200 disabled:text-neutral-400"
+        onClick={() => (match ? onPick(match) : typed && onCreate(typed))}
+        disabled={!match && !typed}
+        className={`kiosk-frame-cta kiosk-press mt-2 min-h-14 w-full shrink-0 rounded-xl px-4 py-3.5 text-2xl font-semibold disabled:bg-neutral-200 disabled:text-neutral-400 ${
+          match
+            ? "bg-blue-600 text-white active:bg-blue-700"
+            : "bg-amber-500 text-white active:bg-amber-600"
+        }`}
       >
-        {!match ? (
+        {!match && !typed ? (
           "Slå in ett ordernummer"
+        ) : !match ? (
+          <>
+            Skapa order {typed}
+            <span className="mt-1 block text-base font-normal text-white/80">
+              märks för kontoret
+            </span>
+          </>
         ) : match.customerName ? (
           <>
             {match.customerName}
@@ -1992,22 +2041,6 @@ function OrderNumberPad({
           </>
         )}
       </button>
-
-      {/* Vägen ut när numret inte finns upplagt. Arbetet börjar ibland innan
-          kontoret hunnit lägga upp ordern, och utan den här knappen stämplar
-          folk på fel order eller inte alls — den timmen går inte att
-          rekonstruera efteråt. */}
-      {!match && (
-        <button
-          onClick={() => onCreate(typed)}
-          className="kiosk-press mt-2 min-h-12 w-full shrink-0 rounded-xl border-2 border-amber-300 bg-amber-50 px-4 py-3 text-xl font-semibold text-amber-900 active:bg-amber-100"
-        >
-          {typed ? `Skapa order ${typed}` : "Snabbjobb utan ordernummer"}
-          <span className="ml-2 text-base font-normal text-amber-800/80">
-            märks för kontoret
-          </span>
-        </button>
-      )}
 
       <button
         onClick={onBrowse}
@@ -2038,7 +2071,7 @@ function Chooser({
 }) {
   return (
     <div>
-      <div className="mb-4 flex items-center justify-between gap-4">
+      <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
         <h2 className="text-xl font-semibold text-neutral-900 sm:text-2xl">
           {title}
         </h2>
