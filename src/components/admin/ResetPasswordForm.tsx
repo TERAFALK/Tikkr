@@ -32,7 +32,7 @@ export default function ResetPasswordForm({
         <Input value={email} readOnly disabled />
       </Field>
 
-      <Field label="Välj ett nytt lösenord" hint="Minst 10 tecken.">
+      <Field label="Nytt lösenord" hint="Minst 10 tecken">
         <Input
           name="password"
           type="password"

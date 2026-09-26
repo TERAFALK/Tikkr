@@ -155,13 +155,11 @@ export default async function PlatformPage({
         {companies.length === 0 ? (
           <EmptyState
             title="Inga registrerade företag"
-            description="Registrerade företag visas här."
           />
         ) : (
           <Card>
             <CardHeader
               title="Företag"
-              description="Senast registrerade först."
               action={
                 // Formulär utan JavaScript. Sökningen hamnar i adressen, så
                 // att en träfflista går att spara och skicka vidare.

@@ -190,7 +190,7 @@ export default function OrderActions({
                 Visa belopp och rabatt
               </span>
               <span className="block text-neutral-500">
-                Utan kryss visas bara tid, som förut
+                Utan kryss visas bara tid
               </span>
             </span>
           </label>
@@ -199,14 +199,14 @@ export default function OrderActions({
             href={`${exportBase}&format=pdf${priceParam}`}
             icon={<IconOrder />}
             title="Ladda ner PDF"
-            description="Färdigt dokument att bifoga en faktura"
+            description="Bilaga till faktura"
             onPick={() => menu.current?.close()}
           />
           <MenuLink
             href={`${exportBase}&format=excel${priceParam}`}
             icon={<IconReport />}
             title="Ladda ner Excel"
-            description="Samma innehåll, att räkna vidare på"
+            description="Samma innehåll som PDF"
             onPick={() => menu.current?.close()}
           />
 
@@ -221,14 +221,14 @@ export default function OrderActions({
             href={`${exportBase}&format=kalkyl`}
             icon={<IconOrder />}
             title="Efterkalkyl som PDF"
-            description="Alla stämplingar, kostnad och pris — skicka inte till kunden"
+            description="Kostnad och marginal. Internt"
             onPick={() => menu.current?.close()}
           />
           <MenuLink
             href={`${exportBase}&format=kalkyl-excel`}
             icon={<IconReport />}
             title="Efterkalkyl som Excel"
-            description="Ert eget ark med tidskostnaden ifylld, resten att komplettera"
+            description="Kostnad och marginal. Internt"
             onPick={() => menu.current?.close()}
           />
 

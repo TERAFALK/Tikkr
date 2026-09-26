@@ -53,13 +53,11 @@ export default async function CompanyHistoryPage({
         {log.total === 0 ? (
           <EmptyState
             title="Ingenting har ändrats"
-            description="Statusändringar, licensändringar och anteckningar visas här."
           />
         ) : (
           <Card>
             <CardHeader
               title={`${log.total.toLocaleString("sv-SE")} åtgärder`}
-              description="Senaste först."
             />
             <ActivityTable rows={log.rows} />
             <Pager

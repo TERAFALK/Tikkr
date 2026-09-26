@@ -40,7 +40,6 @@ export default async function TimeSettingsPage() {
       <Card>
         <CardHeader
           title="Automatisk utstämpling"
-          description="Hantering av stämplingar utan registrerad utstämpling."
         />
 
         <div className="space-y-5 p-5">
@@ -57,7 +56,7 @@ export default async function TimeSettingsPage() {
           <form action={saveTimeSettings} className="max-w-md space-y-4">
             <Field
               label="Stäng glömda stämplingar klockan"
-              hint="HH:MM. Vid skiftarbete, välj en tid då ingen arbetar."
+              hint="HH:MM. Välj en tid då ingen arbetar"
             >
               <Input
                 name="autoCloseAt"
@@ -70,7 +69,6 @@ export default async function TimeSettingsPage() {
 
             <Field
               label="Tidszon"
-              hint="Avgör hur klockslaget tolkas vid sommar- och vintertid."
             >
               <Select name="timezone" defaultValue={company.timezone}>
                 {TIMEZONES.map((zone) => (

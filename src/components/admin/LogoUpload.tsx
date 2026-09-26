@@ -70,11 +70,7 @@ export default function LogoUpload({
 
         <Field
           label={hasLogo ? "Byt bild" : "Ladda upp bild"}
-          hint={
-            wide
-              ? "PNG eller JPEG, högst 512 kB. Bred bild med företagsnamnet rekommenderas, eftersom den placeras överst på underlaget."
-              : "PNG eller JPEG, högst 512 kB. Bilden fyller hela ytan, varför en kvadratisk bild rekommenderas. PNG med genomskinlig bakgrund ger bäst resultat."
-          }
+          hint="PNG eller JPEG, högst 512 kB"
         >
           <input
             type="file"

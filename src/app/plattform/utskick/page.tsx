@@ -29,14 +29,14 @@ export default async function BroadcastPage() {
     <PlatformShell email={email} current="/plattform/utskick">
       <PageHeader
         title="Utskick"
-        description="Mejl till kundernas administratörer. Avsett för driftinformation."
+        description="Mejl till kundernas administratörer."
       />
 
       {emailIsConfigured() ? (
         <Card>
           <CardHeader
             title="Nytt utskick"
-            description="Ett separat mejl per mottagare. Adresserna syns inte för varandra."
+            description="Ett separat mejl per mottagare."
           />
           <BroadcastForm
             counts={{

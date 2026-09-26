@@ -18,9 +18,8 @@ import { formatCurrency } from "@/lib/money";
 import { createMoment, renameMoment, toggleMoment } from "./actions";
 
 /** Hjälptexten är densamma i båda rutorna, så den står på ett ställe. */
-const COST_HINT =
-  "Kronor per timme, företagets kostnad. Lämna tomt om du inte använder kalkylen. " +
-  "En ändring gäller bara tid som registreras framöver.";
+/** Samma text i båda rutorna, därför på ett ställe. */
+const COST_HINT = "Kronor per timme. Gäller tid som registreras framöver";
 
 export const dynamic = "force-dynamic";
 
@@ -42,7 +41,6 @@ export default async function MomentsPage() {
     <FormDialog
       trigger="Nytt arbetsmoment"
       title="Lägg till arbetsmoment"
-      description="Fem till tio moment ger överskådliga val på skärmen."
       action={createMoment}
       submitLabel="Lägg till"
     >
@@ -59,21 +57,18 @@ export default async function MomentsPage() {
     <>
       <PageHeader
         title="Arbetsmoment"
-        description="Väljs efter order på stämplingsskärmen."
         action={newMoment}
       />
 
       {moments.length === 0 ? (
         <EmptyState
           title="Inga arbetsmoment upplagda"
-          description="Minst ett arbetsmoment krävs för att kunna stämpla in."
           action={newMoment}
         />
       ) : (
         <Card>
           <CardHeader
             title={`${moments.length} moment`}
-            description="Aktiva först."
           />
           <Table>
             <thead>

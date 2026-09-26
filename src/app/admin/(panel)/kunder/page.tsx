@@ -54,7 +54,6 @@ export default async function CustomersPage({
     <>
       <PageHeader
         title="Kunder"
-        description="Kunderna ordrarna görs åt. Välj kund när du lägger upp en order."
         action={
           <CustomerDialog
             trigger="Lägg till kund"
@@ -68,7 +67,6 @@ export default async function CustomersPage({
       {customers.length === 0 && !query ? (
         <EmptyState
           title="Inga kunder upplagda"
-          description="Lägg upp era kunder här, så går de att välja när en order skapas — och att följa upp var för sig."
         />
       ) : (
         <Card>
@@ -82,11 +80,7 @@ export default async function CustomersPage({
                     customers.length === 1 ? "kund" : "kunder"
                   }`
             }
-            description={
-              query
-                ? `Sökning på ”${query}”.`
-                : `${active} aktiva. Avaktiverade behåller sina ordrar men går inte att välja.`
-            }
+            description={query ? `Sökning på ”${query}”` : `${active} aktiva`}
             action={
               /* Vanligt GET-formulär, utan JavaScript. Sökningen hamnar i
                  adressen och går därmed att spara som bokmärke. */

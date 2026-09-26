@@ -21,7 +21,7 @@ export default async function ResetPasswordPage({
     return (
       <AuthShell
         title="Länken fungerar inte"
-        subtitle="Den har gått ut, redan använts eller ersatts av en nyare."
+        subtitle="Länken har gått ut eller redan använts."
         footer={
           <Link
             href="/admin/glomt-losenord"
@@ -44,7 +44,7 @@ export default async function ResetPasswordPage({
   return (
     <AuthShell
       title="Välj ett nytt lösenord"
-      subtitle="Du loggas in direkt när det är sparat."
+      subtitle="Du loggas in när det är sparat."
       note="Alla enheter som är inloggade på kontot loggas ut när lösenordet ändras."
     >
       <ResetPasswordForm token={token} email={reset.email} />

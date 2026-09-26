@@ -44,7 +44,6 @@ export default async function DevicesPage() {
     <PairingCodeDialog
       trigger="Ny skärm"
       title="Lägg till skärm"
-      description="Namnge skärmen efter var den sitter. Koden visas direkt."
       action={addDevice}
       submitLabel="Skapa kod"
       disabled={licenses.available <= 0}
@@ -53,8 +52,8 @@ export default async function DevicesPage() {
         label="Namn"
         hint={
           licenses.available === 1
-            ? "En ledig licens återstår."
-            : `${licenses.available} lediga licenser återstår.`
+            ? "1 ledig licens"
+            : `${licenses.available} lediga licenser`
         }
       >
         <Input name="name" placeholder="Verkstaden, entrén, monteringen" required autoFocus />
@@ -66,7 +65,7 @@ export default async function DevicesPage() {
     <>
       <PageHeader
         title="Stämplingsskärmar"
-        description={`${devices.length} av ${licenses.total} licenser används. En skärm kopplas med en sexsiffrig kod.`}
+        description={`${devices.length} av ${licenses.total} licenser används.`}
         action={newDevice}
       />
 
@@ -106,14 +105,12 @@ export default async function DevicesPage() {
       {devices.length === 0 ? (
         <EmptyState
           title="Inga skärmar upplagda"
-          description="Skapa en skärm och knappa in koden på enheten."
           action={newDevice}
         />
       ) : (
         <Card>
           <CardHeader
             title={`${devices.length} ${devices.length === 1 ? "skärm" : "skärmar"}`}
-            description="Koppla om ger en ny kod och stänger ute den gamla enheten."
           />
           <Table>
             <thead>

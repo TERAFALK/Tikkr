@@ -563,7 +563,7 @@ export default function KioskScreen({
         return data.order;
       } catch {
         setError(
-          "Ingen kontakt med servern. En ny order måste skapas med nätet igång."
+          "Ingen kontakt med servern. En ny order kräver uppkoppling."
         );
         return null;
       } finally {
@@ -804,7 +804,7 @@ export default function KioskScreen({
                 ? `${view.employee.name}: byter från ${replacing.label}`
                 : `${view.employee.name}: välj order`
             }
-            empty="Inga öppna ordrar. Kontakta administratören."
+            empty="Inga öppna ordrar. Kontakta kontoret."
             action={
               <div className="flex shrink-0 gap-2">
                 <button
@@ -888,7 +888,7 @@ export default function KioskScreen({
                 .join(" · ") ||
               "Nytt snabbjobb"
             }: välj arbetsmoment`}
-            empty="Inga arbetsmoment upplagda. Kontakta administratören."
+            empty="Inga arbetsmoment upplagda. Kontakta kontoret."
             items={moments.map((moment) => ({
               key: moment.id,
               primary: moment.name,
@@ -921,7 +921,7 @@ export default function KioskScreen({
         {view.name === "moment" && (
           <Chooser
             title={`Order ${view.order.orderNumber}: välj arbetsmoment`}
-            empty="Inga arbetsmoment upplagda. Kontakta administratören."
+            empty="Inga arbetsmoment upplagda. Kontakta kontoret."
             items={moments.map((moment) => ({
               key: moment.id,
               primary: moment.name,
@@ -938,7 +938,7 @@ export default function KioskScreen({
         {view.name === "indirect" && (
           <Chooser
             title={`${view.employee.name}: improduktiv tid`}
-            empty="Inga improduktiva moment upplagda. Kontakta administratören."
+            empty="Inga improduktiva moment upplagda. Kontakta kontoret."
             items={indirectMoments.map((moment) => ({
               key: moment.id,
               primary: moment.name,
@@ -1143,7 +1143,7 @@ function EmployeeGrid({
   onPick: (employee: Employee) => void;
 }) {
   if (employees.length === 0) {
-    return <Empty>Inga anställda upplagda. Kontakta administratören.</Empty>;
+    return <Empty>Inga anställda upplagda. Kontakta kontoret.</Empty>;
   }
 
   return (
@@ -1486,7 +1486,7 @@ function CustomerPicker({
       </h2>
       <p className="mb-4 text-base text-neutral-500">
         {orderNumber
-          ? `Ordern ${orderNumber} läggs upp och märks för kontoret.`
+          ? `Order ${orderNumber} läggs upp och märks för kontoret.`
           : "Ordern får ett tillfälligt nummer och märks för kontoret."}
       </p>
 
@@ -1537,7 +1537,7 @@ function CustomerPicker({
         <p className="rounded-xl border border-neutral-200 bg-white p-5 text-lg text-neutral-500">
           {letter
             ? "Ingen kund börjar på den bokstaven."
-            : "Inga kunder upplagda än. Välj ”Vet inte” — kontoret fyller i kunden."}
+            : "Inga kunder upplagda. Välj ”Vet inte”."}
         </p>
       )}
 

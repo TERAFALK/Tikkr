@@ -38,7 +38,6 @@ export default async function AdminUsersPage() {
         <Card>
           <CardHeader
             title="Bjud in en administratör"
-            description="Den inbjudne väljer sitt eget lösenord via länken."
           />
           <InviteAdminForm baseUrl={`${proto}://${host}`} />
         </Card>
@@ -47,7 +46,7 @@ export default async function AdminUsersPage() {
       <Card>
         <CardHeader
           title="Administratörer"
-          description="Ägare kan bjuda in och ta bort konton. Administratörer kan inte."
+          description="Endast ägare kan bjuda in och ta bort konton."
         />
         <Table>
           <thead>
@@ -101,7 +100,6 @@ export default async function AdminUsersPage() {
         <Card>
           <CardHeader
             title="Väntar på svar"
-            description="Inbjudningar som ännu inte lösts in."
           />
           <Table>
             <thead>

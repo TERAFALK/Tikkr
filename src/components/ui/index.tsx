@@ -376,15 +376,18 @@ export function EmptyState({
   action,
 }: {
   title: string;
-  description: string;
+  /** Skrivs bara när den säger något rubriken inte gör. Se CLAUDE.md § 7.1. */
+  description?: string;
   action?: ReactNode;
 }) {
   return (
     <div className="rounded-lg border border-dashed border-neutral-200 bg-neutral-50/50 px-6 py-14 text-center">
       <p className="text-sm font-medium text-neutral-900">{title}</p>
-      <p className="mx-auto mt-1 max-w-md text-[13px] leading-relaxed text-neutral-500">
-        {description}
-      </p>
+      {description && (
+        <p className="mx-auto mt-1 max-w-md text-[13px] leading-relaxed text-neutral-500">
+          {description}
+        </p>
+      )}
       {action && <div className="mt-5 flex justify-center">{action}</div>}
     </div>
   );

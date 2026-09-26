@@ -133,7 +133,6 @@ export default async function ReportsPage({
     <>
       <PageHeader
         title="Rapporter"
-        description="Underlaget för fakturering. Filtrera och exportera."
         action={
           <div className="flex flex-wrap gap-2">
             {/* Står kvar även när filtren gett en tom rapport: knappen gäller
@@ -231,10 +230,7 @@ export default async function ReportsPage({
             </Select>
           </Field>
 
-          <Field
-            label="Visning"
-            hint="Samma siffror, två sätt att läsa dem. Följer med till PDF och Excel."
-          >
+          <Field label="Visning">
             <Select name="visning" defaultValue={params.visning ?? "detalj"}>
               <option value="detalj">Varje stämpling</option>
               <option value="persondetalj">
@@ -245,10 +241,7 @@ export default async function ReportsPage({
             </Select>
           </Field>
 
-          <Field
-            label="Sorts tid"
-            hint="Fakturerbar tid är standard. Improduktiv tid ingår aldrig i ett orderunderlag."
-          >
+          <Field label="Sorts tid">
             <Select name="kind" defaultValue={params.kind ?? "ORDER"}>
               <option value="ORDER">Fakturerbar tid</option>
               <option value="INDIRECT">Improduktiv tid</option>
@@ -280,27 +273,24 @@ export default async function ReportsPage({
         <Stat
           label="Total tid"
           value={formatDuration(report.totalMinutes)}
-          hint={`${formatDecimalHours(report.totalMinutes)} timmar att fakturera`}
+          hint={`${formatDecimalHours(report.totalMinutes)} timmar`}
         />
         <Stat label="Stämplingar" value={report.rows.length} />
         <Stat
           label="Pågår just nu"
           value={report.ongoingCount}
           tone={report.ongoingCount > 0 ? "active" : "neutral"}
-          hint="tiden räknas fortfarande upp"
         />
         <Stat
           label="Ogranskade"
           value={report.needsReviewCount}
           tone={report.needsReviewCount > 0 ? "warning" : "neutral"}
-          hint="beräknad sluttid"
         />
       </div>
 
       {report.rows.length === 0 ? (
         <EmptyState
           title="Inga stämplingar matchar"
-          description="Utöka datumintervallet eller ta bort ett filter."
         />
       ) : (
         <>
@@ -320,12 +310,10 @@ export default async function ReportsPage({
             <Card>
               <CardHeader
                 title="Summerat per kund"
-                description={`${report.byCustomer.length} kunder i perioden. Ordrar utan kund utelämnas.`}
               />
               {report.byCustomer.length === 0 ? (
                 <p className="px-5 py-6 text-[13px] text-neutral-500">
-                  Ingen av stämplingarna hör till en order med kund. Välj kund
-                  på ordern, så samlas tiden här.
+                  Ingen av stämplingarna hör till en order med kund.
                 </p>
               ) : (
                 <Table>
@@ -364,7 +352,6 @@ export default async function ReportsPage({
             <Card>
               <CardHeader
                 title="Summerat per anställd"
-                description={`${report.byEmployee.length} personer i perioden.`}
               />
               <Table>
                 <thead>
@@ -402,7 +389,7 @@ export default async function ReportsPage({
                     title={group.heading}
                     description={`${group.rows.length} ${
                       group.rows.length === 1 ? "stämpling" : "stämplingar"
-                    }, äldsta först.`}
+                    }`}
                     action={
                       <span className="text-[13px] font-medium tabular-nums text-neutral-900">
                         {formatDuration(group.minutes)}
@@ -436,7 +423,6 @@ export default async function ReportsPage({
           <Card>
             <CardHeader
               title="Alla stämplingar"
-              description={`${report.rows.length} rader, senaste först.`}
             />
             <Table>
               <thead>

@@ -71,7 +71,7 @@ export default async function SubscriptionPage({
       <Card>
         <CardHeader
           title="Prenumeration"
-          description={`${kr(pricing.month)} kr per licens och månad, exklusive moms. En licens ger en stämplingsskärm. Ingen bindningstid.`}
+          description={`${kr(pricing.month)} kr per licens och månad, exkl. moms. Ingen bindningstid.`}
         />
 
         <div className="space-y-5 p-5">
@@ -167,7 +167,7 @@ export default async function SubscriptionPage({
               <div className="w-40">
                 <Field
                   label="Antal licenser"
-                  hint="En licens ger en stämplingsskärm."
+                  hint="En licens per stämplingsskärm"
                 >
                   <Input
                     type="number"

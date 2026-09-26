@@ -118,8 +118,8 @@ export default function OrdersTable({
         title={`${orders.length} ${orders.length === 1 ? "order" : "ordrar"}`}
         description={
           selecting
-            ? "Markera de ordrar du vill ha underlag för. En PDF får en order per sida, en Excel en flik per order."
-            : "Klicka på ett ordernummer för underlag och ändringar."
+            ? "En order per sida i PDF, en flik per order i Excel."
+            : undefined
         }
         action={
           selecting ? (

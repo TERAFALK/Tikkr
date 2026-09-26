@@ -57,7 +57,6 @@ export default async function NoticesPage({
         <div className="mt-4">
           <PageHeader
             title="Arkiverade meddelanden"
-            description="Sparas som underlag för vad kunderna informerats om. Raderas aldrig."
           />
 
           {notices.length === 0 ? (
@@ -87,7 +86,7 @@ export default async function NoticesPage({
     <PlatformShell email={email} current="/plattform/meddelanden">
       <PageHeader
         title="Driftmeddelanden"
-        description="Banner hos kunderna. Gäller samtliga företag samtidigt."
+        description="Banner hos samtliga företag."
         action={
           archivedCount > 0 ? (
             <Link
@@ -130,7 +129,6 @@ export default async function NoticesPage({
         <div className="mt-6">
           <EmptyState
             title="Inga meddelanden inlagda"
-            description="Underhåll och avbrott som lagts in visas här."
           />
         </div>
       ) : (
@@ -142,12 +140,10 @@ export default async function NoticesPage({
           />
           <Section
             title="Kommande"
-            description="Inlagda i förväg. Dyker upp av sig själva."
             notices={upcoming}
           />
           <Section
             title="Avslutade"
-            description="Sluttiden har passerat. Arkivera för att städa bort."
             notices={finished}
           />
         </div>
@@ -162,7 +158,7 @@ function Section({
   notices,
 }: {
   title: string;
-  description: string;
+  description?: string;
   notices: Notice[];
 }) {
   // Tomma avsnitt visas inte. En sida full av tomma rutor lär ögat att hoppa

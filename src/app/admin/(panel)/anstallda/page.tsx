@@ -40,7 +40,6 @@ export default async function EmployeesPage() {
     <EmployeeDialog
       trigger="Ny anställd"
       title="Lägg till anställd"
-      description="Visas som knapp på stämplingsskärmen."
       action={createEmployee}
       submitLabel="Lägg till"
     />
@@ -50,21 +49,18 @@ export default async function EmployeesPage() {
     <>
       <PageHeader
         title="Anställda"
-        description="Avaktiverade döljs på skärmen men behåller sin tid."
         action={newEmployee}
       />
 
       {employees.length === 0 ? (
         <EmptyState
           title="Inga anställda upplagda"
-          description="Lägg upp de personer som ska kunna stämpla."
           action={newEmployee}
         />
       ) : (
         <Card>
           <CardHeader
             title={`${employees.length} ${employees.length === 1 ? "person" : "personer"}`}
-            description="Aktiva först."
           />
           <Table>
             <thead>
@@ -121,7 +117,6 @@ export default async function EmployeesPage() {
                         trigger="Ändra"
                         triggerTone="ghost"
                         title="Ändra anställd"
-                        description="Namn, nummer, timkostnad och bild."
                         action={updateEmployee}
                         submitLabel="Spara"
                         employee={{

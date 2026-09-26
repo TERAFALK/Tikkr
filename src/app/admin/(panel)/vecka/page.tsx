@@ -77,7 +77,7 @@ export default async function WeekPage({
     <>
       <PageHeader
         title="Veckovy"
-        description="Huvudstämplingen per person och dag. Sidojobb syns i rapporten."
+        description="Huvudstämplingen per person och dag."
         action={
           <div className="flex items-center gap-1">
             <NavLink href={`/admin/vecka?v=${shift(-7)}`} label="Föregående" />
@@ -90,7 +90,6 @@ export default async function WeekPage({
       {week.rows.length === 0 ? (
         <EmptyState
           title="Inga anställda upplagda"
-          description="Veckovyn visar tid i arbete per person."
         />
       ) : (
         <Card>
@@ -198,9 +197,8 @@ export default async function WeekPage({
       )}
 
       <p className="mt-4 text-xs leading-relaxed text-neutral-500">
-        Tid räknas på den dag posten påbörjades. Ett skift som passerar midnatt
-        hamnar därför på kvällen det började. Gulmarkerad tid innehåller en post
-        vars sluttid beräknats av systemet.
+        Tid räknas på den dag posten påbörjades. Gulmarkerad tid innehåller en
+        beräknad sluttid.
       </p>
     </>
   );

@@ -42,7 +42,7 @@ export default function PairingCodeDialog({
   trigger: string;
   triggerTone?: "primary" | "secondary" | "ghost";
   title: string;
-  description: string;
+  description?: string;
   action: (
     previous: PairingFormState,
     formData: FormData
@@ -100,7 +100,7 @@ function Body({
   children,
 }: {
   title: string;
-  description: string;
+  description?: string;
   action: (
     previous: PairingFormState,
     formData: FormData
@@ -131,8 +131,7 @@ function Body({
           <Countdown expiresAt={state.expiresAt!} />
 
           <p className="text-[13px] leading-relaxed text-neutral-500">
-            Koden gäller för den här skärmen och kan bara användas en gång.
-            Stängs rutan hämtas en ny kod med knappen på skärmens rad.
+            Koden gäller en gång, för den här skärmen.
           </p>
         </div>
 
@@ -149,9 +148,11 @@ function Body({
     <>
       <div className="border-b border-neutral-200 px-5 py-4">
         <h2 className="text-sm font-semibold text-neutral-900">{title}</h2>
-        <p className="mt-0.5 text-[13px] leading-relaxed text-neutral-500">
-          {description}
-        </p>
+        {description && (
+          <p className="mt-0.5 text-[13px] leading-relaxed text-neutral-500">
+            {description}
+          </p>
+        )}
       </div>
 
       <form action={submit}>

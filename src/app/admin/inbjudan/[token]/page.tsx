@@ -21,7 +21,7 @@ export default async function InvitePage({
     return (
       <AuthShell
         title="Länken fungerar inte"
-        subtitle="Inbjudan har gått ut, redan använts eller återkallats."
+        subtitle="Inbjudan har gått ut eller redan använts."
         footer={
           <Link
             href="/admin/login"

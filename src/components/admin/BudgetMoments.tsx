@@ -109,8 +109,8 @@ export default function BudgetMoments({
     return (
       <p className="text-[13px] text-neutral-500">
         {moments.length === 0
-          ? "Lägg upp arbetsmoment först, så går det att beräkna tid per moment."
-          : "Alla arbetsmoment är avslutade. Aktivera ett för att kunna beräkna tid."}
+          ? "Inga arbetsmoment upplagda."
+          : "Alla arbetsmoment är avaktiverade."}
       </p>
     );
   }
@@ -202,7 +202,7 @@ export default function BudgetMoments({
           className="inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-[13px] font-medium text-blue-700 hover:bg-blue-50 disabled:cursor-not-allowed disabled:text-neutral-400 disabled:hover:bg-transparent"
         >
           <IconPlus />
-          {rows.length === 0 ? "Lägg till arbetsmoment" : "Lägg till ett till"}
+          Lägg till arbetsmoment
         </button>
 
         {/* Totalen står bara när det finns något att summera. En nolla under
@@ -217,11 +217,7 @@ export default function BudgetMoments({
         )}
       </div>
 
-      {available.length === 0 && rows.length > 0 && (
-        <p className="text-xs text-neutral-400">
-          Alla aktiva arbetsmoment är med.
-        </p>
-      )}
+
     </div>
   );
 }

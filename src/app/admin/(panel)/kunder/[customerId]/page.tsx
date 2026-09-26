@@ -119,7 +119,6 @@ export default async function CustomerPage({
           <Stat
             label="Tid totalt"
             value={formatDuration(stats.totalMinutes)}
-            hint="tim:min på kundens ordrar"
           />
           <Stat
             label="Marginal i år"
@@ -140,12 +139,10 @@ export default async function CustomerPage({
           <Stat
             label="Självkostnad"
             value={formatCurrency(money.costOre)}
-            hint="person och maskin"
           />
           <Stat
             label="Pris"
             value={formatCurrency(money.priceOre)}
-            hint="efter påslag och rabatt"
           />
           <Stat
             label="Påslag"
@@ -176,8 +173,7 @@ export default async function CustomerPage({
              saknar timmar är värre än en som säger att den saknar dem. */
           <p className="mt-4 rounded-lg border border-amber-200 bg-amber-50/60 px-4 py-2.5 text-[13px] text-amber-900">
             {formatDuration(money.minutesWithoutRate)} av tiden saknar
-            timkostnad och ingår inte i beloppen. Sätt timkostnad på
-            arbetsmomentet eller på personen.
+            timkostnad och ingår inte i beloppen.
           </p>
         )}
 
@@ -185,7 +181,7 @@ export default async function CustomerPage({
           <Card>
             <CardHeader
               title="Marginal per månad"
-              description="Tolv månader bakåt. Fastprisordrar fördelas efter kostnaden varje månad."
+              description="Tolv månader bakåt."
             />
             <MarginChart months={money.months} />
           </Card>
@@ -233,12 +229,11 @@ export default async function CustomerPage({
               än hur mycket tid de tagit. */}
           <Card className="lg:col-span-2">
             <CardHeader
-              title="Vad vi gör åt dem"
-              description="Tid per arbetsmoment, mest först."
+              title="Tid per arbetsmoment"
             />
             {stats.byMoment.length === 0 ? (
               <p className="px-5 py-6 text-[13px] text-neutral-500">
-                Ingen registrerad tid på kundens ordrar än.
+                Ingen registrerad tid än.
               </p>
             ) : (
               <Table>
@@ -273,14 +268,12 @@ export default async function CustomerPage({
           {stats.orders.length === 0 ? (
             <EmptyState
               title="Inga ordrar på kunden"
-              description="Ordrar som läggs upp med den här kunden vald samlas här."
               action={<ButtonLink href="/admin/ordrar">Till ordrar</ButtonLink>}
             />
           ) : (
             <Card>
               <CardHeader
                 title="Ordrar"
-                description="Öppna först. Det är dem man har en fråga om."
               />
               <Table>
                 <thead>

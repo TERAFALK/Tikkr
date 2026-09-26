@@ -48,7 +48,7 @@ export default function OrderFields({
         />
       </Field>
 
-      <Field label="Kund" hint="Valfritt. Sök på namn, kundnummer eller org.nr.">
+      <Field label="Kund" hint="Valfritt">
         <SearchSelect
           name="customerId"
           options={customers}
@@ -60,14 +60,14 @@ export default function OrderFields({
 
       <Field
         label="Beräknad tid"
-        hint="Valfritt. Ett arbetsmoment i taget, i timmar. Totalen är orderns beräknade tid."
+        hint="Valfritt. Timmar per arbetsmoment"
       >
         <BudgetMoments moments={moments} defaultRows={defaults?.budgets} />
       </Field>
 
       <Field
         label="Påslag"
-        hint="Faktor, t.ex. 1,4. Lämna tomt för företagets standard. Används inte när ett fast pris är satt."
+        hint="Faktor, t.ex. 1,4. Tomt ger företagets standard"
       >
         <Input
           name="markup"
@@ -86,7 +86,7 @@ export default function OrderFields({
 
       <Field
         label="Fast kundpris"
-        hint="Kronor för hela ordern. Ifyllt visar kalkylen det som pris och räknar vinsten mot självkostnaden. Tomt betyder löpande räkning."
+        hint="Kronor för hela ordern. Tomt ger löpande räkning"
       >
         <Input
           name="fixedPrice"

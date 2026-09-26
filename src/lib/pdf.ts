@@ -270,7 +270,7 @@ function renderOrder(
 
     doc.font("Helvetica").fontSize(8).fillColor(over ? "#a16207" : "#525252");
     doc.text(
-      `Beräknad tid ${formatDuration(order.budgetMinutes)}. Upparbetat ${share} procent.`,
+      `Beräknad tid ${formatDuration(order.budgetMinutes)}. Upparbetat ${share} %.`,
       MARGIN,
       y + 4,
       { width: CONTENT_WIDTH }
@@ -336,12 +336,12 @@ function renderOrder(
     const notes: string[] = [];
     if (order.ongoingCount > 0) {
       notes.push(
-        `${order.ongoingCount} stämpling${order.ongoingCount === 1 ? "" : "ar"} pågår och är beräknad till och med utskriftstillfället`
+        `${order.ongoingCount} stämpling${order.ongoingCount === 1 ? "" : "ar"} pågår, räknad till utskriftstillfället`
       );
     }
     if (order.ungradedCount > 0) {
       notes.push(
-        `${order.ungradedCount} post${order.ungradedCount === 1 ? "" : "er"} har en sluttid beräknad av systemet och är ännu inte granskad`
+        `${order.ungradedCount} post${order.ungradedCount === 1 ? "" : "er"} har beräknad sluttid, ännu inte granskad`
       );
     }
 
@@ -353,7 +353,7 @@ function renderOrder(
 
   /* --- Sidfot ------------------------------------------------------------- */
 
-  drawFooter(doc, "Tidsunderlag skapat med Tikkr", {
+  drawFooter(doc, "Tidsunderlag från Tikkr", {
     marginLeft: MARGIN,
     contentWidth: CONTENT_WIDTH,
     y: FOOTER_Y,

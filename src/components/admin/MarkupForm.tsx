@@ -29,11 +29,7 @@ export default function MarkupForm({
 
       <Field
         label="Påslag"
-        hint={
-          "Skrivs som en faktor: 1,4 betyder fyrtio procents påslag på " +
-          "självkostnaden. Lämna tomt om kalkylen bara ska visa kostnaden. " +
-          "En enskild order kan ha ett eget påslag."
-        }
+        hint="Faktor, t.ex. 1,4. Tomt visar bara kostnaden"
       >
         <Input
           name="markup"

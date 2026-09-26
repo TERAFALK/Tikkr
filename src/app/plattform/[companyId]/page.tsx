@@ -122,7 +122,7 @@ export default async function CompanyPage({
           <Card>
             <CardHeader
               title="Prenumeration"
-              description="Manuell status för fakturakunder och förlängda provperioder."
+              description="Manuell status för fakturakunder."
             />
             <div className="space-y-4 p-5">
               <dl className="divide-y divide-neutral-100 text-[13px]">
@@ -311,7 +311,7 @@ export default async function CompanyPage({
           <Card className="mt-6">
           <CardHeader
             title="Supportbesök"
-            description="När någon hos oss sett den här kundens panel. Åtkomsten är läsning."
+            description="Supportbesök i kundens panel. Endast läsning."
           />
           {visits.length === 0 ? (
             <p className="px-5 py-4 text-[13px] text-neutral-500">

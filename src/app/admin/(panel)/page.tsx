@@ -101,7 +101,6 @@ export default async function OverviewPage() {
     <>
       <PageHeader
         title="Översikt"
-        description={`Läget just nu hos ${companyName}.`}
         action={
           <ButtonLink href="/admin/rapporter" tone="secondary">
             Till rapporter
@@ -117,7 +116,7 @@ export default async function OverviewPage() {
                 {onboarding.completed} av {onboarding.total} steg klara
               </p>
               <p className="mt-0.5 text-[13px] text-blue-800">
-                Stämplingsskärmen kan användas när uppsättningen är slutförd.
+                Stämplingsskärmen kan användas när stegen är klara.
               </p>
             </div>
             <ButtonLink href="/admin/kom-igang">Fortsätt uppsättningen</ButtonLink>
@@ -144,14 +143,12 @@ export default async function OverviewPage() {
         <Stat
           label="Registrerat idag"
           value={formatDuration(minutesToday)}
-          hint="inklusive pågående jobb"
           icon={<IconClock />}
         />
         <Stat
           label="Att granska"
           value={needsReview}
           tone={needsReview > 0 ? "warning" : "neutral"}
-          hint="poster systemet stängt automatiskt"
           icon={<IconReview />}
         />
         <Stat label="Öppna ordrar" value={openOrders} icon={<IconOrder />} />
@@ -167,10 +164,9 @@ export default async function OverviewPage() {
           </p>
           <p className="mt-0.5 text-[13px] text-red-800">
             {cron.lastRun
-              ? `Schemajobbet rapporterade senast in för ${cron.minutesAgo} minuter sedan. Det ska köra var 15:e minut.`
-              : "Schemajobbet har aldrig rapporterat in."}{" "}
-            Glömda stämplingar stängs inte, utan ligger öppna och räknas upp.
-            Kontakta den som driftar servern — jobbet läggs in där, inte här.
+              ? `Senaste körning för ${cron.minutesAgo} minuter sedan. Intervallet är 15 minuter.`
+              : "Jobbet har aldrig körts."}{" "}
+            Glömda stämplingar stängs inte. Kontakta den som driftar servern.
           </p>
         </Card>
       )}
@@ -184,8 +180,7 @@ export default async function OverviewPage() {
                 granskas
               </p>
               <p className="mt-0.5 text-[13px] text-amber-800">
-                Utstämpling saknas. Sluttiden är beräknad av systemet och bör
-                kontrolleras före fakturering.
+                Utstämpling saknas. Sluttiden är beräknad.
               </p>
             </div>
             <ButtonLink href="/admin/granskning">Granska nu</ButtonLink>
@@ -197,13 +192,11 @@ export default async function OverviewPage() {
         {working.length === 0 ? (
           <EmptyState
             title="Ingen är instämplad just nu"
-            description="Pågående arbete visas här så snart någon stämplat in."
           />
         ) : (
           <Card>
             <CardHeader
               title="Pågående arbete"
-              description="Tiden räknas upp till dess att posten avslutas."
             />
             <Table>
             <thead>

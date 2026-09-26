@@ -40,7 +40,6 @@ export default function ForgotPasswordForm() {
 
       <Field
         label="E-postadress"
-        hint="Adressen du loggar in med."
       >
         <Input
           name="email"

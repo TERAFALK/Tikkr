@@ -10,7 +10,6 @@ export default function SettingsLayout({
     <>
       <PageHeader
         title="Inställningar"
-        description="Gäller hela företaget och alla dess stämplingsskärmar."
       />
 
       <div className="lg:flex lg:gap-8">

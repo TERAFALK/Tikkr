@@ -104,7 +104,7 @@ export default function CustomerDialog({
               </Field>
 
               <div className="grid gap-4 sm:grid-cols-2">
-                <Field label="Kundnummer" hint="Ert eget. Går att söka på.">
+                <Field label="Kundnummer" hint="Ert eget">
                   <Input
                     name="customerNumber"
                     defaultValue={customer?.customerNumber ?? ""}
@@ -122,7 +122,7 @@ export default function CustomerDialog({
             </div>
 
             <div className="space-y-4 border-t border-neutral-100 pt-5">
-              <SectionTitle hint="Syns bara hos er, aldrig på kundens underlag.">
+              <SectionTitle hint="Syns inte för kunden">
                 Kontakt
               </SectionTitle>
 
@@ -154,7 +154,7 @@ export default function CustomerDialog({
             </div>
 
             <div className="space-y-4 border-t border-neutral-100 pt-5">
-              <SectionTitle hint="Skrivs ut på underlag som skickas till kunden.">
+              <SectionTitle hint="Skrivs ut på kundens underlag">
                 Adress
               </SectionTitle>
 
@@ -185,14 +185,14 @@ export default function CustomerDialog({
             </div>
 
             <div className="space-y-4 border-t border-neutral-100 pt-5">
-              <SectionTitle hint="Lämna tomt för företagets standard.">
+              <SectionTitle hint="Tomt ger företagets standard">
                 Pris
               </SectionTitle>
 
               <div className="grid gap-4 sm:grid-cols-2">
                 <Field
                   label="Påslag"
-                  hint="Faktor, t.ex. 1,3. Gäller kundens ordrar."
+                  hint="Faktor, t.ex. 1,3"
                 >
                   <Input
                     name="markup"
@@ -207,7 +207,7 @@ export default function CustomerDialog({
                 </Field>
                 <Field
                   label="Rabatt (%)"
-                  hint="Dras av efter påslaget. Syns för kunden."
+                  hint="Dras av efter påslaget. Syns för kunden"
                 >
                   <Input
                     name="discount"
@@ -218,7 +218,7 @@ export default function CustomerDialog({
                 </Field>
               </div>
 
-              <Field label="Anteckning" hint="Syns bara hos er.">
+              <Field label="Anteckning" hint="Syns inte för kunden">
                 <Input
                   name="notes"
                   defaultValue={customer?.notes ?? ""}

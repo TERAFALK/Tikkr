@@ -38,13 +38,12 @@ export default async function ActivityPage({
     <PlatformShell email={email} current="/plattform/handelser">
       <PageHeader
         title="Händelser"
-        description="Utförda från plattformspanelen, senaste först."
+        description="Utförda från plattformspanelen."
       />
 
       {log.total === 0 ? (
         <EmptyState
           title="Inga registrerade åtgärder"
-          description="Statusändringar, licenser och raderingar visas här."
         />
       ) : (
         <Card>

@@ -42,9 +42,8 @@ export default function SubscriptionLocked({
             Stämplingsskärmarna är opåverkade
           </p>
           <p className="mt-1 text-[13px] leading-relaxed text-emerald-800">
-            All tid registreras och sparas som vanligt. När prenumerationen är
-            aktiv finns samtliga poster tillgängliga, inklusive de som
-            registrerats under tiden panelen varit låst.
+            All tid registreras som vanligt och finns kvar när panelen låses
+            upp.
           </p>
         </div>
 
@@ -96,9 +95,8 @@ export default function SubscriptionLocked({
               </div>
 
               <p className="text-xs leading-relaxed text-neutral-500">
-                En licens ger en stämplingsskärm. Kortuppgifter hanteras av vår
-                betalningsleverantör och lagras aldrig hos Tikkr. Ingen
-                bindningstid tillämpas.
+                En licens per stämplingsskärm. Ingen bindningstid.
+                Kortuppgifter lagras aldrig hos Tikkr.
               </p>
             </form>
           ) : (

@@ -32,7 +32,7 @@ export default function AcceptInviteForm({
         <Input value={email} readOnly disabled />
       </Field>
 
-      <Field label="Välj ett lösenord" hint="Minst 10 tecken.">
+      <Field label="Välj ett lösenord" hint="Minst 10 tecken">
         <Input
           name="password"
           type="password"

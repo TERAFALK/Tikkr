@@ -97,7 +97,6 @@ export default async function OrdersPage() {
     <>
       <PageHeader
         title="Ordrar"
-        description="Välj ett ordernummer för underlag och ändringar. Även stängda ordrar."
         action={newOrder}
       />
 
@@ -119,7 +118,6 @@ export default async function OrdersPage() {
       {rows.length === 0 ? (
         <EmptyState
           title="Inga ordrar upplagda"
-          description="Minst en öppen order krävs för att kunna stämpla in."
           action={newOrder}
         />
       ) : (

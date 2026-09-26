@@ -27,7 +27,7 @@ export default async function DataProtectionPage() {
       <Card>
         <CardHeader
           title="Lämna ut en persons uppgifter"
-          description="En anställd har rätt att få ut allt som registrerats om denne."
+          description="Allt som registrerats om en anställd."
         />
         <div className="space-y-4 p-5 text-[13px] text-neutral-600">
           <p>
@@ -43,7 +43,7 @@ export default async function DataProtectionPage() {
       <Card>
         <CardHeader
           title="Radera personuppgifter"
-          description="GDPR ger en anställd rätt att bli glömd."
+          description="Namn och nummer ersätts. Tiden står kvar."
         />
 
         <div className="space-y-5 p-5">
@@ -75,7 +75,7 @@ export default async function DataProtectionPage() {
 
             <Field
               label="Skriv ANONYMISERA för att bekräfta"
-              hint="Bekräftelse krävs eftersom åtgärden inte kan ångras."
+              hint="Kan inte ångras"
             >
               <Input name="confirm" placeholder="ANONYMISERA" required />
             </Field>
@@ -88,16 +88,14 @@ export default async function DataProtectionPage() {
       </Card>
 
       <Card>
-        <CardHeader title="Vad Tikkr sparar" />
+        <CardHeader title="Sparade uppgifter" />
         <div className="space-y-2 p-5 text-[13px] leading-relaxed text-neutral-600">
           <p>
-            Om varje stämpling sparas tidpunkt, vilken order och vilket
-            arbetsmoment, vilken skärm trycket gjordes på och från vilken
-            IP-adress. Det sista finns för att en felaktig stämpling ska gå att
-            reda ut i efterhand.
+            Per stämpling sparas tidpunkt, order, arbetsmoment, skärm och
+            IP-adress.
           </p>
           <p>
-            Tikkr registrerar ingen löneinformation, frånvaro eller sjukdom. Systemet avser tidsunderlag för fakturering av kundordrar.
+            Ingen löneinformation, frånvaro eller sjukdom registreras.
           </p>
           <p>
             Ert företag är personuppgiftsansvarigt och TERAFALK AB är

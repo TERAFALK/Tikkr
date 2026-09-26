@@ -52,8 +52,8 @@ export default async function OnboardingPage() {
         title={state.ready ? "Klart att använda" : "Kom igång"}
         description={
           state.ready
-            ? `${companyName} har allt som krävs. Stämplingsskärmen är redo att användas.`
-            : `Fyra steg återstår innan ${companyName} kan börja registrera tid.`
+            ? `${companyName} är redo att registrera tid.`
+            : `Fyra steg återstår för ${companyName}.`
         }
         action={
           state.ready ? (
@@ -68,13 +68,12 @@ export default async function OnboardingPage() {
       <StepCard
         number={1}
         title="Lägg upp anställda"
-        description="Visas som knappar på stämplingsskärmen."
         done={state.steps[0].done}
       >
         <form action={addEmployees} className="space-y-3">
           <Field
             label="Ett namn per rad"
-            hint="En lista kan klistras in. Dubbletter hoppas över."
+            hint="Ett namn per rad"
           >
             <textarea
               name="names"
@@ -99,7 +98,7 @@ export default async function OnboardingPage() {
       <StepCard
         number={2}
         title="Lägg upp arbetsmoment"
-        description="Den typ av arbete tiden avser. Håll listan kort."
+        description="Den typ av arbete tiden avser."
         done={state.steps[1].done}
       >
         <form action={addMoments} className="space-y-4">
@@ -152,7 +151,6 @@ export default async function OnboardingPage() {
       <StepCard
         number={3}
         title="Lägg upp minst en order"
-        description="Minst en öppen order krävs för att kunna stämpla in."
         done={state.steps[2].done}
       >
         <form action={addOrder} className="flex flex-wrap items-end gap-3">
@@ -191,7 +189,7 @@ export default async function OnboardingPage() {
       <StepCard
         number={4}
         title="Koppla en stämplingsskärm"
-        description="Lägg upp skärmen och knappa in koden på enheten. Därefter krävs ingen inloggning."
+        description="Lägg upp skärmen och knappa in koden på enheten."
         done={state.steps[3].done}
         last
       >
@@ -206,8 +204,7 @@ export default async function OnboardingPage() {
             Allt är på plats
           </p>
           <p className="mt-1 text-[13px] text-emerald-800">
-            Stämplingsskärmen är redo att användas. Guiden döljs i menyn men
-            förblir tillgänglig via Inställningar.
+            Guiden döljs i menyn och nås via Inställningar.
           </p>
         </Card>
       )}
@@ -247,7 +244,7 @@ function StepCard({
 }: {
   number: number;
   title: string;
-  description: string;
+  description?: string;
   done: boolean;
   children: React.ReactNode;
   last?: boolean;

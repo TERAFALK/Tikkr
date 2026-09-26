@@ -259,11 +259,8 @@ function renderCalc(
 
   if (order.minutesWithoutRate > 0) {
     notes.push(
-      `${formatDuration(order.minutesWithoutRate)} (tim:min) saknar timkostnad ` +
-        `och ingår inte i summan, som därför är lägre än den verkliga ` +
-        `kostnaden. Fyll i timkostnad på arbetsmomentet — nya stämplingar får ` +
-        `den då automatiskt, medan redan registrerad tid behåller sitt gamla ` +
-        `underlag`
+      `${formatDuration(order.minutesWithoutRate)} (tim:min) saknar ` +
+        `timkostnad och ingår inte i summan`
     );
   }
 
@@ -271,7 +268,7 @@ function renderCalc(
     notes.push(
       `${order.ongoingCount} stämpling${
         order.ongoingCount === 1 ? "" : "ar"
-      } pågår och är räknad till och med utskriftstillfället`
+      } pågår, räknad till utskriftstillfället`
     );
   }
 
@@ -279,7 +276,7 @@ function renderCalc(
     notes.push(
       `${order.ungradedCount} post${
         order.ungradedCount === 1 ? "" : "er"
-      } har en sluttid beräknad av systemet och är ännu inte granskad`
+      } har beräknad sluttid, ännu inte granskad`
     );
   }
 
@@ -321,7 +318,7 @@ function renderCalc(
 
   drawFooter(
     doc,
-    "Internt underlag skapat med Tikkr — innehåller självkostnad och marginal",
+    "Internt underlag från Tikkr. Innehåller självkostnad och marginal",
     { marginLeft: MARGIN, contentWidth: CONTENT_WIDTH, y: FOOTER_Y }
   );
 }

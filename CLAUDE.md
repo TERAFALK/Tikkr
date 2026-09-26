@@ -319,6 +319,46 @@ Användaren kan **inte koda särskilt mycket själv**. Claude driver det teknisk
 6. **Skriv på svenska** i UI och i förklaringar till användaren. Kod, variabel-
    och funktionsnamn på engelska.
 
+### 7.1 Språket i gränssnittet (bestämt 2026-09-26)
+
+Gäller ALL text kunden och kundens kund ser: sidor, knappar, rutor, tabeller,
+felmeddelanden, PDF och Excel. Inte kodkommentarer — de är för utvecklaren och
+får gärna vara utförliga.
+
+**Kort och sakligt. Tikkr är ett verktyg, inte en handledare.**
+
+1. **Skriv ingen beskrivning som inte behöver finnas.** Standardläget är
+   INGEN text. En beskrivning skrivs bara när den hindrar ett konkret fel
+   eller säger något som inte går att se på skärmen. Ett filter, en kolumn
+   eller en knapp med ett begripligt namn förklaras aldrig.
+
+2. **Aldrig beskriva det som redan syns.** "Aktiva först" ovanför en lista
+   där aktiva står först, "senaste först", "mest först" — bort. Läsaren ser
+   det.
+
+3. **Aldrig motivera systemets val för användaren.** "Det är dem man har en
+   fråga om", "Håll listan kort", "Fem till tio moment ger överskådliga val"
+   — bort. Skälen hör hemma i den här filen och i kodkommentarer, inte i
+   gränssnittet.
+
+4. **Inget prat.** Inga tilltal i stil med "så går de att välja när…", inga
+   tankstreck som lägger till en eftertanke, ingen ton av att förklara för
+   någon som inte förstår sitt eget yrke.
+
+5. **Rubriker är substantiv.** "Ordrar", inte "Här är dina ordrar".
+   Knappar är verb i imperativ: "Lägg till", "Spara", "Koppla om".
+
+6. **Fälthjälp bara vid format eller konsekvens**, i en kort mening utan
+   punkt om den är ofullständig: "Timmar, t.ex. 7,5", "Minst 10 tecken",
+   "Kan inte ångras". Inte varför fältet finns.
+
+7. **Felmeddelanden säger vad som är fel och vad som rättar det.** Ett led,
+   inte tre.
+
+Där något verkligen är svårt — GDPR-radering, fast pris kontra påslag — får
+en mening stå kvar. Den ska då vara skriven för en verkstadschef, inte för en
+nybörjare.
+
 ## 8. Affärsmodell (kontext, inte kod)
 
 ### Pris (beslutat 2026-08-11)

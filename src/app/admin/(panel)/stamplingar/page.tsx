@@ -151,7 +151,6 @@ export default async function EntriesPage({
     <>
       <PageHeader
         title="Stämplingar"
-        description="Samtliga registrerade tider. Här rättas och kompletteras de."
         action={
           <NewEntryDialog
             employees={employeeOptions}
@@ -202,7 +201,7 @@ export default async function EntriesPage({
             />
           </Field>
 
-          <Field label="Till och med" hint="Lämna tomt för att se allt framåt.">
+          <Field label="Till och med">
             <Input type="date" name="to" defaultValue={params.to ?? ""} />
           </Field>
 
@@ -229,13 +228,11 @@ export default async function EntriesPage({
       {entries.length === 0 ? (
         <EmptyState
           title="Inga stämplingar i perioden"
-          description="Utöka datumintervallet, eller lägg till en stämpling."
         />
       ) : (
         <Card>
           <CardHeader
             title={`${entries.length} ${entries.length === 1 ? "post" : "poster"}`}
-            description="Senaste posten först. Manuella ändringar markeras i listan."
           />
           <Table>
             <thead>
@@ -309,7 +306,6 @@ export default async function EntriesPage({
                             trigger="Ändra"
                             triggerTone="ghost"
                             title={`Ändra stämpling: ${entry.employee.name}`}
-                            description="Ändringen markeras som manuell."
                             action={editEntry}
                             submitLabel="Spara"
                           >

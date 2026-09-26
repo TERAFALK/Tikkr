@@ -36,7 +36,6 @@ export default async function CompanySettingsPage() {
       <Card>
         <CardHeader
           title="Företagsuppgifter"
-          description="Visas på stämplingsskärmarna och i underlagen."
         />
         <form action={saveCompany} className="max-w-md space-y-4 p-5">
           <Field label="Företagsnamn">
@@ -49,7 +48,7 @@ export default async function CompanySettingsPage() {
       <Card>
         <CardHeader
           title="Kalkyl"
-          description="Påslaget som används när kostnad räknas om till pris. Timkostnaden sätts per arbetsmoment."
+          description="Påslag från kostnad till pris. Timkostnad sätts per arbetsmoment."
         />
         <MarkupForm action={saveMarkup} markupPercent={company.markupPercent} />
       </Card>
@@ -57,7 +56,7 @@ export default async function CompanySettingsPage() {
       <Card>
         <CardHeader
           title="Märke"
-          description="Kvadratisk bild för panelen och stämplingsskärmen."
+          description="Kvadratisk. Panel och stämplingsskärm."
         />
         <LogoUpload
           variant="square"
@@ -69,7 +68,7 @@ export default async function CompanySettingsPage() {
       <Card>
         <CardHeader
           title="Logotyp för utskrifter"
-          description="Bred bild, placeras överst på underlagen till era kunder."
+          description="Bred. Överst på kundernas underlag."
         />
         <LogoUpload
           variant="wide"

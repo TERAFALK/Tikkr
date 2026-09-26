@@ -171,7 +171,7 @@ export default function EmployeeDialog({
 
             <Field
               label="Anställningsnummer"
-              hint="Valfritt. Syns aldrig på stämplingsskärmen."
+              hint="Valfritt"
             >
               <Input
                 name="employeeNumber"
@@ -182,7 +182,7 @@ export default function EmployeeDialog({
 
             <Field
               label="Timkostnad (kr/tim)"
-              hint="Valfritt. Läggs till arbetsmomentets kostnad i efterkalkylen. Syns aldrig på stämplingsskärmen."
+              hint="Valfritt. Läggs till arbetsmomentets kostnad"
             >
               <Input
                 name="costRate"
