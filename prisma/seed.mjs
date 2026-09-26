@@ -73,44 +73,6 @@ async function main() {
           { name: "Underhåll" },
         ],
       },
-      // Kundregistret. Ordrarna kopplas till det nedan, efter att företaget
-      // skapats — kundernas id behövs först.
-      //
-      // Tre kunder med olika prisläge, så att kalkylen har något att visa:
-      // en med eget påslag, en med rabatt, en på företagets standard.
-      customers: {
-        create: [
-          {
-            name: "Volvo Lastvagnar",
-            customerNumber: "1001",
-            orgNumber: "556013-9700",
-            contactName: "Anna Svensson",
-            email: "anna.svensson@example.com",
-            phone: "0520-123 45",
-            addressLine: "Verkstadsgatan 4",
-            postalCode: "462 35",
-            city: "Vänersborg",
-            // Lägre påslag än företagets 140 — en stor kund som förhandlat.
-            markupPercent: 130,
-          },
-          {
-            name: "Sandvik Coromant",
-            customerNumber: "1002",
-            orgNumber: "556234-6362",
-            contactName: "Björn Lind",
-            email: "bjorn.lind@example.com",
-            city: "Sandviken",
-            // Stående rabatt, dras EFTER påslaget. Finns här för att visa att
-            // de två rattarna räknas i rätt ordning.
-            discountPercent: 10,
-          },
-          {
-            name: "Atlas Copco",
-            customerNumber: "1003",
-            city: "Nacka",
-          },
-        ],
-      },
     },
   });
 
@@ -134,13 +96,59 @@ async function main() {
           { name: "Slipning", costRateOre: 14000 },
         ],
       },
-      customers: { create: [{ name: "Egen kund", customerNumber: "1" }] },
     },
   });
 
-  // ORDRARNA SKAPAS EFTER FÖRETAGEN, eftersom de pekar på kunder som inte har
-  // något id förrän de finns. Upsert på (companyId, orderNumber) gör att en
-  // omkörning inte skapar dubbletter.
+  // KUNDERNA SKAPAS EFTER FÖRETAGEN och inte inuti deras create-block.
+  //
+  // Skälet är upserten ovan: `update: {}` betyder att ingenting händer när
+  // företaget redan finns, och då hade ett nästlat `customers: { create }`
+  // hoppats över tyst. Seed på en databas som redan kört seed hade sedan
+  // kraschat på att kunden inte gick att slå upp.
+  //
+  // Tre kunder med olika prisläge, så att kalkylen har något att visa: en med
+  // eget påslag, en med rabatt, en på företagets standard.
+  const customer = async (companyId, name, data = {}) => {
+    const existing = await prisma.customer.findFirst({
+      where: { companyId, name },
+      select: { id: true },
+    });
+
+    if (existing) return existing.id;
+
+    return (
+      await prisma.customer.create({ data: { companyId, name, ...data } })
+    ).id;
+  };
+
+  await customer(demo.id, "Volvo Lastvagnar", {
+    customerNumber: "1001",
+    orgNumber: "556013-9700",
+    contactName: "Anna Svensson",
+    email: "anna.svensson@example.com",
+    phone: "0520-123 45",
+    addressLine: "Verkstadsgatan 4",
+    postalCode: "462 35",
+    city: "Vänersborg",
+    // Lägre påslag än företagets 140 — en stor kund som förhandlat.
+    markupPercent: 130,
+  });
+  await customer(demo.id, "Sandvik Coromant", {
+    customerNumber: "1002",
+    orgNumber: "556234-6362",
+    contactName: "Björn Lind",
+    email: "bjorn.lind@example.com",
+    city: "Sandviken",
+    // Stående rabatt, dras EFTER påslaget. Finns här för att visa att de två
+    // rattarna räknas i rätt ordning.
+    discountPercent: 10,
+  });
+  await customer(demo.id, "Atlas Copco", { customerNumber: "1003", city: "Nacka" });
+
+  await customer(other.id, "Egen kund", { customerNumber: "1" });
+
+  // ORDRARNA PEKAR PÅ KUNDERNA och skapas därför efter dem. Upsert på
+  // (companyId, orderNumber) gör att en omkörning inte skapar dubbletter.
   const customerId = async (companyId, name) =>
     (
       await prisma.customer.findFirstOrThrow({
@@ -149,17 +157,25 @@ async function main() {
       })
     ).id;
 
-  const order = async (companyId, orderNumber, customerName, extra = {}) =>
-    prisma.order.upsert({
+  const order = async (companyId, orderNumber, customerName, extra = {}) => {
+    const id = await customerId(companyId, customerName);
+
+    await prisma.order.upsert({
       where: { companyId_orderNumber: { companyId, orderNumber } },
       update: {},
-      create: {
-        companyId,
-        orderNumber,
-        customerId: await customerId(companyId, customerName),
-        ...extra,
-      },
+      create: { companyId, orderNumber, customerId: id, ...extra },
     });
+
+    // FYLLER I KUNDEN NÄR DEN SAKNAS, men skriver aldrig över en som redan
+    // står där. Demoordrarna fanns före kundregistret och fick customer_id =
+    // NULL när fritextkolumnen försvann; utan den här raden hade de blivit
+    // kundlösa för alltid. Samma regel som snabbjobb följer i quick-order.ts:
+    // ny uppgift fylls i, en befintlig rörs inte.
+    await prisma.order.updateMany({
+      where: { companyId, orderNumber, customerId: null },
+      data: { customerId: id },
+    });
+  };
 
   await order(demo.id, "2601", "Volvo Lastvagnar");
   // Fastprisorder, så kalkylen har något att räkna vinst på. 7 350 kr, samma
