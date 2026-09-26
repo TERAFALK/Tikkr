@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, type ReactNode } from "react";
-import { Button } from "@/components/ui";
+import { Button, dialogBody, dialogEdge, dialogSurface } from "@/components/ui";
 
 /**
  * Knapp som öppnar en ruta med fält.
@@ -56,9 +56,9 @@ export default function FormDialog({
 
       <dialog
         ref={dialog}
-        className="w-[min(30rem,calc(100vw-2rem))] rounded-xl border border-neutral-200 bg-white p-0 shadow-xl backdrop:bg-neutral-900/40"
+        className={`w-[min(30rem,calc(100vw-2rem))] ${dialogSurface}`}
       >
-        <div className="border-b border-neutral-200 px-5 py-4">
+        <div className={`${dialogEdge} border-b border-neutral-200 px-5 py-4`}>
           <h2 className="text-sm font-semibold text-neutral-900">{title}</h2>
           {description && (
             <p className="mt-0.5 text-[13px] leading-relaxed text-neutral-500">
@@ -74,10 +74,13 @@ export default function FormDialog({
             // sidan med det nya innehållet, så den som väntar kvar i en öppen
             // ruta skulle bara se sina egna gamla värden.
             onSubmit={() => dialog.current?.close()}
+            className="flex min-h-0 flex-1 flex-col"
           >
-            <div className="space-y-4 px-5 py-5">{children}</div>
+            <div className={`${dialogBody} space-y-4 px-5 py-5`}>{children}</div>
 
-            <div className="flex justify-end gap-2 border-t border-neutral-200 bg-neutral-50 px-5 py-3">
+            <div
+              className={`${dialogEdge} flex justify-end gap-2 border-t border-neutral-200 bg-neutral-50 px-5 py-3`}
+            >
               <Button
                 type="button"
                 tone="secondary"
@@ -92,8 +95,10 @@ export default function FormDialog({
           </form>
         ) : (
           <>
-            <div className="space-y-4 px-5 py-5">{children}</div>
-            <div className="flex justify-end border-t border-neutral-200 bg-neutral-50 px-5 py-3">
+            <div className={`${dialogBody} space-y-4 px-5 py-5`}>{children}</div>
+            <div
+              className={`${dialogEdge} flex justify-end border-t border-neutral-200 bg-neutral-50 px-5 py-3`}
+            >
               <Button
                 type="button"
                 tone="secondary"

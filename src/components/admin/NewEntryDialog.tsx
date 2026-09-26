@@ -6,7 +6,16 @@ import {
   addEntry,
   type EntryFormState,
 } from "@/app/admin/(panel)/stamplingar/actions";
-import { Alert, Button, Field, Input, Select } from "@/components/ui";
+import {
+  Alert,
+  Button,
+  dialogBody,
+  dialogEdge,
+  dialogSurface,
+  Field,
+  Input,
+  Select,
+} from "@/components/ui";
 import SearchSelect from "./SearchSelect";
 
 interface Option {
@@ -49,9 +58,9 @@ export default function NewEntryDialog({
 
       <dialog
         ref={dialog}
-        className="w-[min(34rem,calc(100vw-2rem))] rounded-xl border border-neutral-200 bg-white p-0 shadow-xl backdrop:bg-neutral-900/40"
+        className={`w-[min(34rem,calc(100vw-2rem))] ${dialogSurface}`}
       >
-        <div className="border-b border-neutral-200 px-5 py-4">
+        <div className={`${dialogEdge} border-b border-neutral-200 px-5 py-4`}>
           <h2 className="text-sm font-semibold text-neutral-900">
             Lägg till stämpling
           </h2>
@@ -61,8 +70,8 @@ export default function NewEntryDialog({
           </p>
         </div>
 
-        <form action={action}>
-          <div className="space-y-4 px-5 py-5">
+        <form action={action} className="flex min-h-0 flex-1 flex-col">
+          <div className={`${dialogBody} space-y-4 px-5 py-5`}>
             {state.error && <Alert>{state.error}</Alert>}
 
             <Field label="Anställd">
@@ -116,7 +125,9 @@ export default function NewEntryDialog({
             </div>
           </div>
 
-          <div className="flex justify-end gap-2 border-t border-neutral-200 bg-neutral-50 px-5 py-3">
+          <div
+            className={`${dialogEdge} flex justify-end gap-2 border-t border-neutral-200 bg-neutral-50 px-5 py-3`}
+          >
             <Button
               type="button"
               tone="secondary"

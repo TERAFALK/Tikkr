@@ -23,6 +23,41 @@ import type { ComponentProps, ReactNode } from "react";
  */
 
 /* -------------------------------------------------------------------------- */
+/* Rutor                                                                       */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * YTAN EN RUTA RITAS PÅ, OCH DEN SOM GÖR ATT KNAPPARNA ALLTID SYNS.
+ *
+ * En ruta växer med sitt innehåll — lägger man till tre arbetsmoment blir den
+ * tre rader högre. Utan takhöjd växer den förbi fönsterkanten, och då hamnar
+ * Spara utanför bild. Man ser ett formulär som inte går att skicka, vilket
+ * läses som att sparandet är trasigt.
+ *
+ * Därför: rutan blir aldrig högre än fönstret, och det är FÄLTEN som skrollar.
+ * Rubriken och knappraden står still. Knappen man letar efter ligger alltid på
+ * samma ställe, oavsett hur långt formuläret blivit.
+ *
+ * `open:flex` och inte `flex`: en stängd `<dialog>` göms av webbläsarens egen
+ * `display: none`, och ett `display: flex` från oss skulle vinna över den och
+ * visa varenda ruta på sidan hela tiden. Varianten gäller bara när rutan är
+ * öppen, och då finns ingen `display: none` att krocka med.
+ *
+ * Bredden står kvar på varje ruta för sig. Den skiljer sig mellan rutorna, och
+ * Tailwind måste kunna läsa klassen som text i filen för att bygga den alls.
+ */
+export const dialogSurface =
+  "max-h-[calc(100dvh-2rem)] open:flex open:flex-col overflow-hidden " +
+  "rounded-xl border border-neutral-200 bg-white p-0 shadow-xl " +
+  "backdrop:bg-neutral-900/40";
+
+/** Fältdelen av en ruta: den enda del som skrollar. */
+export const dialogBody = "min-h-0 flex-1 overflow-y-auto";
+
+/** Rubrik- och knapprad: står still medan fälten skrollar. */
+export const dialogEdge = "shrink-0";
+
+/* -------------------------------------------------------------------------- */
 /* Sidhuvud                                                                    */
 /* -------------------------------------------------------------------------- */
 

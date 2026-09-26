@@ -157,6 +157,24 @@ export default function BudgetMoments({
                 inputMode="decimal"
                 placeholder="8"
                 aria-label="Beräknad tid i timmar"
+                // HÅLLER LÖSENORDSHANTERARE BORTA FRÅN FÄLTET.
+                //
+                // Ett kort numeriskt fält i ett formulär med belopp i tolkas
+                // av tilläggen som ett kortnummer, och då lägger de sin ikon
+                // och sin lista över rutan, fyller i fel och flyttar
+                // skrollningen. Fältet är timmar på ett arbetsmoment och har
+                // ingenting med betalning att göra.
+                //
+                // Attributen är olika per tillägg och ignoreras av dem som
+                // inte känner igen dem — därför står de allihop. Kvarstår
+                // problemet får tillägget stängas av för sidan; ett
+                // webbsideskript kan inte tvinga ett tillägg att avstå.
+                autoComplete="off"
+                data-1p-ignore
+                data-lpignore="true"
+                data-bwignore
+                data-np-ignore
+                data-form-type="other"
                 className="block w-full rounded-md border-0 bg-white py-1.5 pl-2.5 pr-8 text-[13px] text-neutral-900 ring-1 ring-inset ring-neutral-200 placeholder:text-neutral-400 focus:ring-2 focus:ring-inset focus:ring-blue-600"
               />
               <span className="pointer-events-none absolute inset-y-0 right-2.5 flex items-center text-xs text-neutral-400">

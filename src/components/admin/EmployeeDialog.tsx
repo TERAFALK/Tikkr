@@ -3,7 +3,15 @@
 import { useActionState, useEffect, useRef, useState } from "react";
 import { useFormStatus } from "react-dom";
 import type { EmployeeState } from "@/app/admin/(panel)/anstallda/actions";
-import { Alert, Button, Field, Input } from "@/components/ui";
+import {
+  Alert,
+  Button,
+  dialogBody,
+  dialogEdge,
+  dialogSurface,
+  Field,
+  Input,
+} from "@/components/ui";
 import EmployeeAvatar from "@/components/ui/EmployeeAvatar";
 
 /**
@@ -75,9 +83,9 @@ export default function EmployeeDialog({
 
       <dialog
         ref={dialog}
-        className="w-[min(30rem,calc(100vw-2rem))] rounded-xl border border-neutral-200 bg-white p-0 shadow-xl backdrop:bg-neutral-900/40"
+        className={`w-[min(30rem,calc(100vw-2rem))] ${dialogSurface}`}
       >
-        <div className="border-b border-neutral-200 px-5 py-4">
+        <div className={`${dialogEdge} border-b border-neutral-200 px-5 py-4`}>
           <h2 className="text-sm font-semibold text-neutral-900">{title}</h2>
           {description && (
             <p className="mt-0.5 text-[13px] leading-relaxed text-neutral-500">
@@ -86,8 +94,8 @@ export default function EmployeeDialog({
           )}
         </div>
 
-        <form action={submit}>
-          <div className="space-y-4 px-5 py-5">
+        <form action={submit} className="flex min-h-0 flex-1 flex-col">
+          <div className={`${dialogBody} space-y-4 px-5 py-5`}>
             {state.error && <Alert>{state.error}</Alert>}
 
             {employee && (
@@ -189,7 +197,9 @@ export default function EmployeeDialog({
             </Field>
           </div>
 
-          <div className="flex justify-end gap-2 border-t border-neutral-200 bg-neutral-50 px-5 py-3">
+          <div
+            className={`${dialogEdge} flex justify-end gap-2 border-t border-neutral-200 bg-neutral-50 px-5 py-3`}
+          >
             <Button
               type="button"
               tone="secondary"

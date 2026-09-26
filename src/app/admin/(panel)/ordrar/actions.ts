@@ -9,53 +9,33 @@ import { readBudgetRows, saveOrderBudgets } from "@/lib/order-budget";
 
 const PATH = "/admin/ordrar";
 
-export async function createOrder(formData: FormData) {
-  const session = await requireAdmin();
-  await assertWritable(session);
-  const { db, companyId } = session;
-
-  const orderNumber = String(formData.get("orderNumber") ?? "").trim();
-  if (!orderNumber) return;
-
-  const order = await db.order.create({
-    data: {
-      companyId,
-      orderNumber,
-      customerId: await resolveCustomerId(db, formData.get("customerId")),
-    },
-  });
-
-  // Efter ordern och inte i samma anrop: raderna pekar på ordern, som får sitt
-  // id först när den finns. Se src/lib/order-budget.ts.
-  await saveOrderBudgets(db, companyId, order.id, readBudgetRows(formData));
-
-  revalidatePath(PATH);
-}
-
 export interface OrderFormState {
   error?: string;
   /** Sattes senast sparandet gick igenom. Stänger rutan i gränssnittet. */
   savedAt?: number;
 }
 
-/**
- * Ändrar en orders uppgifter.
- *
- * Svarar med ett tillstånd i stället för att bara köra, eftersom påslaget kan
- * avvisas. Ett påslag som skrivits som "40" när man menade "1,4" ska inte
- * sparas tyst — felet syns först på en faktura, och då är det för sent.
- */
-export async function updateOrder(
-  _previous: OrderFormState,
-  formData: FormData
-): Promise<OrderFormState> {
-  const session = await requireAdmin();
-  await assertWritable(session);
-  const { db, companyId } = session;
+/** Orderns uppgifter, färdigtolkade ur formuläret. */
+interface OrderFields {
+  orderNumber: string;
+  markupPercent: number | null;
+  fixedPriceOre: number | null;
+}
 
-  const id = String(formData.get("id") ?? "");
+/**
+ * Läser och kontrollerar fälten som är gemensamma för att skapa och ändra.
+ *
+ * Ligger på ett ställe eftersom det gjorde det tidigare bara vid ändring:
+ * skapa-rutan saknade både påslag och fast pris, och den som la upp en
+ * fastprisorder fick lägga upp den först och rätta den sedan. Två formulär mot
+ * samma tabell ska tolkas av samma kod, annars glider de isär igen.
+ *
+ * Ger antingen ett fel att visa eller färdiga värden — aldrig både och.
+ */
+function readOrderFields(
+  formData: FormData
+): { error: string } | { values: OrderFields } {
   const orderNumber = String(formData.get("orderNumber") ?? "").trim();
-  if (!id) return { error: "Ingen order angiven." };
   if (!orderNumber) return { error: "Ange ett ordernummer." };
 
   // Tomt fält betyder "företagets standardpåslag gäller", vilket är det
@@ -84,15 +64,73 @@ export async function updateOrder(
     };
   }
 
+  return { values: { orderNumber, markupPercent, fixedPriceOre } };
+}
+
+/**
+ * Lägger upp en ny order.
+ *
+ * Svarar med ett tillstånd av samma skäl som updateOrder: ett påslag som
+ * skrivits som "40" när man menade "1,4" ska inte sparas tyst — felet syns
+ * först på en faktura, och då är det för sent.
+ */
+export async function createOrder(
+  _previous: OrderFormState,
+  formData: FormData
+): Promise<OrderFormState> {
+  const session = await requireAdmin();
+  await assertWritable(session);
+  const { db, companyId } = session;
+
+  const fields = readOrderFields(formData);
+  if ("error" in fields) return fields;
+
+  const order = await db.order.create({
+    data: {
+      companyId,
+      orderNumber: fields.values.orderNumber,
+      customerId: await resolveCustomerId(db, formData.get("customerId")),
+      markupPercent: fields.values.markupPercent,
+      fixedPriceOre: fields.values.fixedPriceOre,
+    },
+  });
+
+  // Efter ordern och inte i samma anrop: raderna pekar på ordern, som får sitt
+  // id först när den finns. Se src/lib/order-budget.ts.
+  await saveOrderBudgets(db, companyId, order.id, readBudgetRows(formData));
+
+  revalidatePath(PATH);
+  return { savedAt: Date.now() };
+}
+
+/**
+ * Ändrar en orders uppgifter.
+ *
+ * Samma fält och samma kontroller som när ordern skapas — se readOrderFields.
+ */
+export async function updateOrder(
+  _previous: OrderFormState,
+  formData: FormData
+): Promise<OrderFormState> {
+  const session = await requireAdmin();
+  await assertWritable(session);
+  const { db, companyId } = session;
+
+  const id = String(formData.get("id") ?? "");
+  if (!id) return { error: "Ingen order angiven." };
+
+  const fields = readOrderFields(formData);
+  if ("error" in fields) return fields;
+
   // updateMany och inte update: id:t kommer från formuläret och får aldrig
   // kunna peka på en annan kunds order.
   await db.order.updateMany({
     where: { id },
     data: {
-      orderNumber,
+      orderNumber: fields.values.orderNumber,
       customerId: await resolveCustomerId(db, formData.get("customerId")),
-      markupPercent,
-      fixedPriceOre,
+      markupPercent: fields.values.markupPercent,
+      fixedPriceOre: fields.values.fixedPriceOre,
       // Att spara uppgifterna ÄR kvittot på att någon tittat. Ett snabbjobb
       // skapat i verkstaden slutar därmed vara en uppgift att göra, utan att
       // det behövs en egen knapp för "jag har sett den".

@@ -6,12 +6,19 @@ import type {
   OrderFormState,
   OrderToggleState,
 } from "@/app/admin/(panel)/ordrar/actions";
-import { Alert, Button, Field, Input } from "@/components/ui";
+import {
+  Alert,
+  Button,
+  dialogBody,
+  dialogEdge,
+  dialogSurface,
+} from "@/components/ui";
 import { formatDuration, minutesBetween } from "@/lib/format";
 import BudgetBar from "./BudgetBar";
-import BudgetMoments, { type BudgetMomentOption } from "./BudgetMoments";
+import type { BudgetMomentOption } from "./BudgetMoments";
+import OrderFields from "./OrderFields";
 import type { OrderBudgetRow } from "./OrdersTable";
-import SearchSelect, { type SearchSelectOption } from "./SearchSelect";
+import type { SearchSelectOption } from "./SearchSelect";
 import { IconOrder, IconReport } from "@/components/ui/icons";
 
 /**
@@ -114,9 +121,9 @@ export default function OrderActions({
       {/* Meny */}
       <dialog
         ref={menu}
-        className="w-[min(26rem,calc(100vw-2rem))] rounded-xl border border-neutral-200 bg-white p-0 shadow-xl backdrop:bg-neutral-900/40"
+        className={`w-[min(26rem,calc(100vw-2rem))] ${dialogSurface}`}
       >
-        <div className="border-b border-neutral-200 px-5 py-4">
+        <div className={`${dialogEdge} border-b border-neutral-200 px-5 py-4`}>
           <h2 className="text-sm font-semibold text-neutral-900">
             Order {order.orderNumber}
           </h2>
@@ -162,7 +169,7 @@ export default function OrderActions({
           )}
         </div>
 
-        <div className="p-2">
+        <div className={`${dialogBody} p-2`}>
           <p className="px-3 pb-1 pt-2 text-[11px] font-semibold uppercase tracking-wider text-neutral-400">
             Underlag
           </p>
@@ -274,7 +281,9 @@ export default function OrderActions({
           </form>
         </div>
 
-        <div className="flex justify-end border-t border-neutral-200 bg-neutral-50 px-5 py-3">
+        <div
+          className={`${dialogEdge} flex justify-end border-t border-neutral-200 bg-neutral-50 px-5 py-3`}
+        >
           <Button
             type="button"
             tone="secondary"
@@ -288,79 +297,37 @@ export default function OrderActions({
       {/* Ändra uppgifter */}
       <dialog
         ref={edit}
-        className="w-[min(28rem,calc(100vw-2rem))] rounded-xl border border-neutral-200 bg-white p-0 shadow-xl backdrop:bg-neutral-900/40"
+        className={`w-[min(28rem,calc(100vw-2rem))] ${dialogSurface}`}
       >
-        <div className="border-b border-neutral-200 px-5 py-4">
+        <div className={`${dialogEdge} border-b border-neutral-200 px-5 py-4`}>
           <h2 className="text-sm font-semibold text-neutral-900">
             Ändra order {order.orderNumber}
           </h2>
         </div>
 
-        <form action={submitEdit}>
-          <div className="space-y-4 px-5 py-5">
+        <form action={submitEdit} className="flex min-h-0 flex-1 flex-col">
+          <div className={`${dialogBody} space-y-4 px-5 py-5`}>
             {editState.error && <Alert>{editState.error}</Alert>}
             <input type="hidden" name="id" value={order.id} />
-            <Field label="Ordernummer">
-              <Input
-                name="orderNumber"
-                defaultValue={order.orderNumber}
-                required
-              />
-            </Field>
-            <Field label="Kund" hint="Sök på namn eller kundnummer.">
-              <SearchSelect
-                name="customerId"
-                options={customers}
-                defaultValue={order.customerId}
-                emptyLabel="Ingen kund"
-                placeholder="Sök kund…"
-              />
-            </Field>
-            <Field
-              label="Beräknad tid"
-              hint="Ett arbetsmoment i taget, i timmar. Totalen är orderns beräknade tid. Ta bort alla rader för ingen beräkning."
-            >
-              <BudgetMoments
-                moments={moments}
-                defaultRows={order.budgets.map((budget) => ({
+            <OrderFields
+              customers={customers}
+              moments={moments}
+              defaults={{
+                orderNumber: order.orderNumber,
+                customerId: order.customerId,
+                budgets: order.budgets.map((budget) => ({
                   momentId: budget.momentId,
                   minutes: budget.minutes,
-                }))}
-              />
-            </Field>
-            <Field
-              label="Påslag"
-              hint="Faktor, t.ex. 1,4. Lämna tomt för företagets standard. Används inte när ett fast pris är satt."
-            >
-              <Input
-                name="markup"
-                inputMode="decimal"
-                defaultValue={
-                  order.markupPercent === null
-                    ? ""
-                    : (order.markupPercent / 100).toFixed(2).replace(".", ",")
-                }
-                placeholder="1,4"
-              />
-            </Field>
-            <Field
-              label="Fast kundpris"
-              hint="Kronor för hela ordern. Ifyllt visar kalkylen det som pris och räknar vinsten mot självkostnaden. Tomt betyder löpande räkning."
-            >
-              <Input
-                name="fixedPrice"
-                inputMode="decimal"
-                defaultValue={
-                  order.fixedPriceOre === null
-                    ? ""
-                    : (order.fixedPriceOre / 100).toFixed(2).replace(".", ",")
-                }
-                placeholder="7350"
-              />
-            </Field>
+                })),
+                markupPercent: order.markupPercent,
+                fixedPriceOre: order.fixedPriceOre,
+              }}
+            />
           </div>
 
-          <div className="flex justify-end gap-2 border-t border-neutral-200 bg-neutral-50 px-5 py-3">
+          <div
+            className={`${dialogEdge} flex justify-end gap-2 border-t border-neutral-200 bg-neutral-50 px-5 py-3`}
+          >
             <Button
               type="button"
               tone="secondary"
@@ -380,9 +347,9 @@ export default function OrderActions({
           behövs för att våga trycka på knappen. */}
       <dialog
         ref={closeConfirm}
-        className="w-[min(28rem,calc(100vw-2rem))] rounded-xl border border-neutral-200 bg-white p-0 shadow-xl backdrop:bg-neutral-900/40"
+        className={`w-[min(28rem,calc(100vw-2rem))] ${dialogSurface}`}
       >
-        <div className="border-b border-neutral-200 px-5 py-4">
+        <div className={`${dialogEdge} border-b border-neutral-200 px-5 py-4`}>
           <h2 className="text-sm font-semibold text-neutral-900">
             Avsluta order {order.orderNumber}?
           </h2>
@@ -397,7 +364,7 @@ export default function OrderActions({
           </p>
         </div>
 
-        <ul className="divide-y divide-neutral-100 px-5 py-2">
+        <ul className={`${dialogBody} divide-y divide-neutral-100 px-5 py-2`}>
           {blockers.map((blocker) => (
             <li
               key={`${blocker.employeeName}-${blocker.momentName}-${blocker.since}`}
@@ -429,7 +396,9 @@ export default function OrderActions({
           </div>
         )}
 
-        <div className="flex justify-end gap-2 border-t border-neutral-200 bg-neutral-50 px-5 py-3">
+        <div
+          className={`${dialogEdge} flex justify-end gap-2 border-t border-neutral-200 bg-neutral-50 px-5 py-3`}
+        >
           <Button
             type="button"
             tone="secondary"

@@ -1,9 +1,7 @@
 import { requireAdmin } from "@/lib/admin-session";
-import FormDialog from "@/components/admin/FormDialog";
-import SearchSelect from "@/components/admin/SearchSelect";
-import BudgetMoments from "@/components/admin/BudgetMoments";
+import NewOrderDialog from "@/components/admin/NewOrderDialog";
 import OrdersTable from "@/components/admin/OrdersTable";
-import { Alert, EmptyState, Field, Input, PageHeader } from "@/components/ui";
+import { Alert, EmptyState, PageHeader } from "@/components/ui";
 import { minutesBetween } from "@/lib/format";
 import { budgetTotal } from "@/lib/order-budget";
 import { customerOptions } from "@/lib/customers";
@@ -86,34 +84,11 @@ export default async function OrdersPage() {
   });
 
   const newOrder = (
-    <FormDialog
-      trigger="Ny order"
-      title="Lägg till order"
-      description="Öppna ordrar är valbara på stämplingsskärmen."
+    <NewOrderDialog
+      customers={customerList}
+      moments={moments}
       action={createOrder}
-      submitLabel="Lägg till"
-    >
-      <Field label="Ordernummer">
-        <Input name="orderNumber" placeholder="2601" required autoFocus />
-      </Field>
-      <Field
-        label="Kund"
-        hint="Valfritt. Sök på namn, kundnummer eller org.nr."
-      >
-        <SearchSelect
-          name="customerId"
-          options={customerList}
-          emptyLabel="Ingen kund"
-          placeholder="Sök kund…"
-        />
-      </Field>
-      <Field
-        label="Beräknad tid"
-        hint="Valfritt. Lägg till ett arbetsmoment i taget och ange timmar, exempelvis 40 eller 7,5. Totalen är orderns beräknade tid."
-      >
-        <BudgetMoments moments={moments} />
-      </Field>
-    </FormDialog>
+    />
   );
 
   const quickJobs = rows.filter((order) => order.isQuickJob).length;

@@ -3,7 +3,16 @@
 import { useActionState, useEffect, useRef } from "react";
 import { useFormStatus } from "react-dom";
 import type { CustomerState } from "@/app/admin/(panel)/kunder/actions";
-import { Alert, Button, Field, Input, SectionTitle } from "@/components/ui";
+import {
+  Alert,
+  Button,
+  dialogBody,
+  dialogEdge,
+  dialogSurface,
+  Field,
+  Input,
+  SectionTitle,
+} from "@/components/ui";
 
 /**
  * RUTAN DÄR EN KUND LÄGGS UPP ELLER ÄNDRAS.
@@ -71,14 +80,14 @@ export default function CustomerDialog({
 
       <dialog
         ref={dialog}
-        className="w-[min(34rem,calc(100vw-2rem))] rounded-xl border border-neutral-200 bg-white p-0 shadow-xl backdrop:bg-neutral-900/40"
+        className={`w-[min(34rem,calc(100vw-2rem))] ${dialogSurface}`}
       >
-        <div className="border-b border-neutral-200 px-5 py-4">
+        <div className={`${dialogEdge} border-b border-neutral-200 px-5 py-4`}>
           <h2 className="text-sm font-semibold text-neutral-900">{title}</h2>
         </div>
 
-        <form action={submit}>
-          <div className="max-h-[70vh] space-y-5 overflow-y-auto px-5 py-5">
+        <form action={submit} className="flex min-h-0 flex-1 flex-col">
+          <div className={`${dialogBody} space-y-5 px-5 py-5`}>
             {state.error && <Alert>{state.error}</Alert>}
 
             {customer && <input type="hidden" name="id" value={customer.id} />}
@@ -219,7 +228,9 @@ export default function CustomerDialog({
             </div>
           </div>
 
-          <div className="flex justify-end gap-2 border-t border-neutral-200 bg-neutral-50 px-5 py-3">
+          <div
+            className={`${dialogEdge} flex justify-end gap-2 border-t border-neutral-200 bg-neutral-50 px-5 py-3`}
+          >
             <Button
               type="button"
               tone="secondary"
