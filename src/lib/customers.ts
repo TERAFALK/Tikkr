@@ -1,4 +1,5 @@
 import type { CompanyDb } from "./tenant";
+import { minutesBetween } from "./format";
 
 /**
  * KUNDREGISTRET.
@@ -144,4 +145,138 @@ export async function searchCustomers(
     ...customer,
     orders: _count.orders,
   }));
+}
+
+/** En order på kundsidan, med nedlagd tid. */
+export interface CustomerOrder {
+  id: string;
+  orderNumber: string;
+  status: string;
+  minutes: number;
+  entries: number;
+  isQuickJob: boolean;
+}
+
+export interface CustomerDetail {
+  id: string;
+  name: string;
+  customerNumber: string | null;
+  orgNumber: string | null;
+  contactName: string | null;
+  email: string | null;
+  phone: string | null;
+  addressLine: string | null;
+  postalCode: string | null;
+  city: string | null;
+  notes: string | null;
+  markupPercent: number | null;
+  discountPercent: number | null;
+  active: boolean;
+}
+
+export interface CustomerStats {
+  orders: CustomerOrder[];
+  openOrders: number;
+  totalMinutes: number;
+  /** Tid per arbetsmoment, mest tid först. Vilka maskiner kunden belastar. */
+  byMoment: { name: string; minutes: number }[];
+}
+
+/** Kunden, eller null när id:t inte finns hos företaget. */
+export async function getCustomer(
+  db: CompanyDb,
+  id: string
+): Promise<CustomerDetail | null> {
+  return db.customer.findFirst({
+    where: { id },
+    select: {
+      id: true,
+      name: true,
+      customerNumber: true,
+      orgNumber: true,
+      contactName: true,
+      email: true,
+      phone: true,
+      addressLine: true,
+      postalCode: true,
+      city: true,
+      notes: true,
+      markupPercent: true,
+      discountPercent: true,
+      active: true,
+    },
+  });
+}
+
+/**
+ * Kundens ordrar och tid.
+ *
+ * Räknas fram ur stämplingarna vid varje besök. Ingenting cachas, så en rättad
+ * post slår igenom bakåt — och en siffra som inte stämmer med rapporten för
+ * samma period är ett fel, inte en gammal uträkning.
+ *
+ * ÖPPNA ORDRAR FÖRST. Det är dem man har en fråga om; de avslutade tittar man
+ * på för att jämföra med något.
+ *
+ * Improduktiv tid kan aldrig ha en order och finns därför inte här. Filtret
+ * står ändå utskrivet i frågan, av samma skäl som i order-export.ts: det säger
+ * vad frågan handlar om och kostar ingenting.
+ */
+export async function customerStats(
+  db: CompanyDb,
+  customerId: string
+): Promise<CustomerStats> {
+  const orders = await db.order.findMany({
+    where: { customerId },
+    orderBy: [{ status: "asc" }, { orderNumber: "asc" }],
+    select: {
+      id: true,
+      orderNumber: true,
+      status: true,
+      isQuickJob: true,
+      timeEntries: {
+        where: { kind: "ORDER" },
+        select: {
+          clockInAt: true,
+          clockOutAt: true,
+          moment: { select: { name: true } },
+        },
+      },
+    },
+  });
+
+  const byMoment = new Map<string, number>();
+  let totalMinutes = 0;
+
+  const rows: CustomerOrder[] = orders.map((order) => {
+    let minutes = 0;
+
+    for (const entry of order.timeEntries) {
+      const length = minutesBetween(entry.clockInAt, entry.clockOutAt);
+      minutes += length;
+
+      const name = entry.moment?.name ?? "Okänt arbetsmoment";
+      byMoment.set(name, (byMoment.get(name) ?? 0) + length);
+    }
+
+    totalMinutes += minutes;
+
+    return {
+      id: order.id,
+      orderNumber: order.orderNumber,
+      status: order.status,
+      minutes,
+      entries: order.timeEntries.length,
+      isQuickJob: order.isQuickJob,
+    };
+  });
+
+  return {
+    orders: rows,
+    openOrders: rows.filter((order) => order.status === "OPEN").length,
+    totalMinutes,
+    byMoment: [...byMoment.entries()]
+      .map(([name, minutes]) => ({ name, minutes }))
+      .sort((a, b) => b.minutes - a.minutes),
+  };
 }

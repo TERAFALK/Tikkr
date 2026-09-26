@@ -6,6 +6,7 @@ import { useState } from "react";
 import { logout } from "@/app/admin/actions";
 import {
   IconBroom,
+  IconBuilding,
   IconClock,
   IconDevice,
   IconLogout,
@@ -57,6 +58,7 @@ const sections: { label: string; links: NavLink[] }[] = [
   {
     label: "Register",
     links: [
+      { href: "/admin/kunder", label: "Kunder", icon: IconBuilding },
       { href: "/admin/ordrar", label: "Ordrar", icon: IconOrder },
       { href: "/admin/anstallda", label: "Anställda", icon: IconPeople },
       { href: "/admin/moment", label: "Arbetsmoment", icon: IconMoment },
