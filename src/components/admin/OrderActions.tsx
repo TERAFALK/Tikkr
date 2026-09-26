@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useEffect, useRef } from "react";
+import { useActionState, useEffect, useRef, useState } from "react";
 import { useFormStatus } from "react-dom";
 import type {
   OrderFormState,
@@ -48,6 +48,12 @@ export default function OrderActions({
     formData: FormData
   ) => Promise<OrderToggleState>;
 }) {
+  // Kryssrutan för belopp på kundens underlag. Nollställs inte mellan
+  // öppningar med flit: den som tar ut tre ordrar i rad vill oftast ha samma
+  // sorts underlag på alla tre.
+  const [withPrice, setWithPrice] = useState(false);
+  const priceParam = withPrice ? "&belopp=1" : "";
+
   const menu = useRef<HTMLDialogElement>(null);
   const edit = useRef<HTMLDialogElement>(null);
   // Inte "confirm": det namnet är webbläsarens egen dialogfunktion, och att
@@ -128,15 +134,36 @@ export default function OrderActions({
             Underlag
           </p>
 
+          {/* Kryssrutan styr BARA det här uttaget. Belopp på kundens underlag
+              är ett val man gör per gång, inte ett läge man ställer in på en kund
+              och sedan glömmer. Självkostnad och marginal kommer aldrig med —
+              det är en annan sorts dokument, längre ner i menyn. */}
+          <label className="flex cursor-pointer items-start gap-2 rounded-md px-3 py-2 text-[13px] hover:bg-neutral-50">
+            <input
+              type="checkbox"
+              checked={withPrice}
+              onChange={(event) => setWithPrice(event.target.checked)}
+              className="mt-0.5 h-3.5 w-3.5 rounded border-neutral-300 text-blue-600 focus:ring-blue-600"
+            />
+            <span>
+              <span className="block font-medium text-neutral-900">
+                Visa belopp och rabatt
+              </span>
+              <span className="block text-neutral-500">
+                Utan kryss visas bara tid, som förut
+              </span>
+            </span>
+          </label>
+
           <MenuLink
-            href={`${exportBase}&format=pdf`}
+            href={`${exportBase}&format=pdf${priceParam}`}
             icon={<IconOrder />}
             title="Ladda ner PDF"
             description="Färdigt dokument att bifoga en faktura"
             onPick={() => menu.current?.close()}
           />
           <MenuLink
-            href={`${exportBase}&format=excel`}
+            href={`${exportBase}&format=excel${priceParam}`}
             icon={<IconReport />}
             title="Ladda ner Excel"
             description="Samma innehåll, att räkna vidare på"

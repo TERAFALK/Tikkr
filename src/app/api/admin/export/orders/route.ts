@@ -139,7 +139,15 @@ export async function GET(request: NextRequest) {
   // Både öppna och stängda ordrar går att exportera. En färdig order är ofta
   // den man vill titta på — "hur lång tid tog ett liknande jobb förra gången"
   // är hela poängen med att spara tiden.
-  const orders = await getOrderExports(db, orderIds);
+  // BELOPP ÄR ETT VAL VID UTTAGET, inte ett läge på kunden. Utan kryss ser
+  // underlaget ut precis som förut — bara tid. Den som ska visa hur många
+  // timmar ett jobb tog behöver inte skicka med ett pris.
+  const withPrice = params.get("belopp") === "1";
+
+  const orders = await getOrderExports(db, orderIds, {
+    withPrice,
+    companyMarkupPercent: company?.markupPercent ?? 100,
+  });
 
   if (orders.length === 0) {
     return NextResponse.json({ error: "Hittade ingen order." }, { status: 404 });

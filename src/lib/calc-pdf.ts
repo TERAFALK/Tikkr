@@ -197,13 +197,33 @@ function renderCalc(
   // fastprisorder har det inte bestämt något, och att visa det hade sett ut
   // som en uträkning som inte stämmer.
   if (!order.priceIsFixed) {
+    // Varifrån påslaget kom skrivs ut. Tre ställen kan bestämma det — ordern,
+    // kunden, företaget — och den som undrar varför priset blev som det blev
+    // ska slippa leta i tre inställningar.
+    const source =
+      order.price.markupSource === "order"
+        ? " (satt på ordern)"
+        : order.price.markupSource === "customer"
+          ? " (kundens)"
+          : "";
+
     y = drawSumLine(
       doc,
       y,
-      `Påslag ${formatMarkup(order.markupPercent)}${
-        order.markupFromOrder ? " (satt på ordern)" : ""
-      }`,
-      formatCurrency(order.profitOre)
+      `Påslag ${formatMarkup(order.markupPercent)}${source}`,
+      formatCurrency(order.price.priceBeforeDiscountOre - order.totalCostOre)
+    );
+  }
+
+  // RABATTEN PÅ EGEN RAD, aldrig hopslagen med priset. Ett belopp som inte
+  // går att bryta ned går inte att försvara, och den som ger rabatt ska kunna
+  // se vad den kostade.
+  if (order.price.discountPercent !== null) {
+    y = drawSumLine(
+      doc,
+      y,
+      `Rabatt ${order.price.discountPercent} % (kundens)`,
+      `−${formatCurrency(order.price.discountOre)}`
     );
   }
 

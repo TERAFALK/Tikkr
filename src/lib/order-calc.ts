@@ -1,6 +1,7 @@
 import type { CompanyDb } from "./tenant";
 import { minutesBetween } from "./format";
-import { applyMarkup, costForMinutes } from "./money";
+import { costForMinutes } from "./money";
+import { priceForOrder, type OrderPrice } from "./order-price";
 
 /**
  * EFTERKALKYL PER ORDER — vad jobbet kostat, och vad det ska ge.
@@ -79,8 +80,15 @@ export interface OrderCalc {
    */
   minutesWithoutRate: number;
   markupPercent: number;
-  /** true när påslaget kommer från ordern och inte från företagets standard. */
+  /** true när påslaget kommer från ordern och inte från kunden eller företaget. */
   markupFromOrder: boolean;
+  /**
+   * Priset uppdelat: före rabatt, rabatten, och att betala.
+   *
+   * Samma objekt som kundens underlag får. Delat med flit — två uppräkningar
+   * av samma pris är två chanser att de båda dokumenten säger olika saker.
+   */
+  price: OrderPrice;
   /**
    * Priset mot kund. Orderns fasta pris när ett sådant finns, annars
    * självkostnaden uppräknad med påslaget.
@@ -115,7 +123,9 @@ export async function getOrderCalcs(
     select: {
       id: true,
       orderNumber: true,
-      customer: { select: { name: true } },
+      customer: {
+        select: { name: true, markupPercent: true, discountPercent: true },
+      },
       markupPercent: true,
       fixedPriceOre: true,
       timeEntries: {
@@ -211,14 +221,19 @@ export async function getOrderCalcs(
 
     const sorted = [...groups.values()].sort((a, b) => b.costOre - a.costOre);
 
-    const markupPercent = order.markupPercent ?? companyMarkupPercent;
+    // Hela prisräkningen ligger i order-price.ts, som också är det enda
+    // kundens underlag får se. Delad med flit: två uppräkningar av samma pris
+    // är två chanser att kalkylen och underlaget säger olika saker.
+    const price = priceForOrder({
+      costOre: totalCostOre,
+      orderMarkupPercent: order.markupPercent,
+      customerMarkupPercent: order.customer?.markupPercent ?? null,
+      companyMarkupPercent,
+      customerDiscountPercent: order.customer?.discountPercent ?? null,
+      fixedPriceOre: order.fixedPriceOre,
+    });
 
-    // Ett avtalat pris går före ett framräknat. Har man kommit överens om
-    // 7 350 kr är det priset, oavsett vad påslaget skulle ha gett.
-    const priceIsFixed = order.fixedPriceOre !== null;
-    const priceOre =
-      order.fixedPriceOre ?? applyMarkup(totalCostOre, markupPercent);
-    const profitOre = priceOre - totalCostOre;
+    const profitOre = price.priceOre - totalCostOre;
 
     return {
       orderId: order.id,
@@ -229,10 +244,11 @@ export async function getOrderCalcs(
       totalMinutes,
       totalCostOre,
       minutesWithoutRate,
-      markupPercent,
-      markupFromOrder: order.markupPercent !== null,
-      priceOre,
-      priceIsFixed,
+      markupPercent: price.markupPercent,
+      markupFromOrder: price.markupSource === "order",
+      price,
+      priceOre: price.priceOre,
+      priceIsFixed: price.isFixed,
       profitOre,
       profitPercent:
         totalCostOre > 0 ? Math.round((profitOre / totalCostOre) * 100) : null,

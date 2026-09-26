@@ -1,5 +1,6 @@
 import type { CompanyDb } from "./tenant";
 import { minutesBetween } from "./format";
+import { getOrderPrices, type OrderPrice } from "./order-price";
 
 /**
  * UNDERLAG PER ORDER.
@@ -26,10 +27,33 @@ export interface OrderExportRow {
   manual: boolean;
 }
 
+/**
+ * Kundens uppgifter, som de står i sidhuvudet.
+ *
+ * Fanns inte före kundregistret — då skrevs de för hand varje gång ett
+ * underlag skulle bifogas en faktura.
+ */
+export interface OrderExportCustomer {
+  name: string;
+  orgNumber: string | null;
+  addressLine: string | null;
+  postalCode: string | null;
+  city: string | null;
+}
+
 export interface OrderExport {
   orderId: string;
   orderNumber: string;
   customerName: string | null;
+  customer: OrderExportCustomer | null;
+  /**
+   * Priset, NÄR DET BEGÄRTS. null när underlaget ska visa bara tid.
+   *
+   * Kommer från order-price.ts, som är den enda vägen hit. Självkostnad och
+   * marginal finns inte i typen — att läcka dem till kundens dokument är
+   * därmed ett typfel och inte en fråga om disciplin. Se order-calc.ts.
+   */
+  price: OrderPrice | null;
   status: string;
   /** Beräknad tid i minuter, eller null. Visas i underlaget för jämförelse. */
   budgetMinutes: number | null;
@@ -43,11 +67,32 @@ export interface OrderExport {
   lastEntryAt: Date | null;
 }
 
+export interface OrderExportOptions {
+  /**
+   * Tar med pris och rabatt.
+   *
+   * Ett val vid uttaget, inte ett läge på kunden. Utan det ser underlaget ut
+   * precis som förut — bara tid — och den som bara ska visa hur många timmar
+   * ett jobb tog behöver inte skicka med ett belopp.
+   */
+  withPrice?: boolean;
+  /** Företagets standardpåslag. Krävs när priset ska med. */
+  companyMarkupPercent?: number;
+}
+
 export async function getOrderExports(
   db: CompanyDb,
-  orderIds: string[]
+  orderIds: string[],
+  options: OrderExportOptions = {}
 ): Promise<OrderExport[]> {
   if (orderIds.length === 0) return [];
+
+  // Priset hämtas för sig, genom order-price.ts. Den här filen får aldrig se
+  // en självkostnad — se kommentaren på OrderExport.price.
+  const prices =
+    options.withPrice && options.companyMarkupPercent !== undefined
+      ? await getOrderPrices(db, orderIds, options.companyMarkupPercent)
+      : null;
 
   const orders = await db.order.findMany({
     where: { id: { in: orderIds } },
@@ -55,7 +100,15 @@ export async function getOrderExports(
     select: {
       id: true,
       orderNumber: true,
-      customer: { select: { name: true } },
+      customer: {
+        select: {
+          name: true,
+          orgNumber: true,
+          addressLine: true,
+          postalCode: true,
+          city: true,
+        },
+      },
       status: true,
       budgetMinutes: true,
       timeEntries: {
@@ -92,6 +145,8 @@ export async function getOrderExports(
       orderId: order.id,
       orderNumber: order.orderNumber,
       customerName: order.customer?.name ?? null,
+      customer: order.customer,
+      price: prices?.get(order.id) ?? null,
       status: order.status,
       budgetMinutes: order.budgetMinutes,
       rows,

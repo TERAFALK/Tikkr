@@ -1,6 +1,7 @@
 import PDFDocument from "pdfkit";
 import type { OrderExport } from "./order-export";
 import { formatDate, formatDateTime, formatDuration } from "./format";
+import { formatCurrency } from "./money";
 import { drawBarChart } from "./pdf-chart";
 import { drawFooter } from "./pdf-footer";
 
@@ -127,10 +128,29 @@ function renderOrder(
   doc.text(`Order ${order.orderNumber}`, MARGIN, y);
   y = doc.y + 2;
 
-  if (order.customerName) {
+  if (order.customer) {
     doc.font("Helvetica").fontSize(13).fillColor("#525252");
-    doc.text(order.customerName, MARGIN, y);
+    doc.text(order.customer.name, MARGIN, y);
     y = doc.y;
+
+    // Adress och org.nr under namnet. Skrevs för hand varje gång innan
+    // kundregistret fanns — nu står de där, och underlaget går att bifoga en
+    // faktura utan att kompletteras.
+    const lines = [
+      order.customer.addressLine,
+      [order.customer.postalCode, order.customer.city]
+        .filter(Boolean)
+        .join(" "),
+      order.customer.orgNumber && `Org.nr ${order.customer.orgNumber}`,
+    ].filter((line): line is string => Boolean(line));
+
+    if (lines.length > 0) {
+      doc.font("Helvetica").fontSize(9).fillColor("#737373");
+      for (const line of lines) {
+        doc.text(line, MARGIN, y + 2);
+        y = doc.y;
+      }
+    }
   }
 
   y += 10;
@@ -257,6 +277,52 @@ function renderOrder(
     );
 
     y += 14;
+  }
+
+  /* --- Pris, när det begärts -------------------------------------------- */
+
+  // BARA priset, rabatten och det att betala. Självkostnad och marginal finns
+  // inte i OrderExport och kan därför inte hamna här — se order-price.ts.
+  if (order.price) {
+    y += 8;
+
+    const rows: [string, number][] = [];
+
+    if (order.price.discountPercent !== null) {
+      rows.push(["Pris", order.price.priceBeforeDiscountOre]);
+      rows.push([
+        `Rabatt ${order.price.discountPercent} %`,
+        -order.price.discountOre,
+      ]);
+    }
+
+    for (const [label, amount] of rows) {
+      doc.font("Helvetica").fontSize(9).fillColor("#525252");
+      doc.text(label, MARGIN + 8, y, { width: 200 });
+      doc.text(formatCurrency(amount), A4_WIDTH - MARGIN - 158, y, {
+        width: 150,
+        align: "right",
+      });
+      y += 14;
+    }
+
+    doc.rect(MARGIN, y, CONTENT_WIDTH, 26).fill("#0a0a0a");
+    doc.font("Helvetica-Bold").fontSize(10).fillColor("#ffffff");
+    doc.text("ATT BETALA", MARGIN + 8, y + 8, { width: 200 });
+    doc.text(
+      formatCurrency(order.price.priceOre),
+      A4_WIDTH - MARGIN - 158,
+      y + 8,
+      { width: 150, align: "right" }
+    );
+
+    y += 30;
+
+    if (order.price.isFixed) {
+      doc.font("Helvetica").fontSize(8).fillColor("#737373");
+      doc.text("Avtalat fast pris.", MARGIN, y, { width: CONTENT_WIDTH });
+      y += 12;
+    }
   }
 
   y += 34;

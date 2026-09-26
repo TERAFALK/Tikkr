@@ -31,6 +31,17 @@ function calc(overrides: Partial<OrderCalc> = {}): OrderCalc {
     minutesWithoutRate: 0,
     markupPercent: 140,
     markupFromOrder: false,
+    // Samma tal som fälten nedan, men uppdelat. Underlaget till kunden får
+    // BARA det här objektet — se order-price.ts.
+    price: {
+      priceBeforeDiscountOre: 379610,
+      discountPercent: null,
+      discountOre: 0,
+      priceOre: 379610,
+      isFixed: false,
+      markupPercent: 140,
+      markupSource: "company",
+    },
     priceOre: 379610,
     priceIsFixed: false,
     profitOre: 108460,
