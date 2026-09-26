@@ -43,7 +43,11 @@ beforeAll(async () => {
       data: {
         companyId,
         orderNumber: "7001",
-        customer: { create: { companyId: companyId, name: "Kund A" } },
+        customerId: (
+          await unsafeGlobalPrisma.customer.create({
+            data: { companyId, name: "Kund A" },
+          })
+        ).id,
       },
     })
   ).id;
@@ -52,7 +56,11 @@ beforeAll(async () => {
       data: {
         companyId,
         orderNumber: "7002",
-        customer: { create: { companyId: companyId, name: "Kund B" } },
+        customerId: (
+          await unsafeGlobalPrisma.customer.create({
+            data: { companyId, name: "Kund B" },
+          })
+        ).id,
       },
     })
   ).id;

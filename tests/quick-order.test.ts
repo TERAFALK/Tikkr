@@ -255,10 +255,18 @@ describe("kunderna till rutnätet", () => {
       data: { companyId: otherCompanyId, name: "Grannens kund" },
     });
 
-    expect(await pickableCustomers(forCompany(otherCompanyId))).toHaveLength(1);
-    const names = (await pickableCustomers(forCompany(companyId))).map(
+    // Kontrollerar NAMNEN och inte antalet. Ett tidigare test i filen lägger
+    // också upp en kund hos grannen, och ett hårt antal hade då gått sönder av
+    // en ändring som inte har med isoleringen att göra.
+    const grannens = (await pickableCustomers(forCompany(otherCompanyId))).map(
       (customer) => customer.name
     );
-    expect(names).not.toContain("Grannens kund");
+    const egna = (await pickableCustomers(forCompany(companyId))).map(
+      (customer) => customer.name
+    );
+
+    expect(grannens).toContain("Grannens kund");
+    expect(egna).not.toContain("Grannens kund");
+    expect(grannens).not.toContain("Teltek");
   });
 });

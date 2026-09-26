@@ -60,7 +60,11 @@ beforeAll(async () => {
       data: {
         companyId,
         orderNumber: "5001",
-        customer: { create: { companyId: companyId, name: "Kund A" } },
+        customerId: (
+          await unsafeGlobalPrisma.customer.create({
+            data: { companyId, name: "Kund A" },
+          })
+        ).id,
       },
     })
   ).id;
@@ -69,7 +73,11 @@ beforeAll(async () => {
       data: {
         companyId,
         orderNumber: "5002",
-        customer: { create: { companyId: companyId, name: "Kund B" } },
+        customerId: (
+          await unsafeGlobalPrisma.customer.create({
+            data: { companyId, name: "Kund B" },
+          })
+        ).id,
       },
     })
   ).id;
@@ -692,7 +700,11 @@ describe("avsluta en order med pågående stämplingar", () => {
         data: {
           companyId,
           orderNumber: `9${String(counter).padStart(3, "0")}`,
-          customer: { create: { companyId, name: `Kund C ${counter}` } },
+          customerId: (
+          await unsafeGlobalPrisma.customer.create({
+            data: { companyId, name: `Kund C ${counter}` },
+          })
+        ).id,
         },
       })
     ).id;
