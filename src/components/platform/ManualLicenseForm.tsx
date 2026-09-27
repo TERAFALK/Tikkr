@@ -31,14 +31,9 @@ export default function ManualLicenseForm({
     {}
   );
 
-  if (managedByStripe) {
-    return (
-      <Alert tone="info">
-        Antalet licenser styrs av prenumerationen hos Stripe och ändras av
-        kunden.
-      </Alert>
-    );
-  }
+  // Antalet står redan i tabellen på kortet, och förklaringen står där en
+  // gång. Se SubscriptionOverrideForm.
+  if (managedByStripe) return null;
 
   return (
     <form action={action} className="space-y-3">

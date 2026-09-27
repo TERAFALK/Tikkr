@@ -236,14 +236,17 @@ export default async function SubscriptionPage({
         <CardHeader title="Så räknas priset" />
         <div className="space-y-2 p-5 text-[13px] leading-relaxed text-neutral-600">
           <p>
-            Avgiften avser antalet licenser. En licens ger rätt att koppla en
-            stämplingsskärm. Antalet anställda, ordrar och stämplingar påverkar
-            inte priset, och ingen grundavgift tillkommer. Under provperioden
-            ingår {TRIAL_LICENSES} licenser.
+            Avgiften avser antalet licenser, en per stämplingsskärm. Antalet
+            anställda, ordrar och stämplingar påverkar inte priset, och ingen
+            grundavgift tillkommer. Under provperioden ingår{" "}
+            {TRIAL_LICENSES} licenser.
           </p>
           <p>
-            Antalet ändras endast av er, aldrig automatiskt. Vid utökning under
-            pågående period debiteras enbart återstående dagar av perioden.
+            Tillval kostar ett fast belopp per företag, oavsett antal skärmar.
+          </p>
+          <p>
+            Antal och tillval ändras endast av er. Vid ändring under pågående
+            period debiteras enbart återstående dagar.
           </p>
           <p>
             Stämplingsskärmarna påverkas inte av betalningsläget. Vid utebliven

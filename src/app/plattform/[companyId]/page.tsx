@@ -51,6 +51,8 @@ export default async function CompanyPage({
 
   const { company, admins, devices, note, history, historyTotal, stats, modules } =
     detail;
+  const managedByStripe = Boolean(company.stripeSubscriptionId);
+
   const monthlyRevenue = monthlyRevenueFor(
     company,
     await getScreenPricing(),
@@ -159,27 +161,41 @@ export default async function CompanyPage({
                 />
               </dl>
 
-              <SubscriptionOverrideForm
-                companyId={company.id}
-                currentStatus={company.subscriptionStatus}
-                managedByStripe={Boolean(company.stripeSubscriptionId)}
-              />
+              {/* EN förklaring, inte en per formulär. Status, licenser och
+                  tillval styrs alla av samma sak, och tre rutor som sa samma
+                  mening lästes som tre olika besked. */}
+              {managedByStripe ? (
+                <Alert tone="info">
+                  Prenumerationen hanteras av Stripe. Status, licenser,
+                  intervall och tillval ändras där och uppdateras här
+                  automatiskt.
+                </Alert>
+              ) : (
+                <SubscriptionOverrideForm
+                  companyId={company.id}
+                  currentStatus={company.subscriptionStatus}
+                  managedByStripe={false}
+                />
+              )}
             </div>
 
             {/* Licenserna hör ihop med statusen — båda beskriver vad kunden
                 betalar för. Som eget kort blev det bara ett halvtomt kort
                 bredvid ett fullt. */}
-            <div className="border-t border-neutral-100 p-5">
-              <ManualLicenseForm
-                companyId={company.id}
-                current={company.screenLicenses}
-                used={devices.length}
-                managedByStripe={Boolean(company.stripeSubscriptionId)}
-              />
-            </div>
+            {!managedByStripe && (
+              <div className="border-t border-neutral-100 p-5">
+                <ManualLicenseForm
+                  companyId={company.id}
+                  current={company.screenLicenses}
+                  used={devices.length}
+                  managedByStripe={false}
+                />
+              </div>
+            )}
 
             {/* Tillvalen står i samma kort av samma skäl som licenserna:
-                allt här beskriver vad kunden betalar för. */}
+                allt här beskriver vad kunden betalar för. Listan visas även
+                för Stripe-kunder — vad de köpt står ingen annanstans. */}
             <div className="border-t border-neutral-100 p-5">
               <p className="mb-3 text-[13px] font-medium text-neutral-700">
                 Tillval
@@ -187,7 +203,7 @@ export default async function CompanyPage({
               <ModuleForm
                 companyId={company.id}
                 modules={modules}
-                managedByStripe={Boolean(company.stripeSubscriptionId)}
+                managedByStripe={managedByStripe}
               />
             </div>
           </Card>
@@ -367,7 +383,7 @@ export default async function CompanyPage({
         <DeleteCompanyForm
             companyId={company.id}
             companyName={company.name}
-            managedByStripe={Boolean(company.stripeSubscriptionId)}
+            managedByStripe={managedByStripe}
           />
         </div>
       </div>

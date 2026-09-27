@@ -84,8 +84,8 @@ export default function ModuleSection({
 
       {!hasSubscription && (
         <p className="text-xs leading-relaxed text-neutral-500">
-          Tillval ingår utan kostnad under provperioden. Det som är påslaget
-          när ni börjar betala läggs till på prenumerationen.
+          Utan kostnad under provperioden. Det som är påslaget vid köp läggs
+          till på prenumerationen.
         </p>
       )}
     </div>

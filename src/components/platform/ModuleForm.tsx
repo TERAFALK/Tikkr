@@ -42,12 +42,6 @@ export default function ModuleForm({
       {state.error && <Alert>{state.error}</Alert>}
       {state.ok && <Alert tone="info">{state.ok}</Alert>}
 
-      {managedByStripe && (
-        <Alert tone="info">
-          Tillvalen ligger på prenumerationen hos Stripe och ändras av kunden.
-        </Alert>
-      )}
-
       <ul className="space-y-3">
         {modules.map((row) => (
           <li key={row.key} className="border-t border-neutral-100 pt-3 first:border-0 first:pt-0">

@@ -27,15 +27,11 @@ export default function SubscriptionOverrideForm({
     {}
   );
 
-  if (managedByStripe) {
-    return (
-      <Alert tone="info">
-        Prenumerationen hanteras av Stripe. Ändringar av status, antal licenser
-        och betalningsintervall görs i Stripe och uppdateras här automatiskt.
-        Manuell ändring är avstängd för att de två inte ska visa olika uppgifter.
-      </Alert>
-    );
-  }
+  // Styrs prenumerationen av Stripe finns ingenting att erbjuda här. Statusen
+  // står redan i tabellen ovanför, och FÖRKLARINGEN står en gång på kortet —
+  // inte en gång per formulär. Tre rutor som sa samma sak lästes som tre
+  // olika besked.
+  if (managedByStripe) return null;
 
   return (
     <form action={action} className="space-y-3">
