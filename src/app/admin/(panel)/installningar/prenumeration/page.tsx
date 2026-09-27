@@ -1,7 +1,7 @@
 import { requireAdmin } from "@/lib/admin-session";
 import { unsafeGlobalPrisma } from "@/lib/db";
 import { getBillingOverview } from "@/lib/billing";
-import { isStripeConfigured, yearlyAvailable } from "@/lib/stripe";
+import { paymentsAvailable, yearlyAvailable } from "@/lib/stripe";
 import { evaluateAccess } from "@/lib/subscription";
 import { TRIAL_LICENSES } from "@/lib/licenses";
 import LicenseForm from "@/components/admin/LicenseForm";
@@ -38,8 +38,8 @@ export default async function SubscriptionPage({
     pastDueSince: company.pastDueSince,
   });
 
-  const configured = isStripeConfigured();
-  const yearly = yearlyAvailable();
+  const configured = await paymentsAvailable();
+  const yearly = await yearlyAvailable();
 
   // Hämtas alltid, även utan kortbetalning. Antalet skärmar och priset finns i
   // vår egen databas respektive i reservpriserna — tidigare visades noll

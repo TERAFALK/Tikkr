@@ -6,7 +6,7 @@ import { evaluateAccess } from "@/lib/subscription";
 import { isModuleKey, type ModuleKey } from "@/lib/modules";
 import {
   getScreenPricing,
-  isStripeConfigured,
+  paymentsAvailable,
   yearlyAvailable,
 } from "@/lib/stripe";
 import { activeNotices } from "@/lib/notices";
@@ -129,8 +129,8 @@ export default async function PanelLayout({
               state={access}
               companyName={session.companyName}
               screens={company?.screenLicenses ?? 1}
-              paymentsAvailable={isStripeConfigured()}
-              yearlyAvailable={yearlyAvailable()}
+              paymentsAvailable={await paymentsAvailable()}
+              yearlyAvailable={await yearlyAvailable()}
               pricing={await getScreenPricing()}
             />
           ) : (

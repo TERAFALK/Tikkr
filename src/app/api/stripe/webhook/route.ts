@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import type Stripe from "stripe";
 import { screenItemOf, stripe, toSubscriptionStatus } from "@/lib/stripe";
+import { priceBook } from "@/lib/price-book";
 import { syncModulesFromSubscription } from "@/lib/billing";
 import { unsafeGlobalPrisma } from "@/lib/db";
 
@@ -98,7 +99,7 @@ async function handle(event: Stripe.Event) {
       // kan prenumerationen ha flera rader, och `items.data[0]` kunde lika
       // gärna vara löneunderlaget — kvantitet 1. Då hade en kund med tre
       // skärmar tyst blivit en.
-      const item = screenItemOf(subscription);
+      const item = screenItemOf(await priceBook(), subscription);
       const quantity = item?.quantity;
       const interval = item?.price?.recurring?.interval ?? null;
 

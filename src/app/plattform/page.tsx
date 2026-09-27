@@ -7,7 +7,7 @@ import {
   summarizeRevenue,
 } from "@/lib/platform-admin";
 import { emailIsConfigured } from "@/lib/email";
-import { isStripeConfigured } from "@/lib/stripe";
+import { paymentsAvailable } from "@/lib/stripe";
 import {
   Badge,
   ButtonLink,
@@ -67,7 +67,7 @@ export default async function PlatformPage({
       systemHealth(),
     ]);
 
-  const stripeReady = isStripeConfigured();
+  const stripeReady = await paymentsAvailable();
 
   // Siffrorna raknas pa ALLA foretag, aldrig pa soktraffarna. En manadsintakt
   // som andrar sig nar man soker ar inte en manadsintakt.

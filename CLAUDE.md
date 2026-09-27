@@ -157,6 +157,9 @@ comp_adjustments — id, company_id, employee_id, date, minutes,
   — tillvalen, se § 3.1 —
 company_modules  — id, company_id, module, source, stripe_item_id,
                    enabled_by, enabled_at
+
+  — plattformens egna tabeller, aldrig kundens —
+stripe_prices    — item, month_price_id, year_price_id, updated_by_email
 ```
 
 ### Beslutade regler för stämpling (bestämt 2026-08-10)
@@ -572,6 +575,28 @@ läses därifrån vid varje sidvisning, precis som skärmpriset —
 `FALLBACK_PRICE_PER_SCREEN` och `MODULES[...].fallbackMonthly` används bara i
 labbet och hos kunder som betalar mot faktura. En prisändring hos Stripe syns
 i panelen och på säljsidan utan deploy, och det är hela poängen.
+
+**Vilken artikel som är vad sätts i plattformspanelen**, under Artiklar, och
+ligger i `stripe_prices`. `src/lib/price-book.ts` är enda stället som avgör
+det: databasen först, miljövariabeln som reserv.
+
+Numren stod först bara i miljövariabler. Det betydde att en ny artikel krävde
+att någon redigerade en fil på servern och startade om appen — för att skriva
+in en identifierare som inte ens är hemlig. Variablerna läses fortfarande, så
+att en ny server går att sätta upp med bara en `.env` och så att en
+installation vars databas inte hunnit fyllas kan ta betalt.
+
+Namnen bildas ur nyckeln: `STRIPE_PRICE_<sak>_<MONTH|YEAR>`, där `SCREEN` är
+skärmlicensen och resten heter som sin modulnyckel. De gamla namnen
+(`STRIPE_PRICE_ID` med flera) läses också, så att en `.env` i drift fungerar
+oförändrad. **Skriv inte ut variabelnamn i registret** — en ny modul ska inte
+behöva döpa två variabler, och namn som skrivs var för sig glider isär, vilket
+är precis vad som hände förut.
+
+Numret kontrolleras mot Stripe när det sparas: att artikeln finns, att den är
+återkommande, och att intervallet stämmer med fältet. Ett årspris i
+månadsfältet ger en faktura tolv gånger för dyr, och det ska inte gå att
+spara.
 
 Under provperioden slår kunden på och av modulerna fritt. Vid köp blir de
 påslagna modulerna rader på prenumerationen. En kund som redan betalar slår

@@ -374,6 +374,21 @@ export class PlatformActionError extends Error {
   }
 }
 
+/**
+ * Skriver en rad i åtgärdsloggen utan att röra ett företag.
+ *
+ * Finns för åtgärder som gäller plattformen och inte en enskild kund, som att
+ * ändra ett artikelnummer hos Stripe. Samma logg som allt annat: en ändring
+ * som påverkar vad alla kunder faktureras ska gå att härleda till en person.
+ */
+export async function recordPlatformAction(params: {
+  actorEmail: string;
+  action: string;
+  detail?: string;
+}) {
+  await record(params);
+}
+
 async function record(params: {
   actorEmail: string;
   action: string;

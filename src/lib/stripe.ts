@@ -1,5 +1,6 @@
 import Stripe from "stripe";
 import { MODULES, MODULE_KEYS, type ModuleKey } from "./modules";
+import { priceBook, type PriceBook } from "./price-book";
 
 /**
  * KOPPLINGEN TILL STRIPE.
@@ -18,13 +19,28 @@ let client: Stripe | null = null;
 
 export type BillingInterval = "month" | "year";
 
-export function isStripeConfigured(): boolean {
-  return Boolean(process.env.STRIPE_SECRET_KEY && process.env.STRIPE_PRICE_ID);
+/** true när den hemliga nyckeln finns. Säger inget om artiklarna. */
+export function hasStripeKey(): boolean {
+  return Boolean(process.env.STRIPE_SECRET_KEY);
 }
 
-/** true när årsbetalning går att välja. Saknas priset erbjuds bara månad. */
-export function yearlyAvailable(): boolean {
-  return Boolean(process.env.STRIPE_PRICE_ID_YEARLY);
+/**
+ * true när kunden kan betala med kort.
+ *
+ * Kräver både nyckeln och en artikel för skärmlicensen. ASYNC, till skillnad
+ * från förut: artikelnumren ligger numera i databasen med miljön som reserv,
+ * se price-book.ts. Funktionen bytte därför också namn — en synkron funktion
+ * som blir async utan att byta namn är en fälla, eftersom ett glömt await ger
+ * ett löfte som alltid är sant.
+ */
+export async function paymentsAvailable(): Promise<boolean> {
+  if (!hasStripeKey()) return false;
+  return Boolean((await priceBook()).screen.month);
+}
+
+/** true när årsbetalning går att välja. Saknas artikeln erbjuds bara månad. */
+export async function yearlyAvailable(): Promise<boolean> {
+  return Boolean((await priceBook()).screen.year);
 }
 
 export function stripe(): Stripe {
@@ -50,22 +66,12 @@ export function stripe(): Stripe {
  * — annars hade en glömd miljövariabel stängt hela kassan.
  */
 export function modulePriceId(
+  book: PriceBook,
   key: ModuleKey,
   interval: BillingInterval = "month"
 ): string | undefined {
-  const definition = MODULES[key];
-
-  return interval === "year"
-    ? process.env[definition.priceEnvYearly]
-    : process.env[definition.priceEnv];
-}
-
-/** true när modulen går att köpa i det här intervallet. */
-export function moduleForSale(
-  key: ModuleKey,
-  interval: BillingInterval = "month"
-): boolean {
-  return Boolean(isStripeConfigured() && modulePriceId(key, interval));
+  const pair = book.modules[key];
+  return interval === "year" ? pair.year : pair.month;
 }
 
 export type PriceRole =
@@ -82,15 +88,19 @@ export type PriceRole =
  *
  * Rader slås därför upp på pris-id, aldrig på plats.
  */
-export function priceRole(id: string | undefined | null): PriceRole | null {
+export function priceRole(
+  book: PriceBook,
+  id: string | undefined | null
+): PriceRole | null {
   if (!id) return null;
 
-  if (id === process.env.STRIPE_PRICE_ID || id === process.env.STRIPE_PRICE_ID_YEARLY) {
+  if (id === book.screen.month || id === book.screen.year) {
     return { kind: "SCREENS" };
   }
 
   for (const key of MODULE_KEYS) {
-    if (id === modulePriceId(key, "month") || id === modulePriceId(key, "year")) {
+    const pair = book.modules[key];
+    if (id === pair.month || id === pair.year) {
       return { kind: "MODULE", key };
     }
   }
@@ -108,42 +118,51 @@ export function priceRole(id: string | undefined | null): PriceRole | null {
  * är exakt vad koden gjorde innan moduler fanns.
  */
 export function screenItemOf(
+  book: PriceBook,
   subscription: Stripe.Subscription
 ): Stripe.SubscriptionItem | undefined {
   const items = subscription.items.data;
 
   return (
-    items.find((item) => priceRole(item.price?.id)?.kind === "SCREENS") ??
-    items.find((item) => priceRole(item.price?.id)?.kind !== "MODULE") ??
+    items.find((item) => priceRole(book, item.price?.id)?.kind === "SCREENS") ??
+    items.find((item) => priceRole(book, item.price?.id)?.kind !== "MODULE") ??
     items[0]
   );
 }
 
 /** Modulerna som ligger på prenumerationen just nu, med sin rad. */
 export function moduleItemsOf(
+  book: PriceBook,
   subscription: Stripe.Subscription
 ): { key: ModuleKey; itemId: string }[] {
   const found: { key: ModuleKey; itemId: string }[] = [];
 
   for (const item of subscription.items.data) {
-    const role = priceRole(item.price?.id);
+    const role = priceRole(book, item.price?.id);
     if (role?.kind === "MODULE") found.push({ key: role.key, itemId: item.id });
   }
 
   return found;
 }
 
-export function priceId(interval: BillingInterval = "month"): string {
-  const id =
-    interval === "year"
-      ? process.env.STRIPE_PRICE_ID_YEARLY
-      : process.env.STRIPE_PRICE_ID;
+/**
+ * Artikeln för skärmlicensen. Kastar när den inte är satt.
+ *
+ * Till skillnad från modulernas artiklar är den här obligatorisk: utan den
+ * finns ingenting att sälja alls. Meddelandet pekar på plattformspanelen och
+ * inte på en miljövariabel, eftersom det är där den numera sätts.
+ */
+export function screenPriceId(
+  book: PriceBook,
+  interval: BillingInterval = "month"
+): string {
+  const id = interval === "year" ? book.screen.year : book.screen.month;
 
   if (!id) {
     throw new StripeNotConfiguredError(
       interval === "year"
-        ? "STRIPE_PRICE_ID_YEARLY saknas. Årsbetalning är inte påkopplad."
-        : "STRIPE_PRICE_ID saknas. Betalningar är inte påkopplade."
+        ? "Ingen artikel för årsbetalning är satt. Lägg in den under Artiklar i plattformspanelen."
+        : "Ingen artikel för stämplingsskärmar är satt. Lägg in den under Artiklar i plattformspanelen."
     );
   }
 
@@ -209,13 +228,26 @@ async function getPricing(): Promise<Pricing> {
     return pricingCache.value;
   }
 
+  const book = await priceBook();
+
   const value = {
-    screens: await readPricing(),
-    modules: await readModulePricing(),
+    screens: await readPricing(book),
+    modules: await readModulePricing(book),
   };
 
   pricingCache = { at: Date.now(), value };
   return value;
+}
+
+/**
+ * Glömmer de hämtade priserna.
+ *
+ * Anropas när ett artikelnummer ändras i plattformspanelen. Utan den hade en
+ * rättad artikel inte synts förrän minnet gått ut, och den som just rättade
+ * ett fel hade trott att rättelsen inte tog.
+ */
+export function forgetPricing(): void {
+  pricingCache = null;
 }
 
 export async function getScreenPricing(): Promise<ScreenPricing> {
@@ -234,7 +266,7 @@ export async function getModulePricing(): Promise<ModulePricing> {
  * faktura. Ändras priset hos Stripe syns det här inom tio minuter, utan
  * deploy.
  */
-async function readModulePricing(): Promise<ModulePricing> {
+async function readModulePricing(book: PriceBook): Promise<ModulePricing> {
   const entries = await Promise.all(
     MODULE_KEYS.map(async (key): Promise<[ModuleKey, ModulePrice]> => {
       const fallback: ModulePrice = {
@@ -243,17 +275,17 @@ async function readModulePricing(): Promise<ModulePricing> {
         fromStripe: false,
       };
 
-      if (!isStripeConfigured()) return [key, fallback];
+      if (!hasStripeKey()) return [key, fallback];
 
       try {
-        const month = await amountFor(modulePriceId(key, "month"));
+        const month = await amountFor(modulePriceId(book, key, "month"));
         if (month === null) return [key, fallback];
 
         return [
           key,
           {
             month,
-            year: await amountFor(modulePriceId(key, "year")),
+            year: await amountFor(modulePriceId(book, key, "year")),
             fromStripe: true,
           },
         ];
@@ -269,16 +301,14 @@ async function readModulePricing(): Promise<ModulePricing> {
   return Object.fromEntries(entries) as ModulePricing;
 }
 
-async function readPricing(): Promise<ScreenPricing> {
-  if (!isStripeConfigured()) return fallbackPricing();
+async function readPricing(book: PriceBook): Promise<ScreenPricing> {
+  if (!hasStripeKey()) return fallbackPricing();
 
   try {
-    const month = await amountFor(process.env.STRIPE_PRICE_ID);
+    const month = await amountFor(book.screen.month);
     if (month === null) return fallbackPricing();
 
-    const year = yearlyAvailable()
-      ? await amountFor(process.env.STRIPE_PRICE_ID_YEARLY)
-      : null;
+    const year = await amountFor(book.screen.year);
 
     return {
       month,

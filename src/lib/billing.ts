@@ -3,15 +3,15 @@ import { unsafeGlobalPrisma } from "./db";
 import { getLicenseState, setLicenseCount } from "./licenses";
 import { enabledModules } from "./company-modules";
 import { MODULES, MODULE_KEYS, type ModuleKey } from "./modules";
+import { priceBook, type PriceBook } from "./price-book";
 import {
   getModulePricing,
   getScreenPricing,
   moduleItemsOf,
   modulePriceId,
-  priceId,
   screenItemOf,
+  screenPriceId,
   stripe,
-  yearlyAvailable,
   type BillingInterval,
   type ModulePricing,
   type ScreenPricing,
@@ -67,10 +67,11 @@ export async function createCheckoutSession(params: {
   // fakturan efteråt. Kunden ser båda raderna hos Stripe innan de betalar.
   //
   // Kvantitet 1 och ingen justering: tillvalen är fasta belopp per företag.
+  const book = await priceBook();
   const modules = await enabledModules(params.companyId);
 
   const moduleLines = modules
-    .map((key) => modulePriceId(key, params.interval))
+    .map((key) => modulePriceId(book, key, params.interval))
     .filter((price): price is string => Boolean(price))
     .map((price) => ({ price, quantity: 1 }));
 
@@ -78,7 +79,7 @@ export async function createCheckoutSession(params: {
     mode: "subscription",
     line_items: [
       {
-        price: priceId(params.interval),
+        price: screenPriceId(book, params.interval),
         quantity: screens,
         // Kunden kan justera antalet i kassan också. Den som ändrar sig i
         // sista stund ska inte behöva backa ut och börja om.
@@ -320,16 +321,16 @@ async function licenseUpdateConfiguration(): Promise<string | null> {
  */
 async function updatableProducts() {
   const byProduct = new Map<string, string[]>();
+  const book = await priceBook();
 
   const ids = [
-    priceId("month"),
-    ...(yearlyAvailable() ? [priceId("year")] : []),
-    ...MODULE_KEYS.flatMap((key) =>
-      [modulePriceId(key, "month"), modulePriceId(key, "year")].filter(
-        (id): id is string => Boolean(id)
-      )
-    ),
-  ];
+    book.screen.month,
+    book.screen.year,
+    ...MODULE_KEYS.flatMap((key) => [
+      modulePriceId(book, key, "month"),
+      modulePriceId(book, key, "year"),
+    ]),
+  ].filter((id): id is string => Boolean(id));
 
   for (const id of ids) {
     const price = await stripe().prices.retrieve(id);
@@ -363,7 +364,7 @@ export async function syncModulesFromSubscription(
   companyId: string,
   subscription: Stripe.Subscription
 ): Promise<void> {
-  const onStripe = moduleItemsOf(subscription);
+  const onStripe = moduleItemsOf(await priceBook(), subscription);
   const wanted = new Map(onStripe.map((item) => [item.key, item.itemId]));
 
   const current = await unsafeGlobalPrisma.companyModule.findMany({
@@ -448,6 +449,7 @@ export interface BillingOverview {
  * borde gå att köpa.
  */
 function moduleOffers(
+  book: PriceBook,
   pricing: ModulePricing,
   enabled: ModuleKey[],
   interval: BillingInterval
@@ -462,7 +464,7 @@ function moduleOffers(
       enabled: enabled.includes(key),
       amount:
         interval === "year" ? (price.year ?? price.month * 12) : price.month,
-      forSale: Boolean(modulePriceId(key, interval)),
+      forSale: Boolean(modulePriceId(book, key, interval)),
     };
   });
 }
@@ -471,10 +473,11 @@ function moduleOffers(
 export async function getBillingOverview(
   companyId: string
 ): Promise<BillingOverview> {
-  const [licenses, pricing, modulePricing] = await Promise.all([
+  const [licenses, pricing, modulePricing, book] = await Promise.all([
     getLicenseState(companyId),
     getScreenPricing(),
     getModulePricing(),
+    priceBook(),
   ]);
 
   const screens = licenses.total;
@@ -509,7 +512,7 @@ export async function getBillingOverview(
   const describeModules = async (interval: BillingInterval) => {
     const enabled = await enabledModules(companyId);
 
-    overview.modules = moduleOffers(modulePricing, enabled, interval);
+    overview.modules = moduleOffers(book, modulePricing, enabled, interval);
     overview.moduleAmount = overview.modules
       .filter((module) => module.enabled)
       .reduce((sum, module) => sum + module.amount, 0);
@@ -543,7 +546,7 @@ export async function getBillingOverview(
     // SKÄRMRADEN SLÅS UPP PÅ PRIS-ID, inte på plats i listan. Med en modulrad
     // bredvid är ordningen inte längre given, och `items.data[0]` kunde lika
     // gärna vara löneunderlaget — då hade antalet licenser satts till ett.
-    const item = screenItemOf(subscription);
+    const item = screenItemOf(book, subscription);
 
     overview.interval =
       item?.price?.recurring?.interval === "year" ? "year" : "month";
@@ -616,7 +619,9 @@ export async function previewModuleChange(params: {
   key: ModuleKey;
   on: boolean;
 }): Promise<ModuleChangePreview> {
-  const { subscription, interval } = await subscriptionFor(params.companyId);
+  const { subscription, interval, book } = await subscriptionFor(
+    params.companyId
+  );
 
   const pricing = await getModulePricing();
   const price = pricing[params.key];
@@ -638,7 +643,13 @@ export async function previewModuleChange(params: {
   // redan är påslagen eller när artikeln saknas, och det är svar kunden ska
   // se. Låg anropet innanför hade catch:en nedan svalt dem och visat en
   // bekräftelseruta för en ändring som inte går att göra.
-  const items = changedItems(subscription, params.key, params.on, interval);
+  const items = changedItems(
+    book,
+    subscription,
+    params.key,
+    params.on,
+    interval
+  );
 
   try {
     const upcoming = await previewInvoice({
@@ -731,10 +742,12 @@ export async function applyModuleChange(params: {
   key: ModuleKey;
   on: boolean;
 }): Promise<void> {
-  const { subscription, interval } = await subscriptionFor(params.companyId);
+  const { subscription, interval, book } = await subscriptionFor(
+    params.companyId
+  );
 
   const updated = await stripe().subscriptions.update(subscription.id, {
-    items: changedItems(subscription, params.key, params.on, interval),
+    items: changedItems(book, subscription, params.key, params.on, interval),
     proration_behavior: "create_prorations",
   });
 
@@ -763,12 +776,15 @@ interface ItemChange {
 }
 
 function changedItems(
+  book: PriceBook,
   subscription: Stripe.Subscription,
   key: ModuleKey,
   on: boolean,
   interval: BillingInterval
 ): ItemChange[] {
-  const existing = moduleItemsOf(subscription).find((item) => item.key === key);
+  const existing = moduleItemsOf(book, subscription).find(
+    (item) => item.key === key
+  );
 
   if (!on) {
     if (!existing) {
@@ -782,7 +798,7 @@ function changedItems(
     throw new ModuleChangeError("Tillvalet är redan påslaget.");
   }
 
-  const price = modulePriceId(key, interval);
+  const price = modulePriceId(book, key, interval);
 
   if (!price) {
     throw new ModuleChangeError(
@@ -799,6 +815,7 @@ function changedItems(
 async function subscriptionFor(companyId: string): Promise<{
   subscription: Stripe.Subscription;
   interval: BillingInterval;
+  book: PriceBook;
 }> {
   const company = await unsafeGlobalPrisma.company.findUnique({
     where: { id: companyId },
@@ -817,12 +834,14 @@ async function subscriptionFor(companyId: string): Promise<{
 
   // Modulraden ska ligga i samma intervall som skärmraden. En årsprenumeration
   // med en månadsmodul hade gett kunden en faktura i en takt de inte valt.
+  const book = await priceBook();
+
   const interval =
-    screenItemOf(subscription)?.price?.recurring?.interval === "year"
+    screenItemOf(book, subscription)?.price?.recurring?.interval === "year"
       ? "year"
       : "month";
 
-  return { subscription, interval };
+  return { subscription, interval, book };
 }
 
 function subscriptionCustomerId(subscription: Stripe.Subscription): string {

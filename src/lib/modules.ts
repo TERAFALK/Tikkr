@@ -38,13 +38,13 @@ export interface ModuleDefinition {
    * och läses därifrån, precis som skärmpriset. Reservvärdena används i
    * labbet och hos kunder som betalar mot faktura, och ska hållas i takt med
    * artikeln.
+   *
+   * VILKEN artikel det är står inte här utan i price-book.ts, som slår upp
+   * den i databasen med miljön som reserv. Nyckeln nedan är allt som behövs:
+   * variabelnamnen bildas ur den.
    */
   fallbackMonthly: number;
   fallbackYearly: number;
-
-  /** Miljövariablerna som pekar ut artikeln hos Stripe. */
-  priceEnv: string;
-  priceEnvYearly: string;
 }
 
 export const MODULES = {
@@ -62,9 +62,6 @@ export const MODULES = {
     // ställer första gången de ser fakturan.
     fallbackMonthly: 499,
     fallbackYearly: 4990,
-
-    priceEnv: "STRIPE_PRICE_ID_PAYROLL",
-    priceEnvYearly: "STRIPE_PRICE_ID_PAYROLL_YEARLY",
   },
 } as const satisfies Record<string, ModuleDefinition>;
 

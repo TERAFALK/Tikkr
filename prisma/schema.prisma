@@ -853,6 +853,35 @@ model PlatformNote {
   @@map("platform_notes")
 }
 
+/// ARTIKELNUMREN HOS STRIPE.
+///
+/// Vilken artikel som är "en stämplingsskärm" och vilken som är
+/// "löneunderlaget" stod först i miljövariabler. Det betydde att en ny artikel
+/// krävde att någon redigerade en fil på servern och startade om appen — för
+/// att skriva in en identifierare som inte ens är hemlig.
+///
+/// Den ligger därför här, och sätts i plattformspanelen. Priset i kronor står
+/// fortfarande bara hos Stripe; det här är bara pekaren dit.
+///
+/// Miljövariablerna läses fortfarande, som reserv, se src/lib/price-book.ts.
+/// Databasen vinner när båda finns.
+///
+/// Ingen company_id: raden gäller hela plattformen och inte en kund. Det är
+/// samma slags rad som PlatformNote, och den syns aldrig för en kund.
+model StripePrice {
+  /// "SCREEN", eller en nyckel ur CompanyModuleKey.
+  item String @id
+
+  /// Artikelnumren, i formen price_... Null när intervallet inte erbjuds.
+  monthPriceId String? @map("month_price_id")
+  yearPriceId  String? @map("year_price_id")
+
+  updatedByEmail String   @map("updated_by_email")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  @@map("stripe_prices")
+}
+
 /// En inbjudan att bli administratör.
 ///
 /// Den inbjudne sätter sitt eget lösenord via en engångslänk. Alternativet —

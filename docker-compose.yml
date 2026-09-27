@@ -94,6 +94,13 @@ services:
       MARKETING_HOST: ${MARKETING_HOST:-}
       PORTAL_HOST: ${PORTAL_HOST:-}
       STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-}
+      # Artikelnumren sätts normalt i plattformspanelen och ligger i
+      # databasen. Variablerna är en reserv, se .env.example. De gamla namnen
+      # skickas också in, så att en .env som redan är i drift fungerar.
+      STRIPE_PRICE_SCREEN_MONTH: ${STRIPE_PRICE_SCREEN_MONTH:-}
+      STRIPE_PRICE_SCREEN_YEAR: ${STRIPE_PRICE_SCREEN_YEAR:-}
+      STRIPE_PRICE_PAYROLL_MONTH: ${STRIPE_PRICE_PAYROLL_MONTH:-}
+      STRIPE_PRICE_PAYROLL_YEAR: ${STRIPE_PRICE_PAYROLL_YEAR:-}
       STRIPE_PRICE_ID: ${STRIPE_PRICE_ID:-}
       STRIPE_PRICE_ID_YEARLY: ${STRIPE_PRICE_ID_YEARLY:-}
       STRIPE_PRICE_ID_PAYROLL: ${STRIPE_PRICE_ID_PAYROLL:-}

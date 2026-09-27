@@ -22,6 +22,7 @@ const NAV = [
   { href: "/plattform", label: "Kunder", exact: true },
   { href: "/plattform/meddelanden", label: "Meddelanden" },
   { href: "/plattform/utskick", label: "Utskick" },
+  { href: "/plattform/artiklar", label: "Artiklar" },
   { href: "/plattform/handelser", label: "Händelser" },
 ];
 
