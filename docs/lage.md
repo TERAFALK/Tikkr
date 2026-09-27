@@ -29,6 +29,7 @@ vad som faktiskt finns byggt.
 | Offline-kö | ✅ med tester |
 | Service worker (omladdning utan nät) | ✅ fungerar sedan HTTPS finns |
 | Dokumenterat kiosk-läge | ✅ `docs/kiosk-lage.md` |
+| Skärm som tillbehör (hårdvara, stativ) | 🔶 valt på datablad, otestat — `docs/kioskskarm.md` |
 
 ## Fas 2 — Adminpanel
 

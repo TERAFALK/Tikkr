@@ -544,7 +544,6 @@ skärm öppna sin kopplingslänk på nytt.
 |---|---|
 | GitHub-repo | ⏸ ska skapas av användaren (privat, namn `tikkr`) |
 | Produktionsserver | ⏸ separat från testservern, senare |
-| Domän tikkr.se | ⏸ ej köpt |
 | Offsite-backup (rclone-mål) | ⏸ **medvetet uppskjutet** — labbmiljö utan kunddata. Skripten finns; `BACKUP_REMOTE` sätts före lansering. |
 | Uptime-övervakning | ⏸ kräver publik URL först |
 
