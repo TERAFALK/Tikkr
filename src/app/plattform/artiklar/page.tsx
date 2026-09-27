@@ -1,12 +1,13 @@
 import { requirePlatformAdmin } from "@/lib/platform-admin";
 import {
   PRICE_ITEMS,
+  priceBook,
   priceEnvName,
   priceFromEnv,
   SCREEN_ITEM,
   storedPrices,
 } from "@/lib/price-book";
-import { MODULES, isModuleKey } from "@/lib/modules";
+import { MODULES, MODULE_KEYS, isModuleKey } from "@/lib/modules";
 import { hasStripeKey } from "@/lib/stripe";
 import PlatformShell from "@/components/platform/PlatformShell";
 import PriceForm from "@/components/platform/PriceForm";
@@ -31,6 +32,17 @@ export default async function PricesPage() {
 
   const stored = new Map((await storedPrices()).map((row) => [row.item, row]));
   const keyPresent = hasStripeKey();
+
+  const book = await priceBook();
+
+  // En modul utan årsartikel gör att INGEN kund kan välja årsbetalning med
+  // den påslagen. Det märks annars först den dag en kund försöker, och då
+  // som ett uteblivet val de inte kan förklara.
+  const missingYearly = book.screen.year
+    ? MODULE_KEYS.filter((key) => !book.modules[key].year).map(
+        (key) => MODULES[key].name
+      )
+    : [];
 
   const rows = PRICE_ITEMS.map((item) => {
     const row = stored.get(item);
@@ -60,6 +72,14 @@ export default async function PricesPage() {
         <Alert tone="warning">
           STRIPE_SECRET_KEY saknas. Numren går att spara men kontrolleras inte,
           och ingen kund kan betala med kort.
+        </Alert>
+      )}
+
+      {missingYearly.length > 0 && (
+        <Alert tone="warning">
+          Årsbetalning erbjuds för stämplingsskärmar men saknar artikel för{" "}
+          {missingYearly.join(", ")}. Kunder med tillvalet påslaget kan därför
+          bara betala månadsvis.
         </Alert>
       )}
 

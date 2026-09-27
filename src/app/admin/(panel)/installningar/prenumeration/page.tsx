@@ -186,22 +186,35 @@ export default async function SubscriptionPage({
                   Betala månadsvis · {kr(pricing.month)} kr per licens
                 </Button>
 
-                {yearly && pricing.year !== null && (
-                  <Button
-                    type="submit"
-                    name="interval"
-                    value="year"
-                    tone="secondary"
-                  >
-                    Betala årsvis · {kr(pricing.year)} kr per licens
-                    {pricing.yearlyDiscountPercent !== null && (
-                      <span className="ml-2 rounded bg-emerald-100 px-1.5 py-0.5 text-[11px] font-semibold text-emerald-700">
-                        −{pricing.yearlyDiscountPercent} %
-                      </span>
-                    )}
-                  </Button>
-                )}
+                {/* Årsknappen döljs när ett påslaget tillval saknar
+                    årsartikel. Kassan skulle vägra, och ett val som alltid
+                    ger ett felmeddelande är inget val. */}
+                {yearly &&
+                  pricing.year !== null &&
+                  overview.blocksYearly.length === 0 && (
+                    <Button
+                      type="submit"
+                      name="interval"
+                      value="year"
+                      tone="secondary"
+                    >
+                      Betala årsvis · {kr(pricing.year)} kr per licens
+                      {pricing.yearlyDiscountPercent !== null && (
+                        <span className="ml-2 rounded bg-emerald-100 px-1.5 py-0.5 text-[11px] font-semibold text-emerald-700">
+                          −{pricing.yearlyDiscountPercent} %
+                        </span>
+                      )}
+                    </Button>
+                  )}
               </div>
+
+              {yearly && overview.blocksYearly.length > 0 && (
+                <p className="text-xs leading-relaxed text-neutral-500">
+                  Årsbetalning går inte att välja med{" "}
+                  {overview.blocksYearly.join(", ")} påslaget. Stäng av
+                  tillvalet under Tillval, eller betala månadsvis.
+                </p>
+              )}
 
               <p className="text-xs text-neutral-500">
                 Kortuppgifter hanteras av vår betalningsleverantör och lagras

@@ -28,6 +28,20 @@ import {
  */
 
 /**
+ * Ett svar kunden ska se, till skillnad från ett driftfel.
+ *
+ * Kastas när ändringen inte går att göra av ett skäl som går att rätta: redan
+ * påslaget, ett antal som inte får debiteras, en artikel som saknas. Allt
+ * annat hamnar i serverloggen och möts av ett allmänt meddelande.
+ */
+export class BillingChangeError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "BillingChangeError";
+  }
+}
+
+/**
  * Vad kunden betalar för: antalet licenser de valt.
  *
  * Inte antalet skapade skärmar. Kostnaden ska aldrig växa av sig själv för att
@@ -69,6 +83,30 @@ export async function createCheckoutSession(params: {
   // Kvantitet 1 och ingen justering: tillvalen är fasta belopp per företag.
   const book = await priceBook();
   const modules = await enabledModules(params.companyId);
+
+  // SAKNAS ARTIKELN FÖR DET VALDA INTERVALLET VÄGRAR VI, i stället för att
+  // hoppa över raden.
+  //
+  // Att bara filtrera bort den var det första försöket, och det var tyst på
+  // värsta sättet: kunden betalade för skärmarna, webhooken såg ingen
+  // modulrad hos Stripe och städade därför bort tillvalet — som alltså
+  // försvann i samma ögonblick som de började betala för det.
+  //
+  // En prenumerations alla rader MÅSTE dela intervall hos Stripe, så det går
+  // inte att lösa genom att lägga modulen på månad bredvid ett årsabonnemang.
+  const missing = modules.filter(
+    (key) => !modulePriceId(book, key, params.interval)
+  );
+
+  if (missing.length > 0) {
+    const names = missing.map((key) => MODULES[key].name).join(", ");
+
+    throw new BillingChangeError(
+      params.interval === "year"
+        ? `${names} går inte att köpa med årsbetalning. Välj månadsbetalning, eller stäng av tillvalet först.`
+        : `${names} går inte att köpa just nu. Stäng av tillvalet, eller kontakta support@tikkr.se.`
+    );
+  }
 
   const moduleLines = modules
     .map((key) => modulePriceId(book, key, params.interval))
@@ -217,8 +255,11 @@ export interface ModuleOffer {
   enabled: boolean;
   /** Priset i det intervall kunden betalar i. */
   amount: number;
-  /** false när artikeln saknas hos Stripe. Modulen går då inte att köpa. */
+  /** false när artikeln saknas för det intervall kunden betalar i. */
   forSale: boolean;
+  /** Vilka intervall modulen alls går att köpa i. Styr vad UI:t kan säga. */
+  soldMonthly: boolean;
+  soldYearly: boolean;
 }
 
 export interface BillingOverview {
@@ -240,6 +281,14 @@ export interface BillingOverview {
   modules: ModuleOffer[];
   /** Summan av de påslagna tillvalen, i kundens intervall. */
   moduleAmount: number;
+  /**
+   * Påslagna tillval som saknar årsartikel, med namn.
+   *
+   * Tom lista betyder att årsbetalning går att välja i kassan. Är den inte
+   * tom skulle kassan vägra, och då ska knappen inte finnas — ett val som
+   * alltid ger ett felmeddelande är inget val.
+   */
+  blocksYearly: string[];
 }
 
 /**
@@ -267,6 +316,8 @@ function moduleOffers(
       amount:
         interval === "year" ? (price.year ?? price.month * 12) : price.month,
       forSale: Boolean(modulePriceId(book, key, interval)),
+      soldMonthly: Boolean(modulePriceId(book, key, "month")),
+      soldYearly: Boolean(modulePriceId(book, key, "year")),
     };
   });
 }
@@ -307,6 +358,7 @@ export async function getBillingOverview(
     pricing,
     modules: [],
     moduleAmount: 0,
+    blocksYearly: [],
   };
 
   // Tillvalen räknas fram sist, när intervallet är känt. Utan prenumeration
@@ -315,9 +367,13 @@ export async function getBillingOverview(
     const enabled = await enabledModules(companyId);
 
     overview.modules = moduleOffers(book, modulePricing, enabled, interval);
-    overview.moduleAmount = overview.modules
-      .filter((module) => module.enabled)
-      .reduce((sum, module) => sum + module.amount, 0);
+
+    const on = overview.modules.filter((module) => module.enabled);
+
+    overview.moduleAmount = on.reduce((sum, module) => sum + module.amount, 0);
+    overview.blocksYearly = on
+      .filter((module) => !module.soldYearly)
+      .map((module) => module.name);
   };
 
   if (!company?.stripeSubscriptionId) {
@@ -381,20 +437,6 @@ export async function getBillingOverview(
 /* -------------------------------------------------------------------------- */
 /* Att lägga till eller ta bort ett tillval på en levande prenumeration        */
 /* -------------------------------------------------------------------------- */
-
-/**
- * Ett svar kunden ska se, till skillnad från ett driftfel.
- *
- * Kastas när ändringen inte går att göra av ett skäl som går att rätta: redan
- * påslaget, ett antal som inte får debiteras, en artikel som saknas. Allt
- * annat hamnar i serverloggen och möts av ett allmänt meddelande.
- */
-export class BillingChangeError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = "BillingChangeError";
-  }
-}
 
 export interface ModuleChangePreview {
   key: ModuleKey;

@@ -76,7 +76,11 @@ export default function ModuleSection({
                 <ToggleButton on={!module.enabled} />
               </form>
             ) : (
-              <span className="text-xs text-neutral-400">Kan inte köpas än</span>
+              <span className="text-xs text-neutral-400">
+                {module.soldMonthly && interval === "year"
+                  ? "Endast månadsbetalning"
+                  : "Kan inte köpas än"}
+              </span>
             )}
           </li>
         ))}
