@@ -244,7 +244,20 @@ type View =
   | { name: "break"; employee: Employee }
   | { name: "order"; employee: Employee }
   | { name: "orderNumber"; employee: Employee }
-  | { name: "quickCustomer"; employee: Employee; orderNumber: string }
+  | {
+      name: "quickCustomer";
+      employee: Employee;
+      orderNumber: string;
+      /**
+       * Vyn man kom ifrån, dit Avbryt leder tillbaka.
+       *
+       * Snabbjobbet nås numera från TVÅ håll: knappen i ordervyn och ett okänt
+       * nummer i knappsatsen. Utan det här fältet gick Avbryt alltid till
+       * knappsatsen, och den som tryckt Snabbjobb i ordervyn hamnade i en vy
+       * hen aldrig varit i.
+       */
+      from: "order" | "orderNumber";
+    }
   | {
       name: "quickMoment";
       employee: Employee;
@@ -1009,6 +1022,7 @@ export default function KioskScreen({
                       employee: view.employee,
                       // Tomt nummer betyder att ordern får ett tillfälligt.
                       orderNumber: "",
+                      from: "order",
                     })
                   }
                   className="kiosk-press rounded-xl border border-amber-300 bg-amber-50 px-5 py-4 text-base font-semibold text-amber-900 active:bg-amber-100 sm:text-lg"
@@ -1055,6 +1069,7 @@ export default function KioskScreen({
                 name: "quickCustomer",
                 employee: view.employee,
                 orderNumber,
+                from: "orderNumber",
               })
             }
           />
@@ -1075,7 +1090,14 @@ export default function KioskScreen({
               })
             }
             onBack={() =>
-              setView({ name: "orderNumber", employee: view.employee })
+              // Grenarna skrivs ut. TypeScript kan inte smalna av en union ur
+              // en variabel, och att tvinga fram det med en typkonvertering
+              // vore att stänga av den kontroll som gör ändringen trygg.
+              setView(
+                view.from === "order"
+                  ? { name: "order", employee: view.employee }
+                  : { name: "orderNumber", employee: view.employee }
+              )
             }
           />
         )}
