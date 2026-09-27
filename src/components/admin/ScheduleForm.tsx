@@ -4,6 +4,7 @@ import { useActionState, useState } from "react";
 import { useFormStatus } from "react-dom";
 import type { ScheduleFormState } from "@/app/admin/(panel)/installningar/schema/actions";
 import { Alert, Button, Card, CardHeader, TimeField } from "@/components/ui";
+import { SavedNote } from "@/components/admin/SaveForm";
 import { IconClose, IconPlus } from "@/components/ui/icons";
 import { parseMinuteOfDay } from "@/lib/schedule";
 
@@ -281,9 +282,7 @@ export default function ScheduleForm({
         </div>
 
         <div className="flex items-center justify-end gap-3 border-t border-neutral-200 bg-neutral-50 px-5 py-3">
-          {state.savedAt && (
-            <span className="text-[13px] text-emerald-700">Sparat</span>
-          )}
+          {state.savedAt && <SavedNote>Sparat</SavedNote>}
           <SaveButton />
         </div>
       </Card>

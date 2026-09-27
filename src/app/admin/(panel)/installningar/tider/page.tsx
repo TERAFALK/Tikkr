@@ -1,8 +1,8 @@
 import { requireAdmin } from "@/lib/admin-session";
 import { unsafeGlobalPrisma } from "@/lib/db";
+import SaveForm from "@/components/admin/SaveForm";
 import {
   Alert,
-  Button,
   Card,
   CardHeader,
   Field,
@@ -53,7 +53,7 @@ export default async function TimeSettingsPage() {
             </span>
           </Alert>
 
-          <form action={saveTimeSettings} className="max-w-md space-y-4">
+          <SaveForm action={saveTimeSettings} className="max-w-md space-y-4">
             <Field
               label="Stäng glömda stämplingar klockan"
               hint="Välj en tid då ingen arbetar"
@@ -77,9 +77,7 @@ export default async function TimeSettingsPage() {
                 ))}
               </Select>
             </Field>
-
-            <Button type="submit">Spara</Button>
-          </form>
+          </SaveForm>
         </div>
       </Card>
 

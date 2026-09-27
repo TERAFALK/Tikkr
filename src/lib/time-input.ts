@@ -62,7 +62,9 @@ export function normalizeTimeOfDay(value: string): string | null {
   const trimmed = value.trim();
   if (trimmed === "") return null;
 
-  const withSeparator = /^(\d{1,2})[:.](\d{1,2})$/.exec(trimmed);
+  // Minuterna får saknas: "9" blir "09:" av masken, och den som skrivit så
+  // och sparar menar klockan nio. Halva timmar skrivs ut, hela gör man inte.
+  const withSeparator = /^(\d{1,2})[:.](\d{0,2})$/.exec(trimmed);
   const digitsOnly = /^(\d{1,4})$/.exec(trimmed);
 
   let hour: number;
@@ -70,7 +72,7 @@ export function normalizeTimeOfDay(value: string): string | null {
 
   if (withSeparator) {
     hour = Number(withSeparator[1]);
-    minute = Number(withSeparator[2]);
+    minute = withSeparator[2] === "" ? 0 : Number(withSeparator[2]);
   } else if (digitsOnly) {
     const digits = digitsOnly[1];
     if (digits.length <= 2) {

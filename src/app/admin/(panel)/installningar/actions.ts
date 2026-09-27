@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { assertWritable, requireAdmin } from "@/lib/admin-session";
 import { unsafeGlobalPrisma } from "@/lib/db";
 import { parseMarkupPercent } from "@/lib/money";
+import { saved, type SaveState } from "@/lib/save-state";
 import { normalizeTimeOfDay } from "@/lib/time-input";
 import { parseTimeOfDay } from "@/lib/time-zone";
 
@@ -13,13 +14,16 @@ import { parseTimeOfDay } from "@/lib/time-zone";
  * det företag användaren är inloggad på.
  */
 
-export async function saveCompany(formData: FormData) {
+export async function saveCompany(
+  _previous: SaveState,
+  formData: FormData
+): Promise<SaveState> {
   const session = await requireAdmin();
   await assertWritable(session);
   const { companyId } = session;
 
   const name = String(formData.get("name") ?? "").trim();
-  if (!name) return;
+  if (!name) return { error: "Skriv företagets namn." };
 
   await unsafeGlobalPrisma.company.update({
     where: { id: companyId },
@@ -28,11 +32,8 @@ export async function saveCompany(formData: FormData) {
 
   revalidatePath("/admin/installningar");
   revalidatePath("/admin");
-}
 
-export interface MarkupState {
-  error?: string;
-  ok?: string;
+  return saved();
 }
 
 /**
@@ -47,9 +48,9 @@ export interface MarkupState {
  * högt syns inte på en siffra i en ruta, men det syns på en faktura.
  */
 export async function saveMarkup(
-  _previous: MarkupState,
+  _previous: SaveState,
   formData: FormData
-): Promise<MarkupState> {
+): Promise<SaveState> {
   const session = await requireAdmin();
   await assertWritable(session);
   const { companyId } = session;
@@ -72,7 +73,7 @@ export async function saveMarkup(
 
   revalidatePath("/admin/installningar");
 
-  return { ok: "Påslaget sparat." };
+  return saved();
 }
 
 /** Bildformat som fungerar både på skärm och i PDF. */
@@ -150,7 +151,10 @@ export async function uploadLogo(
   };
 }
 
-export async function removeLogo(formData: FormData) {
+export async function removeLogo(
+  _previous: LogoState,
+  formData: FormData
+): Promise<LogoState> {
   const session = await requireAdmin();
   await assertWritable(session);
   const { companyId } = session;
@@ -164,9 +168,14 @@ export async function removeLogo(formData: FormData) {
   });
 
   revalidatePath("/admin", "layout");
+
+  return { ok: "Bilden är borttagen." };
 }
 
-export async function saveTimeSettings(formData: FormData) {
+export async function saveTimeSettings(
+  _previous: SaveState,
+  formData: FormData
+): Promise<SaveState> {
   const session = await requireAdmin();
   await assertWritable(session);
   const { companyId } = session;
@@ -179,15 +188,19 @@ export async function saveTimeSettings(formData: FormData) {
     String(formData.get("autoCloseAt") ?? "")
   );
   const timezone = String(formData.get("timezone") ?? "").trim();
-  if (!autoCloseAt || !timezone) return;
 
   // Ett ogiltigt klockslag skulle få den automatiska utstämplingen att sluta
-  // fungera tyst — inga fel, bara poster som aldrig stängs. Bättre att vägra.
+  // fungera tyst — inga fel, bara poster som aldrig stängs. Därför vägrar vi,
+  // och säger det: en tyst vägran ser ut som en lyckad sparning.
+  if (!autoCloseAt) {
+    return { error: "Skriv ett klockslag, till exempel 18:00." };
+  }
+
   try {
     parseTimeOfDay(autoCloseAt);
     new Intl.DateTimeFormat("sv-SE", { timeZone: timezone });
   } catch {
-    return;
+    return { error: "Välj en tidszon i listan." };
   }
 
   await unsafeGlobalPrisma.company.update({
@@ -196,6 +209,8 @@ export async function saveTimeSettings(formData: FormData) {
   });
 
   revalidatePath("/admin/installningar/tider");
+
+  return saved();
 }
 
 /**
@@ -210,21 +225,28 @@ export async function saveTimeSettings(formData: FormData) {
  * koppla till en namngiven person. Det är den tolkning som uppfyller båda
  * lagarna samtidigt.
  */
-export async function anonymizeEmployee(formData: FormData) {
+export async function anonymizeEmployee(
+  _previous: SaveState,
+  formData: FormData
+): Promise<SaveState> {
   const session = await requireAdmin();
   await assertWritable(session);
   const { db } = session;
 
   const id = String(formData.get("employeeId") ?? "");
   const confirmation = String(formData.get("confirm") ?? "").trim();
-  if (!id) return;
+  if (!id) return { error: "Välj personen i listan." };
 
   // Handlingen går inte att ångra. Att skriva ordet är en billig men effektiv
   // spärr mot ett felklick i en lista av namn.
-  if (confirmation.toUpperCase() !== "ANONYMISERA") return;
+  if (confirmation.toUpperCase() !== "ANONYMISERA") {
+    return { error: "Skriv ANONYMISERA i rutan för att bekräfta." };
+  }
 
   const employee = await db.employee.findFirst({ where: { id } });
-  if (!employee) return;
+  if (!employee) return { error: "Personen finns inte kvar." };
+
+  const previousName = employee.name;
 
   await db.employee.update({
     where: { id },
@@ -274,4 +296,6 @@ export async function anonymizeEmployee(formData: FormData) {
   revalidatePath("/admin/installningar/dataskydd");
   revalidatePath("/admin/anstallda");
   revalidatePath("/admin/tidrapport");
+
+  return saved(`${previousName} är anonymiserad`);
 }

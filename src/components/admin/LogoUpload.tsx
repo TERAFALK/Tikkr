@@ -29,12 +29,14 @@ export default function LogoUpload({
   updatedAt: string | null;
 }) {
   const [state, action] = useActionState<LogoState, FormData>(uploadLogo, {});
+  const [removal, remove] = useActionState<LogoState, FormData>(removeLogo, {});
   const wide = variant === "wide";
 
   return (
     <div className="space-y-4 p-5">
       {state.error && <Alert>{state.error}</Alert>}
       {state.ok && <Alert tone="info">{state.ok}</Alert>}
+      {removal.ok && <Alert tone="info">{removal.ok}</Alert>}
 
       {hasLogo && (
         <div className="flex items-center gap-4">
@@ -56,7 +58,7 @@ export default function LogoUpload({
             />
           </span>
 
-          <form action={removeLogo}>
+          <form action={remove}>
             <input type="hidden" name="variant" value={variant} />
             <Button type="submit" tone="danger">
               Ta bort

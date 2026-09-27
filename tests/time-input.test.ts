@@ -84,6 +84,14 @@ describe("städa ett skrivet klockslag", () => {
     expect(normalizeTimeOfDay("18")).toBe("18:00");
   });
 
+  it("kolonet masken satte dit räknas inte som en halv inmatning", () => {
+    // Skriver man bara "9" står det "09:" i fältet. Sparas det ska det bli
+    // klockan nio, inte avvisas för att minuterna saknas.
+    expect(normalizeTimeOfDay(maskTimeInput("9"))).toBe("09:00");
+    expect(normalizeTimeOfDay("18:")).toBe("18:00");
+    expect(normalizeTimeOfDay("6.")).toBe("06:00");
+  });
+
   it("vägrar det som inte är ett klockslag", () => {
     expect(normalizeTimeOfDay("")).toBeNull();
     expect(normalizeTimeOfDay("24:00")).toBeNull();
@@ -104,5 +112,10 @@ describe("schemat tolkar samma siffror som fältet", () => {
   it("skräp är fortfarande skräp", () => {
     expect(parseMinuteOfDay("25:00")).toBeNull();
     expect(parseMinuteOfDay("")).toBeNull();
+  });
+
+  it("en ensam timme blir hel timme hela vägen", () => {
+    expect(parseMinuteOfDay("9")).toBe(540);
+    expect(parseMinuteOfDay("09:")).toBe(540);
   });
 });

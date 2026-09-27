@@ -234,6 +234,15 @@ const fieldBase =
 
 const fieldStyles = `block w-full ${fieldBase}`;
 
+/**
+ * Samma fält, men med rött istället för grått. Hela uppsättningen och inte ett
+ * tillägg: två ringfärger på samma element avgörs av ordningen i stilmallen.
+ */
+const fieldInvalid =
+  "rounded-md border-0 bg-red-50 px-2.5 py-1.5 text-[13px] " +
+  "text-red-900 ring-1 ring-inset ring-red-400 " +
+  "placeholder:text-red-300 focus:ring-2 focus:ring-inset focus:ring-red-600";
+
 export function Field({
   label,
   hint,
@@ -267,7 +276,8 @@ export function Select({ className = "", ...props }: ComponentProps<"select">) {
 }
 
 /**
- * Klockslagsfält. Sätter kolonet själv — se `TimeInput`.
+ * Klockslagsfält. Sätter kolonet själv och blir rött på ett otolkbart värde —
+ * se `TimeInput`.
  *
  * Smalare än ett vanligt fält: fyra siffror behöver inte halva formuläret.
  */
@@ -275,10 +285,13 @@ export function TimeField({
   className = "",
   ...props
 }: ComponentProps<typeof TimeInput>) {
+  const shape = `w-24 text-center tabular-nums ${className}`;
+
   return (
     <TimeInput
       {...props}
-      className={`${fieldBase} w-24 text-center tabular-nums ${className}`}
+      className={`${fieldBase} ${shape}`}
+      invalidClassName={`${fieldInvalid} ${shape}`}
     />
   );
 }

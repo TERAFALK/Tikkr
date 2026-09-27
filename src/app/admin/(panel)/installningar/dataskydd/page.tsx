@@ -1,8 +1,8 @@
 import Link from "next/link";
 import { requireAdmin } from "@/lib/admin-session";
+import SaveForm from "@/components/admin/SaveForm";
 import {
   Alert,
-  Button,
   ButtonLink,
   Card,
   CardHeader,
@@ -58,7 +58,13 @@ export default async function DataProtectionPage() {
             <span className="mt-1.5 block">Detta går inte att ångra.</span>
           </Alert>
 
-          <form action={anonymizeEmployee} className="max-w-md space-y-4">
+          <SaveForm
+            action={anonymizeEmployee}
+            submitLabel="Anonymisera personen"
+            pendingLabel="Anonymiserar…"
+            tone="danger"
+            className="max-w-md space-y-4"
+          >
             <Field label="Anställd">
               <Select name="employeeId" required defaultValue="">
                 <option value="" disabled>
@@ -79,11 +85,7 @@ export default async function DataProtectionPage() {
             >
               <Input name="confirm" placeholder="ANONYMISERA" required />
             </Field>
-
-            <Button type="submit" tone="danger">
-              Anonymisera personen
-            </Button>
-          </form>
+          </SaveForm>
         </div>
       </Card>
 

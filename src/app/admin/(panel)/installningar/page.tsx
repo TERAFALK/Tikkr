@@ -2,7 +2,8 @@ import { requireAdmin } from "@/lib/admin-session";
 import { unsafeGlobalPrisma } from "@/lib/db";
 import LogoUpload from "@/components/admin/LogoUpload";
 import MarkupForm from "@/components/admin/MarkupForm";
-import { Button, ButtonLink, Card, CardHeader, Field, Input } from "@/components/ui";
+import SaveForm from "@/components/admin/SaveForm";
+import { ButtonLink, Card, CardHeader, Field, Input } from "@/components/ui";
 import { formatDate } from "@/lib/format";
 import { saveCompany, saveMarkup } from "./actions";
 
@@ -37,12 +38,11 @@ export default async function CompanySettingsPage() {
         <CardHeader
           title="Företagsuppgifter"
         />
-        <form action={saveCompany} className="max-w-md space-y-4 p-5">
+        <SaveForm action={saveCompany}>
           <Field label="Företagsnamn">
             <Input name="name" defaultValue={company.name} required />
           </Field>
-          <Button type="submit">Spara</Button>
-        </form>
+        </SaveForm>
       </Card>
 
       <Card>
