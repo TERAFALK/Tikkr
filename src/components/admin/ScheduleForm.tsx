@@ -3,9 +3,9 @@
 import { useActionState, useState } from "react";
 import { useFormStatus } from "react-dom";
 import type { ScheduleFormState } from "@/app/admin/(panel)/installningar/schema/actions";
-import { Alert, Button, Card, CardHeader } from "@/components/ui";
+import { Alert, Button, Card, CardHeader, TimeField } from "@/components/ui";
 import { IconClose, IconPlus } from "@/components/ui/icons";
-import { formatMinuteOfDay, parseMinuteOfDay } from "@/lib/schedule";
+import { parseMinuteOfDay } from "@/lib/schedule";
 
 /**
  * VECKOSCHEMAT.
@@ -198,18 +198,22 @@ export default function ScheduleForm({
 
                   {day.active ? (
                     <>
-                      <TimeInput
+                      <TimeField
                         name={`start-${day.weekday}`}
                         value={day.start}
-                        onChange={(value) => update(day.weekday, { start: value })}
-                        label={`${label} börjar`}
+                        onValueChange={(value) =>
+                          update(day.weekday, { start: value })
+                        }
+                        placeholder="06:30"
+                        aria-label={`${label} börjar`}
                       />
                       <span className="text-neutral-400">–</span>
-                      <TimeInput
+                      <TimeField
                         name={`end-${day.weekday}`}
                         value={day.end}
-                        onChange={(value) => update(day.weekday, { end: value })}
-                        label={`${label} slutar`}
+                        onValueChange={(value) => update(day.weekday, { end: value })}
+                        placeholder="16:00"
+                        aria-label={`${label} slutar`}
                       />
 
                       <span className="ml-auto text-[13px] tabular-nums text-neutral-500">
@@ -231,22 +235,24 @@ export default function ScheduleForm({
                         <span className="w-32 shrink-0 text-[13px] text-neutral-500">
                           Rast
                         </span>
-                        <TimeInput
+                        <TimeField
                           name={`break-start-${day.weekday}`}
                           value={rest.start}
-                          onChange={(value) =>
+                          onValueChange={(value) =>
                             setBreak(day.weekday, index, { start: value })
                           }
-                          label="Rasten börjar"
+                          placeholder="09:00"
+                          aria-label="Rasten börjar"
                         />
                         <span className="text-neutral-400">–</span>
-                        <TimeInput
+                        <TimeField
                           name={`break-end-${day.weekday}`}
                           value={rest.end}
-                          onChange={(value) =>
+                          onValueChange={(value) =>
                             setBreak(day.weekday, index, { end: value })
                           }
-                          label="Rasten slutar"
+                          placeholder="09:20"
+                          aria-label="Rasten slutar"
                         />
                         <button
                           type="button"
@@ -282,45 +288,6 @@ export default function ScheduleForm({
         </div>
       </Card>
     </form>
-  );
-}
-
-/**
- * Klockslagsfält.
- *
- * `type="text"` och inte `type="time"`: webbläsarens egen tidväljare ser olika
- * ut i varje webbläsare, och på en dator är den långsammare att fylla i än
- * fyra siffror. Formatet kontrolleras ändå på servern.
- */
-function TimeInput({
-  name,
-  value,
-  onChange,
-  label,
-}: {
-  name: string;
-  value: string;
-  onChange: (value: string) => void;
-  label: string;
-}) {
-  return (
-    <input
-      name={name}
-      value={value}
-      onChange={(event) => onChange(event.target.value)}
-      onBlur={(event) => {
-        // Städar "630" till "06:30" när fältet lämnas, men bara när det går
-        // att tolka. Ett obegripligt värde står kvar som skrivet, så att det
-        // syns vad man råkade skriva.
-        const parsed = parseMinuteOfDay(event.target.value);
-        if (parsed !== null) onChange(formatMinuteOfDay(parsed));
-      }}
-      inputMode="numeric"
-      placeholder="06:30"
-      aria-label={label}
-      autoComplete="off"
-      className="w-20 rounded-md border-0 bg-white px-2.5 py-1.5 text-center text-[13px] tabular-nums text-neutral-900 ring-1 ring-inset ring-neutral-200 focus:ring-2 focus:ring-inset focus:ring-blue-600"
-    />
   );
 }
 

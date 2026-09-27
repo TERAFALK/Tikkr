@@ -6,8 +6,8 @@ import {
   Card,
   CardHeader,
   Field,
-  Input,
   Select,
+  TimeField,
 } from "@/components/ui";
 import { saveTimeSettings } from "../actions";
 
@@ -56,13 +56,12 @@ export default async function TimeSettingsPage() {
           <form action={saveTimeSettings} className="max-w-md space-y-4">
             <Field
               label="Stäng glömda stämplingar klockan"
-              hint="HH:MM. Välj en tid då ingen arbetar"
+              hint="Välj en tid då ingen arbetar"
             >
-              <Input
+              <TimeField
                 name="autoCloseAt"
                 defaultValue={company.autoCloseAt}
                 placeholder="18:00"
-                pattern="[0-9]{1,2}:[0-9]{2}"
                 required
               />
             </Field>

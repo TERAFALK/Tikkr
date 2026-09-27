@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { ComponentProps, ReactNode } from "react";
+import { TimeInput } from "./TimeInput";
 
 /**
  * DESIGNSYSTEMET.
@@ -226,10 +227,12 @@ export function Stat({
 /* Formulärfält                                                                */
 /* -------------------------------------------------------------------------- */
 
-const fieldStyles =
-  "block w-full rounded-md border-0 bg-white px-2.5 py-1.5 text-[13px] " +
+const fieldBase =
+  "rounded-md border-0 bg-white px-2.5 py-1.5 text-[13px] " +
   "text-neutral-900 ring-1 ring-inset ring-neutral-200 " +
   "placeholder:text-neutral-400 focus:ring-2 focus:ring-inset focus:ring-blue-600";
+
+const fieldStyles = `block w-full ${fieldBase}`;
 
 export function Field({
   label,
@@ -261,6 +264,23 @@ export function Input({ className = "", ...props }: ComponentProps<"input">) {
 
 export function Select({ className = "", ...props }: ComponentProps<"select">) {
   return <select {...props} className={`${fieldStyles} ${className}`} />;
+}
+
+/**
+ * Klockslagsfält. Sätter kolonet själv — se `TimeInput`.
+ *
+ * Smalare än ett vanligt fält: fyra siffror behöver inte halva formuläret.
+ */
+export function TimeField({
+  className = "",
+  ...props
+}: ComponentProps<typeof TimeInput>) {
+  return (
+    <TimeInput
+      {...props}
+      className={`${fieldBase} w-24 text-center tabular-nums ${className}`}
+    />
+  );
 }
 
 /* -------------------------------------------------------------------------- */

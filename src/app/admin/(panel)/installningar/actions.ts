@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { assertWritable, requireAdmin } from "@/lib/admin-session";
 import { unsafeGlobalPrisma } from "@/lib/db";
 import { parseMarkupPercent } from "@/lib/money";
+import { normalizeTimeOfDay } from "@/lib/time-input";
 import { parseTimeOfDay } from "@/lib/time-zone";
 
 /**
@@ -170,7 +171,13 @@ export async function saveTimeSettings(formData: FormData) {
   await assertWritable(session);
   const { companyId } = session;
 
-  const autoCloseAt = String(formData.get("autoCloseAt") ?? "").trim();
+  // Fältet sätter kolonet medan man skriver, men ett formulär kan skickas
+  // innan det skriptet hunnit köra. Då kommer "1800" fram, och det ska betyda
+  // samma sak som "18:00" — klockslaget lagras som text och läses av den
+  // automatiska utstämplingen.
+  const autoCloseAt = normalizeTimeOfDay(
+    String(formData.get("autoCloseAt") ?? "")
+  );
   const timezone = String(formData.get("timezone") ?? "").trim();
   if (!autoCloseAt || !timezone) return;
 
