@@ -36,9 +36,9 @@ export default async function CompanyHistoryPage({
   const log = await auditLog({ companyId, page });
 
   return (
-    <PlatformShell email={email} current="/plattform">
+    <PlatformShell email={email} current="/plattform/kunder">
       <Link
-        href={`/plattform/${companyId}`}
+        href={`/plattform/kunder/${companyId}`}
         className="text-[13px] font-medium text-blue-600 hover:underline"
       >
         ← {company.name}
@@ -66,7 +66,7 @@ export default async function CompanyHistoryPage({
               total={log.total}
               unit="händelser"
               hrefFor={(next) =>
-                `/plattform/${companyId}/historik?sida=${next}`
+                `/plattform/kunder/${companyId}/historik?sida=${next}`
               }
             />
           </Card>

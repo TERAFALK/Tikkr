@@ -5,7 +5,7 @@ import { useFormStatus } from "react-dom";
 import {
   removeCompany,
   type DeleteCompanyState,
-} from "@/app/plattform/[companyId]/actions";
+} from "@/app/plattform/kunder/[companyId]/actions";
 import { Alert, Button, Field, Input } from "@/components/ui";
 
 /**

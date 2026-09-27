@@ -64,8 +64,9 @@ export async function changeSubscription(
     throw error;
   }
 
-  revalidatePath(`/plattform/${companyId}`);
+  revalidatePath(`/plattform/kunder/${companyId}`);
   revalidatePath("/plattform");
+  revalidatePath("/plattform/kunder");
 
   return { ok: "Statusen är ändrad." };
 }
@@ -107,8 +108,9 @@ export async function changeLicenseCount(
     throw error;
   }
 
-  revalidatePath(`/plattform/${companyId}`);
+  revalidatePath(`/plattform/kunder/${companyId}`);
   revalidatePath("/plattform");
+  revalidatePath("/plattform/kunder");
 
   return { ok: `Antalet är satt till ${licenses}.` };
 }
@@ -147,8 +149,9 @@ export async function changeModule(
     throw error;
   }
 
-  revalidatePath(`/plattform/${companyId}`);
+  revalidatePath(`/plattform/kunder/${companyId}`);
   revalidatePath("/plattform");
+  revalidatePath("/plattform/kunder");
 
   return {
     ok: on
@@ -169,7 +172,7 @@ export async function updateNote(formData: FormData) {
     body: String(formData.get("body") ?? ""),
   });
 
-  revalidatePath(`/plattform/${companyId}`);
+  revalidatePath(`/plattform/kunder/${companyId}`);
 }
 
 export interface DeleteCompanyState {
@@ -205,9 +208,10 @@ export async function removeCompany(
   }
 
   revalidatePath("/plattform");
+  revalidatePath("/plattform/kunder");
 
   // Ligger utanför try-blocket: redirect() avbryter genom att kasta.
-  redirect("/plattform");
+  redirect("/plattform/kunder");
 }
 
 /**
@@ -252,7 +256,7 @@ export async function startSupport(formData: FormData) {
  */
 export async function endSupport(formData: FormData) {
   const session = await readSupportSession();
-  const back = String(formData.get("back") ?? "/plattform");
+  const back = String(formData.get("back") ?? "/plattform/kunder");
 
   if (session) {
     try {

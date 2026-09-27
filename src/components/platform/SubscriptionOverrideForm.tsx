@@ -4,7 +4,7 @@ import { useActionState } from "react";
 import {
   changeSubscription,
   type SubscriptionFormState,
-} from "@/app/plattform/[companyId]/actions";
+} from "@/app/plattform/kunder/[companyId]/actions";
 import { Alert, Button, Field, Input, Select } from "@/components/ui";
 
 /**

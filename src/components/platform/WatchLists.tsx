@@ -72,7 +72,7 @@ export function SilentDeviceList({ devices }: { devices: SilentDevice[] }) {
         {devices.map((device) => (
           <Row
             key={device.id}
-            href={`/plattform/${device.companyId}`}
+            href={`/plattform/kunder/${device.companyId}`}
             title={device.name}
             detail={`${device.companyName} · senast ${
               device.lastSeenAt ? formatDateTime(device.lastSeenAt) : "aldrig"
@@ -105,7 +105,7 @@ export function EndingTrialList({ trials }: { trials: EndingTrial[] }) {
         {trials.map((trial) => (
           <Row
             key={trial.companyId}
-            href={`/plattform/${trial.companyId}`}
+            href={`/plattform/kunder/${trial.companyId}`}
             title={trial.companyName}
             detail={`${trial.entries} stämplingar · ${trial.devices} ${
               trial.devices === 1 ? "skärm" : "skärmar"
@@ -139,7 +139,7 @@ export function QuietCustomerList({
         {customers.map((customer) => (
           <Row
             key={customer.companyId}
-            href={`/plattform/${customer.companyId}`}
+            href={`/plattform/kunder/${customer.companyId}`}
             title={customer.companyName}
             detail={`${
               customer.lastActivityAt

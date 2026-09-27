@@ -5,7 +5,7 @@ import { useFormStatus } from "react-dom";
 import {
   changeModule,
   type ModuleFormState,
-} from "@/app/plattform/[companyId]/actions";
+} from "@/app/plattform/kunder/[companyId]/actions";
 import { MODULES, type ModuleKey } from "@/lib/modules";
 import { Alert, Badge, Button, Field, Input } from "@/components/ui";
 

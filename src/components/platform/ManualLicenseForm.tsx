@@ -5,7 +5,7 @@ import { useFormStatus } from "react-dom";
 import {
   changeLicenseCount,
   type LicenseFormState,
-} from "@/app/plattform/[companyId]/actions";
+} from "@/app/plattform/kunder/[companyId]/actions";
 import { Alert, Button, Field, Input } from "@/components/ui";
 
 /**

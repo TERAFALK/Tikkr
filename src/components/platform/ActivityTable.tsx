@@ -50,7 +50,7 @@ export default function ActivityTable({
               <Td muted>
                 {row.targetCompanyId && companyNames.has(row.targetCompanyId) ? (
                   <Link
-                    href={`/plattform/${row.targetCompanyId}`}
+                    href={`/plattform/kunder/${row.targetCompanyId}`}
                     className="font-medium text-blue-600"
                   >
                     {companyNames.get(row.targetCompanyId)}
