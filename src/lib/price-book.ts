@@ -107,8 +107,35 @@ export async function storedPrices(): Promise<StoredPrice[]> {
     }));
 }
 
+/**
+ * Raderna, eller inga alls när databasen inte går att nå.
+ *
+ * SÄLJSIDAN FÖRRENDERAS VID BYGGET, och då finns ingen databas — det är hur
+ * det här upptäcktes. Men fallet är inte bara ett byggfall: en databas som
+ * ligger nere ska inte ta ned sidan som berättar vad tjänsten kostar.
+ *
+ * Att falla tillbaka på miljön är dessutom precis vad funktionen lovar. Den
+ * har två källor med en ordning; den här raden säger bara att en källa som
+ * inte svarar räknas som tom.
+ *
+ * Samma hållning som driftmeddelandena på säljsidan redan har: hellre ett
+ * pris ur reservvärdena än en sida som inte laddar.
+ */
+async function storedOrNothing(): Promise<StoredPrice[]> {
+  try {
+    return await storedPrices();
+  } catch (error) {
+    console.error(
+      "Kunde inte läsa artikelnumren ur databasen, använder miljövariablerna",
+      error instanceof Error ? error.message : error
+    );
+
+    return [];
+  }
+}
+
 export async function priceBook(): Promise<PriceBook> {
-  const stored = new Map((await storedPrices()).map((row) => [row.item, row]));
+  const stored = new Map((await storedOrNothing()).map((row) => [row.item, row]));
 
   const pairFor = (item: PriceItem): PricePair => {
     const row = stored.get(item);

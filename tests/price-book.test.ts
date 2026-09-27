@@ -1,4 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { readFileSync } from "node:fs";
+import path from "node:path";
 import { unsafeGlobalPrisma } from "@/lib/db";
 import {
   PRICE_ITEMS,
@@ -207,5 +209,40 @@ describe("setStoredPrice", () => {
     });
 
     expect((await priceBook()).screen.month).toBe("price_klistrat");
+  });
+});
+
+describe("en onåbar databas tar inte ned säljsidan", () => {
+  it("uppslaget i priceBook är inbäddat i ett try", () => {
+    // SÄLJSIDAN FÖRRENDERAS VID BYGGET, och då finns ingen databas. När
+    // priceBook() började läsa stripe_prices slutade bygget att gå igenom:
+    // "Environment variable not found: DATABASE_URL" mitt i "Generating
+    // static pages".
+    //
+    // Fallet är inte bara ett byggfall. En databas som ligger nere ska inte
+    // ta ned sidan som berättar vad tjänsten kostar, och att falla tillbaka
+    // på miljön är precis vad funktionen lovar: två källor med en ordning,
+    // där en källa som inte svarar räknas som tom.
+    //
+    // Kontrollen är på källtexten, eftersom felet bara går att framkalla
+    // genom att koppla bort databasen. Den håller åtminstone skyddet kvar
+    // när någon städar i filen.
+    const source = readFileSync(
+      path.resolve(__dirname, "../src/lib/price-book.ts"),
+      "utf8"
+    );
+
+    const block = source.slice(source.indexOf("async function storedOrNothing"));
+
+    expect(
+      block,
+      "storedOrNothing måste fånga fel från databasen. Utan den kraschar " +
+        "bygget av säljsidan, och en nere databas tar ned sidan i drift."
+    ).toMatch(/try\s*{[\s\S]*?catch/);
+
+    expect(
+      source,
+      "priceBook ska gå via storedOrNothing, inte direkt på storedPrices."
+    ).toMatch(/priceBook[\s\S]*?storedOrNothing\(\)/);
   });
 });
