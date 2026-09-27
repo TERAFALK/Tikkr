@@ -4,6 +4,7 @@ import { unsafeGlobalPrisma } from "./db";
 import {
   ClockError,
   clockOutAll,
+  clockSkewNote,
   isUniqueViolation,
   type PunchContext,
 } from "./clock";
@@ -109,6 +110,9 @@ export async function startBreak(
     at,
     kioskDeviceId: input.kioskDeviceId,
     sourceIp: input.sourceIp,
+    // Följer med, annars flaggas rasten men inte jobben som stängdes av samma
+    // tryck — och det är jobben som bär den fakturerbara tiden.
+    rejectedAt: input.rejectedAt,
     // Egen nyckel: utstämplingen och rasten är två skrivningar av samma tryck,
     // och de får inte dela dubblettnyckel — då skulle en omsändning tro att
     // rasten redan skapats för att jobben hann stängas.
@@ -128,6 +132,12 @@ export async function startBreak(
         clientPunchId: input.clientPunchId ?? null,
         kioskDeviceId: input.kioskDeviceId ?? null,
         sourceIp: input.sourceIp ?? null,
+        ...(input.rejectedAt
+          ? {
+              needsReview: true,
+              reviewNote: clockSkewNote(input.rejectedAt),
+            }
+          : {}),
       },
     });
 
@@ -158,7 +168,12 @@ export async function endBreak(
   input: PunchContext & { employeeId: string }
 ): Promise<BreakEntry | null> {
   const at = input.at ?? new Date();
-  return endOpenBreak(forCompany(companyId), input.employeeId, at);
+  return endOpenBreak(
+    forCompany(companyId),
+    input.employeeId,
+    at,
+    input.rejectedAt ? clockSkewNote(input.rejectedAt) : undefined
+  );
 }
 
 export { endOpenBreak };

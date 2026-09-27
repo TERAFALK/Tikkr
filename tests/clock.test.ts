@@ -1380,3 +1380,115 @@ describe("offline-kön skapar inga dubbletter vid utstämpling", () => {
     expect(saved.clockOutPunchId).toBe("ut-3");
   });
 });
+
+/**
+ * Trasig skärmklocka.
+ *
+ * `rejectedAt` sätts av readPunchTime när skärmen uppgav en tid som inte gick
+ * att lita på. Posten ska då skrivas på SERVERNS tid och flaggas — aldrig
+ * avvisas, eftersom offline-kön kastar allt som får ett felsvar.
+ */
+describe("stämpling med opålitlig klocka", () => {
+  const uppgiven = "1970-01-01 01:00";
+
+  it("instämplingen registreras på servertid och flaggas", async () => {
+    const innan = new Date();
+
+    const { started } = await clockIn(companyId, {
+      kind: "ORDER",
+      employeeId: anna,
+      orderId: orderA,
+      momentId: svetsning,
+      // Ingen `at`: readPunchTime utelämnar den när tiden inte gick att lita på.
+      rejectedAt: uppgiven,
+    });
+
+    expect(started.clockInAt.getTime()).toBeGreaterThanOrEqual(innan.getTime());
+    expect(started.needsReview).toBe(true);
+    expect(started.reviewNote).toContain(uppgiven);
+  });
+
+  it("utstämplingen flaggar posten och lämnar inget fel", async () => {
+    await clockIn(companyId, {
+      kind: "ORDER",
+      employeeId: anna,
+      orderId: orderA,
+      momentId: svetsning,
+    });
+
+    const closed = await clockOut(companyId, {
+      employeeId: anna,
+      momentId: svetsning,
+      rejectedAt: uppgiven,
+    });
+
+    expect(closed).not.toBeNull();
+    expect(closed!.clockOutAt).not.toBeNull();
+    expect(closed!.needsReview).toBe(true);
+    expect(closed!.reviewNote).toContain(uppgiven);
+  });
+
+  it("utstämpling utan angivet jobb får med BÅDA skälen i noten", async () => {
+    // Två öppna jobb gör utstämplingen tvetydig, och klockan är dessutom fel.
+    // Den som rättar posten ska se allt som var fel med den.
+    await clockIn(companyId, {
+      kind: "ORDER",
+      employeeId: anna,
+      orderId: orderA,
+      momentId: svetsning,
+    });
+    await clockIn(companyId, {
+      kind: "ORDER",
+      employeeId: anna,
+      orderId: orderB,
+      momentId: montering,
+    });
+
+    const closed = await clockOut(companyId, {
+      employeeId: anna,
+      rejectedAt: uppgiven,
+    });
+
+    expect(closed!.needsReview).toBe(true);
+    expect(closed!.reviewNote).toContain("angav inte vilket jobb");
+    expect(closed!.reviewNote).toContain(uppgiven);
+  });
+
+  it("clockOutAll flaggar varje post den stänger", async () => {
+    await clockIn(companyId, {
+      kind: "ORDER",
+      employeeId: anna,
+      orderId: orderA,
+      momentId: svetsning,
+    });
+    await clockIn(companyId, {
+      kind: "ORDER",
+      employeeId: anna,
+      orderId: orderB,
+      momentId: montering,
+    });
+
+    const closed = await clockOutAll(companyId, {
+      employeeId: anna,
+      rejectedAt: uppgiven,
+    });
+
+    expect(closed).toHaveLength(2);
+    for (const post of closed) {
+      expect(post.needsReview).toBe(true);
+      expect(post.reviewNote).toContain(uppgiven);
+    }
+  });
+
+  it("en riktig tid flaggar ingenting", async () => {
+    const { started } = await clockIn(companyId, {
+      kind: "ORDER",
+      employeeId: anna,
+      orderId: orderA,
+      momentId: svetsning,
+      at: new Date("2026-08-05T06:00:00Z"),
+    });
+
+    expect(started.needsReview).toBe(false);
+  });
+});

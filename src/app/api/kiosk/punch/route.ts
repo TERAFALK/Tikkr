@@ -9,6 +9,7 @@ import { startBreak, endBreak } from "@/lib/breaks";
 import { currentFlexMinutes } from "@/lib/payroll";
 import { forCompany } from "@/lib/tenant";
 import { unsafeGlobalPrisma } from "@/lib/db";
+import { readPunchTime } from "@/lib/punch-time";
 
 // Tar emot en stämpling från kioskskärmen.
 //
@@ -38,33 +39,6 @@ interface PunchBody {
   queued?: boolean;
 }
 
-/** Tillåten klockavvikelse framåt. Skärmens klocka kan gå någon minut fel. */
-const MAX_CLOCK_SKEW_MS = 5 * 60 * 1000;
-
-/** Så gammalt ett köat tryck får vara. Äldre än så är något uppenbart fel. */
-const MAX_QUEUE_AGE_MS = 14 * 24 * 60 * 60 * 1000;
-
-/**
- * Kontrollerar tidpunkten skärmen uppger.
- *
- * Skärmen får bestämma när trycket skedde — det är hela poängen med
- * offline-kön. Men den får inte hitta på vad som helst: en tid i framtiden
- * eller flera veckor bakåt är antingen en trasig klocka eller ett försök att
- * skriva om historien, och blir i båda fallen ett felaktigt fakturaunderlag.
- */
-function validatePunchTime(raw: string | undefined): Date | undefined | null {
-  if (!raw) return undefined;
-
-  const at = new Date(raw);
-  if (Number.isNaN(at.getTime())) return null;
-
-  const drift = at.getTime() - Date.now();
-  if (drift > MAX_CLOCK_SKEW_MS) return null;
-  if (-drift > MAX_QUEUE_AGE_MS) return null;
-
-  return at;
-}
-
 export async function POST(request: NextRequest) {
   const session = await getKioskSession();
   if (!session) {
@@ -92,19 +66,13 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Ofullständigt anrop." }, { status: 400 });
   }
 
-  const at = validatePunchTime(body.at);
-  if (at === null) {
-    return NextResponse.json(
-      { error: "Orimlig tidpunkt på stämplingen. Kontrollera skärmens klocka." },
-      { status: 400 }
-    );
-  }
+  const time = readPunchTime(body.at);
 
   const context = {
     kioskDeviceId: session.deviceId,
     sourceIp: clientIp(request),
     clientPunchId: body.clientPunchId,
-    at,
+    ...time,
     fromOfflineQueue: body.queued === true,
   };
 

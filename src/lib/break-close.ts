@@ -13,7 +13,14 @@ import type { CompanyDb } from "./tenant";
 export async function endOpenBreak(
   db: CompanyDb,
   employeeId: string,
-  at: Date
+  at: Date,
+  /**
+   * Sätts när `at` är serverns tid för att skärmens egen inte gick att lita
+   * på. Rasten får då samma flagga som jobben ur samma tryck — annars vore
+   * rastens längd fel utan att någon fick veta det, och närvarotiden i
+   * tidrapporten med den.
+   */
+  reviewNote?: string
 ): Promise<BreakEntry | null> {
   const open = await db.breakEntry.findFirst({
     where: { employeeId, endedAt: null },
@@ -31,7 +38,10 @@ export async function endOpenBreak(
   // annat stänga rasten däremellan ska den tiden gälla, inte vår.
   const { count } = await db.breakEntry.updateMany({
     where: { id: open.id, endedAt: null },
-    data: { endedAt: at },
+    data: {
+      endedAt: at,
+      ...(reviewNote ? { needsReview: true, reviewNote } : {}),
+    },
   });
 
   if (count === 0) return null;

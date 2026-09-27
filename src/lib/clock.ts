@@ -56,6 +56,33 @@ export interface PunchContext {
   clientPunchId?: string;
   /** true när stämplingen kommer från offline-kön. Syns i audit-loggen. */
   fromOfflineQueue?: boolean;
+  /**
+   * Tiden skärmen uppgav, i läsbar form, när den inte gick att lita på. Är
+   * den satt är `at` medvetet utelämnad, så att servertiden gäller — och
+   * posten flaggas för granskning.
+   *
+   * Finns eftersom en skärms klocka kan gå fel på riktigt: klockbatteriet tar
+   * slut, och efter ett strömavbrott utan nät startar enheten med fel datum.
+   * Sådana tryck avvisades förr med 4xx, och offline-kön kastar allt som får
+   * 4xx — en hel arbetsdag kunde försvinna utan att någon fick veta det.
+   * Samma skäl som att en utstämpling utan angivet jobb flaggas i stället för
+   * att avvisas, se CLAUDE.md § 3 regel 2.
+   */
+  rejectedAt?: string;
+}
+
+/**
+ * Noten som sätts när skärmens klocka inte gick att lita på.
+ *
+ * Samlad på ett ställe så att alla poster ur samma tryck — jobben, rasten —
+ * säger samma sak. Den uppgivna tiden står med: utan den går det inte att i
+ * efterhand avgöra om skärmen låg en timme fel eller femtio år.
+ */
+export function clockSkewNote(rejectedAt: string): string {
+  return (
+    `Skärmens klocka uppgav ${rejectedAt}, vilket är orimligt. Registrerad ` +
+    `tid är serverns. Kontrollera innan fakturering.`
+  );
 }
 
 /**
@@ -160,7 +187,12 @@ export async function clockIn(
   // Ligger före transaktionen med flit: rasten och stämplingen är två olika
   // register, och att blanda in ett annat register i jobbets transaktion vore
   // att låta en rast kunna fälla en instämpling.
-  await endOpenBreak(db, input.employeeId, at);
+  await endOpenBreak(
+    db,
+    input.employeeId,
+    at,
+    input.rejectedAt ? clockSkewNote(input.rejectedAt) : undefined
+  );
 
   return db.$transaction(async (tx) => {
     // Bara samma moment. Ett pågående jobb på en ANNAN maskin ska stå kvar —
@@ -212,6 +244,12 @@ export async function clockIn(
         kioskDeviceId: input.kioskDeviceId ?? null,
         sourceIp: input.sourceIp ?? null,
         clientPunchId: input.clientPunchId ?? null,
+        ...(input.rejectedAt
+          ? {
+              needsReview: true,
+              reviewNote: clockSkewNote(input.rejectedAt),
+            }
+          : {}),
       },
     });
 
@@ -296,6 +334,21 @@ export async function clockOut(
   // trycket gällde är redan avslutad.
   if (target.clockInAt > at) return null;
 
+  // Två skäl kan flagga samma post, och båda ska då stå i noten: den som
+  // rättar posten behöver veta allt som var fel med den, inte det vi råkade
+  // kontrollera först.
+  const notes: string[] = [];
+
+  if (ambiguous) {
+    notes.push(
+      `Utstämplingen angav inte vilket jobb den gällde, och ${open.length} ` +
+        `jobb pågick. Det senast påbörjade stängdes. Kontrollera vilket ` +
+        `som faktiskt avslutades innan fakturering.`
+    );
+  }
+
+  if (input.rejectedAt) notes.push(clockSkewNote(input.rejectedAt));
+
   // VILLKORET `clockOutAt: null` ÄR SJÄLVA POÄNGEN med updateMany här.
   //
   // Mellan uppslaget ovan och den här skrivningen kan posten ha hunnit stängas
@@ -312,14 +365,8 @@ export async function clockOut(
     data: {
       clockOutAt: at,
       clockOutPunchId: input.clientPunchId ?? null,
-      ...(ambiguous
-        ? {
-            needsReview: true,
-            reviewNote:
-              `Utstämplingen angav inte vilket jobb den gällde, och ${open.length} ` +
-              `jobb pågick. Det senast påbörjade stängdes. Kontrollera vilket ` +
-              `som faktiskt avslutades innan fakturering.`,
-          }
+      ...(notes.length > 0
+        ? { needsReview: true, reviewNote: notes.join(" ") }
         : {}),
     },
   });
@@ -372,7 +419,16 @@ export async function clockOutAll(
   // behålla sin sluttid i stället för att få vår påskriven.
   await db.timeEntry.updateMany({
     where: { id: { in: ids }, clockOutAt: null },
-    data: { clockOutAt: at, clockOutPunchId: input.clientPunchId ?? null },
+    data: {
+      clockOutAt: at,
+      clockOutPunchId: input.clientPunchId ?? null,
+      ...(input.rejectedAt
+        ? {
+            needsReview: true,
+            reviewNote: clockSkewNote(input.rejectedAt),
+          }
+        : {}),
+    },
   });
 
   return db.timeEntry.findMany({
