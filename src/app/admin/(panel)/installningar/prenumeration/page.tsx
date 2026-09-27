@@ -5,6 +5,7 @@ import { isStripeConfigured, yearlyAvailable } from "@/lib/stripe";
 import { evaluateAccess } from "@/lib/subscription";
 import { TRIAL_LICENSES } from "@/lib/licenses";
 import LicenseForm from "@/components/admin/LicenseForm";
+import ModuleSection from "@/components/admin/ModuleSection";
 import { Alert, Button, Card, CardHeader, Field, Input } from "@/components/ui";
 import { formatDate } from "@/lib/format";
 import { openBillingPortal, startCheckout } from "./actions";
@@ -93,10 +94,17 @@ export default async function SubscriptionPage({
                   overview.interval === "year" ? "Avgift per år" : "Avgift per månad"
                 }
                 value={`${kr(
-                  overview.interval === "year"
+                  (overview.interval === "year"
                     ? (overview.yearlyAmount ?? 0)
-                    : overview.monthlyAmount
+                    : overview.monthlyAmount) + overview.moduleAmount
                 )} kr`}
+              />
+            )}
+
+            {paying && overview.moduleAmount > 0 && (
+              <Row
+                label="Varav tillval"
+                value={`${kr(overview.moduleAmount)} kr`}
               />
             )}
 
@@ -210,6 +218,19 @@ export default async function SubscriptionPage({
           )}
         </div>
       </Card>
+
+      {overview.modules.length > 0 && (
+        <Card>
+          <CardHeader title="Tillval" />
+          <div className="p-5">
+            <ModuleSection
+              modules={overview.modules}
+              hasSubscription={overview.hasSubscription}
+              interval={overview.interval ?? "month"}
+            />
+          </div>
+        </Card>
+      )}
 
       <Card>
         <CardHeader title="Så räknas priset" />

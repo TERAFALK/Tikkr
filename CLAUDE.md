@@ -356,6 +356,29 @@ Två kopplingar kapas medvetet inte: `spans.ts` är inte lönespecifik
 kalla `endOpenBreak()` vid varje instämpling — den är idempotent, och en kund
 som stänger av modulen mitt på dagen ska inte lämna en rast öppen för alltid.
 
+**En prenumeration har flera rader nu, och ordningen är inte given.**
+Tidigare hade varje prenumeration exakt en rad, och koden läste
+`items.data[0]` för att få antalet skärmar. Ligger löneunderlaget först
+skulle antalet licenser sättas till 1 — tyst, utan felmeddelande. Rader slås
+därför alltid upp på pris-id, via `priceRole()`, `screenItemOf()` och
+`moduleItemsOf()` i `stripe.ts`. Bevakas av `tests/stripe-items.test.ts`.
+
+**Har företaget en prenumeration är Stripes rader HELA sanningen** om vilka
+tillval de har. `syncModulesFromSubscription()` lägger till det som finns där
+och tar bort det som inte gör det, vid varje besked och vid varje visning av
+prenumerationssidan. Regeln är avsiktligt total: plattformspanelen vägrar
+redan ändra tillval för ett företag med prenumeration, så det finns ingen
+modul vid sidan av fakturan att städa bort av misstag. En enklare regel med
+färre lägen slår en klok regel med flera.
+
+En avslutad prenumeration är ett eget fall: Stripe skickar med raderna även i
+det beskedet, så där raderas modulerna uttryckligen.
+
+**Beloppet för en ändring räknas av Stripe, aldrig av oss.** Kunden ser en
+förhandsberäkning innan de bekräftar. Går den inte att hämta stoppas inte
+köpet — då visas bara den löpande avgiften. Att vägra sälja för att en
+förhandsvisning inte gick att hämta vore fel avvägning.
+
 Att lägga till en modul: en nyckel i registret, ett värde i enumen
 `CompanyModuleKey`, en artikel hos Stripe. Ingenting annat i arkitekturen
 behöver röras.

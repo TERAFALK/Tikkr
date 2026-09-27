@@ -1,4 +1,5 @@
 import Stripe from "stripe";
+import { MODULES, MODULE_KEYS, type ModuleKey } from "./modules";
 
 /**
  * KOPPLINGEN TILL STRIPE.
@@ -39,6 +40,97 @@ export function stripe(): Stripe {
   // anslutning varje gång.
   client ??= new Stripe(key);
   return client;
+}
+
+/**
+ * Artikeln för ett tillval, eller undefined när den inte är uppsatt.
+ *
+ * Till skillnad från skärmpriset kastar den inte. En modul utan artikel går
+ * helt enkelt inte att köpa, och resten av prenumerationen ska fungera ändå
+ * — annars hade en glömd miljövariabel stängt hela kassan.
+ */
+export function modulePriceId(
+  key: ModuleKey,
+  interval: BillingInterval = "month"
+): string | undefined {
+  const definition = MODULES[key];
+
+  return interval === "year"
+    ? process.env[definition.priceEnvYearly]
+    : process.env[definition.priceEnv];
+}
+
+/** true när modulen går att köpa i det här intervallet. */
+export function moduleForSale(
+  key: ModuleKey,
+  interval: BillingInterval = "month"
+): boolean {
+  return Boolean(isStripeConfigured() && modulePriceId(key, interval));
+}
+
+export type PriceRole =
+  | { kind: "SCREENS" }
+  | { kind: "MODULE"; key: ModuleKey };
+
+/**
+ * VAD EN RAD PÅ PRENUMERATIONEN BETYDER.
+ *
+ * Det här är skälet att funktionen finns: fram till nu hade varje
+ * prenumeration exakt en rad, och koden läste `items.data[0]` för att få
+ * antalet skärmar. Med en modulrad bredvid är ordningen inte längre given —
+ * hamnar modulen först skulle antalet licenser sättas till ett.
+ *
+ * Rader slås därför upp på pris-id, aldrig på plats.
+ */
+export function priceRole(id: string | undefined | null): PriceRole | null {
+  if (!id) return null;
+
+  if (id === process.env.STRIPE_PRICE_ID || id === process.env.STRIPE_PRICE_ID_YEARLY) {
+    return { kind: "SCREENS" };
+  }
+
+  for (const key of MODULE_KEYS) {
+    if (id === modulePriceId(key, "month") || id === modulePriceId(key, "year")) {
+      return { kind: "MODULE", key };
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Raden som bär antalet stämplingsskärmar.
+ *
+ * Faller tillbaka i två steg, och det är med flit. Byts artikeln hos Stripe
+ * känner `priceRole` inte längre igen den gamla — men gamla prenumerationer
+ * ligger kvar på den, och deras licensantal får inte plötsligt bli fel. Då
+ * duger "raden som inte är en modul", och i sista hand första raden, vilket
+ * är exakt vad koden gjorde innan moduler fanns.
+ */
+export function screenItemOf(
+  subscription: Stripe.Subscription
+): Stripe.SubscriptionItem | undefined {
+  const items = subscription.items.data;
+
+  return (
+    items.find((item) => priceRole(item.price?.id)?.kind === "SCREENS") ??
+    items.find((item) => priceRole(item.price?.id)?.kind !== "MODULE") ??
+    items[0]
+  );
+}
+
+/** Modulerna som ligger på prenumerationen just nu, med sin rad. */
+export function moduleItemsOf(
+  subscription: Stripe.Subscription
+): { key: ModuleKey; itemId: string }[] {
+  const found: { key: ModuleKey; itemId: string }[] = [];
+
+  for (const item of subscription.items.data) {
+    const role = priceRole(item.price?.id);
+    if (role?.kind === "MODULE") found.push({ key: role.key, itemId: item.id });
+  }
+
+  return found;
 }
 
 export function priceId(interval: BillingInterval = "month"): string {
@@ -85,19 +177,96 @@ export interface ScreenPricing {
   fromStripe: boolean;
 }
 
+export interface ModulePrice {
+  /** Kronor per månad för hela företaget, exklusive moms. */
+  month: number;
+  /** Kronor per år. null när årsbetalning inte erbjuds för modulen. */
+  year: number | null;
+  /** true när siffrorna kommer från Stripe och inte från registret. */
+  fromStripe: boolean;
+}
+
+export type ModulePricing = Record<ModuleKey, ModulePrice>;
+
 // Priset ändras några gånger om året, inte några gånger i minuten. Ett kort
 // minne räcker för att slippa ett anrop till Stripe vid varje sidvisning.
+//
+// Skärmpriset och modulpriserna läses i samma svep och delar minne. De
+// hämtas nästan alltid tillsammans — prenumerationssidan visar båda — och
+// två minnen som går ur takt hade kunnat visa gårdagens modulpris bredvid
+// dagens skärmpris.
 const PRICING_CACHE_MS = 10 * 60_000;
-let pricingCache: { at: number; value: ScreenPricing } | null = null;
 
-export async function getScreenPricing(): Promise<ScreenPricing> {
+interface Pricing {
+  screens: ScreenPricing;
+  modules: ModulePricing;
+}
+
+let pricingCache: { at: number; value: Pricing } | null = null;
+
+async function getPricing(): Promise<Pricing> {
   if (pricingCache && Date.now() - pricingCache.at < PRICING_CACHE_MS) {
     return pricingCache.value;
   }
 
-  const value = await readPricing();
+  const value = {
+    screens: await readPricing(),
+    modules: await readModulePricing(),
+  };
+
   pricingCache = { at: Date.now(), value };
   return value;
+}
+
+export async function getScreenPricing(): Promise<ScreenPricing> {
+  return (await getPricing()).screens;
+}
+
+export async function getModulePricing(): Promise<ModulePricing> {
+  return (await getPricing()).modules;
+}
+
+/**
+ * Vad tillvalen kostar.
+ *
+ * Samma ordning som skärmpriset: artikeln hos Stripe är sanningen, siffrorna
+ * i registret är reservvärden för labbet och för kunder som betalar mot
+ * faktura. Ändras priset hos Stripe syns det här inom tio minuter, utan
+ * deploy.
+ */
+async function readModulePricing(): Promise<ModulePricing> {
+  const entries = await Promise.all(
+    MODULE_KEYS.map(async (key): Promise<[ModuleKey, ModulePrice]> => {
+      const fallback: ModulePrice = {
+        month: MODULES[key].fallbackMonthly,
+        year: MODULES[key].fallbackYearly,
+        fromStripe: false,
+      };
+
+      if (!isStripeConfigured()) return [key, fallback];
+
+      try {
+        const month = await amountFor(modulePriceId(key, "month"));
+        if (month === null) return [key, fallback];
+
+        return [
+          key,
+          {
+            month,
+            year: await amountFor(modulePriceId(key, "year")),
+            fromStripe: true,
+          },
+        ];
+      } catch (error) {
+        // Sidan ska gå att visa även när Stripe inte svarar. Ett pris som är
+        // några kronor fel är bättre än en sida som inte laddar.
+        console.error(`Kunde inte hämta priset för ${key} från Stripe`, error);
+        return [key, fallback];
+      }
+    })
+  );
+
+  return Object.fromEntries(entries) as ModulePricing;
 }
 
 async function readPricing(): Promise<ScreenPricing> {

@@ -2,9 +2,14 @@ import { redirect } from "next/navigation";
 import { unsafeGlobalPrisma } from "./db";
 import { isPlatformAdmin } from "./platform-access";
 import { readPlatformSession } from "./platform-session";
-import { getScreenPricing, type ScreenPricing } from "./stripe";
+import {
+  getModulePricing,
+  getScreenPricing,
+  type ModulePricing,
+  type ScreenPricing,
+} from "./stripe";
 import { TRIAL_LICENSES } from "./licenses";
-import { MODULES, isModuleKey, moduleName, type ModuleKey } from "./modules";
+import { isModuleKey, moduleName, type ModuleKey } from "./modules";
 import { moduleStates, setModuleManually } from "./company-modules";
 
 /**
@@ -87,7 +92,8 @@ export function monthlyRevenueFor(
      */
     modules?: { module: string }[];
   },
-  pricing: ScreenPricing
+  pricing: ScreenPricing,
+  modulePricing: ModulePricing
 ): number {
   if (company.subscriptionStatus !== "ACTIVE") return 0;
 
@@ -99,19 +105,13 @@ export function monthlyRevenueFor(
   // Tillvalen är fasta belopp per företag, inte per skärm. En kund med tre
   // skärmar och löneunderlaget betalar tre gånger skärmpriset plus EN
   // modulavgift.
-  //
-  // Modulpriserna tas tills vidare ur registret och inte ur Stripe. Så länge
-  // ingen modul ligger på en prenumeration är det samma siffra; när
-  // modulrader börjar säljas ska de läsas från artikeln, precis som
-  // skärmpriset.
   const modules = (company.modules ?? []).reduce((sum, row) => {
     if (!isModuleKey(row.module)) return sum;
 
-    const definition = MODULES[row.module];
-    return (
-      sum +
-      (yearly ? definition.fallbackYearly / 12 : definition.fallbackMonthly)
-    );
+    const price = modulePricing[row.module];
+    const perYear = price.year ?? price.month * 12;
+
+    return sum + (yearly ? perYear / 12 : price.month);
   }, 0);
 
   return Math.round(company.screenLicenses * perScreen + modules);
@@ -127,7 +127,10 @@ export async function listCompanies(): Promise<CompanyOverview[]> {
   const since = new Date();
   since.setDate(since.getDate() - 30);
 
-  const pricing = await getScreenPricing();
+  const [pricing, modulePricing] = await Promise.all([
+    getScreenPricing(),
+    getModulePricing(),
+  ]);
 
   const companies = await unsafeGlobalPrisma.company.findMany({
     orderBy: { createdAt: "desc" },
@@ -191,7 +194,7 @@ export async function listCompanies(): Promise<CompanyOverview[]> {
     entriesLast30Days: recentByCompany.get(company.id) ?? 0,
     lastActivityAt: latestByCompany.get(company.id) ?? null,
     licenses: company.screenLicenses,
-    monthlyRevenue: monthlyRevenueFor(company, pricing),
+    monthlyRevenue: monthlyRevenueFor(company, pricing, modulePricing),
     managedByStripe: Boolean(company.stripeSubscriptionId),
   }));
 }

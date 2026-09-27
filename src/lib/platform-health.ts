@@ -1,6 +1,6 @@
 import { unsafeGlobalPrisma } from "./db";
 import { monthlyRevenueFor } from "./platform-admin";
-import { getScreenPricing } from "./stripe";
+import { getModulePricing, getScreenPricing } from "./stripe";
 
 /**
  * DET SOM BEHÖVER ÅTGÄRDAS.
@@ -157,7 +157,7 @@ export async function quietCustomers(): Promise<QuietCustomer[]> {
   const cutoff = new Date();
   cutoff.setDate(cutoff.getDate() - QUIET_CUSTOMER_DAYS);
 
-  const [companies, latest, pricing] = await Promise.all([
+  const [companies, latest, pricing, modulePricing] = await Promise.all([
     unsafeGlobalPrisma.company.findMany({
       where: { subscriptionStatus: "ACTIVE" },
       select: {
@@ -174,6 +174,7 @@ export async function quietCustomers(): Promise<QuietCustomer[]> {
       _max: { clockInAt: true },
     }),
     getScreenPricing(),
+    getModulePricing(),
   ]);
 
   const lastByCompany = new Map(
@@ -193,7 +194,7 @@ export async function quietCustomers(): Promise<QuietCustomer[]> {
               (Date.now() - lastActivityAt.getTime()) / (24 * 60 * 60 * 1000)
             )
           : null,
-        monthlyRevenue: monthlyRevenueFor(company, pricing),
+        monthlyRevenue: monthlyRevenueFor(company, pricing, modulePricing),
       };
     })
     .filter(

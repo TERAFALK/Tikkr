@@ -3,11 +3,18 @@
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { assertWritable, requireAdmin } from "@/lib/admin-session";
+import { revalidatePath } from "next/cache";
 import {
+  applyModuleChange,
   createCheckoutSession,
   createPortalSession,
+  ModuleChangeError,
   openLicenseUpdate,
+  previewModuleChange,
 } from "@/lib/billing";
+import { setModuleManually } from "@/lib/company-modules";
+import { isModuleKey, moduleName } from "@/lib/modules";
+import { unsafeGlobalPrisma } from "@/lib/db";
 
 /**
  * Adressen byggs ur anropet istället för att gissas, så att Stripe skickar
@@ -92,4 +99,131 @@ export async function openBillingPortal() {
   });
 
   redirect(url);
+}
+
+/* -------------------------------------------------------------------------- */
+/* Tillval                                                                     */
+/* -------------------------------------------------------------------------- */
+
+export interface ModuleFormState {
+  /** Ifylld när kunden ska bekräfta en ändring som kostar pengar. */
+  preview?: {
+    key: string;
+    name: string;
+    on: boolean;
+    interval: "month" | "year";
+    recurringAmount: number;
+    nextInvoiceAmount: number | null;
+    nextInvoiceAt: string | null;
+  };
+  error?: string;
+  ok?: string;
+}
+
+/**
+ * SLÅR PÅ ELLER AV ETT TILLVAL.
+ *
+ * Tre vägar, och skillnaden mellan dem är om det kostar något:
+ *
+ * 1. Ingen prenumeration — provperiod eller fakturakund. Reglaget skriver
+ *    raden direkt. Det är samma knapp kunden kommer att möta senare, men
+ *    under provperioden är den gratis.
+ * 2. Prenumeration, steg "preview". Vi frågar Stripe vad ändringen kostar
+ *    och visar svaret. Ingenting har hänt än.
+ * 3. Prenumeration, steg "apply". Ändringen görs hos Stripe.
+ *
+ * Att dela upp det i två steg är hela poängen: en kryssruta som tyst ändrar
+ * en faktura är inte ett val kunden gjort medvetet.
+ */
+export async function changeModule(
+  _previous: ModuleFormState,
+  formData: FormData
+): Promise<ModuleFormState> {
+  const session = await requireAdmin();
+  await assertWritable(session);
+
+  const key = String(formData.get("module") ?? "");
+  const on = String(formData.get("on") ?? "") === "1";
+  const step = String(formData.get("step") ?? "");
+
+  // Avbryt är ett eget steg och inte en knapp som bara döljer rutan i
+  // webbläsaren: tillståndet lever i åtgärden, och bara en ny körning av den
+  // kan rensa det.
+  if (step === "cancel") return {};
+
+  const apply = step === "apply";
+
+  if (!isModuleKey(key)) return { error: "Okänt tillval." };
+
+  const company = await unsafeGlobalPrisma.company.findUnique({
+    where: { id: session.companyId },
+    select: { stripeSubscriptionId: true },
+  });
+
+  // Utan prenumeration kostar reglaget ingenting, och då finns inget att
+  // bekräfta. Kunden trycker en gång och är klar.
+  if (!company?.stripeSubscriptionId) {
+    await setModuleManually({
+      companyId: session.companyId,
+      key,
+      on,
+      actorEmail: session.email,
+    });
+
+    revalidatePath("/admin", "layout");
+
+    return {
+      ok: on
+        ? `${moduleName(key)} är påslaget.`
+        : `${moduleName(key)} är avstängt.`,
+    };
+  }
+
+  try {
+    if (!apply) {
+      const preview = await previewModuleChange({
+        companyId: session.companyId,
+        key,
+        on,
+      });
+
+      return {
+        preview: {
+          key: preview.key,
+          name: preview.name,
+          on: preview.on,
+          interval: preview.interval,
+          recurringAmount: preview.recurringAmount,
+          nextInvoiceAmount: preview.nextInvoiceAmount,
+          nextInvoiceAt: preview.nextInvoiceAt?.toISOString() ?? null,
+        },
+      };
+    }
+
+    await applyModuleChange({ companyId: session.companyId, key, on });
+  } catch (error) {
+    if (error instanceof ModuleChangeError) return { error: error.message };
+
+    // Resten är driftfel — Stripe svarar inte, eller en artikel saknas.
+    // Orsaken hamnar i serverloggen med ett sökbart prefix; kunden får ett
+    // svar de kan göra något med.
+    console.error(
+      "[tillval] Ändringen gick inte igenom:",
+      error instanceof Error ? error.message : error
+    );
+
+    return {
+      error:
+        "Ändringen gick inte igenom. Försök igen, eller kontakta support@tikkr.se om felet kvarstår.",
+    };
+  }
+
+  // Hela panelen ritas om: menyn visar eller döljer modulens sidor.
+  revalidatePath("/admin", "layout");
+
+  return {
+    ok: on
+      ? `${moduleName(key)} är påslaget.`
+      : `${moduleName(key)} är avstängt.`,
+  };
 }

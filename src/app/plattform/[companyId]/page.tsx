@@ -33,7 +33,7 @@ import { startSupport } from "./actions";
 import { unsafeGlobalPrisma } from "@/lib/db";
 import ActivityTable from "@/components/platform/ActivityTable";
 import { monthlyRevenueFor } from "@/lib/platform-admin";
-import { getScreenPricing } from "@/lib/stripe";
+import { getModulePricing, getScreenPricing } from "@/lib/stripe";
 import { updateNote } from "./actions";
 
 export const dynamic = "force-dynamic";
@@ -51,7 +51,11 @@ export default async function CompanyPage({
 
   const { company, admins, devices, note, history, historyTotal, stats, modules } =
     detail;
-  const monthlyRevenue = monthlyRevenueFor(company, await getScreenPricing());
+  const monthlyRevenue = monthlyRevenueFor(
+    company,
+    await getScreenPricing(),
+    await getModulePricing()
+  );
 
   // Senaste tjugo besöken. Går utanför tenant-filtreringen med flit: raden
   // gäller LEVERANTÖRENS åtkomst till kunden, inte kundens egen data, och läses

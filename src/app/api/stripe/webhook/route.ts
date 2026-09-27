@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import type Stripe from "stripe";
-import { stripe, toSubscriptionStatus } from "@/lib/stripe";
+import { screenItemOf, stripe, toSubscriptionStatus } from "@/lib/stripe";
+import { syncModulesFromSubscription } from "@/lib/billing";
 import { unsafeGlobalPrisma } from "@/lib/db";
 
 /**
@@ -92,7 +93,12 @@ async function handle(event: Stripe.Event) {
       // Antalet betalda platser är antalet licenser. Stripe är sanningen —
       // ändrar kunden kvantiteten där, i kassan eller i kundportalen, följer
       // vår siffra med.
-      const item = subscription.items.data[0];
+      //
+      // RADEN SLÅS UPP PÅ PRIS-ID OCH INTE PÅ PLATS. Sedan tillvalen finns
+      // kan prenumerationen ha flera rader, och `items.data[0]` kunde lika
+      // gärna vara löneunderlaget — kvantitet 1. Då hade en kund med tre
+      // skärmar tyst blivit en.
+      const item = screenItemOf(subscription);
       const quantity = item?.quantity;
       const interval = item?.price?.recurring?.interval ?? null;
 
@@ -116,6 +122,21 @@ async function handle(event: Stripe.Event) {
             status === "PAST_DUE" ? await pastDueStart(companyId) : null,
         },
       });
+
+      // Tillvalen följer prenumerationens rader.
+      //
+      // En AVSLUTAD prenumeration är ett eget fall: Stripe skickar med
+      // raderna även i det beskedet, så en vanlig synkning hade behållit
+      // modulerna som om kunden fortfarande betalade. Här tas de bort.
+      //
+      // Kundens scheman, raster, frånvaro och komprader ligger orörda kvar
+      // och står där igen om kunden kommer tillbaka. Se CLAUDE.md § 3.1.
+      if (event.type === "customer.subscription.deleted") {
+        await clearModules(companyId);
+      } else {
+        await syncModulesFromSubscription(companyId, subscription);
+      }
+
       return;
     }
 
@@ -149,6 +170,15 @@ async function handle(event: Stripe.Event) {
       // dem gör att de inte köar upp och skickas om i evighet.
       return;
   }
+}
+
+/**
+ * Tar bort alla tillval när prenumerationen avslutas.
+ *
+ * Raderar bara raden som säger att modulen är köpt. Ingen kunddata rörs.
+ */
+async function clearModules(companyId: string): Promise<void> {
+  await unsafeGlobalPrisma.companyModule.deleteMany({ where: { companyId } });
 }
 
 /** Behåller den första tidpunkten betalningen uteblev. */

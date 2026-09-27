@@ -1,11 +1,19 @@
+import type Stripe from "stripe";
 import { unsafeGlobalPrisma } from "./db";
 import { getLicenseState, setLicenseCount } from "./licenses";
+import { enabledModules } from "./company-modules";
+import { MODULES, MODULE_KEYS, type ModuleKey } from "./modules";
 import {
+  getModulePricing,
   getScreenPricing,
+  moduleItemsOf,
+  modulePriceId,
   priceId,
+  screenItemOf,
   stripe,
   yearlyAvailable,
   type BillingInterval,
+  type ModulePricing,
   type ScreenPricing,
 } from "./stripe";
 
@@ -54,6 +62,18 @@ export async function createCheckoutSession(params: {
     select: { stripeCustomerId: true },
   });
 
+  // Tillvalen kunden slagit på under provperioden följer med in i kassan.
+  // Reglaget är samma knapp hela vägen: gratis under provperioden, en rad på
+  // fakturan efteråt. Kunden ser båda raderna hos Stripe innan de betalar.
+  //
+  // Kvantitet 1 och ingen justering: tillvalen är fasta belopp per företag.
+  const modules = await enabledModules(params.companyId);
+
+  const moduleLines = modules
+    .map((key) => modulePriceId(key, params.interval))
+    .filter((price): price is string => Boolean(price))
+    .map((price) => ({ price, quantity: 1 }));
+
   const session = await stripe().checkout.sessions.create({
     mode: "subscription",
     line_items: [
@@ -64,6 +84,7 @@ export async function createCheckoutSession(params: {
         // sista stund ska inte behöva backa ut och börja om.
         adjustable_quantity: { enabled: true, minimum: 1, maximum: 100 },
       },
+      ...moduleLines,
     ],
 
     // Finns kunden redan hos Stripe återanvänder vi den, så att en kund som
@@ -213,6 +234,22 @@ async function licenseUpdateConfiguration(): Promise<string | null> {
     );
 
     if (found) {
+      // ARTIKELLISTAN SKRIVS OM PÅ EN BEFINTLIG KONFIGURATION. Den skapades
+      // innan tillvalen fanns och känner därför inte modulernas produkter —
+      // och en portal som inte känner dem vägrar öppna prenumerationen alls.
+      // Ett anrop per processtart, och det ger samma resultat hur många
+      // gånger det körs.
+      await stripe().billingPortal.configurations.update(found.id, {
+        features: {
+          subscription_update: {
+            enabled: true,
+            default_allowed_updates: ["quantity"],
+            proration_behavior: "create_prorations",
+            products: await updatableProducts(),
+          },
+        },
+      });
+
       licenseConfigurationId = found.id;
       return found.id;
     }
@@ -266,14 +303,35 @@ async function licenseUpdateConfiguration(): Promise<string | null> {
   }
 }
 
-/** Artiklarna kunden får ändra antal på. Priserna kan ligga på samma produkt. */
+/**
+ * Artiklarna kunden får ändra antal på. Priserna kan ligga på samma produkt.
+ *
+ * MODULERNAS ARTIKLAR MÅSTE MED, även om ingen ska ändra antal på dem. Stripes
+ * kundportal vägrar öppna en prenumeration som innehåller en produkt som inte
+ * står i konfigurationen — och sedan tillvalen finns kan prenumerationen
+ * innehålla dem. Utan de här raderna slutar knappen "Ändra antal licenser"
+ * fungera för just de kunder som köpt mest.
+ *
+ * Följden är att en kund i teorin kan skruva upp antalet löneunderlag till
+ * tre hos Stripe. Vår synkning bryr sig inte om kvantiteten — modulen är på
+ * eller av — så det skulle bara betyda att de betalar för mycket, vilket de
+ * kan ändra tillbaka på samma sida. Stripe erbjuder inget sätt att lista en
+ * produkt utan att tillåta kvantitet.
+ */
 async function updatableProducts() {
   const byProduct = new Map<string, string[]>();
 
-  for (const id of [
+  const ids = [
     priceId("month"),
     ...(yearlyAvailable() ? [priceId("year")] : []),
-  ]) {
+    ...MODULE_KEYS.flatMap((key) =>
+      [modulePriceId(key, "month"), modulePriceId(key, "year")].filter(
+        (id): id is string => Boolean(id)
+      )
+    ),
+  ];
+
+  for (const id of ids) {
     const price = await stripe().prices.retrieve(id);
     const product =
       typeof price.product === "string" ? price.product : price.product.id;
@@ -282,6 +340,82 @@ async function updatableProducts() {
   }
 
   return [...byProduct].map(([product, prices]) => ({ product, prices }));
+}
+
+/**
+ * SKRIVER OM MODULRADERNA EFTER VAD STRIPE SÄGER.
+ *
+ * När ett företag har en prenumeration är dess rader HELA sanningen om vilka
+ * tillval de har. Modul på prenumerationen men inte hos oss läggs till; modul
+ * hos oss men inte på prenumerationen tas bort.
+ *
+ * Regeln är avsiktligt total och inte "rör bara det Stripe satt". Skälet:
+ * plattformspanelen vägrar redan ändra tillval för ett företag med
+ * prenumeration, så det finns ingen modul vi gett bort vid sidan av fakturan
+ * som skulle kunna städas bort av misstag. En enklare regel med färre lägen
+ * slår en klok regel med flera.
+ *
+ * Kör vid varje besked från Stripe OCH vid varje visning av
+ * prenumerationssidan, av samma skäl som licensantalet läks där: ett missat
+ * besked ska inte kräva att kunden hör av sig.
+ */
+export async function syncModulesFromSubscription(
+  companyId: string,
+  subscription: Stripe.Subscription
+): Promise<void> {
+  const onStripe = moduleItemsOf(subscription);
+  const wanted = new Map(onStripe.map((item) => [item.key, item.itemId]));
+
+  const current = await unsafeGlobalPrisma.companyModule.findMany({
+    where: { companyId },
+    select: { module: true, source: true, stripeItemId: true },
+  });
+
+  const toRemove = current
+    .filter((row) => !wanted.has(row.module))
+    .map((row) => row.module);
+
+  if (toRemove.length > 0) {
+    await unsafeGlobalPrisma.companyModule.deleteMany({
+      where: { companyId, module: { in: toRemove } },
+    });
+  }
+
+  for (const [key, itemId] of wanted) {
+    const row = current.find((item) => item.module === key);
+
+    // SKRIVER BARA NÄR NÅGOT SKILJER SIG. Funktionen körs vid varje visning
+    // av prenumerationssidan, och en upsert som varje gång skriver samma
+    // värden hade flyttat updated_at utan att något hänt — vilket gör fältet
+    // oanvändbart för att se när kunden faktiskt köpte modulen.
+    if (row?.source === "STRIPE" && row.stripeItemId === itemId) continue;
+
+    await unsafeGlobalPrisma.companyModule.upsert({
+      where: { companyId_module: { companyId, module: key } },
+      create: {
+        companyId,
+        module: key,
+        source: "STRIPE",
+        stripeItemId: itemId,
+      },
+      // En rad som slogs på för hand under provperioden blir Stripe-styrd i
+      // samma stund som den hamnar på en faktura. Annars hade
+      // plattformspanelen trott att den fortfarande gick att ändra där.
+      update: { source: "STRIPE", stripeItemId: itemId },
+    });
+  }
+}
+
+/** Ett tillval så som prenumerationssidan visar det. */
+export interface ModuleOffer {
+  key: ModuleKey;
+  name: string;
+  summary: string;
+  enabled: boolean;
+  /** Priset i det intervall kunden betalar i. */
+  amount: number;
+  /** false när artikeln saknas hos Stripe. Modulen går då inte att köpa. */
+  forSale: boolean;
 }
 
 export interface BillingOverview {
@@ -299,15 +433,48 @@ export interface BillingOverview {
   interval: BillingInterval | null;
   /** Priset per skärm, hämtat från artikeln hos betaltjänsten. */
   pricing: ScreenPricing;
+  /** Tillvalen, med läge och pris i kundens intervall. */
+  modules: ModuleOffer[];
+  /** Summan av de påslagna tillvalen, i kundens intervall. */
+  moduleAmount: number;
+}
+
+/**
+ * Tillvalen som rader att visa.
+ *
+ * Saknas artikeln hos Stripe för det intervall kunden betalar i går modulen
+ * inte att köpa. Den visas ändå, men utan knapp — en modul som tyst försvinner
+ * ur listan ser ut som att den inte finns, och då hör ingen av sig om att den
+ * borde gå att köpa.
+ */
+function moduleOffers(
+  pricing: ModulePricing,
+  enabled: ModuleKey[],
+  interval: BillingInterval
+): ModuleOffer[] {
+  return MODULE_KEYS.map((key) => {
+    const price = pricing[key];
+
+    return {
+      key,
+      name: MODULES[key].name,
+      summary: MODULES[key].summary,
+      enabled: enabled.includes(key),
+      amount:
+        interval === "year" ? (price.year ?? price.month * 12) : price.month,
+      forSale: Boolean(modulePriceId(key, interval)),
+    };
+  });
 }
 
 /** Vad kunden ser på prenumerationssidan. */
 export async function getBillingOverview(
   companyId: string
 ): Promise<BillingOverview> {
-  const [licenses, pricing] = await Promise.all([
+  const [licenses, pricing, modulePricing] = await Promise.all([
     getLicenseState(companyId),
     getScreenPricing(),
+    getModulePricing(),
   ]);
 
   const screens = licenses.total;
@@ -333,9 +500,25 @@ export async function getBillingOverview(
     cancelAtPeriodEnd: false,
     interval: null,
     pricing,
+    modules: [],
+    moduleAmount: 0,
   };
 
-  if (!company?.stripeSubscriptionId) return overview;
+  // Tillvalen räknas fram sist, när intervallet är känt. Utan prenumeration
+  // finns inget intervall, och månad är då det pris kunden kommer att möta.
+  const describeModules = async (interval: BillingInterval) => {
+    const enabled = await enabledModules(companyId);
+
+    overview.modules = moduleOffers(modulePricing, enabled, interval);
+    overview.moduleAmount = overview.modules
+      .filter((module) => module.enabled)
+      .reduce((sum, module) => sum + module.amount, 0);
+  };
+
+  if (!company?.stripeSubscriptionId) {
+    await describeModules("month");
+    return overview;
+  }
 
   try {
     const subscription = await stripe().subscriptions.retrieve(
@@ -356,16 +539,20 @@ export async function getBillingOverview(
 
     overview.currentPeriodEnd = periodEnd ? new Date(periodEnd * 1000) : null;
     overview.cancelAtPeriodEnd = subscription.cancel_at_period_end;
+
+    // SKÄRMRADEN SLÅS UPP PÅ PRIS-ID, inte på plats i listan. Med en modulrad
+    // bredvid är ordningen inte längre given, och `items.data[0]` kunde lika
+    // gärna vara löneunderlaget — då hade antalet licenser satts till ett.
+    const item = screenItemOf(subscription);
+
     overview.interval =
-      subscription.items.data[0]?.price?.recurring?.interval === "year"
-        ? "year"
-        : "month";
+      item?.price?.recurring?.interval === "year" ? "year" : "month";
 
     // Stämmer av mot Stripe varje gång sidan visas. Normalt har webhooken
     // redan skrivit samma siffra, men den kan vara försenad eller ha missats
     // — och då ska kunden som just godkänt en ändring ändå se rätt antal när
     // de kommer tillbaka hit, utan att behöva höra av sig.
-    const quantity = subscription.items.data[0]?.quantity;
+    const quantity = item?.quantity;
 
     if (quantity && quantity !== screens) {
       await setLicenseCount(companyId, quantity);
@@ -373,10 +560,273 @@ export async function getBillingOverview(
       overview.screens = quantity;
       Object.assign(overview, amounts(quantity));
     }
+
+    // Samma självläkning för tillvalen.
+    await syncModulesFromSubscription(companyId, subscription);
   } catch (error) {
     // Sidan ska gå att öppna även när Stripe inte svarar.
     console.error("Kunde inte hämta prenumerationen från Stripe", error);
   }
 
+  await describeModules(overview.interval ?? "month");
+
   return overview;
+}
+
+/* -------------------------------------------------------------------------- */
+/* Att lägga till eller ta bort ett tillval på en levande prenumeration        */
+/* -------------------------------------------------------------------------- */
+
+export class ModuleChangeError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "ModuleChangeError";
+  }
+}
+
+export interface ModuleChangePreview {
+  key: ModuleKey;
+  name: string;
+  on: boolean;
+  interval: BillingInterval;
+  /** Den löpande avgiften för modulen efter ändringen. */
+  recurringAmount: number;
+  /**
+   * Vad nästa faktura landar på, inklusive avräkningen för resten av den
+   * pågående perioden. null när Stripe inte kunde räkna fram den.
+   */
+  nextInvoiceAmount: number | null;
+  nextInvoiceAt: Date | null;
+}
+
+/**
+ * Vad ändringen kommer att kosta — räknat av Stripe, inte av oss.
+ *
+ * Samma princip som står motiverad vid openLicenseUpdate ovan: beloppet ska
+ * räknas fram av den part som faktiskt debiterar. En siffra vi räknat ut i
+ * förväg är en gissning om vad Stripe kommer att fakturera, och en gissning
+ * duger inte för något som ändrar en faktura.
+ *
+ * MISSLYCKAS BERÄKNINGEN STOPPAS INTE KÖPET. Då saknas bara beloppet, och
+ * kunden får veta vad modulen kostar löpande i stället. Att vägra sälja för
+ * att en förhandsvisning inte gick att hämta vore fel avvägning.
+ */
+export async function previewModuleChange(params: {
+  companyId: string;
+  key: ModuleKey;
+  on: boolean;
+}): Promise<ModuleChangePreview> {
+  const { subscription, interval } = await subscriptionFor(params.companyId);
+
+  const pricing = await getModulePricing();
+  const price = pricing[params.key];
+
+  const recurringAmount =
+    interval === "year" ? (price.year ?? price.month * 12) : price.month;
+
+  const preview: ModuleChangePreview = {
+    key: params.key,
+    name: MODULES[params.key].name,
+    on: params.on,
+    interval,
+    recurringAmount,
+    nextInvoiceAmount: null,
+    nextInvoiceAt: null,
+  };
+
+  // LIGGER UTANFÖR try-BLOCKET. Den här kastar ModuleChangeError när modulen
+  // redan är påslagen eller när artikeln saknas, och det är svar kunden ska
+  // se. Låg anropet innanför hade catch:en nedan svalt dem och visat en
+  // bekräftelseruta för en ändring som inte går att göra.
+  const items = changedItems(subscription, params.key, params.on, interval);
+
+  try {
+    const upcoming = await previewInvoice({
+      customer: subscriptionCustomerId(subscription),
+      subscription: subscription.id,
+      subscription_details: {
+        items,
+
+        // Samma avräkning som vid ändrat antal licenser: en modul som läggs
+        // till mitt i perioden kostar resterande dagar, varken en hel period
+        // eller noll.
+        proration_behavior: "create_prorations",
+      },
+    });
+
+    if (upcoming) {
+      preview.nextInvoiceAmount = upcoming.amount_due / 100;
+
+      // Fältet heter olika i olika versioner av Stripes API, precis som
+      // periodslutet ovan. Vi läser båda och tar det som finns.
+      const at = upcoming.next_payment_attempt ?? upcoming.period_end;
+      preview.nextInvoiceAt = at ? new Date(at * 1000) : null;
+    }
+  } catch (error) {
+    console.error(
+      "[tillval] Kunde inte hämta förhandsberäkningen från Stripe:",
+      error instanceof Error ? error.message : error
+    );
+  }
+
+  return preview;
+}
+
+/**
+ * Den kommande fakturan som Stripe räknar fram, eller null.
+ *
+ * ANROPET GÖRS OTYPAT MED FLIT, och det är värt att förklara eftersom det
+ * bryter mot hur resten av filen pratar med Stripe.
+ *
+ * Metoden bytte namn mellan versioner av deras bibliotek:
+ * `invoices.retrieveUpcoming` i version 17, `invoices.createPreview` i 18.
+ * Skrevs anropet typat mot den ena skulle en framtida versionshöjning stanna
+ * bygget — och det som då går sönder är en förhandsvisning av ett belopp, inte
+ * något som rör pengar. Här provas därför båda namnen, och saknas de svarar
+ * funktionen null.
+ *
+ * Följden av att den svarar null är dokumenterad och liten: kunden ser vad
+ * modulen kostar löpande men inte vad nästa faktura landar på. Beloppet som
+ * faktiskt debiteras räknas ändå av Stripe, som alltid.
+ */
+interface PreviewedInvoice {
+  amount_due: number;
+  next_payment_attempt?: number | null;
+  period_end?: number | null;
+}
+
+async function previewInvoice(
+  params: Record<string, unknown>
+): Promise<PreviewedInvoice | null> {
+  const invoices = stripe().invoices as unknown as Record<
+    string,
+    ((params: Record<string, unknown>) => Promise<PreviewedInvoice>) | undefined
+  >;
+
+  const call = invoices.createPreview ?? invoices.retrieveUpcoming;
+
+  if (typeof call !== "function") {
+    console.error(
+      "[tillval] Stripes bibliotek har varken createPreview eller " +
+        "retrieveUpcoming. Förhandsberäkningen hoppas över."
+    );
+    return null;
+  }
+
+  return call.call(stripe().invoices, params);
+}
+
+/**
+ * Genomför ändringen hos Stripe.
+ *
+ * VI SKRIVER INTE MODULRADEN SJÄLVA. Stripe bekräftar via webhooken, och
+ * först då ändras vår databas — samma ordning som för prenumerationen i
+ * övrigt, och den enda där vi inte riskerar att ha en modul påslagen som
+ * ingen faktura täcker.
+ *
+ * Undantaget är avstängning, se nedan.
+ */
+export async function applyModuleChange(params: {
+  companyId: string;
+  key: ModuleKey;
+  on: boolean;
+}): Promise<void> {
+  const { subscription, interval } = await subscriptionFor(params.companyId);
+
+  const updated = await stripe().subscriptions.update(subscription.id, {
+    items: changedItems(subscription, params.key, params.on, interval),
+    proration_behavior: "create_prorations",
+  });
+
+  // Skriver av det uppdaterade svaret direkt i stället för att vänta på
+  // webhooken. Beskedet kommer normalt inom sekunder, men kunden laddar om
+  // sidan snabbare än så — och en modul som inte syns förrän om en stund ser
+  // ut som att köpet inte gick igenom.
+  //
+  // Webhooken skriver sedan samma sak en gång till. Det gör ingenting:
+  // synkningen utgår från prenumerationens rader och ger samma resultat hur
+  // många gånger den körs.
+  await syncModulesFromSubscription(params.companyId, updated);
+}
+
+/**
+ * Raderna att skicka till Stripe för att lägga till eller ta bort modulen.
+ *
+ * Bara det som ÄNDRAS skickas med. Rader som inte nämns lämnas orörda, och
+ * skärmraden ska inte röras av ett modulköp.
+ */
+interface ItemChange {
+  id?: string;
+  price?: string;
+  quantity?: number;
+  deleted?: boolean;
+}
+
+function changedItems(
+  subscription: Stripe.Subscription,
+  key: ModuleKey,
+  on: boolean,
+  interval: BillingInterval
+): ItemChange[] {
+  const existing = moduleItemsOf(subscription).find((item) => item.key === key);
+
+  if (!on) {
+    if (!existing) {
+      throw new ModuleChangeError("Tillvalet ligger inte på prenumerationen.");
+    }
+
+    return [{ id: existing.itemId, deleted: true }];
+  }
+
+  if (existing) {
+    throw new ModuleChangeError("Tillvalet är redan påslaget.");
+  }
+
+  const price = modulePriceId(key, interval);
+
+  if (!price) {
+    throw new ModuleChangeError(
+      `${MODULES[key].name} går inte att köpa med ${
+        interval === "year" ? "årsbetalning" : "månadsbetalning"
+      } än. Kontakta support@tikkr.se.`
+    );
+  }
+
+  return [{ price, quantity: 1 }];
+}
+
+/** Prenumerationen och vilket intervall kunden betalar i. */
+async function subscriptionFor(companyId: string): Promise<{
+  subscription: Stripe.Subscription;
+  interval: BillingInterval;
+}> {
+  const company = await unsafeGlobalPrisma.company.findUnique({
+    where: { id: companyId },
+    select: { stripeSubscriptionId: true },
+  });
+
+  if (!company?.stripeSubscriptionId) {
+    throw new ModuleChangeError(
+      "Tillval kan ändras först när prenumerationen är aktiv."
+    );
+  }
+
+  const subscription = await stripe().subscriptions.retrieve(
+    company.stripeSubscriptionId
+  );
+
+  // Modulraden ska ligga i samma intervall som skärmraden. En årsprenumeration
+  // med en månadsmodul hade gett kunden en faktura i en takt de inte valt.
+  const interval =
+    screenItemOf(subscription)?.price?.recurring?.interval === "year"
+      ? "year"
+      : "month";
+
+  return { subscription, interval };
+}
+
+function subscriptionCustomerId(subscription: Stripe.Subscription): string {
+  return typeof subscription.customer === "string"
+    ? subscription.customer
+    : subscription.customer.id;
 }

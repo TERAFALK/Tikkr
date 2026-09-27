@@ -1,6 +1,6 @@
 import { unsafeGlobalPrisma } from "./db";
 import { monthlyRevenueFor } from "./platform-admin";
-import { getScreenPricing } from "./stripe";
+import { getModulePricing, getScreenPricing } from "./stripe";
 
 /**
  * INTÄKTENS UTVECKLING ÖVER TID.
@@ -19,7 +19,7 @@ import { getScreenPricing } from "./stripe";
 export async function recordSnapshot(now: Date = new Date()): Promise<void> {
   const day = startOfDay(now);
 
-  const [companies, pricing] = await Promise.all([
+  const [companies, pricing, modulePricing] = await Promise.all([
     unsafeGlobalPrisma.company.findMany({
       select: {
         subscriptionStatus: true,
@@ -29,6 +29,7 @@ export async function recordSnapshot(now: Date = new Date()): Promise<void> {
       },
     }),
     getScreenPricing(),
+    getModulePricing(),
   ]);
 
   const paying = companies.filter(
@@ -36,7 +37,7 @@ export async function recordSnapshot(now: Date = new Date()): Promise<void> {
   );
 
   const mrr = paying.reduce(
-    (sum, company) => sum + monthlyRevenueFor(company, pricing),
+    (sum, company) => sum + monthlyRevenueFor(company, pricing, modulePricing),
     0
   );
 
