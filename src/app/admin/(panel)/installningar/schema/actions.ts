@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { assertWritable, requireAdmin } from "@/lib/admin-session";
+import { requireModule } from "@/lib/company-modules";
 import { parseMinuteOfDay } from "@/lib/schedule";
 
 /**
@@ -50,6 +51,7 @@ export async function saveSchedule(
 ): Promise<ScheduleFormState> {
   const session = await requireAdmin();
   await assertWritable(session);
+  await requireModule(session, "PAYROLL");
   const { db, companyId } = session;
 
   const days: {
@@ -154,6 +156,7 @@ function dayName(weekday: number): string {
 export async function createBreakType(formData: FormData) {
   const session = await requireAdmin();
   await assertWritable(session);
+  await requireModule(session, "PAYROLL");
   const { db, companyId } = session;
 
   const name = String(formData.get("name") ?? "").trim();
@@ -171,6 +174,7 @@ export async function createBreakType(formData: FormData) {
 export async function toggleBreakType(formData: FormData) {
   const session = await requireAdmin();
   await assertWritable(session);
+  await requireModule(session, "PAYROLL");
   const { db } = session;
 
   const id = String(formData.get("id") ?? "");

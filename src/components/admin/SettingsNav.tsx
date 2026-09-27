@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import type { ModuleKey } from "@/lib/modules";
 import {
   IconBuilding,
   IconClock,
@@ -24,6 +25,8 @@ interface SettingsPage {
   description: string;
   icon: React.ComponentType<React.SVGProps<SVGSVGElement>>;
   exact?: boolean;
+  /** Tillvalet sidan hör till. Utelämnad betyder basen. Se AdminSidebar. */
+  module?: ModuleKey;
 }
 
 const pages: SettingsPage[] = [
@@ -45,6 +48,7 @@ const pages: SettingsPage[] = [
     label: "Arbetstider",
     description: "Schema och raster",
     icon: IconClock,
+    module: "PAYROLL",
   },
   {
     href: "/admin/installningar/prenumeration",
@@ -66,13 +70,17 @@ const pages: SettingsPage[] = [
   },
 ];
 
-export default function SettingsNav() {
+export default function SettingsNav({ modules }: { modules: ModuleKey[] }) {
   const pathname = usePathname();
+
+  const visible = pages.filter(
+    (page) => !page.module || modules.includes(page.module)
+  );
 
   return (
     <nav className="mb-6 lg:mb-0 lg:w-56 lg:shrink-0">
       <ul className="flex gap-1 overflow-x-auto lg:flex-col lg:overflow-visible">
-        {pages.map((page) => {
+        {visible.map((page) => {
           const active = page.exact
             ? pathname === page.href
             : pathname.startsWith(page.href);

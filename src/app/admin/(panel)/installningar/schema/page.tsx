@@ -1,4 +1,5 @@
 import { requireAdmin } from "@/lib/admin-session";
+import { requireModule } from "@/lib/company-modules";
 import ScheduleForm, {
   type ScheduleDayValue,
 } from "@/components/admin/ScheduleForm";
@@ -22,7 +23,10 @@ import { createBreakType, saveSchedule, toggleBreakType } from "./actions";
 export const dynamic = "force-dynamic";
 
 export default async function SchedulePage() {
-  const { db } = await requireAdmin();
+  const session = await requireAdmin();
+  await requireModule(session, "PAYROLL");
+
+  const { db } = session;
 
   const [schedule, breakTypes] = await Promise.all([
     db.workSchedule.findFirst({

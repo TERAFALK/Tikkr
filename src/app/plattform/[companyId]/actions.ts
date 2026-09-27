@@ -14,9 +14,11 @@ import {
   requirePlatformAdmin,
   saveNote,
   setLicensesManually,
+  setModule,
   setSubscriptionStatus,
   type SubscriptionStatus,
 } from "@/lib/platform-admin";
+import { isModuleKey, moduleName } from "@/lib/modules";
 
 const STATUSES: SubscriptionStatus[] = [
   "TRIALING",
@@ -109,6 +111,50 @@ export async function changeLicenseCount(
   revalidatePath("/plattform");
 
   return { ok: `Antalet är satt till ${licenses}.` };
+}
+
+export interface ModuleFormState {
+  error?: string;
+  ok?: string;
+}
+
+/**
+ * Slår på eller av ett tillval för en fakturakund.
+ *
+ * Samma krav på dokumenterad anledning som licenserna: det ändrar vad kunden
+ * ska faktureras, och en modul som dykt upp utan spår går inte att förklara
+ * ett halvår senare.
+ */
+export async function changeModule(
+  _previous: ModuleFormState,
+  formData: FormData
+): Promise<ModuleFormState> {
+  const { email } = await requirePlatformAdmin();
+
+  const companyId = String(formData.get("companyId") ?? "");
+  const key = String(formData.get("module") ?? "");
+  const on = String(formData.get("on") ?? "") === "1";
+  const reason = String(formData.get("reason") ?? "").trim();
+
+  if (!companyId) return { error: "Okänt företag." };
+  if (!isModuleKey(key)) return { error: "Okänt tillval." };
+  if (!reason) return { error: "Ange en anledning till ändringen." };
+
+  try {
+    await setModule({ actorEmail: email, companyId, module: key, on, reason });
+  } catch (error) {
+    if (error instanceof PlatformActionError) return { error: error.message };
+    throw error;
+  }
+
+  revalidatePath(`/plattform/${companyId}`);
+  revalidatePath("/plattform");
+
+  return {
+    ok: on
+      ? `${moduleName(key)} är påslaget.`
+      : `${moduleName(key)} är avstängt.`,
+  };
 }
 
 export async function updateNote(formData: FormData) {

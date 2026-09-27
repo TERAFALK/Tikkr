@@ -25,6 +25,7 @@ export async function recordSnapshot(now: Date = new Date()): Promise<void> {
         subscriptionStatus: true,
         subscriptionInterval: true,
         screenLicenses: true,
+        modules: { select: { module: true } },
       },
     }),
     getScreenPricing(),

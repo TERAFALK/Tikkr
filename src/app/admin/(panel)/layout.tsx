@@ -3,6 +3,7 @@ import { READ_ONLY_COOKIE, requireAdmin } from "@/lib/admin-session";
 import { unsafeGlobalPrisma } from "@/lib/db";
 import { getOnboardingState } from "@/lib/onboarding";
 import { evaluateAccess } from "@/lib/subscription";
+import { isModuleKey, type ModuleKey } from "@/lib/modules";
 import {
   getScreenPricing,
   isStripeConfigured,
@@ -52,9 +53,21 @@ export default async function PanelLayout({
         pastDueSince: true,
         logoSquareMimeType: true,
         screenLicenses: true,
+
+        // Tillvalen hämtas i samma fråga som allt annat om företaget, i
+        // stället för i en egen. Menyn behöver dem vid varje sidladdning.
+        modules: { select: { module: true } },
       },
     }),
   ]);
+
+  // Vilka menypunkter som ska synas. ATT DÖLJA DEM ÄR BARA KOSMETIK —
+  // sidorna bakom vaktas var för sig av requireModule() och svarar 404
+  // oavsett vad menyn visar. Samma hållning som prenumerationslåset nedan:
+  // gömmer man bara menyn litar man på att ingen gissar adresser.
+  const modules: ModuleKey[] = (company?.modules ?? [])
+    .map((row) => row.module)
+    .filter(isModuleKey);
 
   const access = evaluateAccess({
     status: company?.subscriptionStatus ?? "TRIALING",
@@ -77,6 +90,7 @@ export default async function PanelLayout({
         // igång; sidan finns kvar på sin adress för den som vill tillbaka.
         showOnboarding={!onboarding.ready}
         hasLogo={Boolean(company?.logoSquareMimeType)}
+        modules={modules}
       />
 
       <div className="min-w-0 flex-1">

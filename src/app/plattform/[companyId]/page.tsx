@@ -27,6 +27,7 @@ import {
 import SubscriptionOverrideForm from "@/components/admin/SubscriptionOverrideForm";
 import PlatformShell from "@/components/platform/PlatformShell";
 import ManualLicenseForm from "@/components/platform/ManualLicenseForm";
+import ModuleForm from "@/components/platform/ModuleForm";
 import DeleteCompanyForm from "@/components/platform/DeleteCompanyForm";
 import { startSupport } from "./actions";
 import { unsafeGlobalPrisma } from "@/lib/db";
@@ -48,7 +49,7 @@ export default async function CompanyPage({
   const detail = await getCompanyDetail(companyId);
   if (!detail) notFound();
 
-  const { company, admins, devices, note, history, historyTotal, stats } =
+  const { company, admins, devices, note, history, historyTotal, stats, modules } =
     detail;
   const monthlyRevenue = monthlyRevenueFor(company, await getScreenPricing());
 
@@ -169,6 +170,19 @@ export default async function CompanyPage({
                 companyId={company.id}
                 current={company.screenLicenses}
                 used={devices.length}
+                managedByStripe={Boolean(company.stripeSubscriptionId)}
+              />
+            </div>
+
+            {/* Tillvalen står i samma kort av samma skäl som licenserna:
+                allt här beskriver vad kunden betalar för. */}
+            <div className="border-t border-neutral-100 p-5">
+              <p className="mb-3 text-[13px] font-medium text-neutral-700">
+                Tillval
+              </p>
+              <ModuleForm
+                companyId={company.id}
+                modules={modules}
                 managedByStripe={Boolean(company.stripeSubscriptionId)}
               />
             </div>

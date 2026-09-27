@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import type { AbsenceType } from "@prisma/client";
 import { assertWritable, requireAdmin } from "@/lib/admin-session";
+import { requireModule } from "@/lib/company-modules";
 import { unsafeGlobalPrisma } from "@/lib/db";
 import {
   AbsenceError,
@@ -51,6 +52,7 @@ export async function saveAbsence(
 ): Promise<TimesheetState> {
   const session = await requireAdmin();
   await assertWritable(session);
+  await requireModule(session, "PAYROLL");
   const { db, companyId, email } = session;
 
   const employeeId = String(formData.get("employeeId") ?? "");
@@ -105,6 +107,7 @@ export async function saveAbsence(
 export async function deleteAbsence(formData: FormData) {
   const session = await requireAdmin();
   await assertWritable(session);
+  await requireModule(session, "PAYROLL");
 
   const id = String(formData.get("id") ?? "");
   if (!id) return;
@@ -119,6 +122,7 @@ export async function saveCompEarned(
 ): Promise<TimesheetState> {
   const session = await requireAdmin();
   await assertWritable(session);
+  await requireModule(session, "PAYROLL");
   const { db, companyId, email } = session;
 
   const employeeId = String(formData.get("employeeId") ?? "");
@@ -153,6 +157,7 @@ export async function saveCompEarned(
 export async function deleteCompEarned(formData: FormData) {
   const session = await requireAdmin();
   await assertWritable(session);
+  await requireModule(session, "PAYROLL");
 
   const id = String(formData.get("id") ?? "");
   if (!id) return;
@@ -168,6 +173,7 @@ export async function saveOpeningBalances(
 ): Promise<TimesheetState> {
   const session = await requireAdmin();
   await assertWritable(session);
+  await requireModule(session, "PAYROLL");
   const { db, companyId } = session;
 
   const employeeId = String(formData.get("employeeId") ?? "");

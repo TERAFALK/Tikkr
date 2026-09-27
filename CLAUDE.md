@@ -15,6 +15,10 @@ tillverkningsföretag använder för att registrera arbetstid per **order** och
 (Ändrat 2026-09-26. Tidigare gällde "aldrig för lön". Pilotkunden behövde
 tidrapporter, och beslutet fattades av produktägaren.)
 
+Löneunderlaget är sedan 2026-09-27 dessutom ett TILLVAL kunden betalar extra
+för, se § 3.1. Den gränsen är kommersiell och ligger utanpå den tekniska —
+den gör inget av det som står här mindre sant.
+
 **Gränsen går vid pengar till lön, inte vid tid.** Tikkr räknar timmar:
 planerad tid, närvarotid, flex, komp och frånvaro. Vad timmarna är värda i lön
 avgörs av kollektivavtalet, i lönesystemet. Lägg därför ALDRIG till lönearter,
@@ -149,6 +153,10 @@ absences         — id, company_id, employee_id, date, type, minutes,
                    note, created_by_email
 comp_adjustments — id, company_id, employee_id, date, minutes,
                    note, created_by_email, absence_id
+
+  — tillvalen, se § 3.1 —
+company_modules  — id, company_id, module, source, stripe_item_id,
+                   enabled_by, enabled_at
 ```
 
 ### Beslutade regler för stämpling (bestämt 2026-08-10)
@@ -299,6 +307,58 @@ comp_adjustments — id, company_id, employee_id, date, minutes,
 Multi-tenant-isolering byggs i appens kod: **varje databasfråga går via ett
 gemensamt lager** i Prisma som alltid filtrerar på inloggad användares
 `company_id`. Ett enda ställe i koden, inte utspritt — och testat automatiskt.
+
+### 3.1 Tillval — moduler kunden betalar extra för (beslutat 2026-09-27)
+
+**Basen är stämpling mot order**: kioskskärmen, rapporterna och
+fakturaunderlaget. Den är alltid på.
+
+**Löneunderlaget är ett tillval.** Det byggdes för att en pilotkund behövde
+det och ingick från början gratis, men det är ungefär en tredjedel av
+systemet — och kunden som bara vill fakturera rätt fick en panel full av
+menypunkter hen aldrig öppnar. Planeringsdelen som ska komma blir nästa
+modul. Läggs allt i basen blir Tikkr ett affärssystem till priset av en
+stämpelklocka, och prislappen går inte längre att förklara.
+
+`src/lib/modules.ts` är registret. **Filen har inga importer och ska inte få
+några**: både fakturasidan och lönesidan läser den, och drog den in något
+från endera hållet skulle `tests/payroll-boundary.test.ts` falla.
+
+**Raden ÄR tillståndet.** `company_modules` har en rad per påslagen modul, och
+avstängning raderar den. Ingen boolean och inget `disabled_at` — ett läge som
+går att uttrycka på två sätt hinner alltid sluta säga samma sak, samma skäl
+som att orderns totala beräkning aldrig lagras (regel 6 ovan).
+
+**Att stänga av rör ALDRIG kundens data.** Scheman, raster, frånvaro och
+komprader ligger kvar orörda och står där igen om modulen slås på. Samma
+princip som att stämplingen aldrig slutar fungera: en obetald faktura får
+inte kosta någon registrerad tid, för den tiden går inte att rekonstruera.
+
+**Grinden ligger i koden, inte i menyn**, och det är den enda punkten som
+verkligen är säkerhet. Prenumerationslåset lärde oss varför: det ligger som
+en gren i panelens layout, och rutterna under `/api` renderas aldrig genom
+den. Därför gäller regeln att **varje sida, server action och rutt som rör en
+modul ska kalla `requireModule()` respektive `hasModule()`**. Menyn döljer
+bara — sidan bakom svarar 404 oavsett vad menyn visar.
+
+Bevisas av `tests/module-coverage.test.ts`. Den viktiga kontrollen där är
+inte listan över filer utan den som **härleder** vilka filer som rör modulen,
+ur deras importer och tabellnamn, och fäller en ny lönesida ingen kommit ihåg
+att grinda.
+
+Undantag, uttryckligen: GDPR-anonymiseringen i
+`installningar/actions.ts` raderar frånvaro, raster och komprader **även när
+modulen är av**. Annars vore avstängning ett sätt att göra personuppgifter
+oåtkomliga för rätten att bli glömd.
+
+Två kopplingar kapas medvetet inte: `spans.ts` är inte lönespecifik
+(veckovyn och översikten använder `mainMinutes()`), och `clock.ts` fortsätter
+kalla `endOpenBreak()` vid varje instämpling — den är idempotent, och en kund
+som stänger av modulen mitt på dagen ska inte lämna en rast öppen för alltid.
+
+Att lägga till en modul: en nyckel i registret, ett värde i enumen
+`CompanyModuleKey`, en artikel hos Stripe. Ingenting annat i arkitekturen
+behöver röras.
 
 ## 4. Kritiska säkerhetskrav
 
@@ -473,6 +533,28 @@ helt affärssystem — Tikkr ska ligga tydligt under.
 Höj inte priset för befintliga kunder i onödan; rabatt är lätt att ge, höjning
 är det svåraste som finns. Saknas en nivå för stora kunder (femtio anställda,
 två skärmar) läggs den till när den kunden dyker upp.
+
+### Pris på tillval (beslutat 2026-09-27)
+
+**Löneunderlaget: 499 kr per månad och FÖRETAG, exkl. moms.** Årsbetalning
+4 990 kr, samma tio-för-tolv som basen. En kund med tre skärmar betalar tre
+skärmpriser plus en modulavgift.
+
+Per skärm valdes bort: löneunderlaget har ingenting med skärmar att göra, och
+det är första frågan kunden ställer när de ser fakturan. Per anställd valdes
+bort av samma skäl som basen gjorde det ovan.
+
+**Siffran i koden styr ingenting.** Priset sätts på artikeln hos Stripe och
+läses därifrån vid varje sidvisning, precis som skärmpriset —
+`FALLBACK_PRICE_PER_SCREEN` och `MODULES[...].fallbackMonthly` används bara i
+labbet och hos kunder som betalar mot faktura. En prisändring hos Stripe syns
+i panelen och på säljsidan utan deploy, och det är hela poängen.
+
+Under provperioden slår kunden på och av modulerna fritt. Vid köp blir de
+påslagna modulerna rader på prenumerationen. En kund som redan betalar slår
+på en modul själv och får se Stripes egen beräkning av vad resten av perioden
+kostar innan de bekräftar — beloppet räknas av den som debiterar, aldrig av
+oss.
 
 ### Provperiod och utebliven betalning (beslutat 2026-08-11)
 

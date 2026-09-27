@@ -20,6 +20,28 @@ enum SubscriptionStatus {
   CANCELED
 }
 
+/// Vilka delar av Tikkr ett företag har köpt till.
+///
+/// Basen — stämpling mot order, rapporter och fakturaunderlag — är alltid på
+/// och står inte här. Bara tillvalen. Se src/lib/modules.ts, som är registret
+/// koden läser, och CLAUDE.md § 3.1.
+///
+/// Ett nytt värde här är en additiv ändring. Ta ALDRIG bort ett värde som
+/// något företag kan ha en rad på — raden är deras köp.
+enum CompanyModuleKey {
+  /// Löneunderlaget: schema, raster, flex, komp och frånvaro.
+  PAYROLL
+}
+
+/// Hur en modul slogs på. Avgör vem som får stänga av den igen.
+enum ModuleSource {
+  /// En rad på prenumerationen hos Stripe. Ändras bara av webhooken.
+  STRIPE
+  /// Satt för hand i plattformspanelen — fakturakund, labbmiljö, eller en
+  /// modul vi bjuder på.
+  MANUAL
+}
+
 /// Vad en stämpling avser. Se TimeEntry.kind.
 enum TimeEntryKind {
   /// Tid som ska faktureras en kundorder.
@@ -163,6 +185,9 @@ model Company {
   breakEntries    BreakEntry[]
   absences        Absence[]
   compAdjustments CompAdjustment[]
+
+  /// Tillvalen. Se CompanyModule längst ner i filen.
+  modules CompanyModule[]
 
   @@map("companies")
 }
@@ -1166,4 +1191,51 @@ model CompAdjustment {
 
   @@index([companyId, employeeId, date])
   @@map("comp_adjustments")
+}
+
+// ---------------------------------------------------------------------------
+// TILLVALEN
+//
+// Basen i Tikkr är stämpling mot order: kioskskärmen, rapporterna och
+// fakturaunderlaget. Den är alltid på och finns inte i det här registret.
+//
+// Allt därutöver är moduler kunden köper till, en rad var. Löneunderlaget är
+// den första; planeringsdelen blir nästa. Se src/lib/modules.ts för registret
+// koden läser, och CLAUDE.md § 3.1 för reglerna.
+// ---------------------------------------------------------------------------
+
+/// En modul ett företag har påslagen.
+///
+/// RADEN ÄR TILLSTÅNDET. Finns raden är modulen på; avstängning raderar den.
+/// Ingen boolean och inget disabled_at — ett läge som går att uttrycka på två
+/// sätt hinner alltid sluta säga samma sak, av samma skäl som orderns totala
+/// beräkning aldrig lagras (CLAUDE.md § 3 regel 6).
+///
+/// Att stänga av en modul rör ALDRIG kundens data. Scheman, raster, frånvaro
+/// och komprader ligger kvar orörda och står där igen om modulen slås på. En
+/// obetald faktura får inte kosta någon registrerad tid.
+model CompanyModule {
+  id        String @id @default(cuid())
+  companyId String @map("company_id")
+
+  module CompanyModuleKey
+
+  /// Vem som bestämmer över raden. STRIPE-rader skrivs bara av webhooken —
+  /// rör vi dem för hand hamnar vår databas och fakturan isär.
+  source ModuleSource @default(MANUAL)
+
+  /// Raden hos Stripe som modulen ligger på. Null för manuella.
+  stripeItemId String? @map("stripe_item_id")
+
+  /// Vem som slog på den. E-postadress, som absences.created_by_email — en
+  /// modul som dykt upp av sig själv ska gå att spåra till en människa.
+  enabledBy String? @map("enabled_by")
+
+  enabledAt DateTime @default(now()) @map("enabled_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@unique([companyId, module])
+  @@map("company_modules")
 }

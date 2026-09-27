@@ -1,5 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { requireAdmin } from "@/lib/admin-session";
+import { hasModule } from "@/lib/company-modules";
+import { evaluateAccess } from "@/lib/subscription";
 import { unsafeGlobalPrisma } from "@/lib/db";
 import { buildPayrollPeriod, type PayrollPeriod } from "@/lib/payroll";
 import { buildTimesheetPdf } from "@/lib/timesheet-pdf";
@@ -29,14 +31,38 @@ export async function GET(request: NextRequest) {
   const { db, companyId, companyName } = await requireAdmin();
   const params = request.nextUrl.searchParams;
 
+  // MODULGRINDEN LIGGER HÄR OCH INTE I EN LAYOUT. Rutterna under /api nås
+  // aldrig via panelens layout — middleware.ts undantar dem, och den här
+  // filen är hela vägen in. Ett 404 och inte ett 403: en adress till något
+  // kunden inte har ska se ut som att den inte finns.
+  if (!(await hasModule(companyId, "PAYROLL"))) {
+    return NextResponse.json({ error: "Okänd adress." }, { status: 404 });
+  }
+
   const company = await unsafeGlobalPrisma.company.findUnique({
     where: { id: companyId },
     select: {
       timezone: true,
       logoWideData: true,
       logoWideMimeType: true,
+      subscriptionStatus: true,
+      trialEndsAt: true,
+      pastDueSince: true,
     },
   });
+
+  // Samma lås som panelen, av samma skäl — och det behövs separat här, för
+  // layoutens kontroll gäller bara sidor. Utan den går exporten att hämta med
+  // en direktlänk medan panelen är låst.
+  const access = evaluateAccess({
+    status: company?.subscriptionStatus ?? "TRIALING",
+    trialEndsAt: company?.trialEndsAt ?? null,
+    pastDueSince: company?.pastDueSince ?? null,
+  });
+
+  if (access.level === "locked") {
+    return NextResponse.json({ error: access.headline }, { status: 402 });
+  }
 
   const timeZone = company?.timezone ?? "Europe/Stockholm";
   const now = new Date();

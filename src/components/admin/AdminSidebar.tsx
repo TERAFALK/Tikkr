@@ -18,6 +18,7 @@ import {
   IconReview,
   IconSettings,
 } from "@/components/ui/icons";
+import type { ModuleKey } from "@/lib/modules";
 import CompanyBadge from "@/components/ui/CompanyBadge";
 import { LogoMark } from "@/components/ui/Logo";
 
@@ -42,6 +43,14 @@ interface NavLink {
   exact?: boolean;
   /** Visa antalet ogranskade poster som siffra. */
   badge?: boolean;
+  /**
+   * Tillvalet länken hör till. Utelämnad betyder basen, alltså alltid synlig.
+   *
+   * Att dölja menypunkten är BARA kosmetik — sidan bakom den vaktas av
+   * requireModule() och svarar 404 oavsett vad menyn visar. Se
+   * src/lib/company-modules.ts.
+   */
+  module?: ModuleKey;
 }
 
 const sections: { label: string; links: NavLink[] }[] = [
@@ -51,7 +60,12 @@ const sections: { label: string; links: NavLink[] }[] = [
       { href: "/admin", label: "Översikt", icon: IconOverview, exact: true },
       { href: "/admin/rapporter", label: "Rapporter", icon: IconReport },
       { href: "/admin/vecka", label: "Veckovy", icon: IconClock },
-      { href: "/admin/tidrapport", label: "Tidrapport", icon: IconPeople },
+      {
+        href: "/admin/tidrapport",
+        label: "Tidrapport",
+        icon: IconPeople,
+        module: "PAYROLL",
+      },
       { href: "/admin/granskning", label: "Granskning", icon: IconReview, badge: true },
       { href: "/admin/stamplingar", label: "Stämplingar", icon: IconClock },
     ],
@@ -79,12 +93,15 @@ export default function AdminSidebar({
   reviewCount,
   showOnboarding,
   hasLogo,
+  modules,
 }: {
   companyName: string;
   email: string;
   reviewCount: number;
   showOnboarding: boolean;
   hasLogo: boolean;
+  /** Företagets påslagna tillval. Länkar till avstängda moduler utelämnas. */
+  modules: ModuleKey[];
 }) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
@@ -103,9 +120,18 @@ export default function AdminSidebar({
     ],
   };
 
-  const visibleSections = showOnboarding
-    ? [setupSection, ...sections]
-    : sections;
+  const allSections = showOnboarding ? [setupSection, ...sections] : sections;
+
+  // Avsnitt som blir tomma faller bort med sin rubrik. En rubrik utan länkar
+  // under sig ser ut som ett fel.
+  const visibleSections = allSections
+    .map((section) => ({
+      ...section,
+      links: section.links.filter(
+        (link) => !link.module || modules.includes(link.module)
+      ),
+    }))
+    .filter((section) => section.links.length > 0);
 
   const nav = (
     <nav className="flex h-full flex-col gap-6 p-3">

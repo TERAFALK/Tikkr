@@ -166,6 +166,7 @@ export async function quietCustomers(): Promise<QuietCustomer[]> {
         subscriptionStatus: true,
         subscriptionInterval: true,
         screenLicenses: true,
+        modules: { select: { module: true } },
       },
     }),
     unsafeGlobalPrisma.timeEntry.groupBy({

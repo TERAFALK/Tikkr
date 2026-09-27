@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { requireAdmin } from "@/lib/admin-session";
+import { requireModule } from "@/lib/company-modules";
 import { unsafeGlobalPrisma } from "@/lib/db";
 import FilterForm from "@/components/admin/FilterForm";
 import TimesheetView from "@/components/admin/TimesheetView";
@@ -40,7 +41,10 @@ export default async function TimesheetPage({
 }: {
   searchParams: Promise<Record<string, string | undefined>>;
 }) {
-  const { db, companyId } = await requireAdmin();
+  const session = await requireAdmin();
+  await requireModule(session, "PAYROLL");
+
+  const { db, companyId } = session;
   const params = await searchParams;
 
   const company = await unsafeGlobalPrisma.company.findUnique({

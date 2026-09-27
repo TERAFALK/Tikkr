@@ -7,6 +7,7 @@ import {
 import { clockIn, clockOut, clockOutAll, ClockError } from "@/lib/clock";
 import { startBreak, endBreak } from "@/lib/breaks";
 import { currentFlexMinutes } from "@/lib/payroll";
+import { hasModule } from "@/lib/company-modules";
 import { forCompany } from "@/lib/tenant";
 import { unsafeGlobalPrisma } from "@/lib/db";
 import { readPunchTime } from "@/lib/punch-time";
@@ -76,6 +77,36 @@ export async function POST(request: NextRequest) {
     fromOfflineQueue: body.queued === true,
   };
 
+  // RASTERNA HÖR TILL LÖNEMODULEN. Utan den finns inga rasttyper att välja,
+  // kiosken visar ingen rastknapp, och ett tryck kan bara komma från en flik
+  // som stått öppen sedan modulen stängdes av.
+  //
+  // Ett 4xx tar bort trycket ur offline-kön och visar felet för den som
+  // stämplade (se offline-queue.ts) — vilket är rätt här: rasten går inte att
+  // registrera hur många gånger vi än försöker, och tystnad vore värre.
+  //
+  // Att tappa ett RASTTRYCK är dessutom ofarligt på ett sätt ett arbetstryck
+  // aldrig är. En rast är frånvaro av arbete; blir den inte registrerad
+  // räknas tiden som arbetad, och ingen förlorar tid hen lagt ned.
+  // Uppslaget görs BARA för de tryck som behöver det. "in" och "out" är de
+  // vanligaste och de som ska kännas omedelbara — de ska inte betala för en
+  // extra fråga som ändå aldrig ändrar något för dem.
+  const needsPayroll =
+    body.action === "break" ||
+    body.action === "break-end" ||
+    body.action === "out-all";
+
+  const payroll = needsPayroll
+    ? await hasModule(session.companyId, "PAYROLL")
+    : false;
+
+  if (!payroll && (body.action === "break" || body.action === "break-end")) {
+    return NextResponse.json(
+      { error: "Raster används inte längre." },
+      { status: 409 }
+    );
+  }
+
   try {
     if (body.action === "break") {
       if (!body.breakTypeId) {
@@ -117,11 +148,16 @@ export async function POST(request: NextRequest) {
       // Misslyckas räkningen svarar vi ändå ok: utstämplingen är gjord, och
       // ett saldo som inte gick att räkna fram får aldrig se ut som att
       // stämplingen inte gick igenom.
+      //
+      // Utan lönemodulen finns varken schema eller planerad tid, och då finns
+      // inget flex att visa. Kvittot uteblir helt i stället för att visa noll.
       let flexMinutes: number | null = null;
-      try {
-        flexMinutes = await flexFor(session.companyId, body.employeeId);
-      } catch (error) {
-        console.error("Kunde inte räkna fram flexsaldot", error);
+      if (payroll) {
+        try {
+          flexMinutes = await flexFor(session.companyId, body.employeeId);
+        } catch (error) {
+          console.error("Kunde inte räkna fram flexsaldot", error);
+        }
       }
 
       return NextResponse.json({ ok: true, closed, flexMinutes });

@@ -2,6 +2,7 @@ import { getKioskSession } from "@/lib/kiosk-auth";
 import { unsafeGlobalPrisma } from "@/lib/db";
 import { forCompany } from "@/lib/tenant";
 import { evaluateAccess } from "@/lib/subscription";
+import { hasModule } from "@/lib/company-modules";
 import { activeNotices } from "@/lib/notices";
 import { pickableCustomers } from "@/lib/quick-order";
 import { describeEntry } from "@/lib/entry-label";
@@ -73,6 +74,15 @@ export default async function KioskPage() {
     trialEndsAt: company?.trialEndsAt ?? null,
     pastDueSince: company?.pastDueSince ?? null,
   });
+
+  // RASTKNAPPEN STYRS AV LÖNEMODULEN, och behöver ingen egen mekanism för
+  // det: skärmen döljer den redan när listan över rasttyper är tom. Utan
+  // modulen hämtas listan inte alls, och knappen, rastvalet, "Rast pågår"
+  // och "Avsluta rasten" försvinner tillsammans med den.
+  //
+  // Kioskens serverskydd ligger i /api/kiosk/punch, inte här. Den här sidan
+  // avgör bara vad som syns.
+  const payroll = await hasModule(session.companyId, "PAYROLL");
 
   // Hur långt bakåt ett "senaste jobb" får hämtas. Fyller två syften: ett
   // jobb från i våras är inget vettigt förslag att fortsätta på, och fönstret
@@ -162,21 +172,26 @@ export default async function KioskPage() {
     // ett tangentbord man knappt kan skriva på med handskar.
     pickableCustomers(db),
     // Rasterna. Tom lista döljer rastknappen helt — en verkstad som inte
-    // stämplar raster ska inte få en knapp som inte leder någonstans.
-    db.breakType.findMany({
-      where: { active: true },
-      orderBy: { sortOrder: "asc" },
-      select: { id: true, name: true },
-    }),
-    db.breakEntry.findMany({
-      where: { endedAt: null },
-      orderBy: { startedAt: "desc" },
-      select: {
-        employeeId: true,
-        startedAt: true,
-        breakType: { select: { name: true } },
-      },
-    }),
+    // stämplar raster ska inte få en knapp som inte leder någonstans. Samma
+    // mekanism används när lönemodulen är av, se ovan.
+    payroll
+      ? db.breakType.findMany({
+          where: { active: true },
+          orderBy: { sortOrder: "asc" },
+          select: { id: true, name: true },
+        })
+      : [],
+    payroll
+      ? db.breakEntry.findMany({
+          where: { endedAt: null },
+          orderBy: { startedAt: "desc" },
+          select: {
+            employeeId: true,
+            startedAt: true,
+            breakType: { select: { name: true } },
+          },
+        })
+      : [],
   ]);
 
   // Vilka som är på rast. En person på lunch har inga öppna stämplingar och

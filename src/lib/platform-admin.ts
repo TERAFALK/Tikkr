@@ -4,6 +4,8 @@ import { isPlatformAdmin } from "./platform-access";
 import { readPlatformSession } from "./platform-session";
 import { getScreenPricing, type ScreenPricing } from "./stripe";
 import { TRIAL_LICENSES } from "./licenses";
+import { MODULES, isModuleKey, moduleName, type ModuleKey } from "./modules";
+import { moduleStates, setModuleManually } from "./company-modules";
 
 /**
  * PLATTFORMSADMINISTRATION.
@@ -28,6 +30,7 @@ import { TRIAL_LICENSES } from "./licenses";
 // Själva behörighetsregeln ligger i platform-access.ts, fri från webbramverk
 // så att den går att testa utan att starta en app.
 export { isPlatformAdmin, platformAdminEmails } from "./platform-access";
+export type { ModuleState } from "./company-modules";
 
 /**
  * Grinden till plattformspanelen.
@@ -77,17 +80,41 @@ export function monthlyRevenueFor(
     subscriptionStatus: string;
     screenLicenses: number;
     subscriptionInterval: string | null;
+    /**
+     * Påslagna tillval, i den form Prisma lämnar dem. Utelämnad räknas som
+     * inga — varje anropare måste alltså komma ihåg att välja fältet, och
+     * den som glömmer får ett för lågt tal snarare än ett fel.
+     */
+    modules?: { module: string }[];
   },
   pricing: ScreenPricing
 ): number {
   if (company.subscriptionStatus !== "ACTIVE") return 0;
 
-  const perScreen =
-    company.subscriptionInterval === "year" && pricing.year !== null
-      ? pricing.year / 12
-      : pricing.month;
+  const yearly = company.subscriptionInterval === "year";
 
-  return Math.round(company.screenLicenses * perScreen);
+  const perScreen =
+    yearly && pricing.year !== null ? pricing.year / 12 : pricing.month;
+
+  // Tillvalen är fasta belopp per företag, inte per skärm. En kund med tre
+  // skärmar och löneunderlaget betalar tre gånger skärmpriset plus EN
+  // modulavgift.
+  //
+  // Modulpriserna tas tills vidare ur registret och inte ur Stripe. Så länge
+  // ingen modul ligger på en prenumeration är det samma siffra; när
+  // modulrader börjar säljas ska de läsas från artikeln, precis som
+  // skärmpriset.
+  const modules = (company.modules ?? []).reduce((sum, row) => {
+    if (!isModuleKey(row.module)) return sum;
+
+    const definition = MODULES[row.module];
+    return (
+      sum +
+      (yearly ? definition.fallbackYearly / 12 : definition.fallbackMonthly)
+    );
+  }, 0);
+
+  return Math.round(company.screenLicenses * perScreen + modules);
 }
 
 /**
@@ -110,6 +137,7 @@ export async function listCompanies(): Promise<CompanyOverview[]> {
       subscriptionStatus: true,
       subscriptionInterval: true,
       screenLicenses: true,
+      modules: { select: { module: true } },
       stripeSubscriptionId: true,
       createdAt: true,
       _count: {
@@ -232,6 +260,7 @@ export async function getCompanyDetail(companyId: string) {
       subscriptionStatus: true,
       subscriptionInterval: true,
       screenLicenses: true,
+      modules: { select: { module: true } },
       stripeSubscriptionId: true,
       autoCloseAt: true,
       timezone: true,
@@ -250,6 +279,7 @@ export async function getCompanyDetail(companyId: string) {
     lastEntry,
     history,
     historyTotal,
+    modules,
   ] = await Promise.all([
       unsafeGlobalPrisma.adminUser.findMany({
         where: { companyId },
@@ -295,6 +325,9 @@ export async function getCompanyDetail(companyId: string) {
       unsafeGlobalPrisma.platformAuditLog.count({
         where: { targetCompanyId: companyId },
       }),
+      // Tillvalen. Ett driftfaktum, inte verksamhetsinnehåll: vad kunden
+      // köpt hör till supportsamtalet på samma sätt som antalet licenser.
+      moduleStates(companyId),
     ]);
 
   const [employees, openOrders, moments, totalEntries, needsReview, openNow] =
@@ -307,6 +340,7 @@ export async function getCompanyDetail(companyId: string) {
     note,
     history,
     historyTotal,
+    modules,
     stats: {
       employees,
       openOrders,
@@ -405,6 +439,63 @@ export async function setLicensesManually(params: {
     targetCompanyId: params.companyId,
     detail:
       `${before.screenLicenses} → ${params.licenses}. ${params.reason}`.trim(),
+  });
+}
+
+/**
+ * Slår på eller av ett tillval för hand.
+ *
+ * Behövs av samma skäl som manuella licenser: en fakturakund ska gå att
+ * hantera utan att någon pillar i databasen, och labbmiljön har ingen Stripe
+ * alls. Det är också vägen in för en modul vi bjuder på.
+ *
+ * Spärras för företag med en prenumeration hos Stripe. Där ligger modulen som
+ * en rad på fakturan, och en modul vi slog på här skulle vara påslagen utan
+ * att någon betalar för den — eller avstängd medan kunden betalar. Kunden
+ * ändrar det själv under Inställningar → Prenumeration.
+ *
+ * AVSTÄNGNING RÖR INGEN KUNDDATA. Scheman, raster, frånvaro och komprader
+ * ligger kvar och står där igen om modulen slås på. Se CLAUDE.md § 3.1.
+ */
+export async function setModule(params: {
+  actorEmail: string;
+  companyId: string;
+  module: ModuleKey;
+  on: boolean;
+  reason: string;
+}) {
+  const company = await unsafeGlobalPrisma.company.findUnique({
+    where: { id: params.companyId },
+    select: {
+      stripeSubscriptionId: true,
+      modules: { select: { module: true } },
+    },
+  });
+
+  if (!company) return;
+
+  if (company.stripeSubscriptionId) {
+    throw new PlatformActionError(
+      "Tillvalen ligger på prenumerationen hos Stripe. Kunden ändrar dem " +
+        "själv under Inställningar → Prenumeration."
+    );
+  }
+
+  const already = company.modules.some((row) => row.module === params.module);
+  if (already === params.on) return;
+
+  await setModuleManually({
+    companyId: params.companyId,
+    key: params.module,
+    on: params.on,
+    actorEmail: params.actorEmail,
+  });
+
+  await record({
+    actorEmail: params.actorEmail,
+    action: params.on ? "Slog på tillval" : "Slog av tillval",
+    targetCompanyId: params.companyId,
+    detail: `${moduleName(params.module)}. ${params.reason}`.trim(),
   });
 }
 

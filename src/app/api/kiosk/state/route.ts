@@ -3,6 +3,7 @@ import { getKioskSession } from "@/lib/kiosk-auth";
 import { forCompany } from "@/lib/tenant";
 import { describeEntry } from "@/lib/entry-label";
 import { getOpenBreaks } from "@/lib/breaks";
+import { hasModule } from "@/lib/company-modules";
 import type { KioskActiveJob } from "@/components/kiosk/KioskScreen";
 
 /**
@@ -53,7 +54,12 @@ export async function GET() {
   // Rasterna hämtas samtidigt. En person på lunch har inga öppna stämplingar
   // och skulle annars se ledig ut på de andra skärmarna — och någon skulle
   // stämpla in dem på ett jobb de inte står vid.
-  const openBreaks = await getOpenBreaks(db);
+  //
+  // Utan lönemodulen finns inga raster att hämta. Frågan ställs inte alls
+  // då, i stället för att ställas och svara tomt: rutten anropas av varje
+  // skärm var femte sekund.
+  const payroll = await hasModule(session.companyId, "PAYROLL");
+  const openBreaks = payroll ? await getOpenBreaks(db) : [];
 
   const open = await db.timeEntry.findMany({
     where: { clockOutAt: null },
@@ -76,11 +82,14 @@ export async function GET() {
   // En LISTA per person. Att en operatör kör två maskiner samtidigt är numera
   // ett giltigt läge, och Object.fromEntries hade behållit den sista posten
   // tyst — skärmen hade då visat ett jobb som pågick och dolt det andra.
-  const breakTypes = new Map(
-    (
-      await db.breakType.findMany({ select: { id: true, name: true } })
-    ).map((type) => [type.id, type.name])
-  );
+  //
+  // Typen skrivs ut. Utan den blir uttrycket unionen `{...}[] | never[]`, och
+  // .map() går inte att anropa på en union av arraytyper.
+  const rows: { id: string; name: string }[] = payroll
+    ? await db.breakType.findMany({ select: { id: true, name: true } })
+    : [];
+
+  const breakTypes = new Map(rows.map((type) => [type.id, type.name]));
 
   const active: Record<string, KioskActiveJob[]> = {};
 

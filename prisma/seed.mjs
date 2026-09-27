@@ -99,6 +99,26 @@ async function main() {
     },
   });
 
+  // TILLVALEN SÄTTS EFTER FÖRETAGEN, av samma skäl som kunderna nedan: ett
+  // nästlat create hade hoppats över på en databas som redan kört seed.
+  //
+  // Demoföretaget får löneunderlaget, grannen får det inte. Skillnaden är med
+  // flit — då går det att se vad modulen faktiskt döljer genom att logga in
+  // på det ena företaget och sedan på det andra, i stället för att behöva slå
+  // av och på den i plattformspanelen.
+  await prisma.companyModule.upsert({
+    where: {
+      companyId_module: { companyId: demo.id, module: "PAYROLL" },
+    },
+    update: {},
+    create: {
+      companyId: demo.id,
+      module: "PAYROLL",
+      source: "MANUAL",
+      enabledBy: "seed",
+    },
+  });
+
   // KUNDERNA SKAPAS EFTER FÖRETAGEN och inte inuti deras create-block.
   //
   // Skälet är upserten ovan: `update: {}` betyder att ingenting händer när
