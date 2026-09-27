@@ -382,6 +382,30 @@ förhandsberäkning innan de bekräftar. Går den inte att hämta stoppas inte
 köpet — då visas bara den löpande avgiften. Att vägra sälja för att en
 förhandsvisning inte gick att hämta vore fel avvägning.
 
+**Allt som ändrar vad kunden betalar sker i Tikkr, i två steg** (ändrat
+2026-09-27). Både antal licenser och tillval: reglage eller fält, Stripes
+egen beräkning, bekräfta.
+
+Licensantalet ändrades tidigare på Stripes egen sida. Det gick inte att göra
+likadant med tillvalen, och det är inte ett val vi gjorde: **Stripes
+kundportal kan ändra antal och byta pris på en befintlig rad, men inte lägga
+till en ny produktrad.** En Checkout-session skapar i stället en ny
+prenumeration, alltså två parallella. Kunden mötte därför två olika sätt att
+ändra samma faktura beroende på vad de ändrade.
+
+Med licensändringen hemtagen försvann också portalkonfigurationen som måste
+skrivas om för att modulernas produkter skulle släppas in — ungefär 200 rader
+som fanns enbart för att Stripes sida skulle fungera.
+
+**Kort, kvitton och uppsägning ligger kvar hos Stripe.** Det är sådant vi inte
+ska bygga själva. Ändrar kunden ändå antalet den vägen följer vår siffra med:
+webhooken skriver den, och `getBillingOverview` stämmer av vid varje visning
+av prenumerationssidan.
+
+**En ökning ska inte gå att missa.** Bekräftelserutan visar avgiften före och
+efter, skillnaden, och vad nästa faktura landar på. En siffra som bara ändras
+i ett fält är inget beslut kunden fattat.
+
 Att lägga till en modul: en nyckel i registret, ett värde i enumen
 `CompanyModuleKey`, en artikel hos Stripe. Ingenting annat i arkitekturen
 behöver röras.
@@ -601,8 +625,7 @@ spara.
 Under provperioden slår kunden på och av modulerna fritt. Vid köp blir de
 påslagna modulerna rader på prenumerationen. En kund som redan betalar slår
 på en modul själv och får se Stripes egen beräkning av vad resten av perioden
-kostar innan de bekräftar — beloppet räknas av den som debiterar, aldrig av
-oss.
+kostar innan de bekräftar. Samma flöde gäller antalet licenser, se § 3.1.
 
 ### Provperiod och utebliven betalning (beslutat 2026-08-11)
 

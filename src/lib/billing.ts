@@ -146,204 +146,6 @@ export async function createPortalSession(params: {
 }
 
 /**
- * Öppnar Stripes sida där kunden ändrar antalet licenser.
- *
- * Antalet väljs och bekräftas i ett och samma steg hos Stripe, inte här. Skälet
- * är att beloppet ska räknas fram av den part som faktiskt debiterar, i samma
- * stund som antalet ändras — en siffra vi räknat ut i förväg är en gissning om
- * vad Stripe kommer att fakturera, och en gissning duger inte för något som
- * ändrar en faktura.
- *
- * Antalet skrivs in i vår databas först när Stripe bekräftar ändringen.
- * Avbryter kunden har ingenting hänt.
- *
- * Utan prenumeration går antalet inte att ändra. Under provperioden ingår ett
- * fast antal, och fler får man genom att börja betala.
- */
-export async function openLicenseUpdate(params: {
-  companyId: string;
-  baseUrl: string;
-}): Promise<string> {
-  const company = await unsafeGlobalPrisma.company.findUnique({
-    where: { id: params.companyId },
-    select: { stripeCustomerId: true, stripeSubscriptionId: true },
-  });
-
-  if (!company?.stripeSubscriptionId || !company.stripeCustomerId) {
-    throw new Error(
-      "Antalet licenser kan ändras först när prenumerationen är aktiv."
-    );
-  }
-
-  // Saknas en egen konfiguration används kontots standardportal. Den duger så
-  // länge kvantitetsändring är påslagen där, och ett fel i vår konfiguration
-  // ska inte vara skillnaden mellan att kunden kan köpa en skärm till eller
-  // inte.
-  const configuration = await licenseUpdateConfiguration();
-
-  const session = await stripe().billingPortal.sessions.create({
-    customer: company.stripeCustomerId,
-    ...(configuration && { configuration }),
-    return_url: `${params.baseUrl}/admin/installningar/prenumeration`,
-
-    flow_data: {
-      type: "subscription_update",
-      subscription_update: { subscription: company.stripeSubscriptionId },
-      after_completion: {
-        type: "redirect",
-        redirect: {
-          return_url: `${params.baseUrl}/admin/installningar/prenumeration?uppdaterad=1`,
-        },
-      },
-    },
-  });
-
-  return session.url;
-}
-
-/**
- * Portalkonfigurationen som tillåter ändrat antal.
- *
- * Stripes bekräftelsesida kräver att kundportalen har kvantitetsändring
- * påslagen. Vi skapar därför en egen konfiguration som bara gör den enda
- * saken, istället för att be någon klicka rätt i Stripes gränssnitt — då
- * fungerar det likadant i labbet som i skarp drift, utan manuella steg.
- *
- * Den vanliga kundportalen (kort, kvitton, uppsägning) rörs inte: den använder
- * fortfarande Stripes standardkonfiguration.
- */
-const CONFIGURATION_MARKER = "tikkr-license-update";
-let licenseConfigurationId: string | null = null;
-
-async function licenseUpdateConfiguration(): Promise<string | null> {
-  const fromEnv = process.env.STRIPE_PORTAL_CONFIGURATION_ID;
-  if (fromEnv) return fromEnv;
-
-  if (licenseConfigurationId) return licenseConfigurationId;
-
-  try {
-    // Letar upp en tidigare skapad först. Appen startas om vid varje deploy,
-    // och en ny konfiguration per omstart skulle fylla Stripe-kontot med
-    // dubbletter.
-    const existing = await stripe().billingPortal.configurations.list({
-      active: true,
-      limit: 100,
-    });
-
-    const found = existing.data.find(
-      (item) => item.metadata?.tikkr === CONFIGURATION_MARKER
-    );
-
-    if (found) {
-      // ARTIKELLISTAN SKRIVS OM PÅ EN BEFINTLIG KONFIGURATION. Den skapades
-      // innan tillvalen fanns och känner därför inte modulernas produkter —
-      // och en portal som inte känner dem vägrar öppna prenumerationen alls.
-      // Ett anrop per processtart, och det ger samma resultat hur många
-      // gånger det körs.
-      await stripe().billingPortal.configurations.update(found.id, {
-        features: {
-          subscription_update: {
-            enabled: true,
-            default_allowed_updates: ["quantity"],
-            proration_behavior: "create_prorations",
-            products: await updatableProducts(),
-          },
-        },
-      });
-
-      licenseConfigurationId = found.id;
-      return found.id;
-    }
-
-    const created = await stripe().billingPortal.configurations.create({
-      metadata: { tikkr: CONFIGURATION_MARKER },
-      business_profile: { headline: "Antal stämplingsskärmar" },
-
-      features: {
-        subscription_update: {
-          enabled: true,
-          default_allowed_updates: ["quantity"],
-
-          // Samma avräkning som tidigare: en skärm som läggs till mitt i
-          // perioden kostar resterande dagar, varken en hel period eller noll.
-          proration_behavior: "create_prorations",
-          products: await updatableProducts(),
-        },
-
-        // Kortbyte MÅSTE vara påslaget. Stripe vägrar annars skapa
-        // konfigurationen: "Cannot enable subscription updates while payment
-        // method update is disabled." Rimligt nog — en höjning kan kräva att
-        // kortet går att byta för att gå igenom.
-        //
-        // Det syns ändå inte här. Kunden landar direkt på sidan för antal,
-        // eftersom sessionen styrs av flow_data.
-        payment_method_update: { enabled: true },
-
-        // Resten stängs av. Kvitton och uppsägning ligger kvar i den vanliga
-        // kundportalen, dit knappen "Hantera betalning och fakturor" leder.
-        invoice_history: { enabled: false },
-        customer_update: { enabled: false },
-        subscription_cancel: { enabled: false },
-      },
-    });
-
-    licenseConfigurationId = created.id;
-    return created.id;
-  } catch (error) {
-    // Vanligaste orsaken i skarpt läge: Stripe kräver att kundportalens
-    // villkors- och integritetslänkar är ifyllda innan en konfiguration får
-    // skapas. Vi ger inte upp för det — kontots standardportal används i
-    // stället, och fungerar så länge kvantitetsändring är påslagen där.
-    console.error(
-      "Kunde inte skapa portalkonfiguration hos Stripe, använder kontots " +
-        "standardkonfiguration i stället",
-      error
-    );
-
-    return null;
-  }
-}
-
-/**
- * Artiklarna kunden får ändra antal på. Priserna kan ligga på samma produkt.
- *
- * MODULERNAS ARTIKLAR MÅSTE MED, även om ingen ska ändra antal på dem. Stripes
- * kundportal vägrar öppna en prenumeration som innehåller en produkt som inte
- * står i konfigurationen — och sedan tillvalen finns kan prenumerationen
- * innehålla dem. Utan de här raderna slutar knappen "Ändra antal licenser"
- * fungera för just de kunder som köpt mest.
- *
- * Följden är att en kund i teorin kan skruva upp antalet löneunderlag till
- * tre hos Stripe. Vår synkning bryr sig inte om kvantiteten — modulen är på
- * eller av — så det skulle bara betyda att de betalar för mycket, vilket de
- * kan ändra tillbaka på samma sida. Stripe erbjuder inget sätt att lista en
- * produkt utan att tillåta kvantitet.
- */
-async function updatableProducts() {
-  const byProduct = new Map<string, string[]>();
-  const book = await priceBook();
-
-  const ids = [
-    book.screen.month,
-    book.screen.year,
-    ...MODULE_KEYS.flatMap((key) => [
-      modulePriceId(book, key, "month"),
-      modulePriceId(book, key, "year"),
-    ]),
-  ].filter((id): id is string => Boolean(id));
-
-  for (const id of ids) {
-    const price = await stripe().prices.retrieve(id);
-    const product =
-      typeof price.product === "string" ? price.product : price.product.id;
-
-    byProduct.set(product, [...(byProduct.get(product) ?? []), id]);
-  }
-
-  return [...byProduct].map(([product, prices]) => ({ product, prices }));
-}
-
-/**
  * SKRIVER OM MODULRADERNA EFTER VAD STRIPE SÄGER.
  *
  * När ett företag har en prenumeration är dess rader HELA sanningen om vilka
@@ -580,10 +382,17 @@ export async function getBillingOverview(
 /* Att lägga till eller ta bort ett tillval på en levande prenumeration        */
 /* -------------------------------------------------------------------------- */
 
-export class ModuleChangeError extends Error {
+/**
+ * Ett svar kunden ska se, till skillnad från ett driftfel.
+ *
+ * Kastas när ändringen inte går att göra av ett skäl som går att rätta: redan
+ * påslaget, ett antal som inte får debiteras, en artikel som saknas. Allt
+ * annat hamnar i serverloggen och möts av ett allmänt meddelande.
+ */
+export class BillingChangeError extends Error {
   constructor(message: string) {
     super(message);
-    this.name = "ModuleChangeError";
+    this.name = "BillingChangeError";
   }
 }
 
@@ -605,10 +414,9 @@ export interface ModuleChangePreview {
 /**
  * Vad ändringen kommer att kosta — räknat av Stripe, inte av oss.
  *
- * Samma princip som står motiverad vid openLicenseUpdate ovan: beloppet ska
- * räknas fram av den part som faktiskt debiterar. En siffra vi räknat ut i
- * förväg är en gissning om vad Stripe kommer att fakturera, och en gissning
- * duger inte för något som ändrar en faktura.
+ * Beloppet ska räknas fram av den part som faktiskt debiterar. En siffra vi
+ * räknat ut i förväg är en gissning om vad Stripe kommer att fakturera, och
+ * en gissning duger inte för något som ändrar en faktura.
  *
  * MISSLYCKAS BERÄKNINGEN STOPPAS INTE KÖPET. Då saknas bara beloppet, och
  * kunden får veta vad modulen kostar löpande i stället. Att vägra sälja för
@@ -651,6 +459,26 @@ export async function previewModuleChange(params: {
     interval
   );
 
+  const upcoming = await upcomingAfter(subscription, items, "tillval");
+
+  preview.nextInvoiceAmount = upcoming.amount;
+  preview.nextInvoiceAt = upcoming.at;
+
+  return preview;
+}
+
+/**
+ * Vad nästa faktura landar på om raderna ändras så här.
+ *
+ * Delas av licensändringen och tillvalen. Svarar med tomma värden när Stripe
+ * inte kunde räkna — se previewInvoice nedan om varför det aldrig stoppar en
+ * ändring.
+ */
+async function upcomingAfter(
+  subscription: Stripe.Subscription,
+  items: ItemChange[],
+  what: string
+): Promise<{ amount: number | null; at: Date | null }> {
   try {
     const upcoming = await previewInvoice({
       customer: subscriptionCustomerId(subscription),
@@ -658,29 +486,30 @@ export async function previewModuleChange(params: {
       subscription_details: {
         items,
 
-        // Samma avräkning som vid ändrat antal licenser: en modul som läggs
-        // till mitt i perioden kostar resterande dagar, varken en hel period
-        // eller noll.
+        // En ändring mitt i perioden kostar resterande dagar, varken en hel
+        // period eller noll.
         proration_behavior: "create_prorations",
       },
     });
 
-    if (upcoming) {
-      preview.nextInvoiceAmount = upcoming.amount_due / 100;
+    if (!upcoming) return { amount: null, at: null };
 
-      // Fältet heter olika i olika versioner av Stripes API, precis som
-      // periodslutet ovan. Vi läser båda och tar det som finns.
-      const at = upcoming.next_payment_attempt ?? upcoming.period_end;
-      preview.nextInvoiceAt = at ? new Date(at * 1000) : null;
-    }
+    // Fältet heter olika i olika versioner av Stripes API, precis som
+    // periodslutet i getBillingOverview. Vi läser båda och tar det som finns.
+    const at = upcoming.next_payment_attempt ?? upcoming.period_end;
+
+    return {
+      amount: upcoming.amount_due / 100,
+      at: at ? new Date(at * 1000) : null,
+    };
   } catch (error) {
     console.error(
-      "[tillval] Kunde inte hämta förhandsberäkningen från Stripe:",
+      `[${what}] Kunde inte hämta förhandsberäkningen från Stripe:`,
       error instanceof Error ? error.message : error
     );
-  }
 
-  return preview;
+    return { amount: null, at: null };
+  }
 }
 
 /**
@@ -788,20 +617,20 @@ function changedItems(
 
   if (!on) {
     if (!existing) {
-      throw new ModuleChangeError("Tillvalet ligger inte på prenumerationen.");
+      throw new BillingChangeError("Tillvalet ligger inte på prenumerationen.");
     }
 
     return [{ id: existing.itemId, deleted: true }];
   }
 
   if (existing) {
-    throw new ModuleChangeError("Tillvalet är redan påslaget.");
+    throw new BillingChangeError("Tillvalet är redan påslaget.");
   }
 
   const price = modulePriceId(book, key, interval);
 
   if (!price) {
-    throw new ModuleChangeError(
+    throw new BillingChangeError(
       `${MODULES[key].name} går inte att köpa med ${
         interval === "year" ? "årsbetalning" : "månadsbetalning"
       } än. Kontakta support@tikkr.se.`
@@ -823,7 +652,7 @@ async function subscriptionFor(companyId: string): Promise<{
   });
 
   if (!company?.stripeSubscriptionId) {
-    throw new ModuleChangeError(
+    throw new BillingChangeError(
       "Tillval kan ändras först när prenumerationen är aktiv."
     );
   }
@@ -848,4 +677,141 @@ function subscriptionCustomerId(subscription: Stripe.Subscription): string {
   return typeof subscription.customer === "string"
     ? subscription.customer
     : subscription.customer.id;
+}
+
+/* -------------------------------------------------------------------------- */
+/* Att ändra antalet licenser                                                  */
+/* -------------------------------------------------------------------------- */
+
+export const MAX_LICENSES = 100;
+
+export interface LicenseChangePreview {
+  from: number;
+  to: number;
+  interval: BillingInterval;
+  /** Vad skärmlicenserna kostar löpande EFTER ändringen. */
+  recurringAmount: number;
+  /** Vad de kostar idag. Skillnaden är det kunden behöver se. */
+  currentAmount: number;
+  /**
+   * Vad nästa faktura landar på, inklusive avräkningen för resten av den
+   * pågående perioden. null när Stripe inte kunde räkna fram den.
+   */
+  nextInvoiceAmount: number | null;
+  nextInvoiceAt: Date | null;
+}
+
+/**
+ * VAD ETT ÄNDRAT ANTAL LICENSER KOSTAR.
+ *
+ * Ändringen görs numera här och inte på Stripes egen sida. Skälet är att ett
+ * tillval INTE går att lägga till där: kundportalen kan ändra antal och byta
+ * pris på en befintlig rad, men inte lägga till en ny produktrad. Kunden mötte
+ * därför två olika sätt att ändra samma faktura, beroende på vad de ändrade.
+ *
+ * Beloppet räknas fortfarande av Stripe. Det var hela poängen med att skicka
+ * kunden dit, och den poängen är kvar — det är bara sidan som flyttat.
+ *
+ * Kort, kvitton och uppsägning ligger fortfarande hos Stripe, se
+ * createPortalSession. Det är sådant vi inte ska bygga själva.
+ */
+export async function previewLicenseChange(params: {
+  companyId: string;
+  screens: number;
+}): Promise<LicenseChangePreview> {
+  const { subscription, interval, book } = await subscriptionFor(
+    params.companyId
+  );
+
+  const item = screenItemOf(book, subscription);
+
+  if (!item) {
+    throw new BillingChangeError(
+      "Prenumerationen saknar en rad för stämplingsskärmar."
+    );
+  }
+
+  const from = item.quantity ?? 1;
+  const to = assertLicenseCount(params.screens, from);
+
+  const pricing = await getScreenPricing();
+  const perScreen =
+    interval === "year" ? (pricing.year ?? pricing.month * 12) : pricing.month;
+
+  const upcoming = await upcomingAfter(
+    subscription,
+    [{ id: item.id, quantity: to }],
+    "licenser"
+  );
+
+  return {
+    from,
+    to,
+    interval,
+    recurringAmount: to * perScreen,
+    currentAmount: from * perScreen,
+    nextInvoiceAmount: upcoming.amount,
+    nextInvoiceAt: upcoming.at,
+  };
+}
+
+/**
+ * Genomför ändringen hos Stripe och skriver av svaret.
+ *
+ * Antalet läses ur det UPPDATERADE svaret och inte ur vad vi bad om. Stripe
+ * är sanningen om vad kunden betalar för, och skulle de av något skäl ha satt
+ * något annat ska vår siffra följa deras — inte tvärtom.
+ */
+export async function applyLicenseChange(params: {
+  companyId: string;
+  screens: number;
+}): Promise<number> {
+  const { subscription, book } = await subscriptionFor(params.companyId);
+
+  const item = screenItemOf(book, subscription);
+
+  if (!item) {
+    throw new BillingChangeError(
+      "Prenumerationen saknar en rad för stämplingsskärmar."
+    );
+  }
+
+  const to = assertLicenseCount(params.screens, item.quantity ?? 1);
+
+  const updated = await stripe().subscriptions.update(subscription.id, {
+    items: [{ id: item.id, quantity: to }],
+    proration_behavior: "create_prorations",
+  });
+
+  const quantity = screenItemOf(book, updated)?.quantity ?? to;
+  await setLicenseCount(params.companyId, quantity);
+
+  return quantity;
+}
+
+/**
+ * Vägrar ett antal som inte går att debitera.
+ *
+ * ETT LÄGRE ANTAL ÄN DE UPPLAGDA SKÄRMARNA ÄR TILLÅTET, med flit. Vi stänger
+ * ingen skärm av oss själva, och vilken som ska bort är kundens beslut — se
+ * licenses.ts. Panelen påpekar skillnaden i stället.
+ */
+function assertLicenseCount(screens: number, current: number): number {
+  const to = Math.floor(screens);
+
+  if (!Number.isFinite(to) || to < 1) {
+    throw new BillingChangeError("Antalet måste vara minst en licens.");
+  }
+
+  if (to > MAX_LICENSES) {
+    throw new BillingChangeError(
+      `Fler än ${MAX_LICENSES} licenser hanteras av support@tikkr.se.`
+    );
+  }
+
+  if (to === current) {
+    throw new BillingChangeError(`Antalet är redan ${current}.`);
+  }
+
+  return to;
 }

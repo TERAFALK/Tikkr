@@ -5,11 +5,12 @@ import { redirect } from "next/navigation";
 import { assertWritable, requireAdmin } from "@/lib/admin-session";
 import { revalidatePath } from "next/cache";
 import {
+  applyLicenseChange,
   applyModuleChange,
+  BillingChangeError,
   createCheckoutSession,
   createPortalSession,
-  ModuleChangeError,
-  openLicenseUpdate,
+  previewLicenseChange,
   previewModuleChange,
 } from "@/lib/billing";
 import { setModuleManually } from "@/lib/company-modules";
@@ -46,47 +47,93 @@ export async function startCheckout(formData: FormData) {
 }
 
 export interface LicenseFormState {
+  /** Ifylld när kunden ska bekräfta en ändring som kostar pengar. */
+  preview?: {
+    from: number;
+    to: number;
+    interval: "month" | "year";
+    recurringAmount: number;
+    currentAmount: number;
+    nextInvoiceAmount: number | null;
+    nextInvoiceAt: string | null;
+  };
   error?: string;
+  ok?: string;
 }
 
 /**
- * Skickar vidare till Stripe, där antalet licenser ändras.
+ * ÄNDRAR ANTALET LICENSER.
  *
- * Formuläret stannar kvar vid fel, så att orsaken går att läsa. Ett fel här är
- * nästan alltid en driftsak — Stripe svarar inte, eller saknar den
- * portalkonfiguration som krävs — och detaljerna hamnar i serverloggen.
+ * Två steg, precis som tillvalen: först vad det kostar, sedan ändringen.
+ * Beloppet i mellansteget kommer från Stripe.
+ *
+ * Ändringen görs här och inte på Stripes egen sida, eftersom ett tillval inte
+ * går att lägga till där — kunden mötte annars två olika sätt att ändra samma
+ * faktura beroende på vad de ändrade. Kort, kvitton och uppsägning ligger kvar
+ * hos Stripe, se openBillingPortal nedan.
  */
 export async function changeLicenses(
-  _previous: LicenseFormState
+  _previous: LicenseFormState,
+  formData: FormData
 ): Promise<LicenseFormState> {
   const session = await requireAdmin();
   await assertWritable(session);
 
-  let url: string;
+  const screens = Number(formData.get("screens"));
+  const step = String(formData.get("step") ?? "");
+
+  // Avbryt är ett eget steg och inte en knapp som bara döljer rutan i
+  // webbläsaren: tillståndet lever i åtgärden, och bara en ny körning av den
+  // kan rensa det.
+  if (step === "cancel") return {};
 
   try {
-    url = await openLicenseUpdate({
+    if (step !== "apply") {
+      const preview = await previewLicenseChange({
+        companyId: session.companyId,
+        screens,
+      });
+
+      return {
+        preview: {
+          from: preview.from,
+          to: preview.to,
+          interval: preview.interval,
+          recurringAmount: preview.recurringAmount,
+          currentAmount: preview.currentAmount,
+          nextInvoiceAmount: preview.nextInvoiceAmount,
+          nextInvoiceAt: preview.nextInvoiceAt?.toISOString() ?? null,
+        },
+      };
+    }
+
+    const quantity = await applyLicenseChange({
       companyId: session.companyId,
-      baseUrl: await baseUrl(),
+      screens,
     });
+
+    revalidatePath("/admin/installningar/prenumeration");
+
+    return {
+      ok: `Antalet är ändrat till ${quantity} ${
+        quantity === 1 ? "licens" : "licenser"
+      }.`,
+    };
   } catch (error) {
-    // Felet skrivs ut i klartext och med ett sökbart prefix. Det som går fel
-    // här är nästan alltid en inställning hos betaltjänsten, och då behöver
-    // den som sköter driften kunna läsa orsaken utan att gissa.
+    if (error instanceof BillingChangeError) return { error: error.message };
+
+    // Resten är driftfel. Orsaken hamnar i serverloggen med ett sökbart
+    // prefix; kunden får ett svar de kan göra något med.
     console.error(
-      "[licensändring] Kunde inte öppna betaltjänstens sida:",
+      "[licensändring] Ändringen gick inte igenom:",
       error instanceof Error ? error.message : error
     );
 
     return {
       error:
-        "Sidan för att ändra antalet kunde inte öppnas. Försök igen, eller kontakta support@tikkr.se om felet kvarstår.",
+        "Ändringen gick inte igenom. Försök igen, eller kontakta support@tikkr.se om felet kvarstår.",
     };
   }
-
-  // Ligger utanför try-blocket. redirect() avbryter genom att kasta, och hade
-  // fångats som ett fel om den låg innanför.
-  redirect(url);
 }
 
 export async function openBillingPortal() {
@@ -202,7 +249,7 @@ export async function changeModule(
 
     await applyModuleChange({ companyId: session.companyId, key, on });
   } catch (error) {
-    if (error instanceof ModuleChangeError) return { error: error.message };
+    if (error instanceof BillingChangeError) return { error: error.message };
 
     // Resten är driftfel — Stripe svarar inte, eller en artikel saknas.
     // Orsaken hamnar i serverloggen med ett sökbart prefix; kunden får ett
