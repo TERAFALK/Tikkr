@@ -35,7 +35,7 @@ export default async function ActivityPage({
   ]);
 
   return (
-    <PlatformShell email={email} current="/plattform/handelser">
+    <PlatformShell email={email}>
       <PageHeader
         title="Händelser"
         description="Utförda från plattformspanelen."

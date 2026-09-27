@@ -148,3 +148,40 @@ export const IconClose = (props: IconProps) => (
     <path d="M6 6l12 12M18 6L6 18" />
   </Icon>
 );
+
+/* -------------------------------------------------------------------------- */
+/* Plattformspanelen                                                           */
+/* -------------------------------------------------------------------------- */
+
+/** Utskick. Kuvert. */
+export const IconMail = (props: IconProps) => (
+  <Icon {...props}>
+    <rect x="3" y="5" width="18" height="14" rx="2" />
+    <path d="m3.5 7 8.5 6 8.5-6" />
+  </Icon>
+);
+
+/** Driftmeddelanden. Megafon. */
+export const IconMegaphone = (props: IconProps) => (
+  <Icon {...props}>
+    <path d="M3 11v2a1 1 0 0 0 1 1h3l7 4V6l-7 4H4a1 1 0 0 0-1 1Z" />
+    <path d="M18 9a3 3 0 0 1 0 6" />
+  </Icon>
+);
+
+/** Artiklar hos betaltjänsten. Prislapp. */
+export const IconTag = (props: IconProps) => (
+  <Icon {...props}>
+    <path d="M3 12V5a2 2 0 0 1 2-2h7l9 9-9 9-9-9Z" />
+    <path d="M7.5 7.5h.01" />
+  </Icon>
+);
+
+/** Åtgärdsloggen. Klocka med pil bakåt. */
+export const IconHistory = (props: IconProps) => (
+  <Icon {...props}>
+    <path d="M3 12a9 9 0 1 0 2.6-6.4" />
+    <path d="M3 4v4h4" />
+    <path d="M12 8v4l3 2" />
+  </Icon>
+);

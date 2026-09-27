@@ -46,7 +46,7 @@ export default async function NoticesPage({
 
   if (showArchive) {
     return (
-      <PlatformShell email={email} current="/plattform/meddelanden">
+      <PlatformShell email={email}>
         <Link
           href="/plattform/meddelanden"
           className="text-[13px] font-medium text-blue-600 hover:underline"
@@ -83,7 +83,7 @@ export default async function NoticesPage({
   const finished = notices.filter((n) => noticeState(n) === "avslutat");
 
   return (
-    <PlatformShell email={email} current="/plattform/meddelanden">
+    <PlatformShell email={email}>
       <PageHeader
         title="Driftmeddelanden"
         description="Banner hos samtliga företag."

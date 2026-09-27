@@ -36,7 +36,7 @@ export default async function CompanyHistoryPage({
   const log = await auditLog({ companyId, page });
 
   return (
-    <PlatformShell email={email} current="/plattform/kunder">
+    <PlatformShell email={email}>
       <Link
         href={`/plattform/kunder/${companyId}`}
         className="text-[13px] font-medium text-blue-600 hover:underline"

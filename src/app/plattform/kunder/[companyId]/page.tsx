@@ -106,7 +106,7 @@ export default async function CompanyPage({
     : null;
 
   return (
-    <PlatformShell email={email} current="/plattform/kunder">
+    <PlatformShell email={email}>
       <Link
         href="/plattform/kunder"
         className="text-[13px] font-medium text-blue-600 hover:underline"

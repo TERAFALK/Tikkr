@@ -26,7 +26,7 @@ export default async function BroadcastPage() {
   ]);
 
   return (
-    <PlatformShell email={email} current="/plattform/utskick">
+    <PlatformShell email={email}>
       <PageHeader
         title="Utskick"
         description="Mejl till kundernas administratörer."

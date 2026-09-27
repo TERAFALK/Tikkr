@@ -66,7 +66,7 @@ export default async function CompaniesPage({
   const kr = (value: number) => `${value.toLocaleString("sv-SE")} kr`;
 
   return (
-    <PlatformShell email={email} current="/plattform/kunder">
+    <PlatformShell email={email}>
       <PageHeader title="Kunder" />
 
       {companies.length === 0 ? (

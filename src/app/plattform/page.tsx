@@ -72,7 +72,7 @@ export default async function PlatformPage() {
   const kr = (value: number) => `${value.toLocaleString("sv-SE")} kr`;
 
   return (
-    <PlatformShell email={email} current="/plattform">
+    <PlatformShell email={email}>
       <PageHeader
         title="Översikt"
         description={`${companies.length} företag på installationen, varav ${usedLast30} har registrerat tid senaste 30 dagarna.`}

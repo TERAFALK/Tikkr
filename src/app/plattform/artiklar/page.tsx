@@ -65,7 +65,7 @@ export default async function PricesPage() {
   });
 
   return (
-    <PlatformShell email={email} current="/plattform/artiklar">
+    <PlatformShell email={email}>
       <PageHeader title="Artiklar" />
 
       {!keyPresent && (
