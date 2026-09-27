@@ -1,15 +1,21 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireAdmin } from "@/lib/admin-session";
-import { customerMoney, customerStats, getCustomer } from "@/lib/customers";
+import {
+  customerMoney,
+  customerOptions,
+  customerStats,
+  getCustomer,
+} from "@/lib/customers";
+import { orderRows } from "@/lib/orders";
 import { companyTimeZone } from "@/lib/company";
 import { unsafeGlobalPrisma } from "@/lib/db";
 import { formatDuration } from "@/lib/format";
 import { formatCurrency, formatMarkup } from "@/lib/money";
 import MarginChart from "@/components/admin/MarginChart";
 import CustomerDialog from "@/components/admin/CustomerDialog";
+import OrdersTable from "@/components/admin/OrdersTable";
 import {
-  Badge,
   ButtonLink,
   Card,
   CardHeader,
@@ -22,6 +28,7 @@ import {
   Tr,
 } from "@/components/ui";
 import { updateCustomer } from "../actions";
+import { toggleOrder, updateOrder } from "../../ordrar/actions";
 
 /**
  * KUNDSIDAN.
@@ -57,7 +64,7 @@ export default async function CustomerPage({
   });
   const timeZone = await companyTimeZone(companyId);
 
-  const [stats, money] = await Promise.all([
+  const [stats, money, orders, customerList, moments] = await Promise.all([
     customerStats(db, customerId),
     customerMoney(
       db,
@@ -65,6 +72,14 @@ export default async function CustomerPage({
       company?.markupPercent ?? 100,
       timeZone
     ),
+    orderRows(db, { customerId }),
+    // Ordermenyn kan ändra en orders kund, och då behövs hela registret att
+    // välja ur — inte bara kunden vars sida man står på.
+    customerOptions(db),
+    db.workMoment.findMany({
+      orderBy: [{ active: "desc" }, { name: "asc" }],
+      select: { id: true, name: true, active: true },
+    }),
   ]);
 
   const address = [
@@ -265,52 +280,25 @@ export default async function CustomerPage({
         </div>
 
         <div className="mt-6">
-          {stats.orders.length === 0 ? (
+          {orders.length === 0 ? (
             <EmptyState
               title="Inga ordrar på kunden"
               action={<ButtonLink href="/admin/ordrar">Till ordrar</ButtonLink>}
             />
           ) : (
-            <Card>
-              <CardHeader
-                title="Ordrar"
-              />
-              <Table>
-                <thead>
-                  <tr>
-                    <Th>Order</Th>
-                    <Th>Status</Th>
-                    <Th numeric>Stämplingar</Th>
-                    <Th numeric>Tid (tim:min)</Th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {stats.orders.map((order) => (
-                    <Tr key={order.id} dimmed={order.status !== "OPEN"}>
-                      <Td>
-                        <span className="font-medium">{order.orderNumber}</span>
-                        {order.isQuickJob && (
-                          <span className="ml-2">
-                            <Badge tone="warning">Snabbjobb</Badge>
-                          </span>
-                        )}
-                      </Td>
-                      <Td>
-                        {order.status === "OPEN" ? (
-                          <Badge tone="active">Öppen</Badge>
-                        ) : (
-                          <Badge tone="muted">Avslutad</Badge>
-                        )}
-                      </Td>
-                      <Td numeric muted>
-                        {order.entries}
-                      </Td>
-                      <Td numeric>{formatDuration(order.minutes)}</Td>
-                    </Tr>
-                  ))}
-                </tbody>
-              </Table>
-            </Card>
+            /* Samma tabell som under Ordrar, med kundkolumnen borttagen.
+               Ordernumret öppnar samma meny, och markeringsläget exporterar
+               flera på en gång — annars vore kundens sida en lista man ändå
+               måste lämna för att göra något åt det man ser. */
+            <OrdersTable
+              orders={orders}
+              customers={customerList}
+              moments={moments}
+              updateAction={updateOrder}
+              toggleAction={toggleOrder}
+              title="Ordrar"
+              hideCustomer
+            />
           )}
         </div>
       </div>

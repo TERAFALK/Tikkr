@@ -9,6 +9,18 @@ import { readBudgetRows, saveOrderBudgets } from "@/lib/order-budget";
 
 const PATH = "/admin/ordrar";
 
+/**
+ * Ordrarna ritas på två ställen: under Ordrar och på kundens sida. Båda måste
+ * ritas om, annars visar kundsidan ett ordernummer som just ändrats.
+ *
+ * Kundsidan tas om hand som "layout", vilket täcker varje kund utan att vi
+ * behöver veta vilken order som flyttats — och en ändrad kund berör ju två.
+ */
+function revalidateOrders() {
+  revalidatePath(PATH);
+  revalidatePath("/admin/kunder", "layout");
+}
+
 export interface OrderFormState {
   error?: string;
   /** Sattes senast sparandet gick igenom. Stänger rutan i gränssnittet. */
@@ -99,7 +111,7 @@ export async function createOrder(
   // id först när den finns. Se src/lib/order-budget.ts.
   await saveOrderBudgets(db, companyId, order.id, readBudgetRows(formData));
 
-  revalidatePath(PATH);
+  revalidateOrders();
   return { savedAt: Date.now() };
 }
 
@@ -143,7 +155,7 @@ export async function updateOrder(
   // saveOrderBudgets hittar den av samma skäl inte heller.
   await saveOrderBudgets(db, companyId, id, readBudgetRows(formData));
 
-  revalidatePath(PATH);
+  revalidateOrders();
   return { savedAt: Date.now() };
 }
 
@@ -195,7 +207,7 @@ export async function toggleOrder(
     // kunna peka på en annan kunds order. Företagsfiltret ger då noll rader
     // i stället för en ändring.
     await db.order.updateMany({ where: { id }, data: { status: "OPEN" } });
-    revalidatePath(PATH);
+    revalidateOrders();
     return { savedAt: Date.now() };
   }
 
@@ -227,6 +239,6 @@ export async function toggleOrder(
     throw error;
   }
 
-  revalidatePath(PATH);
+  revalidateOrders();
   return { savedAt: Date.now() };
 }

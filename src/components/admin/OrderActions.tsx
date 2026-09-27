@@ -17,7 +17,7 @@ import { formatDuration, minutesBetween } from "@/lib/format";
 import BudgetBar from "./BudgetBar";
 import type { BudgetMomentOption } from "./BudgetMoments";
 import OrderFields from "./OrderFields";
-import type { OrderBudgetRow } from "./OrdersTable";
+import type { OrderBudgetRow } from "@/lib/orders";
 import type { SearchSelectOption } from "./SearchSelect";
 import { IconOrder, IconReport } from "@/components/ui/icons";
 

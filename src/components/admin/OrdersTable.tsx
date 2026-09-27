@@ -8,6 +8,7 @@ import type {
 import OrderActions from "./OrderActions";
 import type { SearchSelectOption } from "./SearchSelect";
 import type { BudgetMomentOption } from "./BudgetMoments";
+import type { OrderRow } from "@/lib/orders";
 import BudgetBar from "./BudgetBar";
 import {
   Badge,
@@ -32,49 +33,25 @@ import { formatDuration } from "@/lib/format";
  * den man vill titta på: "hur lång tid tog ett liknande jobb förra gången".
  */
 
-/** Beräknad tid för ett arbetsmoment, med utfallet bredvid. */
-export interface OrderBudgetRow {
-  momentId: string;
-  momentName: string;
-  /** Beräknad tid i minuter. */
-  minutes: number;
-  /** Upparbetad tid på just det här momentet, i minuter. */
-  usedMinutes: number;
-}
-
-export interface OrderRow {
-  id: string;
-  orderNumber: string;
-  customerId: string | null;
-  customerName: string | null;
-  status: string;
-  entries: number;
-  minutes: number;
-  /**
-   * Orderns beräknade tid i minuter: summan av raderna nedan, eller null när
-   * ingen beräkning gjorts. Lagras inte — se src/lib/order-budget.ts.
-   */
-  budgetMinutes: number | null;
-  /** Beräkningen uppdelad per arbetsmoment. Tom när ingen gjorts. */
-  budgets: OrderBudgetRow[];
-  /** Orderns eget påslag i procent, eller null för företagets standard. */
-  markupPercent: number | null;
-  /** Avtalat fast pris i ören, eller null för löpande räkning. */
-  fixedPriceOre: number | null;
-  /** Skapad från en stämplingsskärm och ännu inte kompletterad av admin. */
-  isQuickJob: boolean;
-}
-
 export default function OrdersTable({
   orders,
   updateAction,
   toggleAction,
   customers,
   moments,
+  title,
+  hideCustomer = false,
 }: {
   orders: OrderRow[];
   /** Kunderna som går att välja i ändra-rutan. */
   customers: SearchSelectOption[];
+  /** Rubrik över tabellen. Utelämnad ger antalet ordrar. */
+  title?: string;
+  /**
+   * Döljer kundkolumnen. Sätts på en kunds egen sida, där varje rad har samma
+   * kund och kolumnen bara upprepar sidans rubrik.
+   */
+  hideCustomer?: boolean;
   /** Arbetsmomenten som går att beräkna tid på. */
   moments: BudgetMomentOption[];
   updateAction: (
@@ -115,7 +92,10 @@ export default function OrdersTable({
   return (
     <Card>
       <CardHeader
-        title={`${orders.length} ${orders.length === 1 ? "order" : "ordrar"}`}
+        title={
+          title ??
+          `${orders.length} ${orders.length === 1 ? "order" : "ordrar"}`
+        }
         description={
           selecting
             ? "En order per sida i PDF, en flik per order i Excel."
@@ -180,7 +160,7 @@ export default function OrdersTable({
               </Th>
             )}
             <Th>Order</Th>
-            <Th>Kund</Th>
+            {!hideCustomer && <Th>Kund</Th>}
             <Th>Status</Th>
             <Th numeric>Stämplingar</Th>
             <Th numeric>Upparbetad tid (tim:min)</Th>
@@ -217,16 +197,17 @@ export default function OrdersTable({
                       toggleAction={toggleAction}
                     />
                   )}
-                </Td>
-
-                <Td muted>
-                  {order.customerName ?? "—"}
+                  {/* Brickan sitter på ordern och inte på kunden: ett
+                      snabbjobb saknar ofta kund, och kolumnen finns inte alls
+                      på kundens sida. */}
                   {order.isQuickJob && (
                     <span className="ml-2">
                       <Badge tone="warning">Snabbjobb</Badge>
                     </span>
                   )}
                 </Td>
+
+                {!hideCustomer && <Td muted>{order.customerName ?? "—"}</Td>}
                 <Td>
                   {isOpen ? (
                     <Badge tone="active">Öppen</Badge>
