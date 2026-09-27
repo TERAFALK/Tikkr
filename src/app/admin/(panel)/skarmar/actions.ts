@@ -110,3 +110,61 @@ export async function deleteDevice(formData: FormData) {
   await db.kioskDevice.deleteMany({ where: { id } });
   revalidatePath(PATH);
 }
+
+/**
+ * Ställer ljusstyrkan på en skärm.
+ *
+ * Bara meningsfullt på skärmar som kör i kioskappen — panelen visar därför
+ * fältet bara för dem. Kontrolleras ändå här: en serveråtgärd är en publik
+ * ingång och får inte lita på att gränssnittet höll emot.
+ *
+ * Skärmen plockar upp värdet vid nästa pollning, alltså inom några sekunder.
+ */
+export async function setBrightness(formData: FormData) {
+  const session = await requireAdmin();
+  await assertWritable(session);
+  const { db } = session;
+
+  const id = String(formData.get("id") ?? "");
+  if (!id) return;
+
+  const raw = Number(formData.get("brightness"));
+  if (!Number.isFinite(raw)) return;
+
+  const brightness = Math.min(100, Math.max(0, Math.round(raw)));
+
+  // Går genom företagsfiltret, och träffar inget om skärmen saknar appen.
+  await db.kioskDevice.updateMany({
+    where: { id, fullyVersion: { not: null } },
+    data: { brightness },
+  });
+
+  revalidatePath(PATH);
+}
+
+/**
+ * Ber en skärm starta om.
+ *
+ * Skriver en tidpunkt, inte ett kommando i en kö. Skärmen jämför med den den
+ * såg sist och startar om när värdet ändrats medan den varit igång — ett
+ * önskemål som redan låg där när sidan laddades verkställs aldrig, annars hade
+ * varje omstart lett till nästa.
+ *
+ * Är skärmen nere händer ingenting förrän den kommer tillbaka, och då är
+ * omstarten överflödig. Det är rätt beteende: den har just startat.
+ */
+export async function requestRestart(formData: FormData) {
+  const session = await requireAdmin();
+  await assertWritable(session);
+  const { db } = session;
+
+  const id = String(formData.get("id") ?? "");
+  if (!id) return;
+
+  await db.kioskDevice.updateMany({
+    where: { id, fullyVersion: { not: null } },
+    data: { restartRequestedAt: new Date() },
+  });
+
+  revalidatePath(PATH);
+}

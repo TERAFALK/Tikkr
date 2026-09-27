@@ -3,6 +3,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { enqueue, flush, pending, type QueuedPunch } from "@/lib/offline-queue";
+import {
+  applyBrightness,
+  hasFully,
+  readDeviceInfo,
+  restartApp,
+} from "@/lib/fully";
 import CompanyBadge from "@/components/ui/CompanyBadge";
 import { LogoMark } from "@/components/ui/Logo";
 import NoticeBanner from "@/components/ui/NoticeBanner";
@@ -504,6 +510,67 @@ export default function KioskScreen({
     };
   }, [drain]);
 
+  /* ---------------------------------------------------------------------- */
+  /* Skärmen som enhet — bara på skärmar vi sålt                             */
+  /* ---------------------------------------------------------------------- */
+
+  /**
+   * Senast tillämpade ljusstyrka, och senast SEDDA omstartsönskemål.
+   *
+   * `undefined` betyder "har inte sett något än". Skillnaden mot `null` är
+   * avgörande för omstarten: ett önskemål som redan låg där när sidan laddades
+   * får ALDRIG verkställas, för då hade varje omstart lett till nästa. Bara en
+   * ändring som sker medan skärmen är igång räknas.
+   *
+   * Tillämpas från syncActive, som hoppar över hämtningen så länge det ligger
+   * tryck kvar i kön. En skärm med osynkad arbetstid startar därför aldrig om
+   * mitt i — kön överlever visserligen en omstart, men den ska inte behöva
+   * bevisa det för att en administratör råkade trycka.
+   */
+  const brightnessRef = useRef<number | null | undefined>(undefined);
+  const restartRef = useRef<string | null | undefined>(undefined);
+
+  const applyDeviceSettings = useCallback(
+    (device?: { brightness: number | null; restartRequestedAt: string | null }) => {
+      if (!device || !hasFully()) return;
+
+      if (device.brightness !== null && device.brightness !== brightnessRef.current) {
+        applyBrightness(device.brightness);
+      }
+      brightnessRef.current = device.brightness;
+
+      const seen = restartRef.current;
+      restartRef.current = device.restartRequestedAt;
+
+      // Första svaret sätter bara utgångsläget. Se kommentaren ovan.
+      if (seen !== undefined && device.restartRequestedAt !== seen) {
+        restartApp();
+      }
+    },
+    []
+  );
+
+  /**
+   * Berättar för servern vad skärmen är.
+   *
+   * Bara skärmar som kör i kioskappen har något att säga. En kunds egen dator
+   * hör aldrig av sig, och syns därför i adminpanelen utan fjärrkontroller —
+   * vilket är hela skillnaden mellan de två sorternas skärm.
+   */
+  useEffect(() => {
+    const info = readDeviceInfo();
+    if (!info) return;
+
+    void fetch("/api/kiosk/device", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(info),
+    }).catch(() => {
+      // Nätet är nere. Rapporten är inte värd en omsändning — nästa laddning
+      // gör om den, och ingen arbetstid hänger på den.
+    });
+  }, []);
+
   /**
    * Hämtar vem som är instämplad, från servern.
    *
@@ -526,16 +593,21 @@ export default function KioskScreen({
       const data = (await response.json()) as {
         active: Record<string, ActiveJob[]>;
         breaks?: Record<string, KioskBreak>;
+        device?: {
+          brightness: number | null;
+          restartRequestedAt: string | null;
+        };
       };
 
       setActive(data.active);
       setBreaks(data.breaks ?? {});
       setLastSyncedAt(new Date());
+      applyDeviceSettings(data.device);
     } catch {
       // Nätet är nere. Skärmen fortsätter visa det den vet, och kön tar hand
       // om det som trycks under tiden.
     }
-  }, []);
+  }, [applyDeviceSettings]);
 
   // Hämtar med jämna mellanrum, och direkt när skärmen väcks eller nätet
   // kommer tillbaka. Fem sekunder är kort nog för att kännas samtidigt och

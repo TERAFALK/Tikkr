@@ -892,8 +892,34 @@ model KioskDevice {
   pairingExpiresAt DateTime? @map("pairing_expires_at")
 
   lastSeenAt DateTime? @map("last_seen_at")
-  createdAt  DateTime  @default(now()) @map("created_at")
-  updatedAt  DateTime  @updatedAt @map("updated_at")
+
+  /// SKILJER EN TIKKR-SKÄRM FRÅN EN VANLIG DATOR.
+  ///
+  /// Fylls i av skärmen själv när den kör i en kioskapp som går att fjärrstyra
+  /// (Fully Kiosk, som ProDVX säljer under namnet ProMGR). Null betyder en
+  /// kunds egen dator eller surfplatta — och då visas inga fjärrkontroller i
+  /// adminpanelen alls.
+  ///
+  /// Avsiktligt en FÖRMÅGA och inte en bock någon kryssar i. En bock kan vara
+  /// fel, och då visas knappar som inte gör något. Det här fältet är sant så
+  /// länge det är ifyllt.
+  fullyVersion   String? @map("fully_version")
+  webviewVersion String? @map("webview_version")
+
+  /// Ljusstyrka i procent, satt av admin. Null betyder att skärmen behåller
+  /// den den har. Lagras 0–100 och räknas om till appens skala i fully.ts.
+  brightness Int?
+
+  /// När admin senast bad skärmen starta om.
+  ///
+  /// Ett ÖNSKEMÅL och ingen kö: skärmen jämför med värdet den såg sist och
+  /// startar om när det ändrats medan den varit igång. Ett värde som redan var
+  /// satt när sidan laddades verkställs aldrig — annars hade varje omstart
+  /// lett till nästa, i all oändlighet.
+  restartRequestedAt DateTime? @map("restart_requested_at")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
   company     Company     @relation(fields: [companyId], references: [id], onDelete: Cascade)
   timeEntries TimeEntry[]

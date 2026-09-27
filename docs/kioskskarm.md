@@ -280,10 +280,35 @@ Adminpanelen listar företagets skärmar med namn och senaste kontakt
 väntande tryck i kön och när den senast nådde servern. Det täcker det vanliga
 supportsamtalet utan någon extra tjänst.
 
-### Resten via JavaScript-bryggan
+### Resten via JavaScript-bryggan — byggt
 
-Fully exponerar ett `fully`-objekt till den laddade sidan. Kiosksidan kan alltså
-styra enheten själv:
+`src/lib/fully.ts` är den enda filen som vet att Fully finns. Saknas objektet
+svarar den null på allt, och stämpling, offline-kö och device-token fungerar
+precis som på en kunds egen dator. Bevisas av `tests/fully.test.ts`.
+
+Så här hänger det ihop:
+
+1. Skärmen rapporterar app- och WebView-version till `POST /api/kiosk/device`
+   vid laddning. Bara skärmar med appen hör av sig.
+2. `kiosk_devices.fully_version` är därmed ifylld på en Tikkr-skärm och null på
+   en vanlig dator. **Det är så de skiljs åt** — en förmåga skärmen intygar,
+   inte en bock någon kryssat i och glömt.
+3. Adminpanelen visar ljusstyrka och **Starta om** bara för skärmar med
+   `fully_version` satt. Övriga får en tom cell, ingen gråad knapp.
+4. `GET /api/kiosk/state` bär tillbaka ljusstyrkan och omstartsönskemålet.
+   Rutten pollas ändå var femte sekund, så en ändring i panelen syns på väggen
+   nästan direkt.
+
+Omstarten är ett **önskemål med tidsstämpel, inte en kö**: skärmen jämför med
+värdet den såg sist och startar om när det ändrats medan den varit igång. Ett
+önskemål som redan låg där när sidan laddades verkställs aldrig — annars hade
+varje omstart lett till nästa.
+
+Ljusstyrkan lagras 0–100 och räknas om till appens skala i `fully.ts`.
+⟨verifiera⟩ att skalan är 0–255 och att `WRITE_SETTINGS` beviljas av device
+owner. Blir det fel är det en rad som ändras.
+
+Funktionerna som används:
 
 | Funktion | Vad |
 |---|---|
@@ -330,7 +355,8 @@ ingen extra container, inget abonnement.
 - [ ] `scripts/provision-kiosk.ps1` när ADB-flödet är bekräftat på en enhet
 - [ ] Rutt som genererar `fully-settings.json` per skärm, med rätt Start URL och
       raderingsinställningarna avstängda
-- [ ] Fjärrstyrning i kiosken bakom `fully`-detektering, med värdbegränsning
+- [x] Fjärrstyrning bakom `fully`-detektering — ljusstyrka och omstart från
+      adminpanelen. Otestat på hårdvara
 - [ ] `pilot.tikkr.se` uppsatt och pilotkunden flyttad dit — före lansering
 - [ ] Skriv om [kiosk-lage.md](kiosk-lage.md) punkt 2 när hårdvaran är vald. Den
       rekommenderar idag Chrome plus skärmfästning, vilket är svagare än device

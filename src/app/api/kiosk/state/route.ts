@@ -40,6 +40,16 @@ export async function GET() {
 
   const db = forCompany(session.companyId);
 
+  // Skärmens egna inställningar åker med på samma svar.
+  //
+  // Rutten ska förbli liten, och två skalärer är den billigaste vägen till
+  // att en ändring i adminpanelen syns på väggen inom fem sekunder. Ett eget
+  // pollningsanrop hade kostat dubbelt för samma sak.
+  const device = await db.kioskDevice.findFirst({
+    where: { id: session.deviceId },
+    select: { brightness: true, restartRequestedAt: true },
+  });
+
   // Rasterna hämtas samtidigt. En person på lunch har inga öppna stämplingar
   // och skulle annars se ledig ut på de andra skärmarna — och någon skulle
   // stämpla in dem på ett jobb de inte står vid.
@@ -116,7 +126,14 @@ export async function GET() {
   }
 
   return NextResponse.json(
-    { active, breaks },
+    {
+      active,
+      breaks,
+      device: {
+        brightness: device?.brightness ?? null,
+        restartRequestedAt: device?.restartRequestedAt?.toISOString() ?? null,
+      },
+    },
     // Får aldrig mellanlagras. En cachad bild av vem som arbetar är exakt det
     // problem som funktionen finns för att lösa.
     { headers: { "cache-control": "no-store" } }
