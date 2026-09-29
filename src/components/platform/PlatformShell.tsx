@@ -40,7 +40,8 @@ import { platformLogout } from "@/app/plattform/login/actions";
  *   /plattform/handelser    Vad har gjorts härifrån?
  *
  * Grupperna speglar vem man är när man klickar: kundarbete respektive drift av
- * tjänsten själv.
+ * tjänsten själv. Samma ord som kundpanelen använder — "Dagligen" är det man
+ * öppnar varje morgon.
  */
 
 interface NavLink {
@@ -53,7 +54,7 @@ interface NavLink {
 
 const SECTIONS: { label: string; links: NavLink[] }[] = [
   {
-    label: "Kunder",
+    label: "Dagligen",
     links: [
       {
         href: "/plattform",
@@ -61,7 +62,7 @@ const SECTIONS: { label: string; links: NavLink[] }[] = [
         icon: IconOverview,
         exact: true,
       },
-      { href: "/plattform/kunder", label: "Företag", icon: IconBuilding },
+      { href: "/plattform/kunder", label: "Kunder", icon: IconBuilding },
       {
         href: "/plattform/meddelanden",
         label: "Meddelanden",

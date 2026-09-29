@@ -16,9 +16,11 @@ import {
   Stat,
   Table,
   Td,
+  Textarea,
   Th,
   Tr,
 } from "@/components/ui";
+import SaveForm from "@/components/admin/SaveForm";
 import {
   formatDate,
   formatDateTime,
@@ -46,15 +48,13 @@ export const dynamic = "force-dynamic";
 /**
  * ETT KUNDFÖRETAG.
  *
- * Sidan var tidigare sju kort i rad, alla lika viktiga för ögat, och man fick
- * läsa den uppifrån och ned för att hitta något. Nu är den fem delar med
- * varsin rubrik, i den ordning ett supportsamtal rör sig:
+ * Sidan är en journal man LÄSER, med knappar för det som går att ändra. Den
+ * var tidigare fem formulär utfällda ovanpå varandra, och man skrollade förbi
+ * dem för att hitta vad som faktiskt stod. Ett formulär som alltid syns läses
+ * som något man förväntas fylla i.
  *
- *   Nyckeltal   hur ser det ut?
- *   Avtal       vad betalar de för?
- *   Åtkomst     vilka kan logga in, vilka skärmar finns?
- *   Spår        vad har hänt, och vem har varit inne?
- *   Farlig zon  raderingen, avskild och sist.
+ * Fem delar, i den ordning ett supportsamtal rör sig: nyckeltal, avtal,
+ * åtkomst, spår, och sist raderingen.
  *
  * Gränsen för vad som visas står i getCompanyDetail: driftuppgifter är
  * åtkomliga, verksamhetsinnehåll är det inte.
@@ -159,15 +159,34 @@ export default async function CompanyPage({
         <Section title="Avtal">
           <div className="grid gap-4 lg:grid-cols-2">
             <Card>
-              <CardHeader title="Prenumeration" />
-              <div className="space-y-4 p-5">
+              <CardHeader
+                title="Prenumeration"
+                action={
+                  managedByStripe ? undefined : (
+                    <SubscriptionOverrideForm
+                      companyId={company.id}
+                      currentStatus={company.subscriptionStatus}
+                    />
+                  )
+                }
+              />
+              <div className="px-5 py-2">
                 <Facts>
                   <Fact label="Status">
                     <SubscriptionBadge status={company.subscriptionStatus} />
                   </Fact>
                   <Fact label="Licenser">
-                    {company.screenLicenses}{" "}
-                    {company.screenLicenses === 1 ? "skärm" : "skärmar"}
+                    <span className="flex items-center justify-end gap-2">
+                      {company.screenLicenses}{" "}
+                      {company.screenLicenses === 1 ? "skärm" : "skärmar"}
+                      {!managedByStripe && (
+                        <ManualLicenseForm
+                          companyId={company.id}
+                          current={company.screenLicenses}
+                          used={devices.length}
+                        />
+                      )}
+                    </span>
                   </Fact>
                   <Fact label="Betalningsintervall">
                     {company.subscriptionInterval === "year"
@@ -182,43 +201,25 @@ export default async function CompanyPage({
                       : "—"}
                   </Fact>
                 </Facts>
+              </div>
 
-                {/* EN förklaring, inte en per formulär. Status, licenser och
-                    tillval styrs alla av samma sak, och tre rutor som sa samma
-                    mening lästes som tre olika besked. */}
-                {managedByStripe ? (
+              {/* EN förklaring, inte en per knapp. Status, licenser och tillval
+                  styrs alla av samma sak. */}
+              {managedByStripe && (
+                <div className="border-t border-neutral-100 p-5">
                   <Alert tone="info">
                     Prenumerationen hanteras av Stripe. Status, licenser,
                     intervall och tillval ändras där och uppdateras här
                     automatiskt.
                   </Alert>
-                ) : (
-                  <>
-                    <SubscriptionOverrideForm
-                      companyId={company.id}
-                      currentStatus={company.subscriptionStatus}
-                      managedByStripe={false}
-                    />
-
-                    <div className="border-t border-neutral-100 pt-4">
-                      <ManualLicenseForm
-                        companyId={company.id}
-                        current={company.screenLicenses}
-                        used={devices.length}
-                        managedByStripe={false}
-                      />
-                    </div>
-                  </>
-                )}
-              </div>
+                </div>
+              )}
             </Card>
 
             <div className="space-y-4">
               <Card>
                 <CardHeader title="Tillval" />
                 <div className="p-5">
-                  {/* Listan visas även för Stripe-kunder. Vad de köpt står
-                      ingen annanstans i panelen. */}
                   <ModuleForm
                     companyId={company.id}
                     modules={modules}
@@ -232,14 +233,13 @@ export default async function CompanyPage({
                   title="Anteckning"
                   description="Visas inte för kunden."
                 />
-                <form action={updateNote} className="space-y-3 p-5">
+                <SaveForm action={updateNote} className="space-y-3 p-5">
                   <input type="hidden" name="companyId" value={company.id} />
-                  <textarea
+                  <Textarea
                     name="body"
                     rows={5}
                     defaultValue={note?.body ?? ""}
                     placeholder="Kontaktperson, avtal, supportärenden"
-                    className="block w-full rounded-md border-0 bg-white px-2.5 py-1.5 text-[13px] text-neutral-900 ring-1 ring-inset ring-neutral-200 placeholder:text-neutral-400 focus:ring-2 focus:ring-inset focus:ring-blue-600"
                   />
                   {note && (
                     <p className="text-xs text-neutral-400">
@@ -247,10 +247,7 @@ export default async function CompanyPage({
                       {note.updatedByEmail}
                     </p>
                   )}
-                  <Button type="submit" tone="secondary">
-                    Spara anteckning
-                  </Button>
-                </form>
+                </SaveForm>
               </Card>
             </div>
           </div>
@@ -259,10 +256,7 @@ export default async function CompanyPage({
         <Section title="Åtkomst">
           <div className="grid gap-4 lg:grid-cols-2">
             <Card>
-              <CardHeader
-                title="Administratörer"
-                description="Konton med åtkomst till arbetsytan."
-              />
+              <CardHeader title="Administratörer" />
               <Table>
                 <thead>
                   <tr>
@@ -277,7 +271,7 @@ export default async function CompanyPage({
                       <Td>
                         <a
                           href={`mailto:${admin.email}`}
-                          className="font-medium text-blue-600"
+                          className="font-medium text-blue-600 hover:underline"
                         >
                           {admin.email}
                         </a>
@@ -293,10 +287,7 @@ export default async function CompanyPage({
             </Card>
 
             <Card>
-              <CardHeader
-                title="Stämplingsskärmar"
-                description="Status och senaste kontakt."
-              />
+              <CardHeader title="Stämplingsskärmar" />
               {devices.length === 0 ? (
                 <p className="p-5 text-[13px] text-neutral-500">
                   Ingen skärm upplagd. Kunden kan inte stämpla än.
@@ -350,10 +341,7 @@ export default async function CompanyPage({
         >
           <div className="grid gap-4 lg:grid-cols-2">
             <Card>
-              <CardHeader
-                title="Senaste åtgärderna"
-                description="Utförda från plattformspanelen."
-              />
+              <CardHeader title="Senaste åtgärderna" />
               {history.length === 0 ? (
                 <p className="p-5 text-[13px] text-neutral-500">
                   Ingenting har ändrats för det här företaget.

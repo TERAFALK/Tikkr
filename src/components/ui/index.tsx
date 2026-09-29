@@ -271,6 +271,23 @@ export function Input({ className = "", ...props }: ComponentProps<"input">) {
   return <input {...props} className={`${fieldStyles} ${className}`} />;
 }
 
+/**
+ * Flerradigt fält.
+ *
+ * Fanns inte, så varje ställe som behövde ett skrev ut fältklasserna för hand
+ * — anteckningen om en kund, driftmeddelandets text, utskickets brödtext. Tre
+ * kopior som börjar som "nästan lika".
+ */
+export function Textarea({
+  className = "",
+  rows = 4,
+  ...props
+}: ComponentProps<"textarea">) {
+  return (
+    <textarea {...props} rows={rows} className={`${fieldStyles} ${className}`} />
+  );
+}
+
 export function Select({ className = "", ...props }: ComponentProps<"select">) {
   return <select {...props} className={`${fieldStyles} ${className}`} />;
 }

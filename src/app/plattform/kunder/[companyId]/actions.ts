@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { saved, type SaveState } from "@/lib/save-state";
 import { redirect } from "next/navigation";
 import { unsafeGlobalPrisma } from "@/lib/db";
 import {
@@ -160,11 +161,21 @@ export async function changeModule(
   };
 }
 
-export async function updateNote(formData: FormData) {
+/**
+ * Svarar med SaveState och inte void, så att SaveForm kan säga "Sparat".
+ *
+ * En anteckning som sparats ser annars likadan ut som en som inte gjorde det:
+ * sidan står kvar som den var. Samma resonemang som i kundpanelens
+ * inställningar, se src/components/admin/SaveForm.tsx.
+ */
+export async function updateNote(
+  _previous: SaveState,
+  formData: FormData
+): Promise<SaveState> {
   const { email } = await requirePlatformAdmin();
 
   const companyId = String(formData.get("companyId") ?? "");
-  if (!companyId) return;
+  if (!companyId) return { error: "Okänt företag." };
 
   await saveNote({
     actorEmail: email,
@@ -173,6 +184,8 @@ export async function updateNote(formData: FormData) {
   });
 
   revalidatePath(`/plattform/kunder/${companyId}`);
+
+  return saved();
 }
 
 export interface DeleteCompanyState {

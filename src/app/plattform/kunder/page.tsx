@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { listCompanies, requirePlatformAdmin } from "@/lib/platform-admin";
 import {
+  Button,
+  ButtonLink,
   Card,
   CardHeader,
   EmptyState,
@@ -70,32 +72,37 @@ export default async function CompaniesPage({
       <PageHeader title="Kunder" />
 
       {companies.length === 0 ? (
-        <EmptyState title="Inga registrerade företag" />
+        <EmptyState title="Inga registrerade kunder" />
       ) : (
         <Card>
           <CardHeader
             title={
               query
                 ? `${matches.length} träffar`
-                : `${companies.length} företag`
+                : `${companies.length} kunder`
             }
             action={
               /* Formulär utan JavaScript. Sökningen hamnar i adressen, så att
                  en träfflista går att spara och skicka vidare. */
               <form className="flex gap-2">
+                {/* Fältet är inte <Input>: den är block w-full och skulle ta
+                    hela kortrubriken. Klasserna är designsystemets, med en
+                    egen bredd. */}
                 <input
                   type="search"
                   name="q"
                   defaultValue={query}
-                  placeholder="Sök företag…"
+                  placeholder="Sök kund…"
                   className="w-44 rounded-md border-0 bg-white px-2.5 py-1.5 text-[13px] text-neutral-900 ring-1 ring-inset ring-neutral-200 placeholder:text-neutral-400 focus:ring-2 focus:ring-inset focus:ring-blue-600"
                 />
-                <button
-                  type="submit"
-                  className="rounded-md bg-neutral-900 px-3 py-1.5 text-[13px] font-medium text-white"
-                >
+                <Button type="submit" tone="secondary">
                   Sök
-                </button>
+                </Button>
+                {query && (
+                  <ButtonLink href="/plattform/kunder" tone="ghost">
+                    Rensa
+                  </ButtonLink>
+                )}
               </form>
             }
           />
@@ -103,7 +110,7 @@ export default async function CompaniesPage({
           <Table>
             <thead>
               <tr>
-                <Th>Företag</Th>
+                <Th>Kund</Th>
                 <Th>Prenumeration</Th>
                 <Th numeric>Licenser</Th>
                 <Th numeric>Per månad</Th>
@@ -158,7 +165,7 @@ export default async function CompaniesPage({
 
           {matches.length === 0 && (
             <p className="px-5 py-6 text-center text-[13px] text-neutral-500">
-              Inget företag matchar ”{query}”.{" "}
+              Ingen kund matchar ”{query}”.{" "}
               <Link href="/plattform/kunder" className="text-blue-600">
                 Visa alla
               </Link>

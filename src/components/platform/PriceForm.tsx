@@ -1,12 +1,8 @@
 "use client";
 
-import { useActionState } from "react";
-import { useFormStatus } from "react-dom";
-import {
-  savePrices,
-  type PriceFormState,
-} from "@/app/plattform/artiklar/actions";
-import { Alert, Button, Field, Input } from "@/components/ui";
+import { savePrices } from "@/app/plattform/artiklar/actions";
+import SaveForm from "@/components/admin/SaveForm";
+import { Field, Input } from "@/components/ui";
 
 /**
  * Artikelnumren för en sak vi säljer.
@@ -14,6 +10,10 @@ import { Alert, Button, Field, Input } from "@/components/ui";
  * Miljövariabelns värde visas som platshållare i ett tomt fält. Det är
  * skillnaden mellan "inget är satt" och "något är satt någon annanstans, och
  * det är detta" — utan den ser sidan ut att ljuga om att ingen artikel finns.
+ *
+ * Fälten ligger kvar på sidan och inte i en ruta. Det här är en sida man
+ * kommer till för att fylla i, till skillnad från kundsidan där man kommer
+ * för att läsa.
  */
 export default function PriceForm({
   item,
@@ -34,16 +34,12 @@ export default function PriceForm({
   envNameYear: string;
   updatedByEmail: string | null;
 }) {
-  const [state, action] = useActionState<PriceFormState, FormData>(
-    savePrices,
-    {}
-  );
-
   return (
-    <form action={action} className="space-y-3">
-      {state.error && <Alert>{state.error}</Alert>}
-      {state.ok && <Alert tone="info">{state.ok}</Alert>}
-
+    <SaveForm
+      action={savePrices}
+      className="space-y-4"
+      pendingLabel="Kontrollerar…"
+    >
       <input type="hidden" name="item" value={item} />
 
       <div className="grid gap-4 sm:grid-cols-2">
@@ -66,16 +62,12 @@ export default function PriceForm({
         </Field>
       </div>
 
-      <div className="flex flex-wrap items-center gap-3">
-        <SubmitButton />
-
-        {updatedByEmail && (
-          <span className="text-xs text-neutral-400">
-            Senast ändrat av {updatedByEmail}
-          </span>
-        )}
-      </div>
-    </form>
+      {updatedByEmail && (
+        <p className="text-xs text-neutral-400">
+          Senast ändrat av {updatedByEmail}
+        </p>
+      )}
+    </SaveForm>
   );
 }
 
@@ -83,14 +75,4 @@ export default function PriceForm({
 function envHint(value: string | null, name: string): string | undefined {
   if (!value) return undefined;
   return `Ligger i ${name}`;
-}
-
-function SubmitButton() {
-  const { pending } = useFormStatus();
-
-  return (
-    <Button type="submit" tone="secondary" disabled={pending}>
-      {pending ? "Kontrollerar…" : "Spara"}
-    </Button>
-  );
 }

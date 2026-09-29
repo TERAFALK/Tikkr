@@ -6,7 +6,14 @@ import {
   addNotice,
   type NoticeFormState,
 } from "@/app/plattform/meddelanden/actions";
-import { Alert, Button, Field, Input, Select } from "@/components/ui";
+import {
+  Alert,
+  Button,
+  Field,
+  Input,
+  Select,
+  Textarea,
+} from "@/components/ui";
 
 /**
  * Lägger in ett driftmeddelande.
@@ -81,12 +88,11 @@ export default function NoticeForm() {
       </div>
 
       <Field label="Meddelande">
-        <textarea
+        <Textarea
           name="body"
           rows={3}
           required
           placeholder="Tjänsten är otillgänglig mellan 02:00 och 04:00. Stämplingsskärmarna påverkas inte."
-          className="block w-full rounded-md border-0 bg-white px-2.5 py-1.5 text-[13px] text-neutral-900 ring-1 ring-inset ring-neutral-200 placeholder:text-neutral-400 focus:ring-2 focus:ring-inset focus:ring-blue-600"
         />
       </Field>
 

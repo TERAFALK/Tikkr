@@ -1,43 +1,38 @@
 "use client";
 
-import { useActionState } from "react";
 import {
   changeSubscription,
   type SubscriptionFormState,
 } from "@/app/plattform/kunder/[companyId]/actions";
-import { Alert, Button, Field, Input, Select } from "@/components/ui";
+import ActionDialog from "@/components/ui/ActionDialog";
+import { Field, Input, Select } from "@/components/ui";
 
 /**
- * Manuell ändring av prenumerationsstatus i plattformspanelen.
+ * Manuell ändring av prenumerationsstatus.
  *
  * Avsedd för företag som betalar mot faktura eller har en förlängd
- * provperiod. Företag med en prenumeration hos Stripe styrs därifrån.
+ * provperiod. Företag med en prenumeration hos Stripe styrs därifrån, och då
+ * ritas knappen inte alls — statusen står ändå på kortet.
+ *
+ * Ligger i en ruta och inte utfällt på sidan. Ett formulär som alltid syns
+ * läses som något man förväntas fylla i, och kundsidan hade fem sådana ovanpå
+ * varandra.
  */
 export default function SubscriptionOverrideForm({
   companyId,
   currentStatus,
-  managedByStripe,
 }: {
   companyId: string;
   currentStatus: string;
-  managedByStripe: boolean;
 }) {
-  const [state, action] = useActionState<SubscriptionFormState, FormData>(
-    changeSubscription,
-    {}
-  );
-
-  // Styrs prenumerationen av Stripe finns ingenting att erbjuda här. Statusen
-  // står redan i tabellen ovanför, och FÖRKLARINGEN står en gång på kortet —
-  // inte en gång per formulär. Tre rutor som sa samma sak lästes som tre
-  // olika besked.
-  if (managedByStripe) return null;
-
   return (
-    <form action={action} className="space-y-3">
-      {state.error && <Alert>{state.error}</Alert>}
-      {state.ok && <Alert tone="info">{state.ok}</Alert>}
-
+    <ActionDialog<SubscriptionFormState>
+      trigger="Ändra status"
+      title="Ändra prenumerationsstatus"
+      action={changeSubscription}
+      initial={{}}
+      submitLabel="Spara"
+    >
       <input type="hidden" name="companyId" value={companyId} />
 
       <Field label="Status">
@@ -49,18 +44,13 @@ export default function SubscriptionOverrideForm({
         </Select>
       </Field>
 
-      <Field
-        label="Anledning"
-        hint="Sparas i loggen"
-      >
+      <Field label="Anledning" hint="Sparas i åtgärdsloggen">
         <Input
           name="reason"
           placeholder="Fakturakund, avtal till och med 2026-12-31"
           required
         />
       </Field>
-
-      <Button type="submit">Spara</Button>
-    </form>
+    </ActionDialog>
   );
 }

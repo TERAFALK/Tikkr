@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { saved, type SaveState } from "@/lib/save-state";
 import {
   recordPlatformAction,
   requirePlatformAdmin,
@@ -13,11 +14,6 @@ import {
 import { isModuleKey } from "@/lib/modules";
 import { forgetPricing, hasStripeKey, stripe } from "@/lib/stripe";
 
-export interface PriceFormState {
-  error?: string;
-  ok?: string;
-}
-
 /**
  * SPARAR ARTIKELNUMREN FÖR EN SAK VI SÄLJER.
  *
@@ -28,9 +24,9 @@ export interface PriceFormState {
  * det går att se att det blev den rätta.
  */
 export async function savePrices(
-  _previous: PriceFormState,
+  _previous: SaveState,
   formData: FormData
-): Promise<PriceFormState> {
+): Promise<SaveState> {
   const { email } = await requirePlatformAdmin();
 
   const raw = String(formData.get("item") ?? "");
@@ -120,7 +116,7 @@ export async function savePrices(
 
   revalidatePath("/plattform/artiklar");
 
-  return {
-    ok: checked.length > 0 ? `Sparat. ${checked.join(", ")}.` : "Sparat.",
-  };
+  // Beloppet står med i beskedet när det gick att läsa. Att se "Månad 399 kr"
+  // är enda sättet att veta att man klistrat in rätt artikel.
+  return saved(checked.length > 0 ? checked.join(", ") : undefined);
 }
