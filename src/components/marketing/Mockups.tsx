@@ -10,30 +10,42 @@
  * 3. De innehåller ingen riktig kunddata. En skärmdump från en testmiljö har
  *    en tråkig vana att innehålla något man inte tänkt på.
  *
- * De använder samma färger och former som produkten, så det som visas är sant
- * även om det inte är en fotografisk avbildning.
+ * De använder samma färger, former och siffror som produkten, så det som visas
+ * är sant även om det inte är en fotografisk avbildning. Ändras produkten ska
+ * bilderna ändras med den — en säljsida som visar en äldre version är en
+ * besvikelse som kommer fram först efter köpet.
+ *
+ * RAMEN HAR INGA FÖNSTERKNAPPAR. Tre färgade prickar i hörnet härmar ett
+ * operativsystem produkten inte körs i: kiosken är en surfplatta på väggen och
+ * panelen en flik bland andra. En etikettrad som säger VAD man tittar på bär
+ * mer information och ljuger inte.
  */
 
-function Frame({
+export function Frame({
   label,
+  meta,
   children,
   className = "",
 }: {
   label: string;
+  /** Höger sida av etikettraden, t.ex. ett filnamn eller en period. */
+  meta?: string;
   children: React.ReactNode;
   className?: string;
 }) {
   return (
     <div
-      className={`overflow-hidden rounded-xl border border-neutral-200 bg-white shadow-[0_20px_50px_-20px_rgba(15,23,42,0.25)] ${className}`}
+      className={`overflow-hidden rounded-lg border border-neutral-200 bg-white shadow-[0_1px_1px_rgba(15,23,42,0.04),0_24px_48px_-28px_rgba(15,23,42,0.35)] ${className}`}
     >
-      <div className="flex items-center gap-2 border-b border-neutral-200 bg-neutral-50 px-3 py-2">
-        <span className="flex gap-1.5" aria-hidden="true">
-          <span className="h-2 w-2 rounded-full bg-neutral-300" />
-          <span className="h-2 w-2 rounded-full bg-neutral-300" />
-          <span className="h-2 w-2 rounded-full bg-neutral-300" />
+      <div className="flex items-center justify-between gap-3 border-b border-neutral-200 bg-neutral-50 px-3 py-2">
+        <span className="truncate text-[10px] font-semibold uppercase tracking-[0.12em] text-neutral-400">
+          {label}
         </span>
-        <span className="text-[11px] text-neutral-400">{label}</span>
+        {meta && (
+          <span className="shrink-0 text-[10px] tabular-nums text-neutral-400">
+            {meta}
+          </span>
+        )}
       </div>
       {children}
     </div>
@@ -64,7 +76,8 @@ function KioskHeader({ children }: { children?: React.ReactNode }) {
  * Personerna som återkommer i bilderna.
  *
  * Samma namn överallt, så att den som skrollar känner igen sig och förstår att
- * bilderna visar samma verkstad från olika håll.
+ * bilderna visar samma verkstad från olika håll. Anna kör två maskiner, vilket
+ * systemet tillåter och som därför ska synas någonstans.
  */
 const NAMES = [
   { name: "Anna Andersson", job: "2601 · Svetsning", elapsed: "2:15" },
@@ -92,25 +105,22 @@ const ORDERS = [
  */
 export function OrderPickMockup({ className = "" }: { className?: string }) {
   return (
-    <Frame label="Stämplingsskärmen · steg 2" className={className}>
+    <Frame label="Stämplingsskärmen" meta="steg 2 av 3" className={className}>
       <KioskHeader>
-        <span className="ml-auto flex items-center gap-2">
-          <span className="hidden items-center gap-1.5 text-[10px] font-medium text-neutral-500 sm:flex">
-            <span className="flex h-4 w-4 items-center justify-center rounded-full bg-blue-600 text-[8px] font-semibold text-white">
-              2
-            </span>
-            Välj order
-          </span>
-          <span className="rounded-md border border-neutral-200 px-2 py-1 text-[10px] font-semibold text-neutral-500">
-            Avbryt
-          </span>
+        <span className="ml-auto rounded-md border border-neutral-200 px-2 py-1 text-[10px] font-semibold text-neutral-500">
+          Avbryt
         </span>
       </KioskHeader>
 
       <div className="bg-neutral-50 p-3">
-        <p className="mb-2 text-[11px] font-semibold text-neutral-900">
-          Anna Andersson: välj order
-        </p>
+        <div className="mb-2 flex items-center justify-between">
+          <p className="text-[11px] font-semibold text-neutral-900">
+            Anna Andersson: välj order
+          </p>
+          <span className="rounded border border-neutral-200 bg-white px-1.5 py-0.5 text-[9px] font-semibold text-neutral-500">
+            Slå in ordernummer
+          </span>
+        </div>
 
         <div className="grid grid-cols-2 gap-2">
           {ORDERS.map((order, index) => (
@@ -195,12 +205,22 @@ export function RunningMockup({ className = "" }: { className?: string }) {
 /* -------------------------------------------------------------------------- */
 
 const ROWS = [
-  { name: "Anna Andersson", order: "2601", customer: "Volvo Lastvagnar", time: "2:15" },
-  { name: "Erik Ek", order: "2601", customer: "Volvo Lastvagnar", time: "5:02" },
-  { name: "Carina Cederlund", order: "2603", customer: "Atlas Copco", time: "48 min" },
+  {
+    name: "Anna Andersson",
+    order: "2601",
+    customer: "Volvo Lastvagnar",
+    time: "2:15",
+  },
+  { name: "Anna Andersson", order: "2604", customer: "Sandvik", time: "1:40" },
+  {
+    name: "Carina Cederlund",
+    order: "2603",
+    customer: "Atlas Copco",
+    time: "48 min",
+  },
 ];
 
-const MENU = ["Översikt", "Rapporter", "Granskning", "Ordrar", "Anställda"];
+const MENU = ["Översikt", "Rapporter", "Tidrapport", "Granskning", "Ordrar"];
 
 function Sidebar({ active = 0 }: { active?: number }) {
   return (
@@ -232,7 +252,7 @@ function Sidebar({ active = 0 }: { active?: number }) {
 
 export function AdminMockup({ className = "" }: { className?: string }) {
   return (
-    <Frame label="Adminpanelen" className={className}>
+    <Frame label="Adminpanelen" meta="översikt" className={className}>
       <div className="flex">
         <Sidebar active={0} />
 
@@ -244,15 +264,20 @@ export function AdminMockup({ className = "" }: { className?: string }) {
           </div>
 
           <div className="overflow-hidden rounded-lg border border-neutral-200 bg-white">
-            <div className="border-b border-neutral-200 bg-neutral-50/70 px-3 py-1.5">
+            <div className="flex items-center justify-between border-b border-neutral-200 bg-neutral-50/70 px-3 py-1.5">
               <span className="text-[10px] font-medium text-neutral-500">
                 Pågående arbete
+              </span>
+              {/* Anna står två gånger. En operatör som kör två maskiner har
+                  två öppna stämplingar, och båda ordrarna ska betala sin. */}
+              <span className="text-[10px] text-neutral-400">
+                3 jobb · 2 personer
               </span>
             </div>
 
             {ROWS.map((row, index) => (
               <div
-                key={row.name}
+                key={`${row.name}-${row.order}`}
                 className="animate-rise flex items-center gap-2 border-b border-neutral-100 px-3 py-2 last:border-0"
                 style={{ animationDelay: `${500 + index * 90}ms` }}
               >
@@ -315,13 +340,13 @@ const REPORT = [
 /** Summeringen per order — svaret på vad som ska faktureras. */
 export function ReportMockup({ className = "" }: { className?: string }) {
   return (
-    <Frame label="Adminpanelen · rapporter" className={className}>
+    <Frame label="Adminpanelen" meta="rapporter" className={className}>
       <div className="flex">
         <Sidebar active={1} />
 
         <div className="min-w-0 flex-1 bg-neutral-50 p-3">
           <div className="mb-2.5 flex flex-wrap gap-1.5">
-            {["1–31 augusti", "Alla ordrar", "Alla anställda"].map((chip) => (
+            {["Förra veckan", "Alla ordrar", "Fakturerbar tid"].map((chip) => (
               <span
                 key={chip}
                 className="rounded-md border border-neutral-200 bg-white px-2 py-1 text-[9px] font-medium text-neutral-600"
@@ -330,7 +355,7 @@ export function ReportMockup({ className = "" }: { className?: string }) {
               </span>
             ))}
             <span className="ml-auto rounded-md bg-neutral-900 px-2 py-1 text-[9px] font-semibold text-white">
-              Exportera
+              PDF
             </span>
           </div>
 
@@ -394,7 +419,7 @@ export function ReportMockup({ className = "" }: { className?: string }) {
  */
 export function ReviewMockup({ className = "" }: { className?: string }) {
   return (
-    <Frame label="Adminpanelen · granskning" className={className}>
+    <Frame label="Adminpanelen" meta="granskning" className={className}>
       <div className="bg-neutral-50 p-3">
         <div className="mb-2.5 flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2">
           <span className="animate-breathe h-1.5 w-1.5 shrink-0 rounded-full bg-amber-500" />
@@ -442,7 +467,7 @@ export function ReviewMockup({ className = "" }: { className?: string }) {
 }
 
 /* -------------------------------------------------------------------------- */
-/* Underlaget                                                                  */
+/* Dokument 1 — underlaget till kundens kund                                   */
 /* -------------------------------------------------------------------------- */
 
 /**
@@ -451,6 +476,10 @@ export function ReviewMockup({ className = "" }: { className?: string }) {
  * Visar avsiktligt en tänkt logotypruta överst — det är den detalj som gör
  * skillnaden mellan "en systemutskrift" och "ett dokument från leverantören",
  * och den är svår att förklara i text.
+ *
+ * INGA BELOPP. Underlaget visar tid, och priset bara när den som tar ut det
+ * kryssar i rutan. Självkostnad och marginal finns inte ens som möjlighet:
+ * dokumentet byggs ur en typ som saknar de fälten.
  */
 export function ExportMockup({ className = "" }: { className?: string }) {
   const rows = [
@@ -461,7 +490,7 @@ export function ExportMockup({ className = "" }: { className?: string }) {
   ];
 
   return (
-    <Frame label="order-2601.pdf" className={className}>
+    <Frame label="Till kunden" meta="order-2601.pdf" className={className}>
       <div className="px-4 py-4">
         <div className="flex h-7 w-20 items-center justify-center rounded border border-dashed border-neutral-300 text-[8px] text-neutral-400">
           er logotyp
@@ -506,6 +535,192 @@ export function ExportMockup({ className = "" }: { className?: string }) {
           </span>
           <span className="text-[10px] font-semibold tabular-nums text-neutral-900">
             22,75 timmar
+          </span>
+        </div>
+      </div>
+    </Frame>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+/* Dokument 2 — efterkalkylen, internt                                         */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Efterkalkylen.
+ *
+ * Det dokument som svarar på om jobbet var värt att ta. Bandet överst är
+ * produktens eget och står på varje sida: det här pappret innehåller
+ * självkostnad och får aldrig förväxlas med det som skickas vidare.
+ *
+ * Satserna står uppdelade i person och maskin, precis som i produkten. Ett
+ * belopp som inte går att bryta ned går inte att försvara för den som
+ * ifrågasätter fakturan.
+ */
+export function CalcMockup({ className = "" }: { className?: string }) {
+  const rows = [
+    ["Svetsning", "12:30", "850", "10 625"],
+    ["Fräsning", "8:00", "900", "7 200"],
+    ["Montering", "4:15", "600", "2 550"],
+  ];
+
+  return (
+    <Frame label="Internt" meta="efterkalkyl-2601.pdf" className={className}>
+      <div className="px-4 py-4">
+        <div className="rounded bg-neutral-900 px-2 py-1.5">
+          <span className="text-[8px] font-semibold uppercase tracking-wider text-white">
+            Internt underlag · innehåller självkostnad
+          </span>
+        </div>
+
+        <p className="mt-3 text-[13px] font-semibold text-neutral-900">
+          Efterkalkyl order 2601
+        </p>
+        <p className="text-[10px] text-neutral-500">Volvo Lastvagnar</p>
+
+        <table className="mt-3 w-full text-[10px]">
+          <thead>
+            <tr className="border-b border-neutral-200 text-neutral-500">
+              <th className="py-1 text-left font-medium">Arbetsmoment</th>
+              <th className="py-1 text-right font-medium">Tid</th>
+              <th className="py-1 text-right font-medium">kr/tim</th>
+              <th className="py-1 text-right font-medium">Kostnad</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((row) => (
+              <tr key={row[0]} className="border-b border-neutral-100">
+                <td className="py-1 text-neutral-700">{row[0]}</td>
+                <td className="py-1 text-right tabular-nums text-neutral-600">
+                  {row[1]}
+                </td>
+                <td className="py-1 text-right tabular-nums text-neutral-600">
+                  {row[2]}
+                </td>
+                <td className="py-1 text-right tabular-nums text-neutral-900">
+                  {row[3]}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+
+        <p className="mt-1 text-[8px] text-neutral-400">
+          person 350 + maskin 500
+        </p>
+
+        <dl className="mt-3 space-y-1 text-[10px]">
+          <Line label="Självkostnad" value="20 375 kr" />
+          <Line label="Påslag 40 %" value="8 150 kr" />
+          <Line label="Rabatt 5 %" value="−1 426 kr" muted />
+        </dl>
+
+        <div className="mt-2 flex items-center justify-between rounded bg-neutral-900 px-2 py-1.5">
+          <span className="text-[10px] font-semibold text-white">PRIS</span>
+          <span className="text-[10px] font-semibold tabular-nums text-white">
+            27 099 kr
+          </span>
+        </div>
+      </div>
+    </Frame>
+  );
+}
+
+function Line({
+  label,
+  value,
+  muted,
+}: {
+  label: string;
+  value: string;
+  muted?: boolean;
+}) {
+  return (
+    <div className="flex items-center justify-between">
+      <dt className={muted ? "text-neutral-500" : "text-neutral-600"}>
+        {label}
+      </dt>
+      <dd className="tabular-nums text-neutral-900">{value}</dd>
+    </div>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+/* Dokument 3 — tidrapporten, tillval                                          */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Tidrapporten per anställd.
+ *
+ * Ett annat dokument med en annan mottagare: det här går till lönen. Samma
+ * timme räknas olika i de två, och det är avsiktligt. Kör Anna två maskiner
+ * fyra timmar är det åtta maskintimmar att fakturera men fyra timmar på
+ * jobbet.
+ */
+export function TimesheetMockup({ className = "" }: { className?: string }) {
+  const days = [
+    ["Må", "8,50", "8,50", "0,00"],
+    ["Ti", "8,50", "9,25", "+0,75"],
+    ["On", "8,50", "8,50", "0,00"],
+    ["To", "8,50", "0,00", "sjuk"],
+    ["Fr", "6,00", "6,00", "0,00"],
+  ];
+
+  return (
+    <Frame label="Till lönen" meta="tillval" className={className}>
+      <div className="px-4 py-4">
+        <div className="flex items-baseline justify-between">
+          <p className="text-[13px] font-semibold text-neutral-900">
+            Johan Andersson
+          </p>
+          <span className="text-[10px] tabular-nums text-neutral-400">
+            v. 16
+          </span>
+        </div>
+
+        <table className="mt-3 w-full text-[10px]">
+          <thead>
+            <tr className="border-b border-neutral-200 text-neutral-500">
+              <th className="py-1 text-left font-medium">Dag</th>
+              <th className="py-1 text-right font-medium">Planerat</th>
+              <th className="py-1 text-right font-medium">Närvaro</th>
+              <th className="py-1 text-right font-medium">Flex</th>
+            </tr>
+          </thead>
+          <tbody>
+            {days.map((day) => (
+              <tr key={day[0]} className="border-b border-neutral-100">
+                <td className="py-1 text-neutral-700">{day[0]}</td>
+                <td className="py-1 text-right tabular-nums text-neutral-600">
+                  {day[1]}
+                </td>
+                <td className="py-1 text-right tabular-nums text-neutral-600">
+                  {day[2]}
+                </td>
+                <td
+                  className={`py-1 text-right tabular-nums ${
+                    day[3] === "sjuk" ? "text-amber-700" : "text-neutral-900"
+                  }`}
+                >
+                  {day[3]}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+
+        <dl className="mt-3 space-y-1 text-[10px]">
+          <Line label="Planerad tid" value="40,00 tim" />
+          <Line label="Närvarotid" value="32,25 tim" />
+          <Line label="Frånvaro, sjuk" value="8,50 tim" muted />
+        </dl>
+
+        <div className="mt-2 flex items-center justify-between rounded border border-neutral-200 bg-neutral-50 px-2 py-1.5">
+          <span className="text-[10px] font-semibold text-neutral-900">
+            Flexsaldo
+          </span>
+          <span className="text-[10px] font-semibold tabular-nums text-emerald-700">
+            +0,75 tim
           </span>
         </div>
       </div>

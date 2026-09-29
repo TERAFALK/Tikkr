@@ -1,117 +1,120 @@
 import Link from "next/link";
 import {
-  IconClock,
-  IconDevice,
-  IconOrder,
-  IconPeople,
-  IconReport,
-  IconShield,
-} from "@/components/ui/icons";
-import {
   AdminMockup,
+  CalcMockup,
   ExportMockup,
   OrderPickMockup,
   ReportMockup,
   ReviewMockup,
   RunningMockup,
+  TimesheetMockup,
 } from "./Mockups";
 import LiveKiosk from "./LiveKiosk";
-import type { ScreenPricing } from "@/lib/stripe";
+import type { ModulePricing, ScreenPricing } from "@/lib/stripe";
+import { MODULES } from "@/lib/modules";
 import Reveal from "./Reveal";
+
+/**
+ * SÄLJSIDANS AVSNITT.
+ *
+ * FORMGIVNINGEN ÄR ETT SPECIFIKATIONSBLAD, inte en produktsida i allmänhet.
+ * Läsaren är en verkstadschef som köper verktyg efter vad de gör, och sidan är
+ * satt därefter: numrerade avsnitt, hårfina linjer och siffror i tabellsiffror.
+ * Svart, vitt och grått hela vägen; färg förekommer bara INUTI produktbilderna,
+ * där grönt betyder pågår och gult behöver granskas precis som i systemet.
+ *
+ * Det som medvetet INTE finns här, och varför:
+ *
+ *  - Gradienter i rubriktext och suddade färgfläckar bakom innehållet. De
+ *    säger ingenting om produkten och ser likadana ut på varje ny sajt.
+ *  - Rutnät av sex likadana kort med varsin ikon. En ikon som föreställer
+ *    "säkerhet" bär mindre än ordet säkerhet.
+ *  - Kundcitat och logotyper. Vi har en pilotkund, och påhittade referenser
+ *    är det snabbaste sättet att förlora någon som känner branschen.
+ *
+ * Det som får bära sidan i stället: produktens egna ytor. Bilderna är byggda
+ * i kod ur samma färger och siffror som systemet använder, se Mockups.tsx.
+ */
 
 /* -------------------------------------------------------------------------- */
 /* Gemensamma byggstenar                                                       */
 /* -------------------------------------------------------------------------- */
 
+/** Belopp i svensk form. Samma formatering som i produkten. */
+function kr(amount: number): string {
+  return amount.toLocaleString("sv-SE");
+}
+
 /**
- * Rubriken som inleder varje avsnitt.
+ * Avsnittets huvud.
  *
- * Samma uppbyggnad hela vägen ned: en etikett som säger var man är, en rubrik
- * som säger vad avsnittet hävdar, och vid behov en mening som utvecklar. En
- * sida där varje avsnitt ser olika ut läses som flera sidor.
+ * Nummer, linje, etikett. Sedan rubriken och högst ett par rader text. Samma
+ * uppbyggnad hela vägen ned, så att sidan läses som ett dokument och inte som
+ * en trave olika sidor staplade på varandra.
  */
-function SectionHeading({
+function SectionHead({
+  index,
   eyebrow,
   title,
-  body,
-  centered,
+  intro,
   onDark,
 }: {
+  index: string;
   eyebrow: string;
   title: string;
-  body?: string;
-  centered?: boolean;
+  intro?: string;
   onDark?: boolean;
 }) {
   return (
-    <div className={centered ? "mx-auto max-w-2xl text-center" : "max-w-2xl"}>
-      <p
-        className={`inline-flex items-center gap-2 text-[12px] font-semibold uppercase tracking-[0.14em] ${
-          onDark ? "text-blue-300" : "text-blue-600"
-        }`}
-      >
+    <div className="max-w-2xl">
+      <p className="flex items-center gap-3 font-mono text-[11px] uppercase tracking-[0.18em]">
+        <span className={onDark ? "text-neutral-500" : "text-neutral-400"}>
+          {index}
+        </span>
         <span
           aria-hidden="true"
-          className={`h-px w-6 ${onDark ? "bg-blue-300/60" : "bg-blue-600/40"}`}
+          className={`h-px w-8 ${onDark ? "bg-neutral-700" : "bg-neutral-300"}`}
         />
-        {eyebrow}
+        <span className={onDark ? "text-neutral-300" : "text-neutral-500"}>
+          {eyebrow}
+        </span>
       </p>
 
       <h2
-        className={`mt-4 text-[26px] font-semibold leading-tight tracking-tight sm:text-[34px] ${
+        className={`mt-5 text-[28px] font-semibold leading-[1.15] tracking-tight sm:text-[36px] ${
           onDark ? "text-white" : "text-neutral-900"
         }`}
       >
         {title}
       </h2>
 
-      {body && (
+      {intro && (
         <p
-          className={`mt-4 text-[15px] leading-relaxed ${
-            onDark ? "text-neutral-300" : "text-neutral-600"
+          className={`mt-4 max-w-xl text-[15px] leading-relaxed ${
+            onDark ? "text-neutral-400" : "text-neutral-600"
           }`}
         >
-          {body}
+          {intro}
         </p>
       )}
     </div>
   );
 }
 
-function Check() {
+/**
+ * Rad i en uppräkning.
+ *
+ * En linje över varje rad i stället för en bock framför den. Bockar läser ögat
+ * som reklam; linjer läser det som en specifikation, och det är vad det är.
+ */
+function SpecRow({ term, children }: { term: string; children: string }) {
   return (
-    <span
-      aria-hidden="true"
-      className="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-emerald-50 ring-1 ring-inset ring-emerald-200"
-    >
-      <svg
-        viewBox="0 0 20 20"
-        className="h-3 w-3 text-emerald-600"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth={2.5}
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      >
-        <path d="m4 10.5 4 4 8-9" />
-      </svg>
-    </span>
-  );
-}
-
-/** Punktlista med bock. Används i tre avsnitt och ska se likadan ut i alla. */
-function CheckList({ items }: { items: string[] }) {
-  return (
-    <ul className="mt-7 space-y-3">
-      {items.map((item) => (
-        <li key={item} className="flex items-start gap-3">
-          <Check />
-          <span className="text-[14px] leading-relaxed text-neutral-700">
-            {item}
-          </span>
-        </li>
-      ))}
-    </ul>
+    <div className="grid gap-1 border-t border-neutral-200 py-4 sm:grid-cols-[13rem_1fr] sm:gap-6">
+      <dt className="text-[14px] font-medium text-neutral-900">{term}</dt>
+      <dd className="text-[14px] leading-relaxed text-neutral-600">
+        {children}
+      </dd>
+    </div>
   );
 }
 
@@ -119,102 +122,66 @@ function CheckList({ items }: { items: string[] }) {
 /* Hero                                                                        */
 /* -------------------------------------------------------------------------- */
 
-export function Hero() {
+export function Hero({ pricing }: { pricing: ScreenPricing }) {
   return (
-    <section className="relative overflow-hidden border-b border-neutral-200 bg-white">
-      {/* Rutnät i bakgrunden, urtonat mot kanterna. Ger djup åt ytan utan att
-          konkurrera med texten. Masken gör att mönstret aldrig får en synlig
-          kant där det tar slut. */}
-      <div
-        aria-hidden="true"
-        className="pointer-events-none absolute inset-0 bg-[linear-gradient(to_right,rgba(15,23,42,0.045)_1px,transparent_1px),linear-gradient(to_bottom,rgba(15,23,42,0.045)_1px,transparent_1px)] bg-[size:56px_56px] [mask-image:radial-gradient(ellipse_75%_65%_at_50%_0%,black,transparent)]"
-      />
+    <section className="border-b border-neutral-200 bg-white">
+      <div className="mx-auto max-w-6xl px-6 pb-16 pt-14 sm:pb-20 sm:pt-20">
+        <div className="grid items-center gap-12 lg:grid-cols-[1fr_1.05fr] lg:gap-16">
+          <div>
+            <p className="animate-rise font-mono text-[11px] uppercase tracking-[0.18em] text-neutral-500">
+              Stämplingssystem för verkstad
+            </p>
 
-      {/* Mjukt ljus bakom rubriken. En gradient i en låda med bestämd höjd får
-          en synlig kant där lådan tar slut. En suddad fläck har ingen kant. */}
-      <div
-        aria-hidden="true"
-        className="pointer-events-none absolute left-1/2 top-[-300px] h-[600px] w-[1150px] -translate-x-1/2 rounded-full bg-blue-500/[0.10] blur-[140px]"
-      />
-      <div
-        aria-hidden="true"
-        className="pointer-events-none absolute left-[12%] top-[-140px] h-[400px] w-[540px] rounded-full bg-emerald-400/[0.07] blur-[130px]"
-      />
-
-      <div className="relative mx-auto max-w-6xl px-6 pb-24 pt-16 sm:pt-24">
-        <div className="mx-auto max-w-3xl text-center">
-          <span className="animate-rise inline-flex items-center gap-2 rounded-full border border-neutral-200 bg-white/80 px-3.5 py-1.5 text-xs font-medium text-neutral-600 shadow-sm backdrop-blur">
-            <span className="animate-breathe h-1.5 w-1.5 rounded-full bg-emerald-500" />
-            Byggt för svensk verkstadsindustri
-          </span>
-
-          <h1
-            className="animate-rise mt-7 text-[40px] font-semibold leading-[1.05] tracking-tight text-neutral-900 sm:text-6xl"
-            style={{ animationDelay: "60ms" }}
-          >
-            Tidregistrering per order,
-            <br className="hidden sm:block" />{" "}
-            <span className="bg-gradient-to-br from-blue-600 to-blue-500 bg-clip-text text-transparent">
-              direkt i verkstaden
-            </span>
-          </h1>
-
-          <p
-            className="animate-rise mx-auto mt-6 max-w-xl text-[17px] leading-relaxed text-neutral-600 sm:text-lg"
-            style={{ animationDelay: "120ms" }}
-          >
-            Personalen trycker en gång på en skärm. Tiden hamnar på rätt order
-            och arbetsmoment, utan blanketter och utan efterhandsrapportering.
-          </p>
-
-          <div
-            className="animate-rise mt-9 flex flex-wrap justify-center gap-3"
-            style={{ animationDelay: "180ms" }}
-          >
-            <Link
-              href="/registrera"
-              className="rounded-lg bg-blue-600 px-6 py-3 text-sm font-semibold text-white shadow-sm shadow-blue-600/20 transition-all hover:-translate-y-px hover:bg-blue-700 hover:shadow-md hover:shadow-blue-600/25"
+            <h1
+              className="animate-rise mt-6 text-[40px] font-semibold leading-[1.02] tracking-[-0.02em] text-neutral-900 sm:text-[56px]"
+              style={{ animationDelay: "60ms" }}
             >
-              Prova i 30 dagar
-            </Link>
-            <a
-              href="#sa-funkar-det"
-              className="rounded-lg border border-neutral-200 bg-white px-6 py-3 text-sm font-semibold text-neutral-700 transition-colors hover:bg-neutral-50"
+              Rätt tid på rätt order.
+            </h1>
+
+            <p
+              className="animate-rise mt-6 max-w-lg text-[17px] leading-relaxed text-neutral-600"
+              style={{ animationDelay: "120ms" }}
             >
-              Se hur det fungerar
-            </a>
+              En skärm på väggen i verkstaden och en panel på kontoret.
+              Personalen trycker en gång, tiden hamnar på ordern och
+              arbetsmomentet, och underlaget går att skicka samma dag.
+            </p>
+
+            <div
+              className="animate-rise mt-9 flex flex-wrap items-center gap-3"
+              style={{ animationDelay: "180ms" }}
+            >
+              <Link
+                href="/registrera"
+                className="rounded-md bg-neutral-900 px-5 py-3 text-sm font-semibold text-white transition-colors hover:bg-neutral-800"
+              >
+                Prova i 30 dagar
+              </Link>
+              <a
+                href="#sa-funkar-det"
+                className="rounded-md px-5 py-3 text-sm font-semibold text-neutral-700 underline decoration-neutral-300 underline-offset-4 transition-colors hover:text-neutral-900 hover:decoration-neutral-900"
+              >
+                Se hur det fungerar
+              </a>
+            </div>
+
+            <p
+              className="animate-rise mt-6 text-[13px] text-neutral-500"
+              style={{ animationDelay: "240ms" }}
+            >
+              Inget betalkort. Ingen bindningstid. {kr(pricing.month)} kr per
+              skärm och månad när provperioden tar slut.
+            </p>
           </div>
 
-          <p
-            className="animate-rise mt-5 text-[13px] text-neutral-400"
-            style={{ animationDelay: "240ms" }}
-          >
-            Inget betalkort · Uppsättning på en kvart · Ingen bindningstid
-          </p>
-        </div>
-
-        {/* Produktbilderna. Kiosken ligger framför panelen, eftersom det är den
-            anställda ser och den som avgör om systemet används. */}
-        <div className="relative mx-auto mt-20 max-w-4xl">
+          {/* Den levande kioskbilden. Den som tittar i tio sekunder har sett
+              vad produkten gör utan att läsa en rad text. */}
           <div
-            aria-hidden="true"
-            className="pointer-events-none absolute -inset-x-10 -bottom-6 top-10 rounded-[2rem] bg-neutral-900/[0.05] blur-2xl"
-          />
-
-          <div
-            className="animate-rise-soft relative"
+            className="animate-rise-soft"
             style={{ animationDelay: "300ms" }}
           >
-            <AdminMockup />
-          </div>
-
-          <div
-            className="animate-rise-soft absolute -bottom-12 -right-2 hidden w-64 sm:block lg:-right-12 lg:w-80"
-            style={{ animationDelay: "480ms" }}
-          >
-            <div className="animate-drift">
-              <LiveKiosk />
-            </div>
+            <LiveKiosk />
           </div>
         </div>
       </div>
@@ -223,96 +190,90 @@ export function Hero() {
 }
 
 /* -------------------------------------------------------------------------- */
-/* Kapabilitetsremsa                                                           */
+/* Siffrorna direkt under hero                                                 */
 /* -------------------------------------------------------------------------- */
 
 /**
- * Fyra påståenden direkt under hero.
+ * Fyra fakta, satta som en datarad.
  *
- * Ersätter den kundlogotyprad som annars brukar stå här. Vi har inga kunder att
- * visa upp ännu, och påhittade logotyper är det snabbaste sättet att förlora
- * förtroendet hos någon som känner branschen.
+ * Står där andra sidor har en rad kundlogotyper. Vi har en pilotkund och inga
+ * logotyper att visa, och de här siffrorna säger mer ändå: de svarar på det
+ * första en köpare undrar innan hen bestämmer sig för att läsa vidare.
  */
-export function Capabilities() {
-  const items = [
-    { title: "Ett tryck", body: "Ingen inloggning i verkstaden" },
-    { title: "Automatisk utstämpling", body: "Vid jobbyte och dagens slut" },
-    { title: "Per order", body: "Underlag som PDF och Excel" },
-    { title: "Ingen bindningstid", body: "Månadsvis eller årsvis" },
+export function Facts({ pricing }: { pricing: ScreenPricing }) {
+  const facts = [
+    { value: `${kr(pricing.month)} kr`, label: "per skärm och månad" },
+    { value: "30 dagar", label: "provperiod utan betalkort" },
+    { value: "0 kr", label: "i uppstart och installation" },
+    { value: "Sverige", label: "servrar och support" },
   ];
 
   return (
     <section className="border-b border-neutral-200 bg-white">
-      <div className="mx-auto grid max-w-6xl grid-cols-2 gap-px overflow-hidden bg-neutral-200 lg:grid-cols-4">
-        {items.map((item) => (
-          <div
-            key={item.title}
-            className="bg-white px-6 py-7 transition-colors hover:bg-neutral-50"
-          >
-            <p className="text-sm font-semibold text-neutral-900">
-              {item.title}
-            </p>
-            <p className="mt-1 text-[13px] leading-relaxed text-neutral-500">
-              {item.body}
-            </p>
+      {/* Hårlinjerna ritas med gap-px mot en grå botten i stället för med
+          kantlinjer på varje ruta. Kantlinjer på ett rutnät som byter antal
+          kolumner ger alltid en linje för mycket någonstans. */}
+      <dl className="mx-auto grid max-w-6xl grid-cols-2 gap-px bg-neutral-200 lg:grid-cols-4">
+        {facts.map((fact) => (
+          <div key={fact.label} className="bg-white px-6 py-7">
+            <dt className="text-[22px] font-semibold tracking-tight tabular-nums text-neutral-900">
+              {fact.value}
+            </dt>
+            <dd className="mt-1 text-[13px] leading-relaxed text-neutral-500">
+              {fact.label}
+            </dd>
           </div>
         ))}
-      </div>
+      </dl>
     </section>
   );
 }
 
 /* -------------------------------------------------------------------------- */
-/* Problemet                                                                   */
+/* 01 Problemet                                                                */
 /* -------------------------------------------------------------------------- */
 
 /**
- * Avsnittet ligger på mörk botten.
+ * Sidans enda mörka avsnitt.
  *
- * Det är sidans enda avsnitt som beskriver ett problem i stället för en
- * lösning, och en tydlig brytning gör att läsaren registrerar bytet av
- * perspektiv i stället för att skumma vidare genom ännu ett vitt fält.
+ * Det är också det enda som beskriver ett problem i stället för en lösning.
+ * Brytningen gör att läsaren registrerar perspektivbytet i stället för att
+ * skumma vidare genom ännu ett vitt fält.
  */
 export function Problem() {
   const points = [
     {
       title: "Tiden skrivs upp i efterhand",
-      body: "Vid veckans slut ska någon minnas vad som gjordes på tisdagen. Uppskattningar blir underlag för fakturering.",
+      body: "På fredagen ska någon minnas vad som gjordes på tisdagen. Uppskattningen blir underlag för en faktura.",
     },
     {
       title: "Timmar som aldrig faktureras",
       body: "Arbete som inte hinner rapporteras faktureras inte. Bortfallet syns aldrig, eftersom ingen vet vad som saknas.",
     },
     {
-      title: "Ingen vet vad en order kostade",
-      body: "Utan tid per order saknas underlag för att bedöma lönsamhet. Nästa offert bygger på en känsla.",
+      title: "Ingen vet vad ordern kostade",
+      body: "Utan tid per order finns inget att jämföra offerten med. Nästa pris sätts på en känsla.",
     },
   ];
 
   return (
-    <section className="relative overflow-hidden border-b border-neutral-800 bg-neutral-900 py-24">
-      <div
-        aria-hidden="true"
-        className="pointer-events-none absolute left-1/2 top-0 h-[400px] w-[900px] -translate-x-1/2 rounded-full bg-blue-500/10 blur-[130px]"
-      />
-
-      <div className="relative mx-auto max-w-6xl px-6">
-        <SectionHeading
+    <section className="border-b border-neutral-800 bg-neutral-900">
+      <div className="mx-auto max-w-6xl px-6 py-20 sm:py-24">
+        <SectionHead
           onDark
+          index="01"
           eyebrow="Problemet"
           title="Tid som inte registreras när arbetet utförs går inte att rekonstruera"
         />
 
-        <div className="mt-12 grid gap-5 sm:grid-cols-3">
+        <div className="mt-14 grid gap-px overflow-hidden rounded-lg bg-neutral-800 sm:grid-cols-3">
           {points.map((point, index) => (
-            // Korten tonas in efter varandra i stället för samtidigt. Ögat
-            // hinner då läsa i den ordning de är tänkta att läsas.
             <Reveal key={point.title} delay={index * 90}>
-              <div className="h-full rounded-xl border border-white/10 bg-white/[0.04] p-6 backdrop-blur-sm">
+              <div className="h-full bg-neutral-900 p-6">
                 <h3 className="text-[15px] font-semibold text-white">
                   {point.title}
                 </h3>
-                <p className="mt-2.5 text-[13px] leading-relaxed text-neutral-400">
+                <p className="mt-3 text-[13px] leading-relaxed text-neutral-400">
                   {point.body}
                 </p>
               </div>
@@ -325,61 +286,58 @@ export function Problem() {
 }
 
 /* -------------------------------------------------------------------------- */
-/* Så fungerar det                                                             */
+/* 02 Så fungerar det                                                          */
 /* -------------------------------------------------------------------------- */
 
 const STEPS = [
   {
-    number: 1,
-    title: "Den anställde trycker på sitt namn",
-    body: "Order och arbetsmoment väljs i två steg, med knappar stora nog att träffa med arbetshandskar. Vid byte av jobb stängs föregående post automatiskt, så samma tid aldrig hamnar på två ordrar.",
+    number: "1",
+    title: "Namn, order, moment",
+    body: "Tre tryck, med knappar stora nog att träffa med arbetshandskar. Den som har ordernumret på ritningen slår in det på en knappsats i stället. Saknas ordern går den att lägga upp direkt vid skärmen och märks då för kontoret.",
     mockup: <OrderPickMockup />,
   },
   {
-    number: 2,
+    number: "2",
     title: "Tiden räknas medan arbetet pågår",
-    body: "Vem som är instämplad, på vilken order och sedan när syns på skärmen. Samma bild finns i panelen, så kontoret ser läget i verkstaden utan att fråga.",
+    body: "Vem som arbetar, på vad och sedan när syns på skärmen och i panelen samtidigt. En operatör som kör två maskiner stämplar in på båda, och båda ordrarna får sin timme. Försvinner nätet sparas trycken lokalt och skickas när det kommer tillbaka.",
     mockup: <RunningMockup />,
   },
   {
-    number: 3,
-    title: "Avvikelser markeras före fakturering",
-    body: "Saknas utstämpling stängs posten vid ett klockslag ni själva anger och markeras för granskning. Beräknade sluttider är alltid märkta som beräknade, både i panelen och i underlaget.",
+    number: "3",
+    title: "Avvikelser märks före fakturering",
+    body: "Glömd utstämpling stängs vid ett klockslag ni själva anger och hamnar i granskningen. En beräknad sluttid är alltid märkt som beräknad, både i panelen och i underlaget, och ingen tid fylls i tyst.",
     mockup: <ReviewMockup />,
   },
 ];
 
 export function HowItWorks() {
   return (
-    <section id="sa-funkar-det" className="border-b border-neutral-200 py-24">
-      <div className="mx-auto max-w-6xl px-6">
-        <SectionHeading
-          eyebrow="Så fungerar det"
+    <section
+      id="sa-funkar-det"
+      className="border-b border-neutral-200 bg-white"
+    >
+      <div className="mx-auto max-w-6xl px-6 py-20 sm:py-24">
+        <SectionHead
+          index="02"
+          eyebrow="I verkstaden"
           title="Från tryck på skärmen till färdigt underlag"
-          body="Tre steg. De två första sker i verkstaden utan att någon loggar in."
+          intro="De två första stegen sker vid maskinen, utan inloggning och utan att någon skriver något."
         />
 
-        <div className="mt-16 space-y-20">
+        <div className="mt-16 space-y-16">
           {STEPS.map((step, index) => (
             <Reveal key={step.number}>
-              <div className="grid items-center gap-10 lg:grid-cols-2 lg:gap-16">
+              <div className="grid items-center gap-8 border-t border-neutral-200 pt-10 lg:grid-cols-2 lg:gap-16">
                 {/* Vartannat avsnitt speglas, så att blicken flyttas i sidled
                     på vägen ned i stället för att falla rakt igenom. */}
                 <div className={index % 2 === 1 ? "lg:order-2" : ""}>
-                  <div className="flex items-center gap-3">
-                    <span className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-neutral-900 text-sm font-semibold text-white">
-                      {step.number}
-                    </span>
-                    <span
-                      aria-hidden="true"
-                      className="h-px flex-1 bg-gradient-to-r from-neutral-200 to-transparent"
-                    />
-                  </div>
-
-                  <h3 className="mt-5 text-xl font-semibold tracking-tight text-neutral-900 sm:text-2xl">
+                  <p className="font-mono text-[11px] tracking-[0.18em] text-neutral-400">
+                    STEG {step.number}
+                  </p>
+                  <h3 className="mt-3 text-xl font-semibold tracking-tight text-neutral-900 sm:text-2xl">
                     {step.title}
                   </h3>
-                  <p className="mt-3 max-w-md text-[15px] leading-relaxed text-neutral-600">
+                  <p className="mt-4 max-w-md text-[15px] leading-relaxed text-neutral-600">
                     {step.body}
                   </p>
                 </div>
@@ -397,67 +355,125 @@ export function HowItWorks() {
 }
 
 /* -------------------------------------------------------------------------- */
-/* Funktioner                                                                  */
+/* 03 Panelen                                                                  */
 /* -------------------------------------------------------------------------- */
 
-export function Features() {
-  const features = [
+export function AdminSection() {
+  return (
+    <section id="panelen" className="border-b border-neutral-200 bg-neutral-50">
+      <div className="mx-auto max-w-6xl px-6 py-20 sm:py-24">
+        <SectionHead
+          index="03"
+          eyebrow="På kontoret"
+          title="Läget i verkstaden, utan att någon behöver fråga"
+          intro="Registrerad tid finns i panelen i samma stund som knappen trycks. Ingen insamling, ingen sammanställning på fredagen."
+        />
+
+        <div className="mt-14 grid items-start gap-10 lg:grid-cols-2 lg:gap-16">
+          <dl>
+            <SpecRow term="Rapporter">
+              Filtrera på period, order, kund, anställd och arbetsmoment. Ta ut
+              som PDF eller Excel, eller skriv ut direkt.
+            </SpecRow>
+            <SpecRow term="Granskning">
+              Allt som kräver en åtgärd på ett ställe: beräknade sluttider och
+              ordrar som lagts upp vid skärmen och behöver kompletteras.
+            </SpecRow>
+            <SpecRow term="Ordrar och kunder">
+              Kunden bär påslag, rabatt och adressen på underlaget. Ordern kan
+              ha eget påslag eller ett avtalat fast pris.
+            </SpecRow>
+            <SpecRow term="Beräknad tid">
+              Lägg en beräkning per arbetsmoment och se utfallet mot den medan
+              jobbet pågår.
+            </SpecRow>
+            <SpecRow term="Rättelser">
+              Tider går att ändra och skriva in i efterhand. Ändringen märks och
+              går att skilja från ett riktigt tryck.
+            </SpecRow>
+          </dl>
+
+          <div className="space-y-6">
+            <ReportMockup />
+            <div className="hidden lg:block">
+              <AdminMockup />
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+/* 04 Dokumenten                                                               */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Tre dokument, tre mottagare.
+ *
+ * Avsnittet finns för att det är här produkten skiljer sig mest från en vanlig
+ * stämpelklocka, och för att gränsen mellan dokumenten är en av de få saker i
+ * systemet som aldrig får suddas ut. Kundens papper innehåller inga
+ * självkostnader; det interna gör det; lönens räknar samma timme på ett annat
+ * sätt.
+ */
+export function Documents({ modules }: { modules: ModulePricing }) {
+  const docs = [
     {
-      icon: <IconClock />,
-      title: "Automatisk utstämpling",
-      body: "Vid byte av jobb stängs föregående post. Saknas utstämpling stängs posten vid ett klockslag ni anger, och markeras för granskning.",
+      kicker: "Till kunden",
+      title: "Underlag per order",
+      body: "PDF att bifoga fakturan, med er logotyp, ordernummer och kund som rubrik, varje stämpling och en summa sist. Samma innehåll som Excel. Belopp följer med bara när ni kryssar i det.",
+      mockup: <ExportMockup className="h-full" />,
     },
     {
-      icon: <IconDevice />,
-      title: "Ingen installation",
-      body: "Skärmen är en surfplatta eller dator med webbläsare. Panelen nås från kontoret utan särskild programvara.",
+      kicker: "Internt",
+      title: "Efterkalkyl",
+      body: "Vad jobbet kostade och vad det gav. Timkostnaden är personens sats plus maskinens, kopierad till stämplingen när den gjordes, så en prishöjning inte ändrar en kalkyl som redan fakturerats.",
+      mockup: <CalcMockup className="h-full" />,
     },
     {
-      icon: <IconReport />,
-      title: "Underlag med er logotyp",
-      body: "PDF att bifoga fakturan, med ordernummer och kund som rubrik, samtliga stämplingar och totalsumma. Excel finns också.",
-    },
-    {
-      icon: <IconOrder />,
-      title: "All tid hör till en order",
-      body: "Varje registrerad minut är kopplad till en kundorder. Inga interna konton för tid som ändå inte faktureras.",
-    },
-    {
-      icon: <IconPeople />,
-      title: "Ingen inloggning i verkstaden",
-      body: "Skärmen kopplas en gång med en sexsiffrig kod. Personalen behöver inga uppgifter, och en skärm kan när som helst kopplas om.",
-    },
-    {
-      icon: <IconShield />,
-      title: "Spårbart i efterhand",
-      body: "Varje stämpling registrerar tidpunkt, skärm och IP-adress. Manuella ändringar märks och går att skilja från registrerade tryck.",
+      kicker: "Till lönen",
+      title: "Tidrapport per anställd",
+      body: `Planerad tid mot närvaro, med flex, komp och frånvaro. Ett tillval för ${kr(
+        modules.PAYROLL.month
+      )} kr i månaden, och ett annat dokument än de två andra: samma timme räknas olika.`,
+      mockup: <TimesheetMockup className="h-full" />,
     },
   ];
 
   return (
-    <section
-      id="funktioner"
-      className="border-b border-neutral-200 bg-neutral-50 py-24"
-    >
-      <div className="mx-auto max-w-6xl px-6">
-        <SectionHeading
-          eyebrow="Funktioner"
-          title="Anpassat efter verkstadens arbetssätt"
+    <section id="underlag" className="border-b border-neutral-200 bg-white">
+      <div className="mx-auto max-w-6xl px-6 py-20 sm:py-24">
+        <SectionHead
+          index="04"
+          eyebrow="Dokumenten"
+          title="Tre underlag, tre mottagare"
+          intro="Kör en operatör två maskiner fyra timmar är det åtta maskintimmar att fakturera, men fyra timmar på jobbet. Därför räknas samma timme olika i olika dokument, och därför delar de aldrig kod."
         />
 
-        <div className="mt-12 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-          {features.map((feature, index) => (
-            <Reveal key={feature.title} delay={index * 70}>
-              <div className="group h-full rounded-xl border border-neutral-200 bg-white p-6 transition-all hover:-translate-y-1 hover:border-neutral-300 hover:shadow-lg hover:shadow-neutral-900/5">
-                <span className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-neutral-200 bg-neutral-50 text-neutral-500 transition-colors group-hover:border-blue-200 group-hover:bg-blue-50 group-hover:text-blue-600">
-                  {feature.icon}
-                </span>
-                <h3 className="mt-4 text-[15px] font-semibold text-neutral-900">
-                  {feature.title}
-                </h3>
-                <p className="mt-2 text-[13px] leading-relaxed text-neutral-600">
-                  {feature.body}
-                </p>
+        <div className="mt-14 grid gap-10 lg:grid-cols-3 lg:gap-8">
+          {docs.map((doc, index) => (
+            /* h-full hela vägen ned: de tre pappersytorna blir lika höga
+               även när en tabell har en rad mer, och rubrikerna under dem
+               hamnar på samma linje. Utan det står de tre bildtexterna på
+               tre olika höjder, vilket är det enda i avsnittet ögat
+               fastnar på. */
+            <Reveal key={doc.title} delay={index * 90} className="h-full">
+              <div className="flex h-full flex-col">
+                <div className="flex-1">{doc.mockup}</div>
+
+                <div className="mt-6 border-t border-neutral-200 pt-5">
+                  <p className="font-mono text-[11px] uppercase tracking-[0.18em] text-neutral-400">
+                    {doc.kicker}
+                  </p>
+                  <h3 className="mt-2 text-[17px] font-semibold tracking-tight text-neutral-900">
+                    {doc.title}
+                  </h3>
+                  <p className="mt-2 text-[13px] leading-relaxed text-neutral-600">
+                    {doc.body}
+                  </p>
+                </div>
               </div>
             </Reveal>
           ))}
@@ -468,87 +484,124 @@ export function Features() {
 }
 
 /* -------------------------------------------------------------------------- */
-/* Panelen                                                                     */
+/* 05 Allt som ingår                                                           */
 /* -------------------------------------------------------------------------- */
 
-export function AdminSection() {
-  const points = [
-    "Pågående arbete i realtid, per anställd och order",
-    "Rapporter filtrerade på datum, order, anställd och moment",
-    "Granskning av poster där utstämpling saknas",
-    "Manuell registrering i efterhand, tydligt märkt",
-    "Flera administratörer med olika behörighet",
-  ];
-
-  return (
-    <section className="border-b border-neutral-200 py-24">
-      <div className="mx-auto max-w-6xl px-6">
-        <div className="grid items-center gap-12 lg:grid-cols-2 lg:gap-16">
-          <div>
-            <SectionHeading
-              eyebrow="Adminpanelen"
-              title="Överblick i realtid"
-              body="Registrerad tid finns i panelen omedelbart. Ingen insamling och ingen sammanställning."
-            />
-            <CheckList items={points} />
-          </div>
-
-          <ReportMockup />
-        </div>
-      </div>
-    </section>
-  );
-}
-
-/* -------------------------------------------------------------------------- */
-/* Underlaget                                                                  */
-/* -------------------------------------------------------------------------- */
-
-/**
- * Avsnittet som säljer produkten till den som betalar för den.
- *
- * Kiosken avgör om systemet används, men underlaget är skälet att skaffa det.
- * Det förtjänar en egen plats i stället för en punkt i en lista.
- */
-export function Documents() {
-  const points = [
-    "Ordernummer och kund som rubrik, er logotyp överst",
-    "Samtliga stämplingar med anställd, moment och timmar",
-    "Totalsumma, och beräknade sluttider tydligt märkta",
-    "Flera ordrar kan markeras och exporteras samlat",
+export function Capabilities() {
+  const groups = [
+    {
+      title: "I verkstaden",
+      rows: [
+        [
+          "Ett tryck",
+          "Ingen inloggning, ingen PIN. Namn, order, moment och tillbaka till jobbet.",
+        ],
+        [
+          "Flera maskiner",
+          "En person kan ha ett pågående jobb per arbetsmoment. Aldrig två på samma maskin.",
+        ],
+        [
+          "Automatisk utstämpling",
+          "Vid byte av jobb på samma maskin, och vid ett klockslag ni anger i slutet av dagen.",
+        ],
+        [
+          "Fungerar utan nät",
+          "Trycken sparas i skärmen och skickas när uppkopplingen är tillbaka.",
+        ],
+        [
+          "Improduktiv tid",
+          "Städning, möten och underhåll registreras i ett eget register och når aldrig en faktura.",
+        ],
+      ],
+    },
+    {
+      title: "På kontoret",
+      rows: [
+        [
+          "Rapporter och export",
+          "PDF, Excel och utskrift. Flera markerade ordrar ger en fil per order.",
+        ],
+        [
+          "Efterkalkyl",
+          "Självkostnad, påslag, rabatt och pris per order. Internt märkt på varje sida.",
+        ],
+        [
+          "Kundregister",
+          "Påslag och rabatt per kund, adress på underlaget, och all tid samlad per kund.",
+        ],
+        [
+          "Flera administratörer",
+          "Inbjudan per e-post. Alla ändringar är spårbara till ett konto.",
+        ],
+        [
+          "Löneunderlag",
+          "Schema, stämplade raster, flex, komp och frånvaro. Tillval, se priset nedan.",
+        ],
+      ],
+    },
+    {
+      title: "Drift och säkerhet",
+      rows: [
+        [
+          "Svensk drift",
+          "Servrar i Sverige. Personuppgiftsbiträdesavtal ingår och finns att läsa innan ni börjar.",
+        ],
+        [
+          "Spårbarhet",
+          "Varje stämpling bär tidpunkt, skärm och IP. Manuella ändringar märks som manuella.",
+        ],
+        [
+          "Dataskydd",
+          "Export och radering av en enskild anställds uppgifter finns i panelen.",
+        ],
+        [
+          "Ingen installation",
+          "Skärmen är en surfplatta eller dator med webbläsare. Panelen nås som vilken sida som helst.",
+        ],
+        [
+          "Uppdateringar ingår",
+          "Nya funktioner kommer utan att någon behöver installera något.",
+        ],
+      ],
+    },
   ];
 
   return (
     <section
-      id="underlag"
-      className="border-b border-neutral-200 bg-neutral-50 py-24"
+      id="funktioner"
+      className="border-b border-neutral-200 bg-neutral-50"
     >
-      <div className="mx-auto max-w-6xl px-6">
-        <div className="grid items-center gap-12 lg:grid-cols-2 lg:gap-16">
-          <div className="lg:order-2">
-            <SectionHeading
-              eyebrow="Underlaget"
-              title="Ett dokument som går att skicka vidare"
-              body="Underlag per order laddas ned som PDF eller Excel, utformat för att bifogas fakturan till er kund."
-            />
+      <div className="mx-auto max-w-6xl px-6 py-20 sm:py-24">
+        <SectionHead
+          index="05"
+          eyebrow="Innehåll"
+          title="Vad ni får"
+          intro="Allt nedan ingår i grundpriset, utom löneunderlaget som är ett tillval."
+        />
 
-            <CheckList items={points} />
+        <div className="mt-14 grid gap-12 lg:grid-cols-3 lg:gap-10">
+          {groups.map((group, index) => (
+            <Reveal key={group.title} delay={index * 80}>
+              <div>
+                <h3 className="font-mono text-[11px] uppercase tracking-[0.18em] text-neutral-500">
+                  {group.title}
+                </h3>
 
-            <div className="mt-7 flex flex-wrap gap-2">
-              {["order-2601.pdf", "order-2601.xlsx"].map((file) => (
-                <span
-                  key={file}
-                  className="rounded-md border border-neutral-200 bg-white px-2.5 py-1.5 text-xs font-medium text-neutral-600"
-                >
-                  {file}
-                </span>
-              ))}
-            </div>
-          </div>
-
-          <div className="lg:order-1">
-            <ExportMockup className="mx-auto max-w-sm" />
-          </div>
+                <dl className="mt-4">
+                  {group.rows.map(([term, body]) => (
+                    <div key={term} className="border-t border-neutral-200 py-4">
+                      <dt className="text-[14px] font-medium text-neutral-900">
+                        {term}
+                      </dt>
+                      <dd className="mt-1 text-[13px] leading-relaxed text-neutral-600">
+                        {body}
+                      </dd>
+                    </div>
+                  ))}
+                </dl>
+              </div>
+            </Reveal>
+          ))}
         </div>
       </div>
     </section>
@@ -556,83 +609,160 @@ export function Documents() {
 }
 
 /* -------------------------------------------------------------------------- */
-/* Pris                                                                        */
+/* 06 Pris                                                                     */
 /* -------------------------------------------------------------------------- */
 
-export function Pricing({ pricing }: { pricing: ScreenPricing }) {
-  const included = [
-    "Obegränsat antal anställda",
-    "Obegränsat antal ordrar och arbetsmoment",
-    "Obegränsat antal stämplingar",
-    "Rapporter, PDF och Excel",
-    "Flera administratörer",
-    "Support på svenska",
-  ];
+/**
+ * Priset.
+ *
+ * Två rader och en uträkning. Ingen jämförelsetabell med tre kolumner där den
+ * mittersta är förvald: Tikkr har ett pris per skärm och ett tillval, och att
+ * rita upp det som ett paketval vore att låtsas att det finns ett beslut att
+ * fatta som inte finns.
+ *
+ * Siffrorna kommer från prislistan hos betaltjänsten och inte från koden. En
+ * prisändring syns här utan att något behöver byggas om.
+ */
+export function Pricing({
+  pricing,
+  modules,
+}: {
+  pricing: ScreenPricing;
+  modules: ModulePricing;
+}) {
+  const payroll = modules.PAYROLL;
+
+  // Räkneexempel med tre skärmar. Tre är vanligt i en verkstad som har en
+  // skärm vid porten och två ute i produktionen, och exemplet svarar på den
+  // fråga priset i sig inte gör: vad landar fakturan på?
+  const screens = 3;
+  const example = screens * pricing.month + payroll.month;
 
   return (
-    <section id="pris" className="border-b border-neutral-200 py-24">
-      <div className="mx-auto max-w-6xl px-6">
-        <SectionHeading
-          centered
+    <section id="pris" className="border-b border-neutral-200 bg-white">
+      <div className="mx-auto max-w-6xl px-6 py-20 sm:py-24">
+        <SectionHead
+          index="06"
           eyebrow="Pris"
-          title="Ett pris"
-          body="Avgiften avser antalet licenser. En licens ger en stämplingsskärm. Antalet anställda påverkar inte priset."
+          title="Per skärm, inte per anställd"
+          intro="Antalet anställda, ordrar och stämplingar påverkar inte priset. Skärmarna följer verkstadens storlek av sig själva, eftersom folk annars köar vid den enda."
         />
 
-        {/* Gradientram runt kortet. En vanlig kant gör kortet till ännu en ruta
-            bland alla andra på sidan; den här säger att det är sidans svar. */}
-        <div className="mx-auto mt-12 max-w-md rounded-2xl bg-gradient-to-b from-blue-200 via-neutral-200 to-neutral-200 p-px shadow-xl shadow-neutral-900/5">
-          <div className="overflow-hidden rounded-[calc(1rem-1px)] bg-white">
-            <div className="border-b border-neutral-200 bg-gradient-to-b from-blue-50/60 to-white px-6 py-8 text-center">
-              <p className="text-[13px] font-medium uppercase tracking-wider text-neutral-500">
-                Per licens
+        <div className="mt-14 overflow-hidden rounded-lg border border-neutral-200">
+          {/* Basen. Den stora siffran ligger till vänster och innehållet till
+              höger, som en rad i en prislista snarare än ett paketkort. */}
+          <div className="grid gap-8 border-b border-neutral-200 bg-white p-6 sm:p-8 lg:grid-cols-[20rem_1fr] lg:gap-12">
+            <div>
+              <p className="font-mono text-[11px] uppercase tracking-[0.18em] text-neutral-500">
+                Bas
               </p>
-
-              <p className="mt-3 flex items-baseline justify-center gap-1.5">
-                <span className="text-5xl font-semibold tracking-tight text-neutral-900">
-                  {pricing.month.toLocaleString("sv-SE")}
+              <p className="mt-4 flex items-baseline gap-2">
+                <span className="text-[44px] font-semibold leading-none tracking-tight tabular-nums text-neutral-900">
+                  {kr(pricing.month)}
                 </span>
-                <span className="text-sm text-neutral-500">kr / månad</span>
+                <span className="text-[15px] text-neutral-500">
+                  kr per skärm och månad
+                </span>
               </p>
-
-              <p className="mt-1.5 text-xs text-neutral-400">
-                exklusive moms · ingen bindningstid
+              <p className="mt-2 text-[13px] text-neutral-500">
+                Exklusive moms. Ingen bindningstid.
               </p>
 
               {pricing.year !== null && (
-                <p className="mt-4 inline-flex items-center gap-2 rounded-full bg-emerald-50 px-3 py-1.5 text-xs font-medium text-emerald-700 ring-1 ring-inset ring-emerald-200">
-                  {pricing.yearlyDiscountPercent !== null && (
-                    <span className="rounded-full bg-emerald-600 px-1.5 py-0.5 text-[11px] font-semibold text-white">
-                      −{pricing.yearlyDiscountPercent} %
-                    </span>
-                  )}
-                  {pricing.year.toLocaleString("sv-SE")} kr per år
+                <p className="mt-4 inline-flex items-center gap-2 rounded-md border border-neutral-200 bg-neutral-50 px-3 py-1.5 text-[13px] text-neutral-700">
+                  <span className="font-medium tabular-nums">
+                    {kr(pricing.year)} kr per år
+                  </span>
+                  <span className="text-neutral-500">
+                    tio månaders pris för tolv
+                  </span>
                 </p>
               )}
             </div>
 
-            <ul className="space-y-3 px-6 py-7">
-              {included.map((item) => (
-                <li key={item} className="flex items-start gap-3">
-                  <Check />
-                  <span className="text-[14px] text-neutral-700">{item}</span>
-                </li>
-              ))}
-            </ul>
+            <div>
+              <p className="text-[14px] font-medium text-neutral-900">
+                Ingår i basen
+              </p>
+              <ul className="mt-4 grid gap-x-8 gap-y-2 sm:grid-cols-2">
+                {[
+                  "Obegränsat antal anställda",
+                  "Obegränsat antal ordrar och moment",
+                  "Obegränsat antal stämplingar",
+                  "Rapporter, PDF, Excel och utskrift",
+                  "Efterkalkyl och kundregister",
+                  "Flera administratörer",
+                  "Uppdateringar och drift",
+                  "Support på svenska",
+                ].map((item) => (
+                  <li
+                    key={item}
+                    className="border-t border-neutral-100 py-1.5 text-[13px] text-neutral-600"
+                  >
+                    {item}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
 
-            <div className="border-t border-neutral-200 px-6 py-6">
-              <Link
-                href="/registrera"
-                className="block rounded-lg bg-blue-600 px-4 py-3 text-center text-sm font-semibold text-white shadow-sm shadow-blue-600/20 transition-colors hover:bg-blue-700"
-              >
-                Prova i 30 dagar
-              </Link>
-              <p className="mt-3 text-center text-xs text-neutral-400">
-                Inget betalkort. Provperioden övergår inte i betalning av sig
-                själv.
+          {/* Tillvalet. Egen rad med tonad botten, så att det syns att det är
+              något annat än basen och inte ett paket till. */}
+          <div className="grid gap-6 border-b border-neutral-200 bg-neutral-50 p-6 sm:p-8 lg:grid-cols-[20rem_1fr] lg:gap-12">
+            <div>
+              <p className="font-mono text-[11px] uppercase tracking-[0.18em] text-neutral-500">
+                Tillval
+              </p>
+              <p className="mt-4 flex items-baseline gap-2">
+                <span className="text-[28px] font-semibold leading-none tracking-tight tabular-nums text-neutral-900">
+                  {kr(payroll.month)}
+                </span>
+                <span className="text-[14px] text-neutral-500">
+                  kr per månad och företag
+                </span>
+              </p>
+              {payroll.year !== null && (
+                <p className="mt-2 text-[13px] text-neutral-500">
+                  eller {kr(payroll.year)} kr per år
+                </p>
+              )}
+            </div>
+
+            <div>
+              <p className="text-[14px] font-medium text-neutral-900">
+                {MODULES.PAYROLL.name}
+              </p>
+              <p className="mt-2 max-w-xl text-[13px] leading-relaxed text-neutral-600">
+                Arbetstidsschema, stämplade raster, flex, komp, frånvaro och
+                tidrapport per anställd. Priset gäller hela företaget oavsett
+                antal skärmar och anställda. Slås på och av när ni vill, och
+                era uppgifter ligger kvar när det är avstängt.
               </p>
             </div>
           </div>
+
+          {/* Räkneexemplet. Den fråga priset i sig inte besvarar. */}
+          <div className="flex flex-wrap items-baseline justify-between gap-4 bg-white px-6 py-5 sm:px-8">
+            <p className="text-[13px] text-neutral-600">
+              Tre skärmar med löneunderlag: {screens} × {kr(pricing.month)} +{" "}
+              {kr(payroll.month)}
+            </p>
+            <p className="text-[15px] font-semibold tabular-nums text-neutral-900">
+              {kr(example)} kr per månad
+            </p>
+          </div>
+        </div>
+
+        <div className="mt-8 flex flex-wrap items-center gap-4">
+          <Link
+            href="/registrera"
+            className="rounded-md bg-neutral-900 px-5 py-3 text-sm font-semibold text-white transition-colors hover:bg-neutral-800"
+          >
+            Prova i 30 dagar
+          </Link>
+          <p className="text-[13px] text-neutral-500">
+            Inget betalkort. Provperioden övergår inte i betalning av sig själv.
+          </p>
         </div>
       </div>
     </section>
@@ -640,10 +770,10 @@ export function Pricing({ pricing }: { pricing: ScreenPricing }) {
 }
 
 /* -------------------------------------------------------------------------- */
-/* Frågor                                                                      */
+/* 07 Frågor                                                                   */
 /* -------------------------------------------------------------------------- */
 
-export function Faq() {
+export function Faq({ modules }: { modules: ModulePricing }) {
   const questions = [
     {
       q: "Vilken utrustning krävs i verkstaden?",
@@ -651,53 +781,57 @@ export function Faq() {
     },
     {
       q: "Hur lång tid tar uppsättningen?",
-      a: "Omkring en kvart. Anställda, ordrar och arbetsmoment läggs upp i en guide, och skärmen kopplas genom att koden knappas in på den enhet som ska användas.",
+      a: "Omkring en kvart. Anställda, arbetsmoment och ordrar läggs upp i en guide, och skärmen kopplas genom att koden knappas in på den enhet som ska användas.",
+    },
+    {
+      q: "Kan en person arbeta med två maskiner samtidigt?",
+      a: "Ja. En anställd kan ha ett pågående jobb per arbetsmoment, men aldrig två på samma. Går två maskiner en timme är det två maskintimmar, och båda ordrarna får sin.",
     },
     {
       q: "Vad händer om någon glömmer stämpla ut?",
-      a: "Posten stängs vid ett klockslag ni själva anger, exempelvis 18:00, och markeras för granskning. Beräknade sluttider är alltid märkta och kan rättas före fakturering.",
+      a: "Posten stängs vid ett klockslag ni själva anger, exempelvis 18:00, och hamnar i granskningen. Den beräknade sluttiden är märkt som beräknad och rättas innan fakturering.",
     },
     {
-      q: "Går det att rätta en felaktig stämpling?",
-      a: "Ja. Administratören kan ändra tider och registrera stämplingar i efterhand. Manuella ändringar märks och går att skilja från registrerade tryck.",
-    },
-    {
-      q: "Kan underlaget skickas vidare till vår kund?",
-      a: "Ja. PDF:en innehåller ordernummer och kundnamn som rubrik, samtliga stämplingar och totalsumma, med er logotyp överst. Excel finns för vidare bearbetning.",
+      q: "Vad händer om nätet försvinner?",
+      a: "Skärmen fortsätter ta emot tryck. De sparas lokalt och skickas när uppkopplingen är tillbaka. Arbetstid som inte registrerats går inte att rekonstruera, så stämplingen får aldrig vara det som slutar fungera.",
     },
     {
       q: "Kan Tikkr användas för löneunderlag?",
-      a: "Nej. Tikkr avser tid som ska faktureras kund och innehåller varken frånvaro, övertidsregler eller lönearter. Avgränsningen håller systemet enkelt i verkstaden.",
+      a: `Ja, som tillval för ${kr(modules.PAYROLL.month)} kr i månaden: arbetstidsschema, stämplade raster, flex, komp, frånvaro och tidrapport per anställd. Tikkr räknar timmar, inte pengar. Lönearter, OB och övertidsersättning hör till kollektivavtalet och stannar i lönesystemet.`,
     },
     {
-      q: "Hur hanteras personuppgifter?",
-      a: "Uppgifterna om en anställd begränsas till namn och registrerad tid. Administratören kan när som helst exportera eller radera en enskild anställds uppgifter.",
+      q: "Hur hanteras tid som inte ska faktureras?",
+      a: "Städning, möten och underhåll registreras som improduktiv tid i ett eget register. Den tiden når aldrig ett fakturaunderlag, men den göms inte heller i närmaste order.",
     },
     {
-      q: "Vad händer med tiden om prenumerationen avslutas?",
-      a: "Tiden finns kvar. Stämplingsskärmarna fortsätter dessutom fungera vid utebliven betalning. Det är rapporter och export som låses, eftersom oregistrerad arbetstid inte går att rekonstruera.",
+      q: "Kan underlaget skickas vidare till vår kund?",
+      a: "Ja. PDF:en har er logotyp, ordernummer och kund som rubrik, varje stämpling och en summa sist. Självkostnad och marginal finns inte i det dokumentet; de står i efterkalkylen, som är internt märkt.",
+    },
+    {
+      q: "Var lagras uppgifterna?",
+      a: "På servrar i Sverige. Personuppgiftsbiträdesavtal ingår och går att läsa innan ni börjar. Uppgifterna om en anställd begränsas till namn, valfritt anställningsnummer och registrerad tid, och går att exportera eller radera ur panelen.",
+    },
+    {
+      q: "Vad händer om vi slutar betala?",
+      a: "Stämplingsskärmarna fortsätter fungera. Det är panelen och exporten som låses, eftersom oregistrerad arbetstid inte går att få tillbaka. Tiden finns kvar och blir åtkomlig igen när fakturan är betald.",
+    },
+    {
+      q: "Är vi bundna?",
+      a: "Nej. Ingen bindningstid och ingen uppsägningstid. Årsbetalning är ett frivilligt alternativ som ger rabatt, inte en bindning.",
     },
   ];
 
   return (
-    <section
-      id="fragor"
-      className="border-b border-neutral-200 bg-neutral-50 py-24"
-    >
-      <div className="mx-auto max-w-5xl px-6">
-        <SectionHeading centered eyebrow="Frågor" title="Vanliga frågor" />
+    <section id="fragor" className="border-b border-neutral-200 bg-neutral-50">
+      <div className="mx-auto max-w-6xl px-6 py-20 sm:py-24">
+        <SectionHead index="07" eyebrow="Frågor" title="Vanliga frågor" />
 
-        {/* Två spalter på stora skärmar. Åtta frågor i en enda kolumn blev en
-            lång remsa som sköt ned prisavsnittet ur bild. */}
-        <div className="mt-12 grid gap-4 md:grid-cols-2">
+        {/* <details> ger utfällbara svar utan JavaScript. Fungerar även om
+            något går fel, och går att söka i med webbläsarens egen funktion. */}
+        <div className="mt-12 border-t border-neutral-200">
           {questions.map((item) => (
-            // <details> ger utfällbara svar utan JavaScript. Fungerar även om
-            // något går fel, och går att söka i med webbläsarens egen funktion.
-            <details
-              key={item.q}
-              className="group h-fit rounded-xl border border-neutral-200 bg-white px-5 py-4 transition-colors hover:border-neutral-300"
-            >
-              <summary className="flex cursor-pointer list-none items-center justify-between gap-4 text-[15px] font-medium text-neutral-900 [&::-webkit-details-marker]:hidden">
+            <details key={item.q} className="group border-b border-neutral-200">
+              <summary className="flex cursor-pointer list-none items-center justify-between gap-6 py-5 text-[15px] font-medium text-neutral-900 [&::-webkit-details-marker]:hidden">
                 {item.q}
                 <span
                   aria-hidden="true"
@@ -708,14 +842,14 @@ export function Faq() {
                     className="h-5 w-5"
                     fill="none"
                     stroke="currentColor"
-                    strokeWidth={1.75}
+                    strokeWidth={1.5}
                     strokeLinecap="round"
                   >
                     <path d="M10 4v12M4 10h12" />
                   </svg>
                 </span>
               </summary>
-              <p className="mt-3 text-[13px] leading-relaxed text-neutral-600">
+              <p className="max-w-3xl pb-5 text-[14px] leading-relaxed text-neutral-600">
                 {item.a}
               </p>
             </details>
@@ -732,44 +866,42 @@ export function Faq() {
 
 export function FinalCta({ pricing }: { pricing: ScreenPricing }) {
   return (
-    <section className="relative overflow-hidden bg-neutral-900 py-24">
-      <div
-        aria-hidden="true"
-        className="pointer-events-none absolute inset-0 bg-[linear-gradient(to_right,rgba(255,255,255,0.04)_1px,transparent_1px),linear-gradient(to_bottom,rgba(255,255,255,0.04)_1px,transparent_1px)] bg-[size:56px_56px] [mask-image:radial-gradient(ellipse_60%_60%_at_50%_50%,black,transparent)]"
-      />
-      <div
-        aria-hidden="true"
-        className="pointer-events-none absolute left-1/2 top-0 h-[440px] w-[900px] -translate-x-1/2 rounded-full bg-blue-500/20 blur-[140px]"
-      />
+    <section className="bg-neutral-900">
+      <div className="mx-auto max-w-6xl px-6 py-20 sm:py-24">
+        <div className="grid items-end gap-10 lg:grid-cols-2">
+          <div>
+            <h2 className="text-[28px] font-semibold leading-[1.15] tracking-tight text-white sm:text-[36px]">
+              Prova i er egen verkstad
+            </h2>
+            <p className="mt-5 max-w-lg text-[15px] leading-relaxed text-neutral-400">
+              Lägg upp anställda, arbetsmoment och ordrar, koppla skärmen och
+              börja registrera tid. Det tar omkring en kvart, och ni behöver
+              inte lämna några kortuppgifter för att komma igång.
+            </p>
+          </div>
 
-      <div className="relative mx-auto max-w-3xl px-6 text-center">
-        <h2 className="text-[26px] font-semibold tracking-tight text-white sm:text-4xl">
-          Prova i er egen verkstad
-        </h2>
-        <p className="mx-auto mt-5 max-w-xl text-[15px] leading-relaxed text-neutral-300">
-          Lägg upp anställda, ordrar och arbetsmoment, koppla skärmen och börja
-          registrera tid. Det tar omkring en kvart.
-        </p>
+          <div className="lg:justify-self-end">
+            <div className="flex flex-wrap gap-3">
+              <Link
+                href="/registrera"
+                className="rounded-md bg-white px-5 py-3 text-sm font-semibold text-neutral-900 transition-colors hover:bg-neutral-200"
+              >
+                Skapa arbetsyta
+              </Link>
+              <Link
+                href="/admin/login"
+                className="rounded-md border border-neutral-700 px-5 py-3 text-sm font-semibold text-neutral-200 transition-colors hover:bg-neutral-800"
+              >
+                Logga in
+              </Link>
+            </div>
 
-        <div className="mt-9 flex flex-wrap justify-center gap-3">
-          <Link
-            href="/registrera"
-            className="rounded-lg bg-white px-6 py-3 text-sm font-semibold text-neutral-900 transition-all hover:-translate-y-px hover:bg-neutral-100"
-          >
-            Skapa arbetsyta
-          </Link>
-          <Link
-            href="/admin/login"
-            className="rounded-lg border border-neutral-700 px-6 py-3 text-sm font-semibold text-neutral-200 transition-colors hover:bg-neutral-800"
-          >
-            Logga in
-          </Link>
+            <p className="mt-5 text-[13px] text-neutral-500">
+              30 dagar utan betalkort, därefter {kr(pricing.month)} kr per skärm
+              och månad.
+            </p>
+          </div>
         </div>
-
-        <p className="mt-5 text-[13px] text-neutral-400">
-          30 dagars provperiod · inget betalkort · därefter{" "}
-          {pricing.month.toLocaleString("sv-SE")} kr per licens och månad
-        </p>
       </div>
     </section>
   );

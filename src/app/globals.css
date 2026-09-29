@@ -96,16 +96,6 @@ dialog {
   }
 }
 
-@keyframes drift {
-  0%,
-  100% {
-    transform: translateY(0);
-  }
-  50% {
-    transform: translateY(-8px);
-  }
-}
-
 .animate-rise {
   animation: rise 0.7s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
@@ -117,11 +107,6 @@ dialog {
 /* Pulserande punkt som visar att något pågår just nu. */
 .animate-breathe {
   animation: breathe 2.4s ease-in-out infinite;
-}
-
-/* Långsam vertikal rörelse, så produktbilden inte känns som en död bild. */
-.animate-drift {
-  animation: drift 7s ease-in-out infinite;
 }
 
 /*
@@ -188,8 +173,7 @@ dialog {
 @media (prefers-reduced-motion: reduce) {
   .animate-rise,
   .animate-rise-soft,
-  .animate-breathe,
-  .animate-drift {
+  .animate-breathe {
     animation: none;
     opacity: 1;
     transform: none;

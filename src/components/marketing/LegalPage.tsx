@@ -40,7 +40,10 @@ export default function LegalPage({
       <SiteHeader />
 
       <main className="mx-auto max-w-3xl px-6 py-16">
-        <p className="text-[13px] font-semibold uppercase tracking-wider text-blue-600">
+        {/* Samma etikettform som säljsidans avsnitt, så att de rättsliga
+            sidorna läses som en del av samma dokument och inte som en bilaga
+            från någon annan. */}
+        <p className="font-mono text-[11px] uppercase tracking-[0.18em] text-neutral-500">
           TERAFALK AB
         </p>
         <h1 className="mt-3 text-3xl font-semibold tracking-tight text-neutral-900">

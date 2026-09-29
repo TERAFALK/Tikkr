@@ -80,17 +80,22 @@ export default function LiveKiosk({ className = "" }: { className?: string }) {
     return () => clearInterval(timer);
   }, [step]);
 
+  const working = people.filter((person) => person.minutes !== null).length;
+
   return (
+    /* Ramen är skriven av från Frame i Mockups.tsx i stället för importerad.
+       Den här filen körs i webbläsaren, och en import hade dragit med sig
+       samtliga produktbilder dit för en rubrikrad. */
     <div
-      className={`overflow-hidden rounded-xl border border-neutral-200 bg-white shadow-[0_20px_50px_-20px_rgba(15,23,42,0.25)] ${className}`}
+      className={`overflow-hidden rounded-lg border border-neutral-200 bg-white shadow-[0_1px_1px_rgba(15,23,42,0.04),0_24px_48px_-28px_rgba(15,23,42,0.35)] ${className}`}
     >
-      <div className="flex items-center gap-2 border-b border-neutral-200 bg-neutral-50 px-3 py-2">
-        <span className="flex gap-1.5" aria-hidden="true">
-          <span className="h-2 w-2 rounded-full bg-neutral-300" />
-          <span className="h-2 w-2 rounded-full bg-neutral-300" />
-          <span className="h-2 w-2 rounded-full bg-neutral-300" />
+      <div className="flex items-center justify-between gap-3 border-b border-neutral-200 bg-neutral-50 px-3 py-2">
+        <span className="text-[10px] font-semibold uppercase tracking-[0.12em] text-neutral-400">
+          Stämplingsskärmen
         </span>
-        <span className="text-[11px] text-neutral-400">Stämplingsskärmen</span>
+        <span className="text-[10px] tabular-nums text-neutral-400">
+          {working} av {people.length} instämplade
+        </span>
       </div>
 
       <div className="flex items-center gap-2.5 border-b border-neutral-200 px-4 py-3">

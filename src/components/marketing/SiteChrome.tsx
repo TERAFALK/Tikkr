@@ -7,6 +7,9 @@ import { activeNotices } from "@/lib/notices";
  *
  * Menyn följer med när man skrollar. På en sida där beslutet fattas långt ner
  * ska knappen som leder vidare aldrig vara utanför skärmen.
+ *
+ * Formspråket är sidans: hårfina linjer, raka hörn och en enda mörk knapp.
+ * Ingen färg används för att skapa uppmärksamhet — det gör placeringen.
  */
 
 /**
@@ -31,8 +34,8 @@ export const LEGAL = [
  */
 const NAV = [
   { href: "/#sa-funkar-det", label: "Så fungerar det" },
-  { href: "/#funktioner", label: "Funktioner" },
-  { href: "/#underlag", label: "Underlag" },
+  { href: "/#underlag", label: "Dokument" },
+  { href: "/#funktioner", label: "Innehåll" },
   { href: "/#pris", label: "Pris" },
   { href: "/#fragor", label: "Frågor" },
 ];
@@ -115,36 +118,36 @@ export function SiteHeader() {
 
 function SiteHeaderBar() {
   return (
-    <header className="sticky top-0 z-50 border-b border-neutral-200/80 bg-white/85 backdrop-blur">
-      <div className="mx-auto flex max-w-6xl items-center gap-6 px-6 py-3.5">
+    <header className="sticky top-0 z-50 border-b border-neutral-200 bg-white/90 backdrop-blur">
+      <div className="mx-auto flex max-w-6xl items-center gap-8 px-6 py-3.5">
         <Link href="/" aria-label="Tikkr, till startsidan">
-          <Wordmark size={30} />
+          <Wordmark size={28} />
         </Link>
 
-        <nav className="hidden gap-1 md:flex">
+        <nav className="hidden gap-6 md:flex">
           {NAV.map((item) => (
             <a
               key={item.href}
               href={item.href}
-              className="rounded-md px-3 py-1.5 text-[13px] font-medium text-neutral-600 transition-colors hover:bg-neutral-100 hover:text-neutral-900"
+              className="text-[13px] text-neutral-600 transition-colors hover:text-neutral-900"
             >
               {item.label}
             </a>
           ))}
         </nav>
 
-        <div className="ml-auto flex items-center gap-2">
+        <div className="ml-auto flex items-center gap-4">
           <Link
             href="/admin/login"
-            className="rounded-lg px-3 py-1.5 text-[13px] font-medium text-neutral-600 transition-colors hover:bg-neutral-100 hover:text-neutral-900"
+            className="text-[13px] text-neutral-600 transition-colors hover:text-neutral-900"
           >
             Logga in
           </Link>
           <Link
             href="/registrera"
-            className="rounded-lg bg-blue-600 px-3.5 py-1.5 text-[13px] font-medium text-white transition-colors hover:bg-blue-700"
+            className="rounded-md bg-neutral-900 px-3.5 py-2 text-[13px] font-semibold text-white transition-colors hover:bg-neutral-800"
           >
-            Kom igång
+            Prova gratis
           </Link>
         </div>
       </div>
@@ -153,97 +156,77 @@ function SiteHeaderBar() {
 }
 
 export function SiteFooter() {
+  const columns = [
+    { title: "Produkt", links: NAV },
+    {
+      title: "Konto",
+      links: [
+        { href: "/registrera", label: "Skapa arbetsyta" },
+        { href: "/admin/login", label: "Logga in" },
+      ],
+    },
+    { title: "Villkor", links: LEGAL },
+  ];
+
   return (
     <footer className="border-t border-neutral-200 bg-white">
-      <div className="mx-auto max-w-6xl px-6 py-12">
-        <div className="flex flex-wrap items-start justify-between gap-8">
+      <div className="mx-auto max-w-6xl px-6 py-14">
+        <div className="grid gap-10 sm:grid-cols-2 lg:grid-cols-[1.5fr_1fr_1fr_1fr]">
           <div className="max-w-xs">
-            <Wordmark size={30} />
-            <p className="mt-3 text-[13px] leading-relaxed text-neutral-500">
-              Tidregistrering per order och arbetsmoment för svensk verkstadsindustri.
+            <Wordmark size={28} />
+            <p className="mt-4 text-[13px] leading-relaxed text-neutral-500">
+              Tidregistrering per order och arbetsmoment för svensk
+              verkstadsindustri. Drift och support i Sverige.
             </p>
-            <p className="mt-3 text-[13px] text-neutral-500">
+            <p className="mt-4 text-[13px] text-neutral-500">
               En del av{" "}
               <span className="font-medium text-neutral-700">TERAFALK AB</span>
             </p>
           </div>
 
-          <div className="flex gap-12">
-            <div>
-              <p className="text-[11px] font-semibold uppercase tracking-wider text-neutral-400">
-                Produkt
+          {columns.map((column) => (
+            <div key={column.title}>
+              <p className="font-mono text-[11px] uppercase tracking-[0.18em] text-neutral-400">
+                {column.title}
               </p>
-              <ul className="mt-3 space-y-2 text-[13px]">
-                {NAV.map((item) => (
+              <ul className="mt-4 space-y-2.5 text-[13px]">
+                {column.links.map((item) => (
                   <li key={item.href}>
-                    <a
-                      href={item.href}
-                      className="text-neutral-600 hover:text-neutral-900"
-                    >
-                      {item.label}
-                    </a>
+                    {/* Ankarlänkar till startsidan är vanliga a-taggar. Next
+                        hanterar dem, men Link vill helst peka på en sida. */}
+                    {item.href.startsWith("/#") ? (
+                      <a
+                        href={item.href}
+                        className="text-neutral-600 transition-colors hover:text-neutral-900"
+                      >
+                        {item.label}
+                      </a>
+                    ) : (
+                      <Link
+                        href={item.href}
+                        className="text-neutral-600 transition-colors hover:text-neutral-900"
+                      >
+                        {item.label}
+                      </Link>
+                    )}
                   </li>
                 ))}
               </ul>
             </div>
-
-            <div>
-              <p className="text-[11px] font-semibold uppercase tracking-wider text-neutral-400">
-                Konto
-              </p>
-              <ul className="mt-3 space-y-2 text-[13px]">
-                <li>
-                  <Link href="/registrera" className="text-neutral-600 hover:text-neutral-900">
-                    Skapa arbetsyta
-                  </Link>
-                </li>
-                <li>
-                  <Link href="/admin/login" className="text-neutral-600 hover:text-neutral-900">
-                    Logga in
-                  </Link>
-                </li>
-              </ul>
-            </div>
-
-            <div>
-              <p className="text-[11px] font-semibold uppercase tracking-wider text-neutral-400">
-                Villkor
-              </p>
-              <ul className="mt-3 space-y-2 text-[13px]">
-                {LEGAL.map((item) => (
-                  <li key={item.href}>
-                    <Link
-                      href={item.href}
-                      className="text-neutral-600 hover:text-neutral-900"
-                    >
-                      {item.label}
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            </div>
-
-            <div>
-              <p className="text-[11px] font-semibold uppercase tracking-wider text-neutral-400">
-                Kontakt
-              </p>
-              <ul className="mt-3 space-y-2 text-[13px]">
-                <li>
-                  <a
-                    href="mailto:support@tikkr.se"
-                    className="text-neutral-600 hover:text-neutral-900"
-                  >
-                    support@tikkr.se
-                  </a>
-                </li>
-              </ul>
-            </div>
-          </div>
+          ))}
         </div>
 
-        <p className="mt-10 border-t border-neutral-200 pt-6 text-xs text-neutral-400">
-          © {new Date().getFullYear()} TERAFALK AB. Priser exklusive moms.
-        </p>
+        <div className="mt-12 flex flex-wrap items-center justify-between gap-4 border-t border-neutral-200 pt-6">
+          <p className="text-xs text-neutral-400">
+            © {new Date().getFullYear()} TERAFALK AB. Priser exklusive moms.
+          </p>
+          <a
+            href="mailto:support@tikkr.se"
+            className="text-xs text-neutral-500 transition-colors hover:text-neutral-900"
+          >
+            support@tikkr.se
+          </a>
+        </div>
       </div>
     </footer>
   );

@@ -1,14 +1,14 @@
 import type { Metadata } from "next";
 import { siteUrl } from "@/lib/site-url";
-import { getScreenPricing } from "@/lib/stripe";
+import { getModulePricing, getScreenPricing } from "@/lib/stripe";
 import Reveal from "@/components/marketing/Reveal";
 import { SiteFooter, SiteHeader } from "@/components/marketing/SiteChrome";
 import {
   AdminSection,
   Capabilities,
   Documents,
+  Facts,
   Faq,
-  Features,
   FinalCta,
   Hero,
   HowItWorks,
@@ -21,10 +21,10 @@ const base = siteUrl();
 /**
  * Sidan byggs om varje minut istället för en gång vid deploy.
  *
- * Två skäl. Priset hämtas från artikeln hos betaltjänsten, och utan den här
- * raden hade siffran bakats in när containern byggdes. Driftmeddelanden visas
- * dessutom överst, och ett pågående avbrott som dyker upp tio minuter senare
- * är inte värt mycket.
+ * Två skäl. Priserna hämtas från artiklarna hos betaltjänsten, och utan den
+ * här raden hade siffrorna bakats in när containern byggdes. Driftmeddelanden
+ * visas dessutom överst, och ett pågående avbrott som dyker upp tio minuter
+ * senare är inte värt mycket.
  */
 export const revalidate = 60;
 
@@ -38,8 +38,8 @@ export async function generateMetadata(): Promise<Metadata> {
     title: "Tikkr · Tidregistrering per order för verkstad",
     description:
       "Stämplingssystem för touchskärm. Personalen registrerar tid på rätt " +
-      "order och arbetsmoment med ett tryck. Underlag per order laddas ned " +
-      "som PDF eller Excel med er logotyp. " +
+      "order och arbetsmoment med ett tryck. Underlag per order, efterkalkyl " +
+      "och tidrapport. " +
       `${pricing.month.toLocaleString("sv-SE")} kr per stämplingsskärm och månad.`,
 
     // Talar om vilken adress som är den riktiga. Utan den kan tikkr.se och
@@ -62,16 +62,21 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 export default async function Home() {
-  const pricing = await getScreenPricing();
+  // Hämtas parallellt. Båda ligger bakom samma korta minne i stripe.ts, så
+  // det är en fråga till betaltjänsten och inte två.
+  const [pricing, modules] = await Promise.all([
+    getScreenPricing(),
+    getModulePricing(),
+  ]);
 
   return (
     <div className="bg-white">
       <SiteHeader />
 
-      {/* Hero animeras vid inladdning — den syns direkt och har inget att
-          vänta på. Resten tonas in när man skrollar dit. */}
-      <Hero />
-      <Capabilities />
+      {/* Hero och sifferraden animeras vid inladdning — de syns direkt och
+          har inget att vänta på. Resten tonas in när man skrollar dit. */}
+      <Hero pricing={pricing} />
+      <Facts pricing={pricing} />
 
       <Reveal>
         <Problem />
@@ -80,19 +85,19 @@ export default async function Home() {
         <HowItWorks />
       </Reveal>
       <Reveal>
-        <Features />
-      </Reveal>
-      <Reveal>
         <AdminSection />
       </Reveal>
       <Reveal>
-        <Documents />
+        <Documents modules={modules} />
       </Reveal>
       <Reveal>
-        <Pricing pricing={pricing} />
+        <Capabilities />
       </Reveal>
       <Reveal>
-        <Faq />
+        <Pricing pricing={pricing} modules={modules} />
+      </Reveal>
+      <Reveal>
+        <Faq modules={modules} />
       </Reveal>
       <Reveal>
         <FinalCta pricing={pricing} />
