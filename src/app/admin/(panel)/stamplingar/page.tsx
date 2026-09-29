@@ -5,7 +5,6 @@ import { companyTimeZone } from "@/lib/company";
 import NewEntryDialog from "@/components/admin/NewEntryDialog";
 import FormDialog from "@/components/admin/FormDialog";
 import FilterForm from "@/components/admin/FilterForm";
-import ConfirmButton from "@/components/admin/ConfirmButton";
 import {
   Badge,
   Button,
@@ -25,17 +24,24 @@ import {
 import { formatDateTime, formatDuration, minutesBetween } from "@/lib/format";
 import { describeEntry } from "@/lib/entry-label";
 import {
-  addDaysInZone,
   endOfDayIn,
   parseLocalDate,
   startOfDayIn,
-  toDateInput,
   toLocalDateTimeInput,
 } from "@/lib/time-zone";
 import { datePresets } from "@/lib/date-presets";
-import { deleteEntry, editEntry } from "./actions";
+import { editEntry } from "./actions";
 
 export const dynamic = "force-dynamic";
+
+/**
+ * Hur många poster listan visar innan den slutar.
+ *
+ * Taket ersätter det datum som tidigare stod förifyllt i "Från och med".
+ * Skillnaden är att ett tak syns: raden under rubriken säger att listan är
+ * kapad, och då vet man att det finns mer att filtrera fram.
+ */
+const PAGE_SIZE = 200;
 
 interface SearchParams {
   employeeId?: string;
@@ -53,16 +59,17 @@ export default async function EntriesPage({
 
   const timeZone = await companyTimeZone(companyId);
 
-  // Standard: de senaste två veckorna. En obegränsad lista blir oanvändbar
-  // efter några månaders drift.
+  // INGET FÖRVALT FRÅNDATUM (ändrat 2026-09-29). Listan började tidigare två
+  // veckor tillbaka, med skälet att en obegränsad lista blir oanvändbar. Det
+  // var fel sorts skydd: den som letade efter en stämpling från förra månaden
+  // fick en tom lista och inget som sa varför. Taket nedan gör samma jobb utan
+  // att gömma något, och det syns i listan när det slår till.
   //
   // Datumen räknas i företagets tidszon. Gjorde de inte det skulle filtret
   // "från och med idag" börja 02:00 på verkstadsgolvet och tappa morgonens
   // stämplingar — servern kör UTC.
-  const defaultFrom = addDaysInZone(new Date(), -14, timeZone);
-  const from =
-    (params.from ? parseLocalDate(params.from, timeZone) : null) ?? defaultFrom;
-  const fromDayStart = startOfDayIn(from, timeZone);
+  const from = params.from ? parseLocalDate(params.from, timeZone) : null;
+  const fromDayStart = from ? startOfDayIn(from, timeZone) : null;
 
   // "Till och med" sträcker sig till dygnets sista millisekund. Utan det faller
   // hela den sista dagens stämplingar bort, vilket ser ut som att ingen
@@ -101,10 +108,20 @@ export default async function EntriesPage({
       db.timeEntry.findMany({
         where: {
           employeeId: params.employeeId || undefined,
-          clockInAt: { gte: fromDayStart, ...(toDayEnd ? { lte: toDayEnd } : {}) },
+          // Utelämnas helt när inget datum valts. Ett tomt villkorsobjekt hade
+          // gett samma svar, men den här formen säger rakt ut att ingen gräns
+          // finns.
+          ...(fromDayStart || toDayEnd
+            ? {
+                clockInAt: {
+                  ...(fromDayStart ? { gte: fromDayStart } : {}),
+                  ...(toDayEnd ? { lte: toDayEnd } : {}),
+                },
+              }
+            : {}),
         },
         orderBy: { clockInAt: "desc" },
-        take: 200,
+        take: PAGE_SIZE,
         select: {
           id: true,
           clockInAt: true,
@@ -194,11 +211,7 @@ export default async function EntriesPage({
         />
         <FilterForm className="grid gap-4 p-5 sm:grid-cols-2 lg:grid-cols-4">
           <Field label="Från och med">
-            <Input
-              type="date"
-              name="from"
-              defaultValue={params.from ?? toDateInput(defaultFrom, timeZone)}
-            />
+            <Input type="date" name="from" defaultValue={params.from ?? ""} />
           </Field>
 
           <Field label="Till och med">
@@ -227,12 +240,17 @@ export default async function EntriesPage({
 
       {entries.length === 0 ? (
         <EmptyState
-          title="Inga stämplingar i perioden"
+          title="Inga stämplingar"
         />
       ) : (
         <Card>
           <CardHeader
             title={`${entries.length} ${entries.length === 1 ? "post" : "poster"}`}
+            description={
+              entries.length === PAGE_SIZE
+                ? `Listan visar de ${PAGE_SIZE} senaste. Välj datum för äldre.`
+                : undefined
+            }
           />
           <Table>
             <thead>
@@ -301,6 +319,13 @@ export default async function EntriesPage({
                           Ändras när den avslutats
                         </span>
                       ) : (
+                        // BARA ÄNDRA, INGEN RADERING (ändrat 2026-09-29).
+                        // Knappen fanns för felregistreringar, men en
+                        // felstämpling rättas genom att skrivas om: tiden är
+                        // fakturaunderlag och numera även löneunderlag, och en
+                        // rad som försvinner går inte att få tillbaka. En
+                        // ändrad post bär dessutom spår av vem som ändrade
+                        // den, vilket en raderad inte gör.
                         <div className="flex justify-end gap-2">
                           <FormDialog
                             trigger="Ändra"
@@ -391,17 +416,6 @@ export default async function EntriesPage({
                               </Field>
                             </div>
                           </FormDialog>
-
-                          <form action={deleteEntry}>
-                            <input type="hidden" name="id" value={entry.id} />
-                            <ConfirmButton
-                              type="submit"
-                              tone="danger"
-                              question={`Radera stämplingen för ${entry.employee.name}? Tiden går inte att få tillbaka.`}
-                            >
-                              Radera
-                            </ConfirmButton>
-                          </form>
                         </div>
                       )}
                     </Td>

@@ -128,22 +128,15 @@ export async function editEntry(formData: FormData) {
   revalidatePath(PATH);
 }
 
-/**
- * Raderar en stämpling.
+/*
+ * DET FINNS INGEN RADERING HÄR (borttagen 2026-09-29).
  *
- * Finns för felregistreringar — någon stämplade in på fel person eller fel
- * order. Gränssnittet frågar innan, eftersom raderad tid inte går att få
- * tillbaka och det är fakturaunderlag som försvinner.
+ * Den fanns för felregistreringar, och gränssnittet frågade innan. Kunden bad
+ * ändå att knappen skulle bort, och skälet håller: en felaktig stämpling
+ * rättas genom att skrivas om, inte genom att försvinna. Tiden är både
+ * fakturaunderlag och löneunderlag, en ändrad post bär spår av vem som ändrade
+ * den, och en raderad post lämnar bara ett hål ingen kan förklara i efterhand.
+ *
+ * Ska en persons tid bort helt finns GDPR-raderingen i inställningarna, som är
+ * avsiktligt svårare att nå och som tar med allt som hör personen till.
  */
-export async function deleteEntry(formData: FormData) {
-  const session = await requireAdmin();
-  await assertWritable(session);
-  const { db } = session;
-
-  const id = String(formData.get("id") ?? "");
-  if (!id) return;
-
-  await db.timeEntry.delete({ where: { id } });
-  revalidatePath(PATH);
-  revalidatePath("/admin");
-}
