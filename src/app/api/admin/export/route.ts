@@ -279,10 +279,17 @@ async function reportAsPdf(
 
     const period = from && to ? `${from}_${to}` : formatDate(new Date(), timeZone);
 
+    // Utskriftsknappen ber om visning i stället för nedladdning. Ett dokument
+    // som kommer som "attachment" hamnar i nedladdningsmappen i stället för i
+    // skrivardialogen. Se PrintButton i panelen.
+    const inline = params.get("visa") === "1";
+
     return new NextResponse(new Uint8Array(pdf), {
       headers: {
         "content-type": "application/pdf",
-        "content-disposition": `attachment; filename="tikkr-rapport-${period}.pdf"`,
+        "content-disposition": `${
+          inline ? "inline" : "attachment"
+        }; filename="tikkr-rapport-${period}.pdf"`,
         "cache-control": "no-store",
       },
     });

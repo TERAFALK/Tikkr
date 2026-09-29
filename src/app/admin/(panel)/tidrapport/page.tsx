@@ -3,6 +3,7 @@ import { requireAdmin } from "@/lib/admin-session";
 import { requireModule } from "@/lib/company-modules";
 import { unsafeGlobalPrisma } from "@/lib/db";
 import FilterForm from "@/components/admin/FilterForm";
+import PrintButton from "@/components/admin/PrintButton";
 import TimesheetView from "@/components/admin/TimesheetView";
 import type { TimesheetDayRow } from "@/components/admin/TimesheetTable";
 import {
@@ -20,6 +21,7 @@ import { buildPayrollPeriod } from "@/lib/payroll";
 import { ABSENCE_LABELS } from "@/lib/absence";
 import { formatDate, formatDecimalHours, formatTime } from "@/lib/format";
 import { startOfWeekIn, addDaysInZone, parseLocalDate, toDateInput } from "@/lib/time-zone";
+import { datePresets } from "@/lib/date-presets";
 import { saveAbsence } from "./actions";
 
 /**
@@ -180,6 +182,22 @@ export default async function TimesheetPage({
     `/api/admin/export/timesheet?anstalld=${employeeId}` +
     `&from=${toDateInput(from, timeZone)}&to=${toDateInput(to, timeZone)}`;
 
+  /*
+   * Förra veckans stämplingar för ALLA anställda, en person per sida.
+   *
+   * Samma knapp som i rapportvyn, och med flit densamma: utskriften görs på
+   * måndagen när veckan ska stämmas av, och det är då man står här. Att den
+   * finns på två ställen är inte en dubblett utan två vägar till samma papper.
+   *
+   * Den hämtar sitt dokument från rapportexporten och inte från tidrapportens
+   * egen. Det är en stämplingslista, inte ett löneunderlag: kind=ALL ger både
+   * fakturerbar och improduktiv tid, och inga frånvarouppgifter följer med.
+   */
+  const lastWeek = datePresets(timeZone).lastWeek;
+  const lastWeekHref =
+    `/api/admin/export?from=${lastWeek.from}&to=${lastWeek.to}` +
+    `&visning=persondetalj&kind=ALL&format=pdf`;
+
   return (
     <>
       <PageHeader
@@ -190,6 +208,10 @@ export default async function TimesheetPage({
         )} – ${formatDate(to, timeZone)}`}
         action={
           <div className="flex flex-wrap gap-2">
+            <PrintButton
+              href={lastWeekHref}
+              label="Förra veckan per anställd"
+            />
             <ButtonLink href={exportHref} tone="secondary">
               PDF
             </ButtonLink>

@@ -200,7 +200,10 @@ function render(
   } else if (options.view === "person") {
     y = drawGroupTable(doc, "Anställd", report.byEmployee, y);
   } else if (options.view === "persondetalj") {
-    y = drawEmployeeDetailTable(doc, company, report, y);
+    // Skickar med perioden: varje anställd får ett eget papper, och ett
+    // papper som lämnas till någon ska säga vilken vecka det gäller utan att
+    // förstasidan följer med.
+    y = drawEmployeeDetailTable(doc, company, report, y, options.filterLines[0]);
   } else {
     y = drawDetailTable(doc, company, report, y);
   }
@@ -444,7 +447,7 @@ function line(doc: PDFKit.PDFDocument, y: number) {
 }
 
 /**
- * VARJE STÄMPLING, GRUPPERAD PER ANSTÄLLD.
+ * VARJE STÄMPLING, GRUPPERAD PER ANSTÄLLD. EN PERSON PER SIDA.
  *
  * Formen kunden bad om: en rubrik per person, personens stämplingar under den
  * i tidsordning, och en delsumma innan nästa person börjar.
@@ -454,6 +457,16 @@ function line(doc: PDFKit.PDFDocument, y: number) {
  * veckan"; den här besvarar "vad gjorde Anna", och det är den frågan man har
  * när man ska stämma av en vecka med någon.
  *
+ * VARJE PERSON BÖRJAR PÅ EN NY SIDA (ändrat 2026-09-29). Tidigare flöt de
+ * ihop, så att Annas vecka slutade mitt på ett papper där Bertils började.
+ * Utskriften delas ut till var och en, och då går den inte att dela ut alls
+ * utan att någon får läsa någon annans rader. Förstasidan är summeringen;
+ * personerna följer därefter, en per sida.
+ *
+ * DÄRFÖR FINNS INGEN SLUTSUMMA SIST. Den skulle hamna på den sista personens
+ * papper och påstå att raden ovanför gäller hen. Periodens totaler står i
+ * rutan på förstasidan, där de hör hemma.
+ *
  * Grupperingen sker här och inte i report.ts. Raderna bär redan namn och
  * nummer, och ReportResult är delad med Excel-exporten och rapportvyn — en ny
  * gruppering där hade fått alla tre att bära något bara den här sidan behöver.
@@ -462,7 +475,8 @@ function drawEmployeeDetailTable(
   doc: PDFKit.PDFDocument,
   company: ReportPdfCompany,
   report: ReportResult,
-  startY: number
+  startY: number,
+  period: string
 ): number {
   let y = startY + 6;
 
@@ -493,16 +507,23 @@ function drawEmployeeDetailTable(
   for (const [heading, rows] of people) {
     rows.sort((a, b) => a.clockInAt.getTime() - b.clockInAt.getTime());
 
-    // Rubriken ska aldrig bli ensam kvar längst ner på en sida. Plats för
-    // namnet, tabellhuvudet och minst en rad, annars börjar personen på nästa.
-    if (y + 18 + 22 + 20 > PAGE_BREAK_Y) {
-      doc.addPage();
-      y = MARGIN;
-    }
+    // Alltid en ny sida, även för den första. Förstasidan bär summeringen och
+    // staplarna, och en person som börjar under dem får ett papper som inte
+    // går att lämna vidare.
+    doc.addPage();
+    y = MARGIN;
 
     doc.font("Helvetica-Bold").fontSize(11).fillColor("#0a0a0a");
     doc.text(heading, MARGIN, y);
-    y += 18;
+    y += 15;
+
+    // Företag och period under namnet. Ett löst papper ska svara på vem det
+    // gäller, var det kommer ifrån och vilken vecka det är.
+    doc.font("Helvetica").fontSize(8).fillColor("#737373");
+    doc.text(`${company.name}   ·   ${period}`, MARGIN, y, {
+      width: CONTENT_WIDTH,
+    });
+    y = doc.y + 8;
 
     y = drawHead(doc, EMPLOYEE_DETAIL_COLUMNS, y);
     doc.font("Helvetica").fontSize(9);
@@ -547,10 +568,5 @@ function drawEmployeeDetailTable(
     y += 6;
   }
 
-  return drawTotal(
-    doc,
-    EMPLOYEE_DETAIL_COLUMNS,
-    ["TOTALT", "", "", formatDuration(report.totalMinutes)],
-    y
-  );
+  return y;
 }

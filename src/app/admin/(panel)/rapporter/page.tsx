@@ -1,5 +1,6 @@
 import Link from "next/link";
 import FilterForm from "@/components/admin/FilterForm";
+import PrintButton from "@/components/admin/PrintButton";
 import SearchSelect from "@/components/admin/SearchSelect";
 import { requireAdmin } from "@/lib/admin-session";
 import { unsafeGlobalPrisma } from "@/lib/db";
@@ -63,7 +64,11 @@ export default async function ReportsPage({
   const { presets, lastWeek } = datePresets(timeZone);
 
   // Förra veckans stämplingar per anställd, direkt som PDF. Den utskriften
-  // görs varje måndag, och den ska inte kräva fyra val först.
+  // görs varje måndag, och den ska inte kräva fyra val först. Samma knapp
+  // finns på tidrapporten, som är där man är när veckan ska stämmas av.
+  //
+  // En anställd per sida i PDF:en, så att varje papper går att lämna vidare
+  // utan att någon får läsa någon annans rader. Se report-pdf.ts.
   //
   // kind=ALL med flit: frågan är vad personen gjort i veckan, och då hör
   // städning och möten dit. Improduktiva rader står i gult och rubriken säger
@@ -136,10 +141,15 @@ export default async function ReportsPage({
         action={
           <div className="flex flex-wrap gap-2">
             {/* Står kvar även när filtren gett en tom rapport: knappen gäller
-                förra veckan och inte det som råkar visas på skärmen. */}
-            <ButtonLink href={lastWeekHref} tone="secondary">
-              Förra veckan per anställd
-            </ButtonLink>
+                förra veckan och inte det som råkar visas på skärmen.
+
+                Skriver ut direkt i stället för att ladda ner. Utskriften är
+                det den finns för, och den som ändå vill ha en fil väljer
+                "Spara som PDF" i skrivardialogen. */}
+            <PrintButton
+              href={lastWeekHref}
+              label="Förra veckan per anställd"
+            />
             {report.rows.length > 0 && (
               <>
                 <ButtonLink
