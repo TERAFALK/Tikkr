@@ -20,13 +20,18 @@ import {
   Th,
   Tr,
 } from "@/components/ui";
-import { formatCurrency } from "@/lib/money";
 import { createEmployee, toggleEmployee, updateEmployee } from "./actions";
 
 export const dynamic = "force-dynamic";
 
 /**
  * ANSTÄLLDA.
+ *
+ * TIMKOSTNADEN STÅR INTE I LISTAN (ändrat 2026-09-29). Den fanns som en egen
+ * kolumn, och därmed syntes vad varje person kostar för den som råkade gå
+ * förbi skärmen. Satsen finns kvar under Ändra, där den hör hemma: den som
+ * öppnar rutan har ett ärende dit. Samma hållning som att kiosken aldrig visar
+ * belopp.
  *
  * Arbetstiderna i ändra-rutan hör till lönemodulen och visas bara för den som
  * har den. Grinden är `hasModule` och inte bara en dold kryssruta: sidan och
@@ -95,7 +100,6 @@ export default async function EmployeesPage() {
               <tr>
                 <Th>Namn</Th>
                 <Th>Anställningsnummer</Th>
-                <Th numeric>Timkostnad</Th>
                 <Th>Status</Th>
                 <Th numeric>Stämplingar</Th>
                 <Th>
@@ -120,13 +124,6 @@ export default async function EmployeesPage() {
                   <Td muted>
                     {employee.employeeNumber ?? (
                       <span className="text-neutral-300">—</span>
-                    )}
-                  </Td>
-                  <Td numeric muted={employee.costRateOre === null}>
-                    {employee.costRateOre === null ? (
-                      <span className="text-neutral-300">—</span>
-                    ) : (
-                      `${formatCurrency(employee.costRateOre)}/tim`
                     )}
                   </Td>
                   <Td>
