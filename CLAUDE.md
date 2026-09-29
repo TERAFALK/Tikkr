@@ -469,6 +469,13 @@ hamna på den sista personens papper och påstå att raden ovanför gäller hen.
 Periodens totaler står på förstasidan. Knappen finns både under Rapporter och
 på Tidrapport, eftersom det är där man står på måndagen.
 
+**Excel-arken ska gå att skriva ut.** Efterkalkylens ark skalas till EN sida,
+liggande, och kundnamnet spänner över hela sin rad. Ett långt kundnamn klipptes
+förut mitt i, eftersom Excel bara visar den text som får plats när grannrutan
+är upptagen, och arket blev två sidor där den andra var en remsa med en enda
+kolumn på. Kolumnbredderna styrs av det längsta som ska stå i kolumnen, inte av
+vad som råkade se bra ut.
+
 **Stämplingar går inte att radera** (ändrat 2026-09-29). Knappen fanns för
 felregistreringar. En felaktig stämpling rättas i stället genom att skrivas om:
 tiden är både faktura- och löneunderlag, en ändrad post bär spår av vem som

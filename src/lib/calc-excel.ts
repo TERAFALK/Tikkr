@@ -97,16 +97,41 @@ function renderSheet(
   companyName: string,
   order: OrderCalc
 ) {
+  // BREDDERNA STYRS AV DET LÄNGSTA SOM SKA STÅ I KOLUMNEN, inte av vad som
+  // råkade se bra ut. "Ordernummer:" är tolv tecken och bestämmer D;
+  // beloppen i E och G är sällan mer än tio. Summan hålls nere så att arket
+  // ryms på en sida i bredd, se pageSetup nedan.
   sheet.columns = [
-    { width: 22 }, // A  etiketter
-    { width: 8 }, // B  löpnr
-    { width: 26 }, // C  vad
-    { width: 18 }, // D  etiketter till höger
-    { width: 14 }, // E  belopp
-    { width: 10 }, // F  påslag / frakt
-    { width: 16 }, // G  belopp med påslag
-    { width: 12 }, // H  etiketter längst ut
+    { width: 20 }, // A  etiketter
+    { width: 7 }, // B  löpnr
+    { width: 22 }, // C  vad
+    { width: 16 }, // D  etiketter till höger
+    { width: 13 }, // E  belopp
+    { width: 9 }, // F  påslag / frakt
+    { width: 14 }, // G  belopp med påslag
+    { width: 11 }, // H  etiketter längst ut
   ];
+
+  // EN SIDA VID UTSKRIFT. Arket är åtta kolumner brett och fyrtiofem rader
+  // långt, vilket i Excels standardinställning blir två sidor: den andra en
+  // remsa med en enda kolumn på. Nu skalas det ner till en sida, liggande,
+  // eftersom arket är bredare än det är högt.
+  sheet.pageSetup = {
+    paperSize: 9, // A4
+    orientation: "landscape",
+    fitToPage: true,
+    fitToWidth: 1,
+    fitToHeight: 1,
+    horizontalCentered: true,
+    margins: {
+      left: 0.4,
+      right: 0.4,
+      top: 0.5,
+      bottom: 0.5,
+      header: 0.3,
+      footer: 0.3,
+    },
+  };
 
   const set = (ref: string, value: CellValue) => {
     sheet.getCell(ref).value = value;
@@ -120,13 +145,21 @@ function renderSheet(
   /* --- Huvud --------------------------------------------------------------- */
 
   set("B1", "Efterkalkyl").font = { bold: true, size: 14 };
+
+  // KUNDNAMNET FÅR HELA RADEN (ändrat 2026-09-29). Det stod i E1 med
+  // "Uppdaterad:" i G1 bredvid, och ett långt namn klipptes därför mitt i:
+  // Excel visar bara text som får plats när grannrutan är upptagen. Namnet
+  // spänner nu över fyra kolumner, och datumet har flyttat ner en rad till en
+  // plats som ändå stod tom.
   set("D1", "Kund:");
+  sheet.mergeCells("E1:H1");
   set("E1", order.customerName ?? "");
-  set("G1", "Uppdaterad:");
-  set("H1", new Date()).numFmt = "yyyy-mm-dd";
+  sheet.getCell("E1").alignment = { horizontal: "left", shrinkToFit: true };
 
   set("D2", "Ordernummer:");
   set("E2", order.orderNumber);
+  set("G2", "Uppdaterad:");
+  set("H2", new Date()).numFmt = "yyyy-mm-dd";
   bold("E1");
   bold("E2");
 

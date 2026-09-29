@@ -83,6 +83,49 @@ describe("huvudet", () => {
     expect(sheet.getCell("E1").value).toBe("");
     expect(sheet.name).toBe("35466");
   });
+
+  it("ger kundnamnet hela raden, så att ett långt namn inte klipps", () => {
+    // Namnet stod tidigare i E1 med "Uppdaterad:" i grannrutan, och Excel
+    // visar bara den text som får plats när grannen är upptagen. Ett långt
+    // kundnamn syntes därför halvt.
+    const sheet = sheetFor(
+      calc({ customerName: "Sandvik Coromant Materials Technology AB" })
+    );
+
+    expect(sheet.getCell("E1").value).toBe(
+      "Sandvik Coromant Materials Technology AB"
+    );
+    expect(sheet.getCell("H1").isMerged).toBe(true);
+    expect(sheet.getCell("H1").master.address).toBe("E1");
+  });
+
+  it("flyttar datumet till rad två, där det inte tränger namnet", () => {
+    const sheet = sheetFor(calc());
+
+    expect(sheet.getCell("G2").value).toBe("Uppdaterad:");
+    expect(sheet.getCell("H2").value).toBeInstanceOf(Date);
+  });
+});
+
+describe("utskriften", () => {
+  it("skalas till en sida", () => {
+    const sheet = sheetFor(calc());
+
+    expect(sheet.pageSetup.fitToPage).toBe(true);
+    expect(sheet.pageSetup.fitToWidth).toBe(1);
+    expect(sheet.pageSetup.fitToHeight).toBe(1);
+    expect(sheet.pageSetup.orientation).toBe("landscape");
+  });
+
+  it("håller arket smalt nog att läsa i utskrift", () => {
+    // Bredderna är det som avgör hur mycket Excel måste krympa arket för att
+    // få in det på en sida. Krymper det för mycket blir siffrorna oläsliga.
+    const total = sheetFor(calc())
+      .columns.map((column) => column.width ?? 0)
+      .reduce((sum, width) => sum + width, 0);
+
+    expect(total).toBeLessThanOrEqual(115);
+  });
 });
 
 describe("raden Tikkr fyller i", () => {
