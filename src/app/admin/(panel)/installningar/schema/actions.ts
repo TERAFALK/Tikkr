@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { assertWritable, requireAdmin } from "@/lib/admin-session";
 import { requireModule } from "@/lib/company-modules";
-import { parseMinuteOfDay } from "@/lib/schedule";
+import { readScheduleDays } from "@/lib/schedule";
 
 /**
  * Arbetstidsschemat.
@@ -11,6 +11,10 @@ import { parseMinuteOfDay } from "@/lib/schedule";
  * Hela veckan sparas i ett svep. Alternativet — en knapp per dag — skulle
  * göra det möjligt att lämna halva veckan osparad utan att det syns, och ett
  * halvt schema ger en planerad tid som ser rimlig ut men är fel.
+ *
+ * Fälten läses av `readScheduleDays` i lib/schedule.ts, som också läser rutan
+ * med egna tider under Anställda. Samma formulärfält på två ställen ska tolkas
+ * av samma kod.
  */
 
 const PATH = "/admin/installningar/schema";
@@ -18,31 +22,6 @@ const PATH = "/admin/installningar/schema";
 export interface ScheduleFormState {
   error?: string;
   savedAt?: number;
-}
-
-/** Rasterna på en dag, som de kommer från formuläret. */
-function readBreaks(
-  formData: FormData,
-  weekday: number
-): { startMinute: number; endMinute: number }[] {
-  const starts = formData.getAll(`break-start-${weekday}`);
-  const ends = formData.getAll(`break-end-${weekday}`);
-
-  const breaks: { startMinute: number; endMinute: number }[] = [];
-
-  for (const [index, rawStart] of starts.entries()) {
-    const start = parseMinuteOfDay(String(rawStart ?? ""));
-    const end = parseMinuteOfDay(String(ends[index] ?? ""));
-
-    // Halvfyllda rader hoppas över. Den som tryckt på plus och ångrat sig har
-    // lämnat en tom rad, inte begått ett fel.
-    if (start === null || end === null) continue;
-    if (end <= start) continue;
-
-    breaks.push({ startMinute: start, endMinute: end });
-  }
-
-  return breaks;
 }
 
 export async function saveSchedule(
@@ -54,46 +33,9 @@ export async function saveSchedule(
   await requireModule(session, "PAYROLL");
   const { db, companyId } = session;
 
-  const days: {
-    weekday: number;
-    startMinute: number;
-    endMinute: number;
-    breaks: { startMinute: number; endMinute: number }[];
-  }[] = [];
-
-  for (let weekday = 1; weekday <= 7; weekday++) {
-    // Dagen är arbetsfri när rutan inte är i. Raden skrivs då inte alls, och
-    // planerad tid blir noll.
-    if (formData.get(`active-${weekday}`) !== "on") continue;
-
-    const start = parseMinuteOfDay(String(formData.get(`start-${weekday}`) ?? ""));
-    const end = parseMinuteOfDay(String(formData.get(`end-${weekday}`) ?? ""));
-
-    if (start === null || end === null) {
-      return {
-        error: "Skriv tiderna som klockslag, till exempel 06:30.",
-      };
-    }
-
-    if (end <= start) {
-      return { error: "Sluttiden måste ligga efter starttiden." };
-    }
-
-    const breaks = readBreaks(formData, weekday);
-
-    const breakMinutes = breaks.reduce(
-      (total, rest) => total + (rest.endMinute - rest.startMinute),
-      0
-    );
-
-    if (breakMinutes >= end - start) {
-      return {
-        error: `Rasterna är längre än arbetsdagen på ${dayName(weekday)}.`,
-      };
-    }
-
-    days.push({ weekday, startMinute: start, endMinute: end, breaks });
-  }
+  const read = readScheduleDays(formData);
+  if ("error" in read) return read;
+  const days = read.days;
 
   const existing = await db.workSchedule.findFirst({
     where: { isDefault: true },
@@ -137,18 +79,6 @@ export async function saveSchedule(
   revalidatePath(PATH);
   revalidatePath("/admin/tidrapport");
   return { savedAt: Date.now() };
-}
-
-function dayName(weekday: number): string {
-  return [
-    "måndag",
-    "tisdag",
-    "onsdag",
-    "torsdag",
-    "fredag",
-    "lördag",
-    "söndag",
-  ][weekday - 1];
 }
 
 /* --- Rasttyper ----------------------------------------------------------- */

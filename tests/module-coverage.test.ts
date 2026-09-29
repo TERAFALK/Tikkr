@@ -76,6 +76,26 @@ const PAYROLL_SURFACE = [
 ];
 
 /**
+ * Filer där BARA EN DEL rör lönemodulen.
+ *
+ * De har en vakt, men inte överst: resten av filen hör till basen och måste
+ * fungera för varje kund.
+ *
+ * anstallda/page.tsx och anstallda/actions.ts: listan över anställda, deras
+ * namn, nummer, bild och timkostnad är basen. Arbetstiderna i ändra-rutan är
+ * lönemodulen, och bara de raderna ligger bakom `hasModule`. Att svara 404 på
+ * hela anställdlistan för den som inte köpt löneunderlaget vore fel sorts
+ * spärr — den skulle ta bort något de betalar för.
+ *
+ * Kontrolleras hårdare än NO_GUARD_NEEDED nedan: filen MÅSTE innehålla en
+ * vakt. Det enda som lättas är kravet att varje åtgärd i filen har en.
+ */
+const PARTIAL_GUARD = [
+  "app/admin/(panel)/anstallda/page.tsx",
+  "app/admin/(panel)/anstallda/actions.ts",
+];
+
+/**
  * Filer som rör lönetabellerna men INTE ska ha en vakt.
  *
  * Varje rad är ett hål i skyddet och måste ha ett skäl som håller.
@@ -96,7 +116,7 @@ const PAYROLL_SURFACE = [
 const NO_GUARD_NEEDED = [
   "app/admin/(panel)/installningar/actions.ts",
   "app/api/cron/auto-close/route.ts",
-  "components/admin/ScheduleForm.tsx",
+  "components/admin/ScheduleDays.tsx",
   "components/admin/AbsenceDialog.tsx",
   "components/admin/TimesheetTable.tsx",
 ];
@@ -211,11 +231,27 @@ describe("lönemodulen är grindad", () => {
     ).toEqual([]);
   });
 
+  it("varje delvis grindad fil har en vakt", () => {
+    for (const file of PARTIAL_GUARD) {
+      expect(exists(file), `${file} finns inte i src/`).toBe(true);
+
+      expect(
+        GUARD.test(read(file)),
+        `${file} står i PARTIAL_GUARD men har ingen vakt alls. Delen som rör ` +
+          "lönemodulen ska ligga bakom hasModule()."
+      ).toBe(true);
+    }
+  });
+
   it("ingen fil rör löneunderlaget utan att stå i listan", () => {
     // DEN VIKTIGASTE KONTROLLEN. De tre ovan litar på en handskriven lista;
     // den här räknar fram vilka filer som faktiskt rör modulen och fäller en
     // ny lönesida ingen kommit ihåg att lägga till.
-    const known = new Set([...PAYROLL_SURFACE, ...NO_GUARD_NEEDED]);
+    const known = new Set([
+      ...PAYROLL_SURFACE,
+      ...PARTIAL_GUARD,
+      ...NO_GUARD_NEEDED,
+    ]);
 
     const missed = [
       ...walk(path.join(SRC, "app")),
@@ -231,10 +267,11 @@ describe("lönemodulen är grindad", () => {
 
     expect(
       missed,
-      "Dessa filer rör löneunderlaget men står varken i PAYROLL_SURFACE " +
-        "eller i NO_GUARD_NEEDED. Lägg till en modulvakt och skriv in filen " +
-        "i PAYROLL_SURFACE — eller, om den bevisligen inte behöver någon, i " +
-        "NO_GUARD_NEEDED med ett skäl."
+      "Dessa filer rör löneunderlaget men står i ingen av listorna. Lägg " +
+        "till en modulvakt och skriv in filen i PAYROLL_SURFACE, i " +
+        "PARTIAL_GUARD om bara en del av filen hör till modulen — eller, om " +
+        "den bevisligen inte behöver någon vakt, i NO_GUARD_NEEDED med ett " +
+        "skäl."
     ).toEqual([]);
   });
 

@@ -1,6 +1,13 @@
 import { requireAdmin } from "@/lib/admin-session";
+import { hasModule } from "@/lib/company-modules";
 import EmployeeDialog from "@/components/admin/EmployeeDialog";
 import EmployeeAvatar from "@/components/ui/EmployeeAvatar";
+import type { ScheduleDayValue } from "@/components/admin/ScheduleDays";
+import {
+  formatMinuteOfDay,
+  ownScheduleDays,
+  type ScheduleDayInput,
+} from "@/lib/schedule";
 import {
   Badge,
   Button,
@@ -18,8 +25,19 @@ import { createEmployee, toggleEmployee, updateEmployee } from "./actions";
 
 export const dynamic = "force-dynamic";
 
+/**
+ * ANSTÄLLDA.
+ *
+ * Arbetstiderna i ändra-rutan hör till lönemodulen och visas bara för den som
+ * har den. Grinden är `hasModule` och inte bara en dold kryssruta: sidan och
+ * åtgärden är samma väg in, och en gömd ruta är ingen spärr. Se
+ * lib/company-modules.ts och tests/module-coverage.test.ts.
+ */
 export default async function EmployeesPage() {
-  const { db } = await requireAdmin();
+  const session = await requireAdmin();
+  const { db, companyId } = session;
+
+  const payroll = await hasModule(companyId, "PAYROLL");
 
   const employees = await db.employee.findMany({
     orderBy: [{ active: "desc" }, { name: "asc" }],
@@ -36,12 +54,22 @@ export default async function EmployeesPage() {
     },
   });
 
+  // Hämtas i EN fråga för hela listan och inte en per person. Tjugo anställda
+  // hade annars blivit tjugo uppslag för fält som oftast är tomma.
+  const schedules: Map<string, ScheduleDayInput[]> = payroll
+    ? await ownScheduleDays(
+        db,
+        employees.map((employee) => employee.id)
+      )
+    : new Map();
+
   const newEmployee = (
     <EmployeeDialog
       trigger="Ny anställd"
       title="Lägg till anställd"
       action={createEmployee}
       submitLabel="Lägg till"
+      canEditSchedule={payroll}
     />
   );
 
@@ -126,6 +154,8 @@ export default async function EmployeesPage() {
                           costRateOre: employee.costRateOre,
                           hasPhoto: Boolean(employee.photoMimeType),
                         }}
+                        canEditSchedule={payroll}
+                        scheduleDays={toDayValues(schedules.get(employee.id))}
                       />
 
                       <form action={toggleEmployee}>
@@ -149,4 +179,33 @@ export default async function EmployeesPage() {
       )}
     </>
   );
+}
+
+/**
+ * Minuter från midnatt tillbaka till klockslag.
+ *
+ * Databasen räknar i minuter eftersom ett schema ska gå att räkna på;
+ * formuläret visar "06:30" eftersom det är vad en människa skriver.
+ */
+function toDayValues(
+  days:
+    | {
+        weekday: number;
+        startMinute: number;
+        endMinute: number;
+        breaks: { startMinute: number; endMinute: number }[];
+      }[]
+    | undefined
+): ScheduleDayValue[] | null {
+  if (!days || days.length === 0) return null;
+
+  return days.map((day) => ({
+    weekday: day.weekday,
+    start: formatMinuteOfDay(day.startMinute),
+    end: formatMinuteOfDay(day.endMinute),
+    breaks: day.breaks.map((rest) => ({
+      start: formatMinuteOfDay(rest.startMinute),
+      end: formatMinuteOfDay(rest.endMinute),
+    })),
+  }));
 }

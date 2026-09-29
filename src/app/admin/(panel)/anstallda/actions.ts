@@ -2,7 +2,10 @@
 
 import { revalidatePath } from "next/cache";
 import { assertWritable, requireAdmin } from "@/lib/admin-session";
+import { hasModule } from "@/lib/company-modules";
 import { parseOre } from "@/lib/money";
+import { readScheduleDays, saveOwnScheduleDays } from "@/lib/schedule";
+import type { CompanyDb } from "@/lib/tenant";
 
 // Varje åtgärd börjar med requireAdmin(). Det ger både inloggningskontroll och
 // en databasklient låst till rätt företag — en serveråtgärd är en publik
@@ -108,6 +111,36 @@ interface PhotoFields {
   photoUpdatedAt?: Date;
 }
 
+/**
+ * Personens egna arbetstider, när företaget har lönemodulen.
+ *
+ * DELVIS GRINDAD FIL. Namn, nummer, bild och timkostnad hör till basen och
+ * ska fungera för alla; bara arbetstiderna är ett tillval. Därför `hasModule`
+ * kring just de raderna i stället för `requireModule` överst — en
+ * anställdlista som svarar 404 för den som inte köpt löneunderlaget vore fel
+ * sorts spärr. Se tests/module-coverage.test.ts.
+ *
+ * Inga dagsfält i formuläret betyder att personen ska gå på företagets
+ * standardschema. Det är samma sak som att kryssa ur rutan, och därför
+ * behöver gränssnittet inte skicka något extra för att säga det.
+ *
+ * Ger ett felmeddelande att visa, eller inget alls.
+ */
+async function saveSchedule(
+  db: CompanyDb,
+  companyId: string,
+  employeeId: string,
+  formData: FormData
+): Promise<string | null> {
+  if (!(await hasModule(companyId, "PAYROLL"))) return null;
+
+  const read = readScheduleDays(formData);
+  if ("error" in read) return read.error;
+
+  await saveOwnScheduleDays(db, companyId, employeeId, read.days);
+  return null;
+}
+
 function photoFields(
   photo: { data: Uint8Array<ArrayBuffer>; mimeType: string } | undefined,
   remove: boolean
@@ -141,8 +174,10 @@ export async function createEmployee(
   const photo = await readPhoto(formData);
   if (photo && "error" in photo) return { error: photo.error };
 
+  let created: { id: string };
+
   try {
-    await db.employee.create({
+    created = await db.employee.create({
       data: {
         name,
         companyId,
@@ -150,10 +185,16 @@ export async function createEmployee(
         costRateOre: parseOre(formData.get("costRate")),
         ...photoFields(photo, false),
       },
+      select: { id: true },
     });
   } catch (error) {
     return { error: describeError(error) };
   }
+
+  // Efter personen och inte i samma anrop: schemat pekar på den anställda,
+  // som får sitt id först när raden finns.
+  const scheduleError = await saveSchedule(db, companyId, created.id, formData);
+  if (scheduleError) return { error: scheduleError };
 
   revalidatePath(PATH);
   return { savedAt: Date.now() };
@@ -171,7 +212,7 @@ export async function updateEmployee(
 ): Promise<EmployeeState> {
   const session = await requireAdmin();
   await assertWritable(session);
-  const { db } = session;
+  const { db, companyId } = session;
 
   const id = String(formData.get("id") ?? "");
   const name = String(formData.get("name") ?? "").trim();
@@ -201,7 +242,12 @@ export async function updateEmployee(
     return { error: describeError(error) };
   }
 
+  const scheduleError = await saveSchedule(db, companyId, id, formData);
+  if (scheduleError) return { error: scheduleError };
+
   revalidatePath(PATH);
+  // Planerad tid ändras, och den räknas fram på tidrapporten.
+  revalidatePath("/admin/tidrapport");
   return { savedAt: Date.now() };
 }
 

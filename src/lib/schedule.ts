@@ -230,3 +230,265 @@ export function formatMinuteOfDay(minutes: number): string {
   const minute = minutes % 60;
   return `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
 }
+
+/* --- Schemat som formulär -------------------------------------------------
+ *
+ * Två ställen skickar in ett veckoschema: inställningarnas schemasida, som
+ * sätter företagets standard, och rutan under Anställda, som ger en person
+ * egna tider. Fälten heter likadant och tolkas därför av samma kod. Två
+ * läsare av samma formulär hade glidit isär vid första ändringen, och den
+ * sortens glidning syns först som ett felaktigt flexsaldo. */
+
+/** En dag på väg in i databasen. */
+export interface ScheduleDayInput {
+  weekday: number;
+  startMinute: number;
+  endMinute: number;
+  breaks: { startMinute: number; endMinute: number }[];
+}
+
+/** Rasterna på en dag, som de kommer från formuläret. */
+function readBreaks(
+  formData: FormData,
+  weekday: number
+): { startMinute: number; endMinute: number }[] {
+  const starts = formData.getAll(`break-start-${weekday}`);
+  const ends = formData.getAll(`break-end-${weekday}`);
+
+  const breaks: { startMinute: number; endMinute: number }[] = [];
+
+  for (const [index, rawStart] of starts.entries()) {
+    const start = parseMinuteOfDay(String(rawStart ?? ""));
+    const end = parseMinuteOfDay(String(ends[index] ?? ""));
+
+    // Halvfyllda rader hoppas över. Den som tryckt på plus och ångrat sig har
+    // lämnat en tom rad, inte begått ett fel.
+    if (start === null || end === null) continue;
+    if (end <= start) continue;
+
+    breaks.push({ startMinute: start, endMinute: end });
+  }
+
+  return breaks;
+}
+
+/**
+ * Hela veckan ur ett formulär.
+ *
+ * Ger antingen ett fel att visa eller färdiga dagar, aldrig både och. Noll
+ * dagar är ett giltigt svar och betyder "inget eget schema": för företaget att
+ * ingen dag är arbetsdag, för en anställd att standardschemat gäller.
+ */
+export function readScheduleDays(
+  formData: FormData
+): { error: string } | { days: ScheduleDayInput[] } {
+  const days: ScheduleDayInput[] = [];
+
+  for (let weekday = 1; weekday <= 7; weekday++) {
+    // Dagen är arbetsfri när rutan inte är i. Raden skrivs då inte alls, och
+    // planerad tid blir noll.
+    if (formData.get(`active-${weekday}`) !== "on") continue;
+
+    const start = parseMinuteOfDay(String(formData.get(`start-${weekday}`) ?? ""));
+    const end = parseMinuteOfDay(String(formData.get(`end-${weekday}`) ?? ""));
+
+    if (start === null || end === null) {
+      return { error: "Skriv tiderna som klockslag, till exempel 06:30." };
+    }
+
+    if (end <= start) {
+      return { error: "Sluttiden måste ligga efter starttiden." };
+    }
+
+    const breaks = readBreaks(formData, weekday);
+
+    const breakMinutes = breaks.reduce(
+      (total, rest) => total + (rest.endMinute - rest.startMinute),
+      0
+    );
+
+    if (breakMinutes >= end - start) {
+      return {
+        error: `Rasterna är längre än arbetsdagen på ${dayName(weekday)}.`,
+      };
+    }
+
+    days.push({ weekday, startMinute: start, endMinute: end, breaks });
+  }
+
+  return { days };
+}
+
+export function dayName(weekday: number): string {
+  return [
+    "måndag",
+    "tisdag",
+    "onsdag",
+    "torsdag",
+    "fredag",
+    "lördag",
+    "söndag",
+  ][weekday - 1];
+}
+
+/* --- Egna arbetstider per anställd ----------------------------------------
+ *
+ * De flesta i en verkstad går på samma tider, och därför är företagets
+ * standardschema det normala. Men alla gör det inte: en deltid, en som börjar
+ * fem för att hinna hem, en lärling som går halva fredagen. Utan egna tider
+ * mäts deras flex mot någon annans dag, och då visar saldot fel varje vecka.
+ *
+ * Personens tider lagras som ETT VANLIGT SCHEMA som bara hen är kopplad till.
+ * Formen fanns redan i datamodellen (`Employee.scheduleId`), och beräkningen
+ * behövde därför inte ändras alls: `schedulesForEmployees` tar personens eget
+ * schema om det finns och standardschemat annars. */
+
+/**
+ * Namnet ett personligt schema får.
+ *
+ * Syns ingenstans i gränssnittet. Namn måste vara unika per företag, och två
+ * anställda kan heta samma sak — därför id:t och inte namnet.
+ */
+function personalScheduleName(employeeId: string): string {
+  return `employee:${employeeId}`;
+}
+
+/**
+ * De egna tiderna för var och en i listan.
+ *
+ * Saknas personen i kartan går hen på företagets standard. En tom lista
+ * förekommer inte: ett schema utan dagar raderas i stället för att sparas.
+ */
+export async function ownScheduleDays(
+  db: CompanyDb,
+  employeeIds: string[]
+): Promise<Map<string, ScheduleDayInput[]>> {
+  const result = new Map<string, ScheduleDayInput[]>();
+  if (employeeIds.length === 0) return result;
+
+  const [employees, schedules] = await Promise.all([
+    db.employee.findMany({
+      where: { id: { in: employeeIds }, NOT: { scheduleId: null } },
+      select: { id: true, scheduleId: true },
+    }),
+    // Bara de personliga. Standardschemat hör till företaget, och skulle det
+    // dyka upp här såg det ut som att varje anställd har egna tider.
+    db.workSchedule.findMany({
+      where: { isDefault: false },
+      select: {
+        id: true,
+        days: {
+          orderBy: { weekday: "asc" },
+          select: {
+            weekday: true,
+            startMinute: true,
+            endMinute: true,
+            breaks: {
+              orderBy: { startMinute: "asc" },
+              select: { startMinute: true, endMinute: true },
+            },
+          },
+        },
+      },
+    }),
+  ]);
+
+  const byId = new Map(schedules.map((schedule) => [schedule.id, schedule.days]));
+
+  for (const employee of employees) {
+    const days = employee.scheduleId ? byId.get(employee.scheduleId) : undefined;
+    if (days) result.set(employee.id, days);
+  }
+
+  return result;
+}
+
+/**
+ * Skriver en anställds egna tider.
+ *
+ * Tomma dagar betyder att personen ska gå på företagets standard igen, och då
+ * raderas det personliga schemat. Raden ÄR tillståndet, samma princip som för
+ * tillvalen: ett "eget schema utan dagar" vore ett andra sätt att uttrycka
+ * standard, och två sätt hinner alltid börja säga olika saker.
+ *
+ * Företagets standardschema rörs aldrig härifrån. Skulle en anställd vara
+ * kopplad till det lämnas kopplingen som den är.
+ */
+export async function saveOwnScheduleDays(
+  db: CompanyDb,
+  companyId: string,
+  employeeId: string,
+  days: ScheduleDayInput[]
+): Promise<void> {
+  const employee = await db.employee.findFirst({
+    where: { id: employeeId },
+    select: { id: true, scheduleId: true },
+  });
+
+  // Hör personen till ett annat företag gav företagsfiltret ingen träff, och
+  // då ska ingenting skrivas.
+  if (!employee) return;
+
+  const own = employee.scheduleId
+    ? await db.workSchedule.findFirst({
+        where: { id: employee.scheduleId, isDefault: false },
+        select: { id: true },
+      })
+    : null;
+
+  if (days.length === 0) {
+    if (!own) return;
+
+    // Kopplingen nollställs av databasen när schemat försvinner
+    // (onDelete: SetNull), men vi gör det uttryckligen ändå: en kod som litar
+    // på en regel i schemat går sönder tyst den dag regeln ändras.
+    await db.employee.updateMany({
+      where: { id: employeeId },
+      data: { scheduleId: null },
+    });
+    await db.workSchedule.deleteMany({ where: { id: own.id, isDefault: false } });
+    return;
+  }
+
+  const scheduleId =
+    own?.id ??
+    (
+      await db.workSchedule.create({
+        data: {
+          companyId,
+          name: personalScheduleName(employeeId),
+          isDefault: false,
+        },
+      })
+    ).id;
+
+  // Dagarna skrivs om från grunden, av samma skäl som företagets schema gör
+  // det: en omskrivning kan inte lämna kvar en dag som tagits bort i rutan.
+  await db.scheduleDay.deleteMany({ where: { scheduleId } });
+
+  for (const day of days) {
+    await db.scheduleDay.create({
+      data: {
+        companyId,
+        scheduleId,
+        weekday: day.weekday,
+        startMinute: day.startMinute,
+        endMinute: day.endMinute,
+        breaks: {
+          create: day.breaks.map((rest) => ({
+            companyId,
+            startMinute: rest.startMinute,
+            endMinute: rest.endMinute,
+          })),
+        },
+      },
+    });
+  }
+
+  if (!own) {
+    await db.employee.updateMany({
+      where: { id: employeeId },
+      data: { scheduleId },
+    });
+  }
+}

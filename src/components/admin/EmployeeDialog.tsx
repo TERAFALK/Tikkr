@@ -13,6 +13,9 @@ import {
   Input,
 } from "@/components/ui";
 import EmployeeAvatar from "@/components/ui/EmployeeAvatar";
+import ScheduleDays, {
+  type ScheduleDayValue,
+} from "@/components/admin/ScheduleDays";
 
 /**
  * RUTAN DÄR EN ANSTÄLLD LÄGGS UPP ELLER ÄNDRAS.
@@ -20,6 +23,15 @@ import EmployeeAvatar from "@/components/ui/EmployeeAvatar";
  * Namn, anställningsnummer och bild i ETT formulär. Bilden låg tidigare i en
  * egen ruta, vilket gjorde att man fick öppna två ställen för att lägga upp en
  * person ordentligt — och det andra stället var lätt att aldrig hitta.
+ *
+ * ARBETSTIDER FINNS HÄR NUMERA (tillagt 2026-09-29), för den som inte går på
+ * företagets vanliga schema. De ligger bakom en kryssruta och inte framme:
+ * de flesta går på standardtiderna, och sju dagsrader i varje ruta skulle
+ * göra det vanliga fallet långsammare för att det ovanliga finns.
+ *
+ * Utan kryss skickas inga dagsfält alls, och servern läser det som att
+ * personen ska gå på företagets standard igen. Det är samma sak som att
+ * kryssa ur: formuläret säger vad som gäller, inte vad som ändrats.
  *
  * Rutan stängs inte av sig själv vid fel. Ett upptaget anställningsnummer ska
  * gå att rätta utan att skriva in allt igen.
@@ -32,6 +44,8 @@ export default function EmployeeDialog({
   action,
   submitLabel,
   employee,
+  scheduleDays,
+  canEditSchedule = false,
 }: {
   trigger: string;
   triggerTone?: "primary" | "secondary" | "ghost";
@@ -50,15 +64,25 @@ export default function EmployeeDialog({
     costRateOre: number | null;
     hasPhoto: boolean;
   };
+  /**
+   * Personens egna arbetstider, eller null när hen går på företagets schema.
+   * Utelämnad helt när företaget inte har lönemodulen, och då visas avsnittet
+   * inte alls.
+   */
+  scheduleDays?: ScheduleDayValue[] | null;
+  /** true när lönemodulen är påslagen. Avgör om arbetstiderna går att sätta. */
+  canEditSchedule?: boolean;
 }) {
   const dialog = useRef<HTMLDialogElement>(null);
   const [state, submit] = useActionState<EmployeeState, FormData>(action, {});
   const [preview, setPreview] = useState<string | null>(null);
   const [removePhoto, setRemovePhoto] = useState(false);
+  const [ownHours, setOwnHours] = useState(Boolean(scheduleDays?.length));
 
   function open() {
     setPreview(null);
     setRemovePhoto(false);
+    setOwnHours(Boolean(scheduleDays?.length));
     dialog.current?.showModal();
   }
 
@@ -81,9 +105,17 @@ export default function EmployeeDialog({
         {trigger}
       </Button>
 
+      {/* Bredare när arbetstiderna får plats i rutan: en dagrad är två
+          klockslagsfält bredvid varandra, och de ska inte behöva radbrytas.
+          Klasserna skrivs ut i sin helhet, eftersom Tailwind läser dem som
+          text i filen och inte kan sätta ihop dem åt oss. */}
       <dialog
         ref={dialog}
-        className={`w-[min(30rem,calc(100vw-2rem))] ${dialogSurface}`}
+        className={`${
+          canEditSchedule
+            ? "w-[min(36rem,calc(100vw-2rem))]"
+            : "w-[min(30rem,calc(100vw-2rem))]"
+        } ${dialogSurface}`}
       >
         <div className={`${dialogEdge} border-b border-neutral-200 px-5 py-4`}>
           <h2 className="text-sm font-semibold text-neutral-900">{title}</h2>
@@ -195,6 +227,33 @@ export default function EmployeeDialog({
                 }
               />
             </Field>
+
+            {canEditSchedule && (
+              <div className="border-t border-neutral-200 pt-4">
+                <label className="flex cursor-pointer items-start gap-2 text-[13px]">
+                  <input
+                    type="checkbox"
+                    checked={ownHours}
+                    onChange={(event) => setOwnHours(event.target.checked)}
+                    className="mt-0.5 h-3.5 w-3.5 rounded border-neutral-300 text-blue-600 focus:ring-blue-600"
+                  />
+                  <span>
+                    <span className="block font-medium text-neutral-900">
+                      Egna arbetstider
+                    </span>
+                    <span className="block text-neutral-500">
+                      Utan kryss gäller företagets schema
+                    </span>
+                  </span>
+                </label>
+
+                {ownHours && (
+                  <div className="mt-3">
+                    <ScheduleDays initial={scheduleDays ?? []} compact />
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
           <div
