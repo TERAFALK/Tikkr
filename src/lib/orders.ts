@@ -51,13 +51,18 @@ export interface OrderRow {
  * Ordrarna med upparbetad tid, beräkning och utfall per arbetsmoment.
  *
  * `customerId` begränsar till en kunds ordrar. Utelämnad ger företagets alla.
+ * `onlyQuickJobs` ger bara de som skapats från en stämplingsskärm och ännu
+ * inte kompletterats — det granskningssidan visar.
  */
 export async function orderRows(
   db: CompanyDb,
-  options: { customerId?: string } = {}
+  options: { customerId?: string; onlyQuickJobs?: boolean } = {}
 ): Promise<OrderRow[]> {
   const orders = await db.order.findMany({
-    where: options.customerId ? { customerId: options.customerId } : undefined,
+    where: {
+      ...(options.customerId ? { customerId: options.customerId } : {}),
+      ...(options.onlyQuickJobs ? { isQuickJob: true } : {}),
+    },
     orderBy: [{ status: "asc" }, { orderNumber: "asc" }],
     select: {
       id: true,

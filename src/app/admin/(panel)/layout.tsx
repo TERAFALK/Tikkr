@@ -41,25 +41,32 @@ export default async function PanelLayout({
   // under en rendering.
   const deniedWrite = (await cookies()).get(READ_ONLY_COOKIE)?.value === "1";
 
-  const [reviewCount, onboarding, notices, company] = await Promise.all([
-    session.db.timeEntry.count({ where: { needsReview: true } }),
-    getOnboardingState(session.db),
-    activeNotices("admin"),
-    unsafeGlobalPrisma.company.findUnique({
-      where: { id: session.companyId },
-      select: {
-        subscriptionStatus: true,
-        trialEndsAt: true,
-        pastDueSince: true,
-        logoSquareMimeType: true,
-        screenLicenses: true,
+  // Siffran i menyn ska säga hur mycket som är ogjort, inte hur många poster
+  // av ett visst slag som är det. Snabbjobben räknas därför med: de ligger på
+  // samma sida och är det av de två som hindrar en faktura helt.
+  const [reviewEntries, quickJobs, onboarding, notices, company] =
+    await Promise.all([
+      session.db.timeEntry.count({ where: { needsReview: true } }),
+      session.db.order.count({ where: { isQuickJob: true } }),
+      getOnboardingState(session.db),
+      activeNotices("admin"),
+      unsafeGlobalPrisma.company.findUnique({
+        where: { id: session.companyId },
+        select: {
+          subscriptionStatus: true,
+          trialEndsAt: true,
+          pastDueSince: true,
+          logoSquareMimeType: true,
+          screenLicenses: true,
 
-        // Tillvalen hämtas i samma fråga som allt annat om företaget, i
-        // stället för i en egen. Menyn behöver dem vid varje sidladdning.
-        modules: { select: { module: true } },
-      },
-    }),
-  ]);
+          // Tillvalen hämtas i samma fråga som allt annat om företaget, i
+          // stället för i en egen. Menyn behöver dem vid varje sidladdning.
+          modules: { select: { module: true } },
+        },
+      }),
+    ]);
+
+  const reviewCount = reviewEntries + quickJobs;
 
   // Vilka menypunkter som ska synas. ATT DÖLJA DEM ÄR BARA KOSMETIK —
   // sidorna bakom vaktas var för sig av requireModule() och svarar 404
@@ -85,9 +92,8 @@ export default async function PanelLayout({
         companyName={session.companyName}
         email={session.email}
         reviewCount={reviewCount}
-        // Guiden ligger i menyn tills den är klar, och försvinner sedan.
-        // En permanent "kom igång"-länk är bara skräp för den som redan kommit
-        // igång; sidan finns kvar på sin adress för den som vill tillbaka.
+        // Styr bara VAR guiden hamnar i menyn, inte om den syns: överst medan
+        // uppsättningen pågår, sist när den är klar. Se AdminSidebar.
         showOnboarding={!onboarding.ready}
         hasLogo={Boolean(company?.logoSquareMimeType)}
         modules={modules}

@@ -1,5 +1,9 @@
 import { requireAdmin } from "@/lib/admin-session";
 import { unsafeGlobalPrisma } from "@/lib/db";
+import OrdersTable from "@/components/admin/OrdersTable";
+import { orderRows } from "@/lib/orders";
+import { customerOptions } from "@/lib/customers";
+import { toggleOrder, updateOrder } from "../ordrar/actions";
 import {
   Badge,
   Button,
@@ -20,6 +24,26 @@ import { reviewEntry } from "./actions";
 
 export const dynamic = "force-dynamic";
 
+/**
+ * GRANSKNING — DET SOM KRÄVER ATT NÅGON GÖR NÅGOT.
+ *
+ * Två slags poster, och de har olika fel:
+ *
+ *  - SNABBJOBBEN är ordrar som verkstaden lagt upp själv vid skärmen. De har
+ *    ofta ett avskrivet nummer och saknar kund, och tiden på dem ska ändå
+ *    faktureras. Tillagt här 2026-09-29: de stod bara som en rad överst i
+ *    orderlistan, alltså på en sida man öppnar när man har ett annat ärende.
+ *    Nu ligger de där allt annat ogjort ligger, och räknas in i siffran i
+ *    menyn.
+ *  - STÄMPLINGARNA är poster systemet räknat fram en sluttid på.
+ *
+ * Snabbjobben står först. En order utan nummer går inte att fakturera alls;
+ * en beräknad sluttid är en siffra som behöver bekräftas.
+ *
+ * Rutan för att rätta ett snabbjobb är orderlistans egen, med flit: den kan
+ * redan allt som behövs och visar sina fel inuti sig. En egen liten
+ * kompletteringsruta hade blivit ett andra ställe som ändrar samma order.
+ */
 export default async function ReviewPage() {
   const { db, companyId } = await requireAdmin();
 
@@ -29,35 +53,55 @@ export default async function ReviewPage() {
   });
   const timeZone = company?.timezone ?? "Europe/Stockholm";
 
-  const entries = await db.timeEntry.findMany({
-    where: { needsReview: true },
-    orderBy: { clockInAt: "desc" },
-    select: {
-      id: true,
-      clockInAt: true,
-      clockOutAt: true,
-      reviewNote: true,
-      employee: { select: { name: true } },
-      kind: true,
-      order: {
-        select: { orderNumber: true, customer: { select: { name: true } } },
+  const [entries, quickJobs, customers, moments] = await Promise.all([
+    db.timeEntry.findMany({
+      where: { needsReview: true },
+      orderBy: { clockInAt: "desc" },
+      select: {
+        id: true,
+        clockInAt: true,
+        clockOutAt: true,
+        reviewNote: true,
+        employee: { select: { name: true } },
+        kind: true,
+        order: {
+          select: { orderNumber: true, customer: { select: { name: true } } },
+        },
+        moment: { select: { name: true } },
+        indirectMoment: { select: { name: true } },
       },
-      moment: { select: { name: true } },
-      indirectMoment: { select: { name: true } },
-    },
-  });
+    }),
+    orderRows(db, { onlyQuickJobs: true }),
+    customerOptions(db),
+    db.workMoment.findMany({
+      orderBy: [{ active: "desc" }, { name: "asc" }],
+      select: { id: true, name: true, active: true },
+    }),
+  ]);
 
   return (
     <>
       <PageHeader
         title="Granskning"
-        description={`Poster utan utstämpling, stängda ${company?.autoCloseAt ?? "18:00"} med beräknad sluttid.`}
+        description={`Snabbjobb att komplettera, och poster utan utstämpling som stängts ${company?.autoCloseAt ?? "18:00"} med beräknad sluttid.`}
       />
 
+      {quickJobs.length > 0 && (
+        <div className="mb-6">
+          <OrdersTable
+            orders={quickJobs}
+            customers={customers}
+            moments={moments}
+            updateAction={updateOrder}
+            toggleAction={toggleOrder}
+            selectable={false}
+            title={`${quickJobs.length} snabbjobb att komplettera`}
+          />
+        </div>
+      )}
+
       {entries.length === 0 ? (
-        <EmptyState
-          title="Inget att granska"
-        />
+        quickJobs.length === 0 && <EmptyState title="Inget att granska" />
       ) : (
         <Card>
           <CardHeader

@@ -47,6 +47,7 @@ export default function OrdersTable({
   moments,
   title,
   hideCustomer = false,
+  selectable = true,
 }: {
   orders: OrderRow[];
   /** Kunderna som går att välja i ändra-rutan. */
@@ -58,6 +59,11 @@ export default function OrdersTable({
    * kund och kolumnen bara upprepar sidans rubrik.
    */
   hideCustomer?: boolean;
+  /**
+   * Döljer markeringsläget och dess uttag. Sätts på granskningssidan, där
+   * listan är en uppgift att beta av och inte ett urval att exportera.
+   */
+  selectable?: boolean;
   /** Arbetsmomenten som går att beräkna tid på. */
   moments: BudgetMomentOption[];
   updateAction: (
@@ -147,7 +153,7 @@ export default function OrdersTable({
                 Avbryt
               </Button>
             </div>
-          ) : (
+          ) : selectable ? (
             <Button
               type="button"
               tone="secondary"
@@ -155,7 +161,7 @@ export default function OrdersTable({
             >
               Markera ordrar
             </Button>
-          )
+          ) : undefined
         }
       />
 
