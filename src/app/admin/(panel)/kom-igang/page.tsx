@@ -165,6 +165,7 @@ export default async function OnboardingPage() {
             <Field label="Kund" hint="Valfritt">
               <SearchSelect
                 name="customerId"
+                variant="search"
                 options={customerList}
                 emptyLabel="Ingen kund"
                 placeholder="Sök kund…"

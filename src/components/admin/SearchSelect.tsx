@@ -20,6 +20,18 @@ import { useEffect, useId, useMemo, useRef, useState } from "react";
  * Filtreringen sker i webbläsaren på en lista servern redan skickat. Det gör
  * svaret omedelbart och kräver ingen fråga per tangenttryck. Listan är rimlig
  * i storlek — ett företag har hundratals kunder, inte hundratusentals.
+ *
+ * TVÅ UTSEENDEN, SAMMA VÄLJARE (tillagt 2026-09-29).
+ *
+ * I ett FILTER ser den ut som en väljare: "Alla kunder" med en pil, eftersom
+ * det tomma läget betyder något där. I ett FORMULÄR ser den i stället ut som
+ * ett sökfält med förstoringsglas, eftersom det tomma läget bara är ett fält
+ * man ännu inte fyllt i.
+ *
+ * Skillnaden finns för att kunden bad om att kunna söka kund när en order
+ * läggs upp. Det gick redan, men ingenting sa det: fältet såg ut som en
+ * rullgardin, och en rullgardin klickar man på och skrollar i. Samma
+ * funktion, en annan skylt.
  */
 
 export interface SearchSelectOption {
@@ -37,6 +49,7 @@ export default function SearchSelect({
   placeholder = "Sök…",
   emptyLabel,
   required = false,
+  variant = "select",
 }: {
   name: string;
   options: SearchSelectOption[];
@@ -45,6 +58,11 @@ export default function SearchSelect({
   /** Texten för "inget valt". Utelämnad betyder att ett val krävs. */
   emptyLabel?: string;
   required?: boolean;
+  /**
+   * "select" ser ut som en rullgardin och visar emptyLabel när inget valts.
+   * "search" ser ut som ett sökfält och visar platshållaren. Se toppen.
+   */
+  variant?: "select" | "search";
 }) {
   const listId = useId();
   const wrapper = useRef<HTMLDivElement>(null);
@@ -113,8 +131,29 @@ export default function SearchSelect({
     <div ref={wrapper} className="relative">
       <input ref={hidden} type="hidden" name={name} value={selected ?? ""} />
 
-      {/* Knappen visar valet. Klick öppnar sökfältet — samma yta, två lägen,
-          så att raden inte hoppar till i höjd när listan öppnas. */}
+      {/* Förstoringsglaset står still medan fältet byter läge. Låg det inuti
+          knappen respektive fältet skulle det hoppa i sidled i samma stund som
+          man börjar skriva. */}
+      {variant === "search" && (
+        <span
+          aria-hidden="true"
+          className="pointer-events-none absolute left-2.5 top-1/2 z-10 -translate-y-1/2 text-neutral-400"
+        >
+          <svg
+            viewBox="0 0 24 24"
+            width={14}
+            height={14}
+            fill="none"
+            stroke="currentColor"
+            strokeWidth={2}
+            strokeLinecap="round"
+          >
+            <circle cx="11" cy="11" r="7" />
+            <path d="m20 20-3.5-3.5" />
+          </svg>
+        </span>
+      )}
+
       {open ? (
         <input
           autoFocus
@@ -134,22 +173,32 @@ export default function SearchSelect({
             }
           }}
           placeholder={placeholder}
-          className="w-full rounded-md border-0 bg-white px-3 py-1.5 text-[13px] text-neutral-900 ring-1 ring-inset ring-neutral-200 focus:ring-2 focus:ring-inset focus:ring-blue-600"
+          className={`w-full rounded-md border-0 bg-white py-1.5 pr-3 text-[13px] text-neutral-900 ring-1 ring-inset ring-neutral-200 focus:ring-2 focus:ring-inset focus:ring-blue-600 ${
+            variant === "search" ? "pl-8" : "pl-3"
+          }`}
         />
       ) : (
+        /* Knappen visar valet. Klick öppnar sökfältet: samma yta, två lägen,
+           så att raden inte hoppar till i höjd när listan öppnas. */
         <button
           type="button"
           onClick={() => setOpen(true)}
-          className={`flex w-full items-center justify-between rounded-md bg-white px-3 py-1.5 text-left text-[13px] ring-1 ring-inset ring-neutral-200 hover:bg-neutral-50 ${
-            chosen ? "text-neutral-900" : "text-neutral-400"
-          }`}
+          className={`flex w-full items-center justify-between rounded-md bg-white py-1.5 pr-3 text-left text-[13px] ring-1 ring-inset ring-neutral-200 hover:bg-neutral-50 ${
+            variant === "search" ? "pl-8" : "pl-3"
+          } ${chosen ? "text-neutral-900" : "text-neutral-400"}`}
         >
           <span className="truncate">
-            {chosen?.label ?? emptyLabel ?? placeholder}
+            {chosen?.label ??
+              (variant === "search" ? placeholder : emptyLabel ?? placeholder)}
           </span>
-          <span aria-hidden="true" className="ml-2 shrink-0 text-neutral-400">
-            ▾
-          </span>
+
+          {/* Pilen hör till rullgardinen. I ett sökfält vore den en lögn: man
+              skriver i det, man fäller inte ut det. */}
+          {variant === "select" && (
+            <span aria-hidden="true" className="ml-2 shrink-0 text-neutral-400">
+              ▾
+            </span>
+          )}
         </button>
       )}
 

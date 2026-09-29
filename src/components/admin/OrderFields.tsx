@@ -48,9 +48,13 @@ export default function OrderFields({
         />
       </Field>
 
+      {/* Sökfält och inte rullgardin. Att söka gick redan, men fältet såg ut
+          som en lista man skrollar i, och med tvåhundra kunder gjorde folk
+          just det. Se SearchSelect. */}
       <Field label="Kund" hint="Valfritt">
         <SearchSelect
           name="customerId"
+          variant="search"
           options={customers}
           defaultValue={defaults?.customerId ?? null}
           emptyLabel="Ingen kund"
