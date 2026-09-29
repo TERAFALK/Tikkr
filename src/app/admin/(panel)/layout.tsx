@@ -92,8 +92,8 @@ export default async function PanelLayout({
         companyName={session.companyName}
         email={session.email}
         reviewCount={reviewCount}
-        // Styr bara VAR guiden hamnar i menyn, inte om den syns: överst medan
-        // uppsättningen pågår, sist när den är klar. Se AdminSidebar.
+        // Guiden ligger i menyn tills den är klar, och försvinner sedan. Den
+        // nås därefter från Inställningar, under Om arbetsytan.
         showOnboarding={!onboarding.ready}
         hasLogo={Boolean(company?.logoSquareMimeType)}
         modules={modules}

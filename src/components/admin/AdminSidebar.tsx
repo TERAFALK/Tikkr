@@ -98,7 +98,7 @@ export default function AdminSidebar({
   companyName: string;
   email: string;
   reviewCount: number;
-  /** Styr bara VAR "Kom igång" hamnar, inte om den syns. */
+  /** Visar avsnittet "Uppsättning" med Kom igång. Döljs när guiden är klar. */
   showOnboarding: boolean;
   hasLogo: boolean;
   /** Företagets påslagna tillval. Länkar till avstängda moduler utelämnas. */
@@ -121,15 +121,15 @@ export default function AdminSidebar({
     ],
   };
 
-  // "KOM IGÅNG" FINNS ALLTID (ändrat 2026-09-29). Den försvann när alla fyra
-  // stegen var klara, och dök upp igen så fort kunden levererat sina sista
-  // ordrar. Det såg ut som att systemet glömt bort dem. Nu står den kvar, och
-  // det enda som ändras är var: överst medan uppsättningen pågår, sist när
-  // den är klar. Sidan är ändå bra att komma åt senare, den lägger upp
-  // anställda och arbetsmoment lika bra i mars som i januari.
-  const allSections = showOnboarding
-    ? [setupSection, ...sections]
-    : [...sections, setupSection];
+  // Guiden ligger överst medan uppsättningen pågår och försvinner när den är
+  // klar. En permanent menypunkt är skräp för den som redan kommit igång, och
+  // kunden bad uttryckligen om att slippa den: sidan nås från Inställningar,
+  // under Om arbetsytan.
+  //
+  // Att den dök upp igen när alla ordrar levererats var ett annat fel, och det
+  // sitter inte här. Se lib/onboarding.ts: stegen räknar allt som finns, inte
+  // bara det som är öppet just nu.
+  const allSections = showOnboarding ? [setupSection, ...sections] : sections;
 
   // Avsnitt som blir tomma faller bort med sin rubrik. En rubrik utan länkar
   // under sig ser ut som ett fel.

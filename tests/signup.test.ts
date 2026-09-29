@@ -145,4 +145,37 @@ describe("den nya arbetsytan är tom och isolerad", () => {
     expect(state.ready).toBe(true);
     expect(state.completed).toBe(4);
   });
+
+  it("de rekommenderade stegen avgör inte om guiden är klar", async () => {
+    // Kundregister, timkostnader och improduktiv tid gör underlagen
+    // kompletta, men man kan stämpla utan dem. Räknades de in skulle en kund
+    // som inte vill ha ett kundregister aldrig bli klar.
+    const { company } = await signup();
+    const companyId = company.id;
+    const db = forCompany(companyId);
+
+    await db.employee.create({ data: { companyId, name: "Anna" } });
+    await db.workMoment.create({ data: { companyId, name: "Svetsning" } });
+    await db.order.create({ data: { companyId, orderNumber: "1" } });
+    await db.kioskDevice.create({
+      data: { companyId, name: "Verkstaden", tokenHash: `hash-${companyId}` },
+    });
+
+    const state = await getOnboardingState(db);
+
+    expect(state.ready).toBe(true);
+    expect(state.total).toBe(4);
+    expect(state.extras.every((step) => step.done)).toBe(false);
+  });
+
+  it("arbetstidsschemat är ett steg bara för den som har löneunderlaget", async () => {
+    const { company } = await signup();
+    const db = forCompany(company.id);
+
+    const utan = await getOnboardingState(db);
+    const med = await getOnboardingState(db, { payroll: true });
+
+    expect(utan.extras.some((step) => step.key === "schedule")).toBe(false);
+    expect(med.extras.some((step) => step.key === "schedule")).toBe(true);
+  });
 });

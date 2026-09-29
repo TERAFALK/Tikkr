@@ -1,6 +1,11 @@
 import Link from "next/link";
 import { requireAdmin } from "@/lib/admin-session";
-import { getOnboardingState, SUGGESTED_MOMENTS } from "@/lib/onboarding";
+import { hasModule } from "@/lib/company-modules";
+import {
+  getOnboardingState,
+  SUGGESTED_MOMENTS,
+  type OnboardingStep,
+} from "@/lib/onboarding";
 import {
   Badge,
   Button,
@@ -10,6 +15,7 @@ import {
   Field,
   Input,
   PageHeader,
+  SectionTitle,
 } from "@/components/ui";
 import SearchSelect from "@/components/admin/SearchSelect";
 import { customerOptions } from "@/lib/customers";
@@ -17,9 +23,24 @@ import { addEmployees, addMoments, addOrder } from "./actions";
 
 export const dynamic = "force-dynamic";
 
+/**
+ * KOM IGÅNG.
+ *
+ * Fyra steg som KRÄVS för att kunna stämpla, och därefter det som gör
+ * underlagen kompletta. Guiden ligger inte kvar i menyn när den är klar; den
+ * nås från Inställningar, under Om arbetsytan.
+ *
+ * Arbetstidsschemat räknas bara som ett steg för den som har löneunderlaget.
+ * Att visa ett steg för något kunden inte köpt vore att be dem göra något de
+ * inte kan.
+ */
 export default async function OnboardingPage() {
-  const { db, companyName } = await requireAdmin();
-  const state = await getOnboardingState(db);
+  const session = await requireAdmin();
+  const { db, companyName, companyId } = session;
+
+  const state = await getOnboardingState(db, {
+    payroll: await hasModule(companyId, "PAYROLL"),
+  });
 
   const [employees, moments, orders, customerList] = await Promise.all([
     db.employee.findMany({
@@ -50,12 +71,14 @@ export default async function OnboardingPage() {
 
   return (
     <>
+      {/* Sa "Fyra steg återstår" oavsett hur många som gjorts. Siffran räknas
+          nu fram, och den som gjort tre av fyra ska se att det är ett kvar. */}
       <PageHeader
         title={state.ready ? "Klart att använda" : "Kom igång"}
         description={
           state.ready
             ? `${companyName} är redo att registrera tid.`
-            : `Fyra steg återstår för ${companyName}.`
+            : `${state.total - state.completed} av ${state.total} steg återstår för ${companyName}.`
         }
         action={
           state.ready ? (
@@ -203,14 +226,61 @@ export default async function OnboardingPage() {
 
       {state.ready && (
         <Card className="mt-6 border-emerald-200 bg-emerald-50/60 p-5">
-          {/* Sa tidigare att guiden döljs i menyn. Den står kvar numera, och
-              då ska rutan inte påstå något annat. */}
           <p className="text-sm font-medium text-emerald-900">
-            Allt är på plats
+            Allt som krävs är på plats
+          </p>
+          <p className="mt-1 text-[13px] text-emerald-800">
+            Guiden döljs i menyn. Den nås från Inställningar.
           </p>
         </Card>
       )}
+
+      {/* DÄREFTER. Inte steg i samma mening: man kan stämpla utan dem, men
+          fakturaunderlaget och tidrapporten blir sämre. Därför en egen grupp
+          under de fyra, utan siffra i mätaren. */}
+      <div className="mt-8">
+        <SectionTitle>Därefter</SectionTitle>
+
+        <div className="space-y-3">
+          {state.extras.map((step) => (
+            <ExtraCard key={step.key} step={step} />
+          ))}
+        </div>
+      </div>
     </>
+  );
+}
+
+/**
+ * Ett rekommenderat steg.
+ *
+ * Länk och inte formulär. De här stegen görs på sina egna sidor, där det
+ * finns fler fält än guiden rimligen kan rymma, och att bygga en genväg hit
+ * vore ett andra ställe som lägger upp samma sak.
+ */
+function ExtraCard({ step }: { step: OnboardingStep }) {
+  return (
+    <Card>
+      <div className="flex flex-wrap items-center justify-between gap-4 px-5 py-4">
+        <div className="min-w-0">
+          <p className="flex items-center gap-2 text-sm font-medium text-neutral-900">
+            {step.title}
+            {step.done ? (
+              <Badge tone="active">Klart</Badge>
+            ) : (
+              <Badge tone="muted">Ej gjort</Badge>
+            )}
+          </p>
+          <p className="mt-0.5 max-w-2xl text-[13px] leading-relaxed text-neutral-500">
+            {step.description}
+          </p>
+        </div>
+
+        <ButtonLink href={step.href} tone="secondary">
+          {step.action ?? "Öppna"}
+        </ButtonLink>
+      </div>
+    </Card>
   );
 }
 
