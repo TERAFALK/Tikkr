@@ -3,11 +3,11 @@ import {
   AdminMockup,
   CalcMockup,
   ExportMockup,
+  Frame,
   OrderPickMockup,
   ReportMockup,
   ReviewMockup,
   RunningMockup,
-  ScreenMockup,
   TimesheetMockup,
 } from "./Mockups";
 import LiveKiosk from "./LiveKiosk";
@@ -175,20 +175,19 @@ export function Hero() {
             </p>
           </div>
 
-          {/* Skärmen på stativ, med den levande ytan i sig. Den som tittar i
-              tio sekunder ser någon stämpla in utan att läsa en rad text. */}
+          {/* Stämplingsskärmen, levande. Den som tittar i tio sekunder ser
+              någon stämpla in utan att läsa en rad text.
+
+              Låg en period i en tecknad skärm på stativ. Den togs bort: en
+              ritad hårdvara blir en teckning av en skärm, och det är
+              gränssnittet som ska synas. */}
           <div
             className="animate-rise-soft"
             style={{ animationDelay: "300ms" }}
           >
-            <ScreenMockup>
+            <Frame label="Stämplingsskärmen">
               <LiveKiosk />
-            </ScreenMockup>
-
-            <p className="mt-8 text-center text-[13px] text-neutral-500">
-              24 tums pekskärm på stativ. Fungerar lika bra som väggmonterad
-              skärm eller surfplatta.
-            </p>
+            </Frame>
           </div>
         </div>
       </div>

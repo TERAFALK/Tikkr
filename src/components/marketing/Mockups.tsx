@@ -118,7 +118,7 @@ export function KioskCard({
   size = "normal",
 }: {
   person: KioskPerson;
-  /** "stor" används i skärmen på stativ, där ytan är större. */
+  /** "stor" används i hero, där bilden får mer plats. */
   size?: "normal" | "stor";
 }) {
   const working = person.job !== null;
@@ -221,78 +221,6 @@ export const PEOPLE: KioskPerson[] = [
     tone: "bg-amber-100 text-amber-700",
   },
 ];
-
-/* -------------------------------------------------------------------------- */
-/* Skärmen på stativ                                                           */
-/* -------------------------------------------------------------------------- */
-
-/**
- * EN 24-TUMS PEKSKÄRM PÅ GOLVSTATIV.
- *
- * Ritad i CSS och inte fotograferad. Produkten säljs utan hårdvara, och ett
- * foto av en viss skärm hade lovat en viss skärm.
- *
- * Vinkeln är avsiktligt liten, fyra grader hit och åtta dit. Tillräckligt för
- * att ytan ska läsas som ett föremål i ett rum i stället för en bild på en
- * sida, men inte så mycket att gränssnittet blir svårt att läsa. Stativet och
- * skärmen vrids tillsammans, eftersom de är samma föremål; skuggan på golvet
- * står still, eftersom golvet gör det.
- */
-export function ScreenMockup({
-  children,
-  className = "",
-}: {
-  children: React.ReactNode;
-  className?: string;
-}) {
-  return (
-    <div className={`[perspective:2200px] ${className}`}>
-      <div className="[transform-style:preserve-3d] [transform:rotateX(4deg)_rotateY(-8deg)]">
-        {/* Kåpan. Tunn ram runt om och en något högre haka, som på en skärm
-            man köper idag. */}
-        <div className="relative rounded-[18px] bg-gradient-to-b from-neutral-600 via-neutral-800 to-neutral-900 p-2 pb-7 shadow-[0_50px_90px_-40px_rgba(15,23,42,0.75)] ring-1 ring-inset ring-white/10">
-          <div className="relative overflow-hidden rounded-[9px] bg-neutral-50">
-            {children}
-
-            {/* Glansen. Ett svagt ljus snett över glaset, aldrig så starkt att
-                det går ut över läsbarheten. */}
-            <div
-              aria-hidden="true"
-              className="pointer-events-none absolute inset-0 bg-gradient-to-br from-white/20 via-white/[0.03] to-transparent"
-            />
-          </div>
-
-          <span
-            aria-hidden="true"
-            className="absolute bottom-2 left-1/2 -translate-x-1/2 text-[9px] font-semibold tracking-[0.2em] text-neutral-500"
-          >
-            TIKKR
-          </span>
-        </div>
-
-        {/* Halsen. En smal pelare som vidgas en aning nedåt. Var först en bred
-            triangel, vilket fick stativet att se ut som en hatt under
-            skärmen. */}
-        <div
-          aria-hidden="true"
-          className="mx-auto h-16 w-20 bg-gradient-to-b from-neutral-700 via-neutral-700 to-neutral-800 [clip-path:polygon(38%_0,62%_0,72%_100%,28%_100%)]"
-        />
-
-        {/* Foten. En ellips, eftersom skärmen står en aning ovanför ögat.
-            Ljusare upptill: en plan metallyta fångar ljuset där. */}
-        <div
-          aria-hidden="true"
-          className="mx-auto h-3.5 w-72 rounded-[50%] bg-gradient-to-b from-neutral-500 via-neutral-700 to-neutral-900"
-        />
-      </div>
-
-      <div
-        aria-hidden="true"
-        className="mx-auto mt-3 h-5 w-[70%] rounded-[50%] bg-neutral-900/15 blur-xl"
-      />
-    </div>
-  );
-}
 
 /* -------------------------------------------------------------------------- */
 /* Stämplingsskärmen — steg två, välj order                                    */
