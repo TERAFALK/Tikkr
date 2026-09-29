@@ -110,7 +110,9 @@ function renderCalc(
   // skickar vidare.
   doc.rect(MARGIN, y, CONTENT_WIDTH, 20).fill("#0a0a0a");
   doc.font("Helvetica-Bold").fontSize(9).fillColor("#ffffff");
-  doc.text("INTERNT UNDERLAG — INNEHÅLLER SJÄLVKOSTNAD", MARGIN + 8, y + 6, {
+  // Två ord räcker. Tillägget "innehåller självkostnad" stod här tidigare och
+  // sa vad den som håller i pappret redan ser på nästa rad.
+  doc.text("INTERNT UNDERLAG", MARGIN + 8, y + 6, {
     width: CONTENT_WIDTH - 16,
   });
   y += 32;
@@ -318,7 +320,7 @@ function renderCalc(
 
   drawFooter(
     doc,
-    "Internt underlag från Tikkr. Innehåller självkostnad och marginal",
+    "Internt underlag från Tikkr",
     { marginLeft: MARGIN, contentWidth: CONTENT_WIDTH, y: FOOTER_Y }
   );
 }

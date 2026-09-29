@@ -5,20 +5,20 @@
  *
  * 1. De blir skarpa i alla upplösningar, även på en retina-skärm där en
  *    skärmdump ser suddig ut.
- * 2. De kan animeras — en pulserande punkt visar att tid räknas just nu,
- *    vilket en stillbild inte kan.
+ * 2. De kan animeras. En skärm där någon stämplar in visar på tio sekunder
+ *    vad produkten gör, vilket en stillbild inte kan.
  * 3. De innehåller ingen riktig kunddata. En skärmdump från en testmiljö har
  *    en tråkig vana att innehålla något man inte tänkt på.
  *
- * De använder samma färger, former och siffror som produkten, så det som visas
- * är sant även om det inte är en fotografisk avbildning. Ändras produkten ska
- * bilderna ändras med den — en säljsida som visar en äldre version är en
- * besvikelse som kommer fram först efter köpet.
+ * DE MÅSTE HÅLLAS I TAKT MED PRODUKTEN. Namnknappen visade länge en tickande
+ * tidräknare som tagits bort ur kiosken för länge sedan: där står numera VAD
+ * personen är instämplad på, eftersom det är den frågan man har när man går
+ * fram till skärmen. En säljsida som visar en äldre version är en besvikelse
+ * som kommer fram först efter köpet.
  *
  * RAMEN HAR INGA FÖNSTERKNAPPAR. Tre färgade prickar i hörnet härmar ett
- * operativsystem produkten inte körs i: kiosken är en surfplatta på väggen och
- * panelen en flik bland andra. En etikettrad som säger VAD man tittar på bär
- * mer information och ljuger inte.
+ * operativsystem produkten inte körs i. En etikettrad som säger vad man tittar
+ * på bär mer information och ljuger inte.
  */
 
 export function Frame({
@@ -52,22 +52,123 @@ export function Frame({
   );
 }
 
-/** Företagsraden som återkommer överst i kioskbilderna. */
-function KioskHeader({ children }: { children?: React.ReactNode }) {
+/* -------------------------------------------------------------------------- */
+/* Stämplingsskärmens egna delar                                               */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Rubrikraden i kiosken: företaget till vänster, Tikkr nedtonat till höger.
+ *
+ * Samma uppdelning som på riktigt. Skärmen hänger på kundens vägg och är
+ * deras.
+ */
+export function KioskChrome({ children }: { children?: React.ReactNode }) {
   return (
-    <div className="flex items-center gap-2.5 border-b border-neutral-200 px-4 py-3">
+    <div className="flex items-center gap-2.5 border-b border-neutral-200 bg-white px-3 py-2.5">
       <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-neutral-900 text-[11px] font-semibold text-white">
         D
       </span>
       <span className="min-w-0">
-        <span className="block truncate text-[13px] font-semibold leading-tight text-neutral-900">
+        <span className="block truncate text-[12px] font-semibold leading-tight text-neutral-900">
           Demo Mekaniska AB
         </span>
-        <span className="block text-[11px] leading-tight text-neutral-400">
+        <span className="block text-[10px] leading-tight text-neutral-400">
           Verkstaden
         </span>
       </span>
-      {children}
+
+      <span className="ml-auto flex items-center gap-2">
+        {children}
+        <span className="text-[10px] font-semibold text-neutral-400">
+          tikkr
+        </span>
+      </span>
+    </div>
+  );
+}
+
+/** En person på stämplingsskärmen, som kortet faktiskt ser ut. */
+export interface KioskPerson {
+  name: string;
+  /** Order och moment, eller null för utstämplad. */
+  job: string | null;
+  /** Det som står på en utstämplad knapp. */
+  last?: string;
+  /** Klass för initialerna när kortet är vitt. Ur produktens egen palett. */
+  tone: string;
+}
+
+/** Förnamnets och efternamnets första bokstav, som i produkten. */
+function initials(name: string): string {
+  const parts = name.trim().split(/\s+/);
+  const first = parts[0]?.[0] ?? "";
+  const last = parts.length > 1 ? (parts[parts.length - 1][0] ?? "") : "";
+  return (first + last).toUpperCase();
+}
+
+/**
+ * NAMNKNAPPEN.
+ *
+ * Grön fyllning betyder instämplad, vit betyder utstämplad, och det som står
+ * under namnet är jobbet. Ingen tidräknare: hur länge man varit inne står i
+ * panelen, inte på väggen.
+ */
+export function KioskCard({
+  person,
+  size = "normal",
+}: {
+  person: KioskPerson;
+  /** "stor" används i skärmen på stativ, där ytan är större. */
+  size?: "normal" | "stor";
+}) {
+  const working = person.job !== null;
+  const big = size === "stor";
+
+  return (
+    <div
+      className={`flex flex-col justify-between rounded-lg border p-2.5 ${
+        big ? "min-h-[86px]" : "min-h-[64px]"
+      } ${
+        working
+          ? "border-emerald-600 bg-emerald-600"
+          : "border-neutral-200 bg-white"
+      }`}
+    >
+      <span className="flex items-center gap-2">
+        <span
+          aria-hidden="true"
+          className={`flex shrink-0 items-center justify-center rounded-full font-semibold ${
+            big ? "h-7 w-7 text-[10px]" : "h-6 w-6 text-[9px]"
+          } ${working ? "bg-white/20 text-white" : person.tone}`}
+        >
+          {initials(person.name)}
+        </span>
+        <span
+          className={`min-w-0 truncate font-semibold leading-tight ${
+            big ? "text-[12px]" : "text-[11px]"
+          } ${working ? "text-white" : "text-neutral-900"}`}
+        >
+          {person.name}
+        </span>
+      </span>
+
+      {working ? (
+        <span
+          className={`mt-2 block truncate font-semibold leading-snug text-white ${
+            big ? "text-[12px]" : "text-[11px]"
+          }`}
+        >
+          {person.job}
+        </span>
+      ) : person.last ? (
+        <span className="mt-2 block truncate text-[10px] text-neutral-500">
+          Senast: {person.last}
+        </span>
+      ) : (
+        <span className="mt-2 block text-[10px] text-neutral-400">
+          Ej instämplad
+        </span>
+      )}
     </div>
   );
 }
@@ -76,15 +177,122 @@ function KioskHeader({ children }: { children?: React.ReactNode }) {
  * Personerna som återkommer i bilderna.
  *
  * Samma namn överallt, så att den som skrollar känner igen sig och förstår att
- * bilderna visar samma verkstad från olika håll. Anna kör två maskiner, vilket
- * systemet tillåter och som därför ska synas någonstans.
+ * bilderna visar samma verkstad från olika håll. Tonerna är hämtade ur
+ * produktens egen palett för initialer.
  */
-const NAMES = [
-  { name: "Anna Andersson", job: "2601 · Svetsning", elapsed: "2:15" },
-  { name: "Björn Bergqvist", job: null, elapsed: null },
-  { name: "Carina Cederlund", job: "2603 · Montering", elapsed: "48 min" },
-  { name: "David Dahl", job: null, elapsed: null },
+export const PEOPLE: KioskPerson[] = [
+  {
+    name: "Anna Andersson",
+    job: "2601 · Svetsning",
+    tone: "bg-blue-100 text-blue-700",
+  },
+  {
+    name: "Björn Bergqvist",
+    job: null,
+    last: "2602 · Montering",
+    tone: "bg-emerald-100 text-emerald-700",
+  },
+  {
+    name: "Carina Cederlund",
+    job: "2603 · Montering",
+    tone: "bg-amber-100 text-amber-700",
+  },
+  { name: "David Dahl", job: null, tone: "bg-violet-100 text-violet-700" },
+  {
+    name: "Erik Ek",
+    job: "2601 · Fräsning",
+    tone: "bg-rose-100 text-rose-700",
+  },
+  {
+    name: "Frida Falk",
+    job: null,
+    last: "2603 · Kapning",
+    tone: "bg-cyan-100 text-cyan-700",
+  },
+  {
+    name: "Gustav Gran",
+    job: "2604 · Lackering",
+    tone: "bg-blue-100 text-blue-700",
+  },
+  { name: "Hanna Holm", job: null, tone: "bg-emerald-100 text-emerald-700" },
+  {
+    name: "Ivar Isaksson",
+    job: "2605 · Kapning",
+    tone: "bg-amber-100 text-amber-700",
+  },
 ];
+
+/* -------------------------------------------------------------------------- */
+/* Skärmen på stativ                                                           */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * EN 24-TUMS PEKSKÄRM PÅ GOLVSTATIV.
+ *
+ * Ritad i CSS och inte fotograferad. Produkten säljs utan hårdvara, och ett
+ * foto av en viss skärm hade lovat en viss skärm.
+ *
+ * Vinkeln är avsiktligt liten, fyra grader hit och åtta dit. Tillräckligt för
+ * att ytan ska läsas som ett föremål i ett rum i stället för en bild på en
+ * sida, men inte så mycket att gränssnittet blir svårt att läsa. Stativet och
+ * skärmen vrids tillsammans, eftersom de är samma föremål; skuggan på golvet
+ * står still, eftersom golvet gör det.
+ */
+export function ScreenMockup({
+  children,
+  className = "",
+}: {
+  children: React.ReactNode;
+  className?: string;
+}) {
+  return (
+    <div className={`[perspective:2200px] ${className}`}>
+      <div className="[transform-style:preserve-3d] [transform:rotateX(4deg)_rotateY(-8deg)]">
+        {/* Kåpan. Tunn ram runt om och en något högre haka, som på en skärm
+            man köper idag. */}
+        <div className="relative rounded-[18px] bg-gradient-to-b from-neutral-600 via-neutral-800 to-neutral-900 p-2 pb-7 shadow-[0_50px_90px_-40px_rgba(15,23,42,0.75)] ring-1 ring-inset ring-white/10">
+          <div className="relative overflow-hidden rounded-[9px] bg-neutral-50">
+            {children}
+
+            {/* Glansen. Ett svagt ljus snett över glaset, aldrig så starkt att
+                det går ut över läsbarheten. */}
+            <div
+              aria-hidden="true"
+              className="pointer-events-none absolute inset-0 bg-gradient-to-br from-white/20 via-white/[0.03] to-transparent"
+            />
+          </div>
+
+          <span
+            aria-hidden="true"
+            className="absolute bottom-2 left-1/2 -translate-x-1/2 text-[9px] font-semibold tracking-[0.2em] text-neutral-500"
+          >
+            TIKKR
+          </span>
+        </div>
+
+        {/* Halsen. En smal pelare som vidgas en aning nedåt. Var först en bred
+            triangel, vilket fick stativet att se ut som en hatt under
+            skärmen. */}
+        <div
+          aria-hidden="true"
+          className="mx-auto h-16 w-20 bg-gradient-to-b from-neutral-700 via-neutral-700 to-neutral-800 [clip-path:polygon(38%_0,62%_0,72%_100%,28%_100%)]"
+        />
+
+        {/* Foten. En ellips, eftersom skärmen står en aning ovanför ögat.
+            Ljusare upptill: en plan metallyta fångar ljuset där. */}
+        <div
+          aria-hidden="true"
+          className="mx-auto h-3.5 w-72 rounded-[50%] bg-gradient-to-b from-neutral-500 via-neutral-700 to-neutral-900"
+        />
+      </div>
+
+      <div
+        aria-hidden="true"
+        className="mx-auto mt-3 h-5 w-[70%] rounded-[50%] bg-neutral-900/15 blur-xl"
+      />
+    </div>
+  );
+}
 
 /* -------------------------------------------------------------------------- */
 /* Stämplingsskärmen — steg två, välj order                                    */
@@ -101,23 +309,23 @@ const ORDERS = [
  * Andra steget i kiosken.
  *
  * Finns med för att visa att valet är knappar och inte en rullgardinslista.
- * Skillnaden är hela poängen för någon som står med handskar på.
+ * Skillnaden är hela poängen för den som står med arbetshandskar på.
  */
 export function OrderPickMockup({ className = "" }: { className?: string }) {
   return (
     <Frame label="Stämplingsskärmen" meta="steg 2 av 3" className={className}>
-      <KioskHeader>
-        <span className="ml-auto rounded-md border border-neutral-200 px-2 py-1 text-[10px] font-semibold text-neutral-500">
+      <KioskChrome>
+        <span className="rounded-md border border-neutral-200 px-2 py-1 text-[10px] font-semibold text-neutral-500">
           Avbryt
         </span>
-      </KioskHeader>
+      </KioskChrome>
 
       <div className="bg-neutral-50 p-3">
-        <div className="mb-2 flex items-center justify-between">
+        <div className="mb-2 flex items-center justify-between gap-2">
           <p className="text-[11px] font-semibold text-neutral-900">
             Anna Andersson: välj order
           </p>
-          <span className="rounded border border-neutral-200 bg-white px-1.5 py-0.5 text-[9px] font-semibold text-neutral-500">
+          <span className="shrink-0 rounded border border-neutral-200 bg-white px-1.5 py-0.5 text-[9px] font-semibold text-neutral-500">
             Slå in ordernummer
           </span>
         </div>
@@ -144,55 +352,29 @@ export function OrderPickMockup({ className = "" }: { className?: string }) {
 }
 
 /* -------------------------------------------------------------------------- */
-/* Stämplingsskärmen — pågående arbete                                         */
+/* Stämplingsskärmen — namnrutnätet                                            */
 /* -------------------------------------------------------------------------- */
 
 /**
- * Namnrutnätet med tiden som räknas.
+ * Namnrutnätet.
  *
- * Grönt kort betyder instämplad, och den förflutna tiden står på kortet. Vem
- * som arbetar med vad går att läsa från andra sidan verkstaden, vilket är
- * skälet att korten är så stora.
+ * Grönt kort betyder instämplad och ordern står under namnet. Vem som arbetar
+ * med vad går att läsa från andra sidan verkstaden, vilket är skälet att
+ * korten är så stora.
  */
 export function RunningMockup({ className = "" }: { className?: string }) {
   return (
     <Frame label="Stämplingsskärmen" className={className}>
-      <KioskHeader />
+      <KioskChrome />
 
       <div className="grid grid-cols-2 gap-2 bg-neutral-50 p-3">
-        {NAMES.map((person, index) => (
+        {PEOPLE.slice(0, 4).map((person, index) => (
           <div
             key={person.name}
-            className={`animate-rise rounded-lg border p-3 ${
-              person.job
-                ? "border-emerald-600 bg-emerald-600"
-                : "border-neutral-200 bg-white"
-            }`}
+            className="animate-rise"
             style={{ animationDelay: `${200 + index * 80}ms` }}
           >
-            <span
-              className={`block truncate text-[12px] font-semibold leading-tight ${
-                person.job ? "text-white" : "text-neutral-900"
-              }`}
-            >
-              {person.name}
-            </span>
-
-            {person.job ? (
-              <>
-                <span className="mt-2 inline-flex items-center gap-1.5 rounded bg-white/20 px-1.5 py-0.5 text-[10px] font-semibold tabular-nums text-white ring-1 ring-inset ring-white/25">
-                  <span className="animate-breathe h-1.5 w-1.5 rounded-full bg-white" />
-                  {person.elapsed}
-                </span>
-                <span className="mt-1 block truncate text-[10px] text-white/80">
-                  {person.job}
-                </span>
-              </>
-            ) : (
-              <span className="mt-2 block text-[10px] text-neutral-400">
-                Ej instämplad
-              </span>
-            )}
+            <KioskCard person={person} />
           </div>
         ))}
       </div>
@@ -216,7 +398,7 @@ const ROWS = [
     name: "Carina Cederlund",
     order: "2603",
     customer: "Atlas Copco",
-    time: "48 min",
+    time: "0:48",
   },
 ];
 
@@ -250,6 +432,13 @@ function Sidebar({ active = 0 }: { active?: number }) {
   );
 }
 
+/**
+ * Översikten i panelen.
+ *
+ * Här STÅR tiden som gått, till skillnad från på stämplingsskärmen. Det är
+ * skillnaden mellan de två ytorna: skärmen svarar på vad man är instämplad på,
+ * panelen på hur länge.
+ */
 export function AdminMockup({ className = "" }: { className?: string }) {
   return (
     <Frame label="Adminpanelen" meta="översikt" className={className}>
@@ -258,8 +447,8 @@ export function AdminMockup({ className = "" }: { className?: string }) {
 
         <div className="min-w-0 flex-1 bg-neutral-50 p-3">
           <div className="mb-3 grid grid-cols-3 gap-2">
-            <Stat label="Arbetar nu" value="3" tone="emerald" />
-            <Stat label="Idag" value="18:30" />
+            <Stat label="Arbetar just nu" value="3" tone="emerald" />
+            <Stat label="Registrerat idag" value="18:30" />
             <Stat label="Att granska" value="1" tone="amber" />
           </div>
 
@@ -337,7 +526,7 @@ const REPORT = [
   { order: "2604", customer: "Sandvik Coromant", hours: "14:15", share: 34 },
 ];
 
-/** Summeringen per order — svaret på vad som ska faktureras. */
+/** Summeringen per order. Svaret på vad som ska faktureras. */
 export function ReportMockup({ className = "" }: { className?: string }) {
   return (
     <Frame label="Adminpanelen" meta="rapporter" className={className}>
@@ -413,16 +602,15 @@ export function ReportMockup({ className = "" }: { className?: string }) {
 /**
  * Posten där utstämplingen saknas.
  *
- * Visar det som skiljer Tikkr från ett system som fyller i tyst: sluttiden är
- * beräknad, den är märkt som beräknad, och den ligger i en lista som ska
- * gås igenom före fakturering.
+ * Sluttiden är beräknad, den är märkt som beräknad, och den ligger i en lista
+ * som gås igenom före fakturering.
  */
 export function ReviewMockup({ className = "" }: { className?: string }) {
   return (
     <Frame label="Adminpanelen" meta="granskning" className={className}>
       <div className="bg-neutral-50 p-3">
         <div className="mb-2.5 flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2">
-          <span className="animate-breathe h-1.5 w-1.5 shrink-0 rounded-full bg-amber-500" />
+          <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-amber-500" />
           <span className="text-[10px] font-medium text-amber-900">
             1 post behöver granskas före fakturering
           </span>
@@ -467,19 +655,14 @@ export function ReviewMockup({ className = "" }: { className?: string }) {
 }
 
 /* -------------------------------------------------------------------------- */
-/* Dokument 1 — underlaget till kundens kund                                   */
+/* Dokument 1 — underlaget till kunden                                         */
 /* -------------------------------------------------------------------------- */
 
 /**
  * Underlaget som skickas vidare till kundens kund.
  *
- * Visar avsiktligt en tänkt logotypruta överst — det är den detalj som gör
- * skillnaden mellan "en systemutskrift" och "ett dokument från leverantören",
- * och den är svår att förklara i text.
- *
- * INGA BELOPP. Underlaget visar tid, och priset bara när den som tar ut det
- * kryssar i rutan. Självkostnad och marginal finns inte ens som möjlighet:
- * dokumentet byggs ur en typ som saknar de fälten.
+ * Logotypsrutan överst är med avsikt. Det är den detalj som gör skillnaden
+ * mellan en systemutskrift och ett dokument från leverantören.
  */
 export function ExportMockup({ className = "" }: { className?: string }) {
   const rows = [
@@ -543,19 +726,14 @@ export function ExportMockup({ className = "" }: { className?: string }) {
 }
 
 /* -------------------------------------------------------------------------- */
-/* Dokument 2 — efterkalkylen, internt                                         */
+/* Dokument 2 — efterkalkylen                                                  */
 /* -------------------------------------------------------------------------- */
 
 /**
  * Efterkalkylen.
  *
- * Det dokument som svarar på om jobbet var värt att ta. Bandet överst är
- * produktens eget och står på varje sida: det här pappret innehåller
- * självkostnad och får aldrig förväxlas med det som skickas vidare.
- *
- * Satserna står uppdelade i person och maskin, precis som i produkten. Ett
- * belopp som inte går att bryta ned går inte att försvara för den som
- * ifrågasätter fakturan.
+ * Bandet överst är produktens eget och står på varje sida. Satserna redovisas
+ * uppdelade i person och maskin, som i systemet.
  */
 export function CalcMockup({ className = "" }: { className?: string }) {
   const rows = [
@@ -569,7 +747,7 @@ export function CalcMockup({ className = "" }: { className?: string }) {
       <div className="px-4 py-4">
         <div className="rounded bg-neutral-900 px-2 py-1.5">
           <span className="text-[8px] font-semibold uppercase tracking-wider text-white">
-            Internt underlag · innehåller självkostnad
+            Internt underlag
           </span>
         </div>
 
@@ -646,17 +824,10 @@ function Line({
 }
 
 /* -------------------------------------------------------------------------- */
-/* Dokument 3 — tidrapporten, tillval                                          */
+/* Dokument 3 — tidrapporten                                                   */
 /* -------------------------------------------------------------------------- */
 
-/**
- * Tidrapporten per anställd.
- *
- * Ett annat dokument med en annan mottagare: det här går till lönen. Samma
- * timme räknas olika i de två, och det är avsiktligt. Kör Anna två maskiner
- * fyra timmar är det åtta maskintimmar att fakturera men fyra timmar på
- * jobbet.
- */
+/** Tidrapporten per anställd. Underlaget som går vidare till lönen. */
 export function TimesheetMockup({ className = "" }: { className?: string }) {
   const days = [
     ["Må", "8,50", "8,50", "0,00"],
@@ -667,7 +838,7 @@ export function TimesheetMockup({ className = "" }: { className?: string }) {
   ];
 
   return (
-    <Frame label="Till lönen" meta="tillval" className={className}>
+    <Frame label="Till lönen" meta="tidrapport.pdf" className={className}>
       <div className="px-4 py-4">
         <div className="flex items-baseline justify-between">
           <p className="text-[13px] font-semibold text-neutral-900">

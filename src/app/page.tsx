@@ -28,19 +28,16 @@ const base = siteUrl();
  */
 export const revalidate = 60;
 
-// Priset står även här, i texten sökmotorer visar. Det hämtas därför ur samma
-// källa som resten av sidan — en prisändring ska inte kunna lämna kvar en
-// gammal siffra i sökresultatet.
+// INGET PRIS I BESKRIVNINGEN. Den är det första en besökare ser, i
+// sökresultatet, och priset hör hemma längre ned på sidan när det står klart
+// vad man får. Siffran stod här tidigare och gjorde texten till en prislapp.
 export async function generateMetadata(): Promise<Metadata> {
-  const pricing = await getScreenPricing();
-
   return {
     title: "Tikkr · Tidregistrering per order för verkstad",
     description:
-      "Stämplingssystem för touchskärm. Personalen registrerar tid på rätt " +
+      "Stämplingssystem för pekskärm. Personalen registrerar tid på rätt " +
       "order och arbetsmoment med ett tryck. Underlag per order, efterkalkyl " +
-      "och tidrapport. " +
-      `${pricing.month.toLocaleString("sv-SE")} kr per stämplingsskärm och månad.`,
+      "och tidrapport, med drift och support i Sverige.",
 
     // Talar om vilken adress som är den riktiga. Utan den kan tikkr.se och
     // www.tikkr.se räknas som två sidor med samma innehåll, och deras värde
@@ -75,8 +72,8 @@ export default async function Home() {
 
       {/* Hero och sifferraden animeras vid inladdning — de syns direkt och
           har inget att vänta på. Resten tonas in när man skrollar dit. */}
-      <Hero pricing={pricing} />
-      <Facts pricing={pricing} />
+      <Hero />
+      <Facts />
 
       <Reveal>
         <Problem />
@@ -88,7 +85,7 @@ export default async function Home() {
         <AdminSection />
       </Reveal>
       <Reveal>
-        <Documents modules={modules} />
+        <Documents />
       </Reveal>
       <Reveal>
         <Capabilities />

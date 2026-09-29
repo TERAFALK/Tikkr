@@ -7,6 +7,7 @@ import {
   ReportMockup,
   ReviewMockup,
   RunningMockup,
+  ScreenMockup,
   TimesheetMockup,
 } from "./Mockups";
 import LiveKiosk from "./LiveKiosk";
@@ -20,20 +21,20 @@ import Reveal from "./Reveal";
  * FORMGIVNINGEN ÄR ETT SPECIFIKATIONSBLAD, inte en produktsida i allmänhet.
  * Läsaren är en verkstadschef som köper verktyg efter vad de gör, och sidan är
  * satt därefter: numrerade avsnitt, hårfina linjer och siffror i tabellsiffror.
- * Svart, vitt och grått hela vägen; färg förekommer bara INUTI produktbilderna,
+ * Svart, vitt och grått hela vägen; färg förekommer bara inuti produktbilderna,
  * där grönt betyder pågår och gult behöver granskas precis som i systemet.
  *
- * Det som medvetet INTE finns här, och varför:
+ * SPRÅKET FÖLJER CLAUDE.md § 7.1, och det gäller här lika hårt som i panelen:
  *
- *  - Gradienter i rubriktext och suddade färgfläckar bakom innehållet. De
- *    säger ingenting om produkten och ser likadana ut på varje ny sajt.
- *  - Rutnät av sex likadana kort med varsin ikon. En ikon som föreställer
- *    "säkerhet" bär mindre än ordet säkerhet.
- *  - Kundcitat och logotyper. Vi har en pilotkund, och påhittade referenser
- *    är det snabbaste sättet att förlora någon som känner branschen.
+ *  - Formell svenska. "Internetanslutningen bryts", inte "nätet försvinner".
+ *  - Vad systemet GÖR, aldrig varför det är byggt som det är. Att två
+ *    dokument inte delar kod är sant och viktigt, men det är en uppgift för
+ *    den som underhåller systemet och inte för den som köper det.
+ *  - Inga eftertankar efter tankstreck, och ingen text som säger det bilden
+ *    redan visar.
  *
- * Det som får bära sidan i stället: produktens egna ytor. Bilderna är byggda
- * i kod ur samma färger och siffror som systemet använder, se Mockups.tsx.
+ * PRISET STÅR BARA I PRISAVSNITTET. Den som vill veta vad det kostar hittar
+ * dit; den som läser uppifrån ska först få veta vad de får.
  */
 
 /* -------------------------------------------------------------------------- */
@@ -104,8 +105,8 @@ function SectionHead({
 /**
  * Rad i en uppräkning.
  *
- * En linje över varje rad i stället för en bock framför den. Bockar läser ögat
- * som reklam; linjer läser det som en specifikation, och det är vad det är.
+ * En linje över varje rad i stället för en bock framför den. Bockar läses som
+ * reklam; linjer läses som en specifikation.
  */
 function SpecRow({ term, children }: { term: string; children: string }) {
   return (
@@ -122,11 +123,11 @@ function SpecRow({ term, children }: { term: string; children: string }) {
 /* Hero                                                                        */
 /* -------------------------------------------------------------------------- */
 
-export function Hero({ pricing }: { pricing: ScreenPricing }) {
+export function Hero() {
   return (
     <section className="border-b border-neutral-200 bg-white">
-      <div className="mx-auto max-w-6xl px-6 pb-16 pt-14 sm:pb-20 sm:pt-20">
-        <div className="grid items-center gap-12 lg:grid-cols-[1fr_1.05fr] lg:gap-16">
+      <div className="mx-auto max-w-6xl px-6 pb-20 pt-14 sm:pb-24 sm:pt-20">
+        <div className="grid items-center gap-14 lg:grid-cols-[0.9fr_1.1fr] lg:gap-16">
           <div>
             <p className="animate-rise font-mono text-[11px] uppercase tracking-[0.18em] text-neutral-500">
               Stämplingssystem för verkstad
@@ -143,9 +144,9 @@ export function Hero({ pricing }: { pricing: ScreenPricing }) {
               className="animate-rise mt-6 max-w-lg text-[17px] leading-relaxed text-neutral-600"
               style={{ animationDelay: "120ms" }}
             >
-              En skärm på väggen i verkstaden och en panel på kontoret.
-              Personalen trycker en gång, tiden hamnar på ordern och
-              arbetsmomentet, och underlaget går att skicka samma dag.
+              En pekskärm i verkstaden och en panel på kontoret. Personalen
+              registrerar tiden med ett tryck, den hamnar på rätt order och
+              arbetsmoment, och underlaget kan skickas samma dag.
             </p>
 
             <div
@@ -170,18 +171,24 @@ export function Hero({ pricing }: { pricing: ScreenPricing }) {
               className="animate-rise mt-6 text-[13px] text-neutral-500"
               style={{ animationDelay: "240ms" }}
             >
-              Inget betalkort. Ingen bindningstid. {kr(pricing.month)} kr per
-              skärm och månad när provperioden tar slut.
+              Inget betalkort. Ingen bindningstid.
             </p>
           </div>
 
-          {/* Den levande kioskbilden. Den som tittar i tio sekunder har sett
-              vad produkten gör utan att läsa en rad text. */}
+          {/* Skärmen på stativ, med den levande ytan i sig. Den som tittar i
+              tio sekunder ser någon stämpla in utan att läsa en rad text. */}
           <div
             className="animate-rise-soft"
             style={{ animationDelay: "300ms" }}
           >
-            <LiveKiosk />
+            <ScreenMockup>
+              <LiveKiosk />
+            </ScreenMockup>
+
+            <p className="mt-8 text-center text-[13px] text-neutral-500">
+              24 tums pekskärm på stativ. Fungerar lika bra som väggmonterad
+              skärm eller surfplatta.
+            </p>
           </div>
         </div>
       </div>
@@ -197,14 +204,13 @@ export function Hero({ pricing }: { pricing: ScreenPricing }) {
  * Fyra fakta, satta som en datarad.
  *
  * Står där andra sidor har en rad kundlogotyper. Vi har en pilotkund och inga
- * logotyper att visa, och de här siffrorna säger mer ändå: de svarar på det
- * första en köpare undrar innan hen bestämmer sig för att läsa vidare.
+ * logotyper att visa.
  */
-export function Facts({ pricing }: { pricing: ScreenPricing }) {
+export function Facts() {
   const facts = [
-    { value: `${kr(pricing.month)} kr`, label: "per skärm och månad" },
     { value: "30 dagar", label: "provperiod utan betalkort" },
     { value: "0 kr", label: "i uppstart och installation" },
+    { value: "Obegränsat", label: "antal anställda och ordrar" },
     { value: "Sverige", label: "servrar och support" },
   ];
 
@@ -216,7 +222,7 @@ export function Facts({ pricing }: { pricing: ScreenPricing }) {
       <dl className="mx-auto grid max-w-6xl grid-cols-2 gap-px bg-neutral-200 lg:grid-cols-4">
         {facts.map((fact) => (
           <div key={fact.label} className="bg-white px-6 py-7">
-            <dt className="text-[22px] font-semibold tracking-tight tabular-nums text-neutral-900">
+            <dt className="text-[22px] font-semibold tracking-tight text-neutral-900">
               {fact.value}
             </dt>
             <dd className="mt-1 text-[13px] leading-relaxed text-neutral-500">
@@ -244,7 +250,7 @@ export function Problem() {
   const points = [
     {
       title: "Tiden skrivs upp i efterhand",
-      body: "På fredagen ska någon minnas vad som gjordes på tisdagen. Uppskattningen blir underlag för en faktura.",
+      body: "På fredagen ska någon minnas vad som utfördes på tisdagen. Uppskattningen blir underlag för en faktura.",
     },
     {
       title: "Timmar som aldrig faktureras",
@@ -252,7 +258,7 @@ export function Problem() {
     },
     {
       title: "Ingen vet vad ordern kostade",
-      body: "Utan tid per order finns inget att jämföra offerten med. Nästa pris sätts på en känsla.",
+      body: "Utan tid per order saknas underlag för att bedöma lönsamheten. Nästa offert bygger på en uppskattning.",
     },
   ];
 
@@ -268,7 +274,7 @@ export function Problem() {
 
         <div className="mt-14 grid gap-px overflow-hidden rounded-lg bg-neutral-800 sm:grid-cols-3">
           {points.map((point, index) => (
-            <Reveal key={point.title} delay={index * 90}>
+            <Reveal key={point.title} delay={index * 90} className="h-full">
               <div className="h-full bg-neutral-900 p-6">
                 <h3 className="text-[15px] font-semibold text-white">
                   {point.title}
@@ -286,26 +292,26 @@ export function Problem() {
 }
 
 /* -------------------------------------------------------------------------- */
-/* 02 Så fungerar det                                                          */
+/* 02 I verkstaden                                                             */
 /* -------------------------------------------------------------------------- */
 
 const STEPS = [
   {
     number: "1",
-    title: "Namn, order, moment",
-    body: "Tre tryck, med knappar stora nog att träffa med arbetshandskar. Den som har ordernumret på ritningen slår in det på en knappsats i stället. Saknas ordern går den att lägga upp direkt vid skärmen och märks då för kontoret.",
+    title: "Namn, order, arbetsmoment",
+    body: "Tre tryck, med knappar anpassade för arbetshandskar. Den som har ordernumret på ritningen kan ange det på en knappsats i stället. Saknas ordern läggs den upp vid skärmen och markeras för komplettering på kontoret.",
     mockup: <OrderPickMockup />,
   },
   {
     number: "2",
     title: "Tiden räknas medan arbetet pågår",
-    body: "Vem som arbetar, på vad och sedan när syns på skärmen och i panelen samtidigt. En operatör som kör två maskiner stämplar in på båda, och båda ordrarna får sin timme. Försvinner nätet sparas trycken lokalt och skickas när det kommer tillbaka.",
+    body: "Skärmen visar vem som är instämplad och på vilket jobb. En operatör som kör två maskiner stämplar in på båda, och tiden räknas på var och en av ordrarna. Vid avbrott i internetanslutningen sparas registreringarna i skärmen och skickas när anslutningen återupprättats.",
     mockup: <RunningMockup />,
   },
   {
     number: "3",
     title: "Avvikelser märks före fakturering",
-    body: "Glömd utstämpling stängs vid ett klockslag ni själva anger och hamnar i granskningen. En beräknad sluttid är alltid märkt som beräknad, både i panelen och i underlaget, och ingen tid fylls i tyst.",
+    body: "En glömd utstämpling stängs vid ett klockslag ni anger och hamnar i granskningen. Beräknade sluttider är märkta som beräknade, både i panelen och i underlaget.",
     mockup: <ReviewMockup />,
   },
 ];
@@ -321,7 +327,7 @@ export function HowItWorks() {
           index="02"
           eyebrow="I verkstaden"
           title="Från tryck på skärmen till färdigt underlag"
-          intro="De två första stegen sker vid maskinen, utan inloggning och utan att någon skriver något."
+          intro="De två första stegen sker vid maskinen och kräver ingen inloggning."
         />
 
         <div className="mt-16 space-y-16">
@@ -355,7 +361,7 @@ export function HowItWorks() {
 }
 
 /* -------------------------------------------------------------------------- */
-/* 03 Panelen                                                                  */
+/* 03 På kontoret                                                              */
 /* -------------------------------------------------------------------------- */
 
 export function AdminSection() {
@@ -365,8 +371,8 @@ export function AdminSection() {
         <SectionHead
           index="03"
           eyebrow="På kontoret"
-          title="Läget i verkstaden, utan att någon behöver fråga"
-          intro="Registrerad tid finns i panelen i samma stund som knappen trycks. Ingen insamling, ingen sammanställning på fredagen."
+          title="Överblick i realtid"
+          intro="Registrerad tid finns i panelen i samma stund som den registreras."
         />
 
         <div className="mt-14 grid items-start gap-10 lg:grid-cols-2 lg:gap-16">
@@ -376,20 +382,19 @@ export function AdminSection() {
               som PDF eller Excel, eller skriv ut direkt.
             </SpecRow>
             <SpecRow term="Granskning">
-              Allt som kräver en åtgärd på ett ställe: beräknade sluttider och
-              ordrar som lagts upp vid skärmen och behöver kompletteras.
+              Beräknade sluttider och ordrar som lagts upp vid skärmen samlas på
+              ett ställe för komplettering.
             </SpecRow>
             <SpecRow term="Ordrar och kunder">
-              Kunden bär påslag, rabatt och adressen på underlaget. Ordern kan
-              ha eget påslag eller ett avtalat fast pris.
+              Kunden bär påslag, rabatt och adressuppgifter till underlaget.
+              Ordern kan ha eget påslag eller avtalat fast pris.
             </SpecRow>
             <SpecRow term="Beräknad tid">
-              Lägg en beräkning per arbetsmoment och se utfallet mot den medan
-              jobbet pågår.
+              Anges per arbetsmoment och jämförs löpande med utfallet.
             </SpecRow>
             <SpecRow term="Rättelser">
-              Tider går att ändra och skriva in i efterhand. Ändringen märks och
-              går att skilja från ett riktigt tryck.
+              Tider kan ändras och registreras i efterhand. Ändringar märks och
+              går att skilja från registreringar gjorda på skärmen.
             </SpecRow>
           </dl>
 
@@ -409,35 +414,24 @@ export function AdminSection() {
 /* 04 Dokumenten                                                               */
 /* -------------------------------------------------------------------------- */
 
-/**
- * Tre dokument, tre mottagare.
- *
- * Avsnittet finns för att det är här produkten skiljer sig mest från en vanlig
- * stämpelklocka, och för att gränsen mellan dokumenten är en av de få saker i
- * systemet som aldrig får suddas ut. Kundens papper innehåller inga
- * självkostnader; det interna gör det; lönens räknar samma timme på ett annat
- * sätt.
- */
-export function Documents({ modules }: { modules: ModulePricing }) {
+export function Documents() {
   const docs = [
     {
       kicker: "Till kunden",
       title: "Underlag per order",
-      body: "PDF att bifoga fakturan, med er logotyp, ordernummer och kund som rubrik, varje stämpling och en summa sist. Samma innehåll som Excel. Belopp följer med bara när ni kryssar i det.",
+      body: "PDF eller Excel med er logotyp, ordernummer och kund som rubrik, samtliga stämplingar och en summa sist. Belopp tas med när ni väljer det.",
       mockup: <ExportMockup className="h-full" />,
     },
     {
       kicker: "Internt",
       title: "Efterkalkyl",
-      body: "Vad jobbet kostade och vad det gav. Timkostnaden är personens sats plus maskinens, kopierad till stämplingen när den gjordes, så en prishöjning inte ändrar en kalkyl som redan fakturerats.",
+      body: "Självkostnad, påslag, rabatt och pris per order. Timkostnaden är personens sats plus arbetsmomentets, hämtad från den tidpunkt arbetet utfördes.",
       mockup: <CalcMockup className="h-full" />,
     },
     {
       kicker: "Till lönen",
       title: "Tidrapport per anställd",
-      body: `Planerad tid mot närvaro, med flex, komp och frånvaro. Ett tillval för ${kr(
-        modules.PAYROLL.month
-      )} kr i månaden, och ett annat dokument än de två andra: samma timme räknas olika.`,
+      body: "Planerad tid mot närvaro, med flex, komp och frånvaro. Ingår i tillvalet Löneunderlag.",
       mockup: <TimesheetMockup className="h-full" />,
     },
   ];
@@ -449,16 +443,14 @@ export function Documents({ modules }: { modules: ModulePricing }) {
           index="04"
           eyebrow="Dokumenten"
           title="Tre underlag, tre mottagare"
-          intro="Kör en operatör två maskiner fyra timmar är det åtta maskintimmar att fakturera, men fyra timmar på jobbet. Därför räknas samma timme olika i olika dokument, och därför delar de aldrig kod."
+          intro="Tid som registrerats en gång blir underlag till kundens faktura, till er egen efterkalkyl och till lönen."
         />
 
         <div className="mt-14 grid gap-10 lg:grid-cols-3 lg:gap-8">
           {docs.map((doc, index) => (
-            /* h-full hela vägen ned: de tre pappersytorna blir lika höga
-               även när en tabell har en rad mer, och rubrikerna under dem
-               hamnar på samma linje. Utan det står de tre bildtexterna på
-               tre olika höjder, vilket är det enda i avsnittet ögat
-               fastnar på. */
+            /* h-full hela vägen ned: de tre pappersytorna blir lika höga även
+               när en tabell har en rad mer, och rubrikerna under dem hamnar på
+               samma linje. */
             <Reveal key={doc.title} delay={index * 90} className="h-full">
               <div className="flex h-full flex-col">
                 <div className="flex-1">{doc.mockup}</div>
@@ -484,84 +476,92 @@ export function Documents({ modules }: { modules: ModulePricing }) {
 }
 
 /* -------------------------------------------------------------------------- */
-/* 05 Allt som ingår                                                           */
+/* 05 Innehåll                                                                 */
 /* -------------------------------------------------------------------------- */
 
+interface Capability {
+  term: string;
+  body: string;
+  /** Märks som tillval i listan. Priset står i prisavsnittet. */
+  tillval?: boolean;
+}
+
 export function Capabilities() {
-  const groups = [
+  const groups: { title: string; rows: Capability[] }[] = [
     {
       title: "I verkstaden",
       rows: [
-        [
-          "Ett tryck",
-          "Ingen inloggning, ingen PIN. Namn, order, moment och tillbaka till jobbet.",
-        ],
-        [
-          "Flera maskiner",
-          "En person kan ha ett pågående jobb per arbetsmoment. Aldrig två på samma maskin.",
-        ],
-        [
-          "Automatisk utstämpling",
-          "Vid byte av jobb på samma maskin, och vid ett klockslag ni anger i slutet av dagen.",
-        ],
-        [
-          "Fungerar utan nät",
-          "Trycken sparas i skärmen och skickas när uppkopplingen är tillbaka.",
-        ],
-        [
-          "Improduktiv tid",
-          "Städning, möten och underhåll registreras i ett eget register och når aldrig en faktura.",
-        ],
+        {
+          term: "Ett tryck",
+          body: "Ingen inloggning och ingen kod. Namn, order och arbetsmoment.",
+        },
+        {
+          term: "Flera maskiner",
+          body: "En anställd kan ha ett pågående jobb per arbetsmoment.",
+        },
+        {
+          term: "Automatisk utstämpling",
+          body: "Vid byte av jobb på samma arbetsmoment, och vid ett klockslag ni anger.",
+        },
+        {
+          term: "Fungerar vid avbrott",
+          body: "Registreringarna sparas i skärmen och skickas när internetanslutningen återupprättats.",
+        },
+        {
+          term: "Improduktiv tid",
+          body: "Städning, möten och underhåll registreras skilt från ordrarna.",
+        },
       ],
     },
     {
       title: "På kontoret",
       rows: [
-        [
-          "Rapporter och export",
-          "PDF, Excel och utskrift. Flera markerade ordrar ger en fil per order.",
-        ],
-        [
-          "Efterkalkyl",
-          "Självkostnad, påslag, rabatt och pris per order. Internt märkt på varje sida.",
-        ],
-        [
-          "Kundregister",
-          "Påslag och rabatt per kund, adress på underlaget, och all tid samlad per kund.",
-        ],
-        [
-          "Flera administratörer",
-          "Inbjudan per e-post. Alla ändringar är spårbara till ett konto.",
-        ],
-        [
-          "Löneunderlag",
-          "Schema, stämplade raster, flex, komp och frånvaro. Tillval, se priset nedan.",
-        ],
+        {
+          term: "Rapporter och export",
+          body: "PDF, Excel och utskrift. Flera markerade ordrar ger en fil per order.",
+        },
+        {
+          term: "Efterkalkyl",
+          body: "Självkostnad, påslag, rabatt och pris per order.",
+        },
+        {
+          term: "Kundregister",
+          body: "Påslag och rabatt per kund, adressuppgifter till underlaget och all tid samlad per kund.",
+        },
+        {
+          term: "Flera administratörer",
+          body: "Inbjudan per e-post. Ändringar är spårbara till ett konto.",
+        },
+        {
+          term: "Löneunderlag",
+          body: "Arbetstidsschema, stämplade raster, flex, komp och frånvaro.",
+          tillval: true,
+        },
       ],
     },
     {
       title: "Drift och säkerhet",
       rows: [
-        [
-          "Svensk drift",
-          "Servrar i Sverige. Personuppgiftsbiträdesavtal ingår och finns att läsa innan ni börjar.",
-        ],
-        [
-          "Spårbarhet",
-          "Varje stämpling bär tidpunkt, skärm och IP. Manuella ändringar märks som manuella.",
-        ],
-        [
-          "Dataskydd",
-          "Export och radering av en enskild anställds uppgifter finns i panelen.",
-        ],
-        [
-          "Ingen installation",
-          "Skärmen är en surfplatta eller dator med webbläsare. Panelen nås som vilken sida som helst.",
-        ],
-        [
-          "Uppdateringar ingår",
-          "Nya funktioner kommer utan att någon behöver installera något.",
-        ],
+        {
+          term: "Svensk drift",
+          body: "Servrar i Sverige. Personuppgiftsbiträdesavtal ingår.",
+        },
+        {
+          term: "Spårbarhet",
+          body: "Varje stämpling registrerar tidpunkt, skärm och IP-adress.",
+        },
+        {
+          term: "Dataskydd",
+          body: "Export och radering av en enskild anställds uppgifter sker i panelen.",
+        },
+        {
+          term: "Ingen installation",
+          body: "Skärmen är en pekskärm med webbläsare. Panelen nås på samma sätt.",
+        },
+        {
+          term: "Uppdateringar",
+          body: "Nya versioner driftsätts löpande och kräver ingen åtgärd.",
+        },
       ],
     },
   ];
@@ -572,12 +572,7 @@ export function Capabilities() {
       className="border-b border-neutral-200 bg-neutral-50"
     >
       <div className="mx-auto max-w-6xl px-6 py-20 sm:py-24">
-        <SectionHead
-          index="05"
-          eyebrow="Innehåll"
-          title="Vad ni får"
-          intro="Allt nedan ingår i grundpriset, utom löneunderlaget som är ett tillval."
-        />
+        <SectionHead index="05" eyebrow="Innehåll" title="Vad som ingår" />
 
         <div className="mt-14 grid gap-12 lg:grid-cols-3 lg:gap-10">
           {groups.map((group, index) => (
@@ -588,13 +583,21 @@ export function Capabilities() {
                 </h3>
 
                 <dl className="mt-4">
-                  {group.rows.map(([term, body]) => (
-                    <div key={term} className="border-t border-neutral-200 py-4">
-                      <dt className="text-[14px] font-medium text-neutral-900">
-                        {term}
+                  {group.rows.map((row) => (
+                    <div
+                      key={row.term}
+                      className="border-t border-neutral-200 py-4"
+                    >
+                      <dt className="flex items-center gap-2 text-[14px] font-medium text-neutral-900">
+                        {row.term}
+                        {row.tillval && (
+                          <span className="rounded border border-neutral-300 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-[0.12em] text-neutral-500">
+                            Tillval
+                          </span>
+                        )}
                       </dt>
                       <dd className="mt-1 text-[13px] leading-relaxed text-neutral-600">
-                        {body}
+                        {row.body}
                       </dd>
                     </div>
                   ))}
@@ -615,10 +618,9 @@ export function Capabilities() {
 /**
  * Priset.
  *
- * Två rader och en uträkning. Ingen jämförelsetabell med tre kolumner där den
- * mittersta är förvald: Tikkr har ett pris per skärm och ett tillval, och att
- * rita upp det som ett paketval vore att låtsas att det finns ett beslut att
- * fatta som inte finns.
+ * Två rader: basen per skärm och tillvalet per företag. Ingen jämförelsetabell
+ * med tre kolumner där den mittersta är förvald, eftersom det inte finns tre
+ * varianter att välja mellan.
  *
  * Siffrorna kommer från prislistan hos betaltjänsten och inte från koden. En
  * prisändring syns här utan att något behöver byggas om.
@@ -632,12 +634,6 @@ export function Pricing({
 }) {
   const payroll = modules.PAYROLL;
 
-  // Räkneexempel med tre skärmar. Tre är vanligt i en verkstad som har en
-  // skärm vid porten och två ute i produktionen, och exemplet svarar på den
-  // fråga priset i sig inte gör: vad landar fakturan på?
-  const screens = 3;
-  const example = screens * pricing.month + payroll.month;
-
   return (
     <section id="pris" className="border-b border-neutral-200 bg-white">
       <div className="mx-auto max-w-6xl px-6 py-20 sm:py-24">
@@ -645,12 +641,12 @@ export function Pricing({
           index="06"
           eyebrow="Pris"
           title="Per skärm, inte per anställd"
-          intro="Antalet anställda, ordrar och stämplingar påverkar inte priset. Skärmarna följer verkstadens storlek av sig själva, eftersom folk annars köar vid den enda."
+          intro="Antalet anställda, ordrar och stämplingar påverkar inte priset."
         />
 
         <div className="mt-14 overflow-hidden rounded-lg border border-neutral-200">
-          {/* Basen. Den stora siffran ligger till vänster och innehållet till
-              höger, som en rad i en prislista snarare än ett paketkort. */}
+          {/* Basen. Den stora siffran till vänster och innehållet till höger,
+              som en rad i en prislista snarare än ett paketkort. */}
           <div className="grid gap-8 border-b border-neutral-200 bg-white p-6 sm:p-8 lg:grid-cols-[20rem_1fr] lg:gap-12">
             <div>
               <p className="font-mono text-[11px] uppercase tracking-[0.18em] text-neutral-500">
@@ -669,7 +665,7 @@ export function Pricing({
               </p>
 
               {pricing.year !== null && (
-                <p className="mt-4 inline-flex items-center gap-2 rounded-md border border-neutral-200 bg-neutral-50 px-3 py-1.5 text-[13px] text-neutral-700">
+                <p className="mt-4 inline-flex flex-wrap items-center gap-2 rounded-md border border-neutral-200 bg-neutral-50 px-3 py-1.5 text-[13px] text-neutral-700">
                   <span className="font-medium tabular-nums">
                     {kr(pricing.year)} kr per år
                   </span>
@@ -708,7 +704,7 @@ export function Pricing({
 
           {/* Tillvalet. Egen rad med tonad botten, så att det syns att det är
               något annat än basen och inte ett paket till. */}
-          <div className="grid gap-6 border-b border-neutral-200 bg-neutral-50 p-6 sm:p-8 lg:grid-cols-[20rem_1fr] lg:gap-12">
+          <div className="grid gap-6 bg-neutral-50 p-6 sm:p-8 lg:grid-cols-[20rem_1fr] lg:gap-12">
             <div>
               <p className="font-mono text-[11px] uppercase tracking-[0.18em] text-neutral-500">
                 Tillval
@@ -735,21 +731,10 @@ export function Pricing({
               <p className="mt-2 max-w-xl text-[13px] leading-relaxed text-neutral-600">
                 Arbetstidsschema, stämplade raster, flex, komp, frånvaro och
                 tidrapport per anställd. Priset gäller hela företaget oavsett
-                antal skärmar och anställda. Slås på och av när ni vill, och
-                era uppgifter ligger kvar när det är avstängt.
+                antal skärmar och anställda. Kan slås på och av, och
+                registrerade uppgifter ligger kvar när tillvalet är avstängt.
               </p>
             </div>
-          </div>
-
-          {/* Räkneexemplet. Den fråga priset i sig inte besvarar. */}
-          <div className="flex flex-wrap items-baseline justify-between gap-4 bg-white px-6 py-5 sm:px-8">
-            <p className="text-[13px] text-neutral-600">
-              Tre skärmar med löneunderlag: {screens} × {kr(pricing.month)} +{" "}
-              {kr(payroll.month)}
-            </p>
-            <p className="text-[15px] font-semibold tabular-nums text-neutral-900">
-              {kr(example)} kr per månad
-            </p>
           </div>
         </div>
 
@@ -777,47 +762,47 @@ export function Faq({ modules }: { modules: ModulePricing }) {
   const questions = [
     {
       q: "Vilken utrustning krävs i verkstaden?",
-      a: "En surfplatta eller dator med pekskärm och webbläsare. Ingen installation. Skärmen kopplas en gång med en sexsiffrig kod och kräver därefter ingen inloggning.",
+      a: "En pekskärm eller surfplatta med webbläsare. Ingen installation krävs. Skärmen kopplas en gång med en sexsiffrig kod och kräver därefter ingen inloggning.",
     },
     {
       q: "Hur lång tid tar uppsättningen?",
-      a: "Omkring en kvart. Anställda, arbetsmoment och ordrar läggs upp i en guide, och skärmen kopplas genom att koden knappas in på den enhet som ska användas.",
+      a: "Cirka femton minuter. Anställda, arbetsmoment och ordrar läggs upp i en guide, och skärmen kopplas genom att koden anges på den enhet som ska användas.",
     },
     {
-      q: "Kan en person arbeta med två maskiner samtidigt?",
-      a: "Ja. En anställd kan ha ett pågående jobb per arbetsmoment, men aldrig två på samma. Går två maskiner en timme är det två maskintimmar, och båda ordrarna får sin.",
+      q: "Kan en anställd arbeta med två maskiner samtidigt?",
+      a: "Ja. En anställd kan ha ett pågående jobb per arbetsmoment, men inte två på samma. Pågår två maskiner en timme registreras två maskintimmar, fördelade på respektive order.",
     },
     {
-      q: "Vad händer om någon glömmer stämpla ut?",
-      a: "Posten stängs vid ett klockslag ni själva anger, exempelvis 18:00, och hamnar i granskningen. Den beräknade sluttiden är märkt som beräknad och rättas innan fakturering.",
+      q: "Vad händer om någon glömmer att stämpla ut?",
+      a: "Posten stängs vid ett klockslag ni anger, exempelvis 18:00, och hamnar i granskningen. Den beräknade sluttiden är märkt som beräknad och rättas före fakturering.",
     },
     {
-      q: "Vad händer om nätet försvinner?",
-      a: "Skärmen fortsätter ta emot tryck. De sparas lokalt och skickas när uppkopplingen är tillbaka. Arbetstid som inte registrerats går inte att rekonstruera, så stämplingen får aldrig vara det som slutar fungera.",
+      q: "Vad händer vid avbrott i internetanslutningen?",
+      a: "Skärmen tar emot registreringar som vanligt. De sparas lokalt och skickas när anslutningen återupprättats. Arbetstid som inte registrerats går inte att rekonstruera i efterhand.",
     },
     {
       q: "Kan Tikkr användas för löneunderlag?",
-      a: `Ja, som tillval för ${kr(modules.PAYROLL.month)} kr i månaden: arbetstidsschema, stämplade raster, flex, komp, frånvaro och tidrapport per anställd. Tikkr räknar timmar, inte pengar. Lönearter, OB och övertidsersättning hör till kollektivavtalet och stannar i lönesystemet.`,
+      a: `Ja, som tillval för ${kr(modules.PAYROLL.month)} kr per månad: arbetstidsschema, stämplade raster, flex, komp, frånvaro och tidrapport per anställd. Tikkr redovisar timmar. Lönearter, OB och övertidsersättning regleras i kollektivavtal och hanteras i lönesystemet.`,
     },
     {
       q: "Hur hanteras tid som inte ska faktureras?",
-      a: "Städning, möten och underhåll registreras som improduktiv tid i ett eget register. Den tiden når aldrig ett fakturaunderlag, men den göms inte heller i närmaste order.",
+      a: "Städning, möten och underhåll registreras som improduktiv tid i ett eget register, skilt från ordrarna.",
     },
     {
       q: "Kan underlaget skickas vidare till vår kund?",
-      a: "Ja. PDF:en har er logotyp, ordernummer och kund som rubrik, varje stämpling och en summa sist. Självkostnad och marginal finns inte i det dokumentet; de står i efterkalkylen, som är internt märkt.",
+      a: "Ja. Underlaget innehåller er logotyp, ordernummer och kund som rubrik, samtliga stämplingar och en summa sist. Självkostnad och marginal redovisas enbart i efterkalkylen, som är märkt som internt underlag.",
     },
     {
       q: "Var lagras uppgifterna?",
-      a: "På servrar i Sverige. Personuppgiftsbiträdesavtal ingår och går att läsa innan ni börjar. Uppgifterna om en anställd begränsas till namn, valfritt anställningsnummer och registrerad tid, och går att exportera eller radera ur panelen.",
+      a: "På servrar i Sverige. Personuppgiftsbiträdesavtal ingår och kan läsas innan ni börjar. Uppgifterna om en anställd omfattar namn, valfritt anställningsnummer och registrerad tid, och kan exporteras eller raderas i panelen.",
     },
     {
-      q: "Vad händer om vi slutar betala?",
-      a: "Stämplingsskärmarna fortsätter fungera. Det är panelen och exporten som låses, eftersom oregistrerad arbetstid inte går att få tillbaka. Tiden finns kvar och blir åtkomlig igen när fakturan är betald.",
+      q: "Vad händer vid utebliven betalning?",
+      a: "Stämplingsskärmarna fortsätter att fungera. Panelen och exporten låses, eftersom arbetstid som inte registrerats inte går att återskapa. Registrerad tid finns kvar och blir åtkomlig igen när fakturan är betald.",
     },
     {
-      q: "Är vi bundna?",
-      a: "Nej. Ingen bindningstid och ingen uppsägningstid. Årsbetalning är ett frivilligt alternativ som ger rabatt, inte en bindning.",
+      q: "Finns det någon bindningstid?",
+      a: "Nej. Varken bindningstid eller uppsägningstid. Årsbetalning är ett frivilligt alternativ som ger rabatt.",
     },
   ];
 
@@ -875,8 +860,8 @@ export function FinalCta({ pricing }: { pricing: ScreenPricing }) {
             </h2>
             <p className="mt-5 max-w-lg text-[15px] leading-relaxed text-neutral-400">
               Lägg upp anställda, arbetsmoment och ordrar, koppla skärmen och
-              börja registrera tid. Det tar omkring en kvart, och ni behöver
-              inte lämna några kortuppgifter för att komma igång.
+              börja registrera tid. Uppsättningen tar cirka femton minuter och
+              kräver inga kortuppgifter.
             </p>
           </div>
 

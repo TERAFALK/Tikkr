@@ -45,17 +45,19 @@ const DOCUMENT_FILES = [
 /**
  * Tillåtna tankstreck, var och en med sitt skäl.
  *
- * Listan är med flit kort och svår att utöka av slarv: den som lägger till en
- * rad får skriva varför strecket inte är en eftertanke.
+ * LISTAN ÄR TOM, och det är ett bra tecken. Den innehöll länge bandet på
+ * efterkalkylen, "INTERNT UNDERLAG — INNEHÅLLER SJÄLVKOSTNAD", där strecket
+ * skilde två jämbördiga led åt. Bandet säger numera bara "INTERNT UNDERLAG":
+ * resten sa vad den som håller i pappret ändå ser på nästa rad.
  *
- * "INTERNT UNDERLAG — …": versal varningsbanner på efterkalkylen. Strecket
- * skiljer två jämbördiga led åt, som ett kolon.
+ * Den som lägger till en rad här får skriva varför strecket inte är en
+ * eftertanke. Är det svårt att formulera är det förmodligen en eftertanke.
  *
  * Platshållaren "—" i en tom tabellcell står INTE här, och behöver inte göra
  * det: den är inte en hint, description eller utskriven mening och plockas
  * därför aldrig upp av kontrollen nedan.
  */
-const ALLOWED = ["INTERNT UNDERLAG — INNEHÅLLER SJÄLVKOSTNAD"];
+const ALLOWED: string[] = [];
 
 function filesIn(dir: string): string[] {
   const full = path.join(ROOT, dir);
