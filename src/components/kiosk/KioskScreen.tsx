@@ -305,8 +305,16 @@ const IDLE_MS = 45_000;
  */
 const SYNC_MS = 5_000;
 
-/** Hur ofta listorna med anställda, ordrar och moment hämtas om. */
-const LIST_REFRESH_MS = 5 * 60_000;
+/**
+ * Hur ofta listorna med anställda, ordrar och moment hämtas om.
+ *
+ * Var femte minut tidigare, med skälet att listorna ändras sällan. Det stämde
+ * inte i praktiken: stänger kontoret en order står den kvar på väggen i upp
+ * till fem minuter, och den som trycker på den får ett felmeddelande i stället
+ * för att stämpla in. En minut är fortfarande sällan mätt i databasfrågor, och
+ * listorna hämtas dessutom om varje gång skärmen återgår till namnrutnätet.
+ */
+const LIST_REFRESH_MS = 60_000;
 
 export default function KioskScreen({
   companyName,
@@ -369,7 +377,13 @@ export default function KioskScreen({
     setError(null);
     // Avbrutet byte. Ingenting har hänt, och ingenting ska hända.
     setReplacing(null);
-  }, []);
+
+    // Hämtar listorna på nytt medan ingen står vid skärmen. Nästa person ska
+    // se de ordrar som är öppna nu, inte de som var öppna när sidan laddades.
+    // Det är den billigaste stunden att göra det på: ingen väntar, och inget
+    // val står halvfärdigt.
+    router.refresh();
+  }, [router]);
 
   // Skärmen återgår själv om någon lämnar den mitt i ett val.
   useEffect(() => {
@@ -1034,9 +1048,14 @@ export default function KioskScreen({
             onClockOut={(job) => punchOut(view.employee, job)}
             // Stämplar INTE ut här. Bara ihågkommet vilket jobb som ska
             // lämnas, så att den som ångrar sig står kvar på sitt jobb.
+            //
+            // GÅR TILL KNAPPSATSEN OCH INTE TILL RUTNÄTET (ändrat
+            // 2026-09-29). Den som byter jobb har nästa ritning i handen och
+            // numret framför sig. Rutnätet finns kvar ett tryck bort, på
+            // "Visa öppna ordrar".
             onSwitchFrom={(job) => {
               setReplacing(job);
-              setView({ name: "order", employee: view.employee });
+              setView({ name: "orderNumber", employee: view.employee });
             }}
             onClockOutAll={(jobs) => punchOutAll(view.employee, jobs)}
             onAdd={() => setView({ name: "order", employee: view.employee })}
@@ -1130,6 +1149,7 @@ export default function KioskScreen({
           <OrderNumberPad
             employee={view.employee}
             orders={orders}
+            switchingFrom={replacing?.label ?? null}
             onPick={(order) =>
               setView({ name: "moment", employee: view.employee, order })
             }
@@ -1687,7 +1707,17 @@ function ActionChoice({
         </div>
       )}
 
-      <div className="mt-3 grid min-h-0 flex-1 auto-rows-fr gap-3 sm:grid-cols-2">
+      {/* KNAPPARNA HAR ETT TAK (ändrat 2026-09-29).
+
+          auto-rows-fr lät raderna dela på all plats som blev över. På en
+          surfplatta blev det lagom; på en stor skärm blev två knappar två
+          fält som tog halva bilden var, för ingenting. En knapp ska vara stor
+          nog för en hand med handskar, inte så stor som ytan råkar tillåta.
+
+          minmax behåller den nedre gränsen som löste skrollningen och lägger
+          till en övre. content-start samlar raderna upptill i stället för att
+          sprida ut dem när taket slagit i. */}
+      <div className="mt-3 grid min-h-0 flex-1 auto-rows-[minmax(5rem,9rem)] content-start gap-3 sm:grid-cols-2">
         {/* PÅ RAST. Då är det bara två vägar vidare: tillbaka till jobbet,
             eller avsluta rasten utan att börja på något. Utstämpling och
             jobbval göms — personen har redan lämnat sina jobb, och att visa
@@ -1979,12 +2009,15 @@ function CustomerPicker({
 function OrderNumberPad({
   employee,
   orders,
+  switchingFrom,
   onPick,
   onBrowse,
   onCreate,
 }: {
   employee: Employee;
   orders: Order[];
+  /** Jobbet man byter från, eller null. Visas så att bytet syns hela vägen. */
+  switchingFrom: string | null;
   onPick: (order: Order) => void;
   onBrowse: () => void;
   /** Numret som slagits in, eller tom sträng när inget angetts. */
@@ -2009,8 +2042,13 @@ function OrderNumberPad({
        mer än en surfplattas höjd. Nu delar knappsatsen och knapparna på den
        plats som blir över, i stället för att var och en kräva sitt mått. */
     <div className="mx-auto flex min-h-0 w-full max-w-xl flex-1 flex-col">
+      {/* Vid byte står det man lämnar i rubriken. Knappsatsen ser likadan ut
+          i båda fallen, och den som tryckt fel ska se det innan numret är
+          inslaget. */}
       <h2 className="kiosk-frame-title mb-2 shrink-0 text-xl font-semibold text-neutral-900 sm:mb-4 sm:text-2xl">
-        {employee.name}: slå in ordernummer
+        {switchingFrom
+          ? `${employee.name}: byter från ${switchingFrom}`
+          : `${employee.name}: slå in ordernummer`}
       </h2>
 
       {/* Fast höjd på både ruta och besked. Utan den hoppar knappsatsen nedåt
