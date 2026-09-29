@@ -6,6 +6,7 @@ import type {
   OrderToggleState,
 } from "@/app/admin/(panel)/ordrar/actions";
 import OrderActions from "./OrderActions";
+import PrintButton from "./PrintButton";
 import type { SearchSelectOption } from "./SearchSelect";
 import type { BudgetMomentOption } from "./BudgetMoments";
 import type { OrderRow } from "@/lib/orders";
@@ -31,6 +32,11 @@ import { formatDuration } from "@/lib/format";
  *
  * Både öppna och stängda ordrar går att exportera. En färdig order är ofta
  * den man vill titta på: "hur lång tid tog ett liknande jobb förra gången".
+ *
+ * EFTERKALKYLEN FINNS ÄVEN HÄR sedan 2026-09-29. Den låg bara i menyn på en
+ * enskild order, vilket betydde tjugo besök i tjugo menyer för en vecka av
+ * färdiga jobb. Utskriften tar alla markerade i ett svep, och nedladdningen
+ * ger en fil per order.
  */
 
 export default function OrdersTable({
@@ -80,7 +86,7 @@ export default function OrdersTable({
     setSelected(new Set());
   }
 
-  function exportUrl(format: "pdf" | "excel") {
+  function exportUrl(format: "pdf" | "excel" | "kalkyl") {
     const params = new URLSearchParams();
     for (const id of selected) params.append("order", id);
     params.set("format", format);
@@ -98,43 +104,45 @@ export default function OrdersTable({
         }
         description={
           selecting
-            ? "En order per sida i PDF, en flik per order i Excel."
+            ? "En fil per order i PDF, en flik per order i Excel."
             : undefined
         }
         action={
           selecting ? (
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center justify-end gap-2">
               <span className="text-[13px] tabular-nums text-neutral-500">
                 {count} {count === 1 ? "vald" : "valda"}
               </span>
-              <a
-                href={count > 0 ? exportUrl("pdf") : undefined}
-                onClick={(event) => {
-                  if (count === 0) event.preventDefault();
-                }}
-                aria-disabled={count === 0}
-                className={`inline-flex items-center rounded-md px-3 py-1.5 text-[13px] font-medium transition-colors ${
-                  count === 0
-                    ? "cursor-not-allowed bg-neutral-100 text-neutral-400"
-                    : "bg-blue-600 text-white hover:bg-blue-700"
-                }`}
+
+              {/* Utskriften först: det är den som gör att kalkylen kan tas ut
+                  för en hel vecka utan att en enda fil sparas. */}
+              <PrintButton
+                href={exportUrl("kalkyl")}
+                label="Skriv ut efterkalkyl"
+                disabled={count === 0}
+              />
+              <ExportLink href={exportUrl("kalkyl")} disabled={count === 0}>
+                Efterkalkyl
+              </ExportLink>
+
+              {/* Skiljer det interna från det kunden får se. Kalkylen bär
+                  sitt svarta band på varje sida, men två knappar bredvid
+                  varandra ska inte se ut som två varianter av samma sak. */}
+              <span
+                aria-hidden="true"
+                className="mx-1 h-4 w-px bg-neutral-200"
+              />
+
+              <ExportLink
+                href={exportUrl("pdf")}
+                disabled={count === 0}
+                primary
               >
-                PDF
-              </a>
-              <a
-                href={count > 0 ? exportUrl("excel") : undefined}
-                onClick={(event) => {
-                  if (count === 0) event.preventDefault();
-                }}
-                aria-disabled={count === 0}
-                className={`inline-flex items-center rounded-md px-3 py-1.5 text-[13px] font-medium ring-1 ring-inset transition-colors ${
-                  count === 0
-                    ? "cursor-not-allowed text-neutral-400 ring-neutral-200"
-                    : "bg-white text-neutral-700 ring-neutral-200 hover:bg-neutral-50"
-                }`}
-              >
+                Underlag
+              </ExportLink>
+              <ExportLink href={exportUrl("excel")} disabled={count === 0}>
                 Excel
-              </a>
+              </ExportLink>
               <Button type="button" tone="ghost" onClick={stopSelecting}>
                 Avbryt
               </Button>
@@ -231,5 +239,43 @@ export default function OrdersTable({
         </tbody>
       </Table>
     </Card>
+  );
+}
+
+/**
+ * En nedladdningslänk i markeringsläget.
+ *
+ * Länk och inte knapp: filen hämtas av webbläsaren, och en länk går att öppna
+ * i en ny flik som vilken annan. Utan markerade ordrar leder den ingenstans,
+ * och ser ut därefter.
+ */
+function ExportLink({
+  href,
+  disabled,
+  primary = false,
+  children,
+}: {
+  href: string;
+  disabled: boolean;
+  primary?: boolean;
+  children: React.ReactNode;
+}) {
+  const tone = disabled
+    ? "cursor-not-allowed text-neutral-400 ring-1 ring-inset ring-neutral-200"
+    : primary
+      ? "bg-blue-600 text-white hover:bg-blue-700"
+      : "bg-white text-neutral-700 ring-1 ring-inset ring-neutral-200 hover:bg-neutral-50";
+
+  return (
+    <a
+      href={disabled ? undefined : href}
+      onClick={(event) => {
+        if (disabled) event.preventDefault();
+      }}
+      aria-disabled={disabled}
+      className={`inline-flex items-center rounded-md px-3 py-1.5 text-[13px] font-medium transition-colors ${tone}`}
+    >
+      {children}
+    </a>
   );
 }

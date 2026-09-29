@@ -8,6 +8,7 @@ import { buildOrderPdf, type PdfCompany } from "@/lib/pdf";
 import { buildOrderCalcPdf } from "@/lib/calc-pdf";
 import { buildOrderCalcWorkbook } from "@/lib/calc-excel";
 import { formatDate, toDecimalHours } from "@/lib/format";
+import { buildZip, uniqueName } from "@/lib/zip";
 
 /**
  * Underlag per order, som PDF eller Excel.
@@ -23,11 +24,30 @@ import { formatDate, toDecimalHours } from "@/lib/format";
  * (calc-pdf.ts), och delar inte en rad med de två andra. Se toppkommentaren i
  * calc-pdf.ts för varför de hålls isär.
  *
- * Flera ordrar ger EN fil i samtliga fall. Tio separata filer skulle bli tio
- * bilagor att hålla reda på, och en PDF med tio sidor skrivs ut i ett svep.
+ * FLERA MARKERADE ORDRAR GER EN FIL PER ORDER, i ett zip-arkiv (ändrat
+ * 2026-09-29). Tidigare gavs ett dokument med en sida per order, med skälet
+ * att tio filer blir tio bilagor att hålla reda på. Det var fel håll:
+ * underlagen bifogas tio OLIKA fakturor till tio olika kunder, och då är det
+ * den som fakturerar som får klippa isär dokumentet. Arkivet packas upp en
+ * gång; uppdelningen behövde göras varje gång.
+ *
+ * UNDANTAGET ÄR UTSKRIFT. `visa=1` lämnar ut dokumentet för visning i stället
+ * för nedladdning, och då är en sammanhållen PDF hela poängen: den går till
+ * skrivaren i ett svep. Se PrintButton i panelen.
  */
 
 export const runtime = "nodejs";
+
+/**
+ * Rubriken som avgör om webbläsaren laddar ner filen eller visar den.
+ *
+ * Utskriftsknappen laddar dokumentet i en dold ram och ber webbläsaren skriva
+ * ut det. En fil som kommer som `attachment` hamnar då i nedladdningsmappen i
+ * stället för i skrivardialogen.
+ */
+function disposition(inline: boolean, fileName: string): string {
+  return `${inline ? "inline" : "attachment"}; filename="${fileName}"`;
+}
 
 export async function GET(request: NextRequest) {
   const { db, companyId, companyName } = await requireAdmin();
@@ -43,6 +63,10 @@ export async function GET(request: NextRequest) {
           ? "kalkyl-excel"
           : "pdf";
   const orderIds = params.getAll("order").filter(Boolean);
+
+  // Visning i stället för nedladdning. Sätts av utskriftsknappen, som behöver
+  // ett sammanhållet dokument att skicka till skrivaren.
+  const inline = params.get("visa") === "1";
 
   if (orderIds.length === 0) {
     return NextResponse.json({ error: "Ingen order vald." }, { status: 400 });
@@ -109,6 +133,30 @@ export async function GET(request: NextRequest) {
     }
 
     try {
+      // Flera ordrar blir ett arkiv med en kalkyl per order. Vid utskrift
+      // blir de i stället ett dokument, eftersom en zip inte går att skicka
+      // till en skrivare.
+      if (calcs.length > 1 && !inline) {
+        const taken = new Set<string>();
+        const files: { name: string; data: Buffer }[] = [];
+
+        for (const calc of calcs) {
+          files.push({
+            name: uniqueName(
+              taken,
+              `efterkalkyl-${slugify(calc.orderNumber)}`,
+              "pdf"
+            ),
+            data: await buildOrderCalcPdf(
+              { name: companyName, timezone: timeZone, logo },
+              [calc]
+            ),
+          });
+        }
+
+        return zipResponse(files, calcBase);
+      }
+
       const pdf = await buildOrderCalcPdf(
         { name: companyName, timezone: timeZone, logo },
         calcs
@@ -117,7 +165,7 @@ export async function GET(request: NextRequest) {
       return new NextResponse(new Uint8Array(pdf), {
         headers: {
           "content-type": "application/pdf",
-          "content-disposition": `attachment; filename="${calcBase}.pdf"`,
+          "content-disposition": disposition(inline, `${calcBase}.pdf`),
           "cache-control": "no-store",
         },
       });
@@ -179,12 +227,28 @@ export async function GET(request: NextRequest) {
   };
 
   try {
+    // Samma regel som för kalkylen: en fil per order när flera markerats, ett
+    // sammanhållet dokument när det ska skrivas ut.
+    if (orders.length > 1 && !inline) {
+      const taken = new Set<string>();
+      const files: { name: string; data: Buffer }[] = [];
+
+      for (const order of orders) {
+        files.push({
+          name: uniqueName(taken, `order-${slugify(order.orderNumber)}`, "pdf"),
+          data: await buildOrderPdf(pdfCompany, [order]),
+        });
+      }
+
+      return zipResponse(files, fileBase);
+    }
+
     const pdf = await buildOrderPdf(pdfCompany, orders);
 
     return new NextResponse(new Uint8Array(pdf), {
       headers: {
         "content-type": "application/pdf",
-        "content-disposition": `attachment; filename="${fileBase}.pdf"`,
+        "content-disposition": disposition(inline, `${fileBase}.pdf`),
         "cache-control": "no-store",
       },
     });
@@ -201,6 +265,22 @@ export async function GET(request: NextRequest) {
       { status: 500 }
     );
   }
+}
+
+/** Arkivet med en fil per order. Alltid en nedladdning. */
+function zipResponse(
+  files: { name: string; data: Buffer }[],
+  fileBase: string
+): NextResponse {
+  const archive = buildZip(files);
+
+  return new NextResponse(new Uint8Array(archive), {
+    headers: {
+      "content-type": "application/zip",
+      "content-disposition": `attachment; filename="${fileBase}.zip"`,
+      "cache-control": "no-store",
+    },
+  });
 }
 
 async function buildWorkbook(

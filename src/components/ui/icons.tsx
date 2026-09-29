@@ -185,3 +185,12 @@ export const IconHistory = (props: IconProps) => (
     <path d="M12 8v4l3 2" />
   </Icon>
 );
+
+/** Utskrift. Skrivare med ett papper som matas ut. */
+export const IconPrinter = (props: IconProps) => (
+  <Icon {...props}>
+    <path d="M7 8V3h10v5" />
+    <path d="M7 18H5a2 2 0 0 1-2-2v-4a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v4a2 2 0 0 1-2 2h-2" />
+    <rect x="7" y="14" width="10" height="7" rx="1" />
+  </Icon>
+);
