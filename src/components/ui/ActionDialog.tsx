@@ -32,6 +32,24 @@ export interface DialogState {
   ok?: string;
 }
 
+/**
+ * VARFÖR DET FÖREGÅENDE SVARET HAR TYPEN DialogState OCH INTE S.
+ *
+ * `useActionState<S, …>` kräver ett utgångsläge av typen `Awaited<S>`. Är S en
+ * generisk parameter kan TypeScript inte visa att den saknar `then`, och
+ * `Awaited<S>` går därför inte att förenkla till S. Ett `initial: S` avvisas
+ * med "Type 'S' is not assignable to parameter of type 'Awaited<S>'", och
+ * bygget stannar.
+ *
+ * Rutan läser bara `error` och `ok`, så den kör på DialogState inuti sig.
+ * Åtgärdens egen typ finns kvar där den gör nytta: i svaret, och därmed i
+ * `initial`. Åtgärderna tar emot sitt föregående svar utan att använda det, så
+ * den bredare parametern kostar ingenting på anropsplatsen.
+ *
+ * Alternativet vore en typkonvertering inuti komponenten. Den hade dolt exakt
+ * det som är värt att veta här.
+ */
+
 export default function ActionDialog<S extends DialogState>({
   trigger,
   triggerTone = "secondary",
@@ -50,7 +68,8 @@ export default function ActionDialog<S extends DialogState>({
   triggerTone?: "primary" | "secondary" | "danger" | "ghost";
   title: string;
   description?: string;
-  action: (previous: S, formData: FormData) => Promise<S>;
+  /** Se kommentaren ovanför om varför `previous` är DialogState och inte S. */
+  action: (previous: DialogState, formData: FormData) => Promise<S>;
   /** Utgångsläget. Skickas in eftersom typen är åtgärdens, inte rutans. */
   initial: S;
   submitLabel: string;
@@ -63,7 +82,10 @@ export default function ActionDialog<S extends DialogState>({
   children: ReactNode;
 }) {
   const dialog = useRef<HTMLDialogElement>(null);
-  const [state, submit] = useActionState<S, FormData>(action, initial);
+  const [state, submit] = useActionState<DialogState, FormData>(
+    action,
+    initial
+  );
 
   // Stänger när åtgärden svarat att det gick. Reffen hindrar att samma svar
   // stänger rutan en gång till om den öppnas direkt igen — useActionState

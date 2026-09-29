@@ -393,7 +393,11 @@ export async function ownScheduleDays(
     }),
   ]);
 
-  const byId = new Map(schedules.map((schedule) => [schedule.id, schedule.days]));
+  // Typargumenten skrivs ut. Utan dem tolkas paren i map() som en vanlig
+  // array och inte som tupler, och Map-konstruktorn vägrar ta emot dem.
+  const byId = new Map<string, ScheduleDayInput[]>(
+    schedules.map((schedule) => [schedule.id, schedule.days])
+  );
 
   for (const employee of employees) {
     const days = employee.scheduleId ? byId.get(employee.scheduleId) : undefined;
