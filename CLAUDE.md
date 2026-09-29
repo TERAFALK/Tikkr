@@ -266,6 +266,25 @@ stripe_prices    — item, month_price_id, year_price_id, updated_by_email
    är 06:30–16:00 minus 20 minuters frukost och 40 minuters lunch, alltså 8,5
    timmar. Utan schema finns ingen planerad tid, och allt arbete blir flex.
 
+   **Den som inte går på företagets tider får egna** (tillagt 2026-09-29).
+   Arbetstiderna sätts under Anställda, i samma ruta som namn och timkostnad,
+   och lagras som ett vanligt schema personen ensam är kopplad till. Tomt
+   betyder företagets standard, vilket är det normala.
+
+   Formen fanns redan i datamodellen (`Employee.scheduleId`), så beräkningen
+   behövde inte ändras alls: `schedulesForEmployees` tar personens eget schema
+   när det finns och standardschemat annars. Skälet att bygga det nu är att en
+   deltid annars mäts mot någon annans dag, och då visar flexsaldot fel varje
+   vecka utan att någon kan peka på varför.
+
+   Fälten och tolkningen av dem ligger på VARSITT ställe och inte på två:
+   `ScheduleDays` ritar dagarna, `readScheduleDays` läser dem. Samma formulär
+   står på två sidor, och två läsare av samma fält hade glidit isär vid första
+   ändringen — en glidning som syns först som ett felaktigt saldo.
+
+   Ett eget schema utan dagar finns inte. Kryssas rutan ur raderas schemat och
+   kopplingen, samma princip som att raden ÄR tillståndet i § 3.1.
+
    **Rasterna STÄMPLAS** (kundens val), och ett rasttryck stänger ALLA
    pågående jobb. Därmed faller rasten bort ur närvarotiden av sig själv, och
    varken rapporterna eller fakturaunderlaget behöver veta att raster finns.
@@ -409,6 +428,53 @@ i ett fält är inget beslut kunden fattat.
 Att lägga till en modul: en nyckel i registret, ett värde i enumen
 `CompanyModuleKey`, en artikel hos Stripe. Ingenting annat i arkitekturen
 behöver röras.
+
+### 3.2 Underlagen på papper (beslutat 2026-09-29)
+
+Kunden skriver ut. Det låter självklart, men systemet byggdes som om allt
+skulle sparas som filer, och skillnaden är fyra steg varje gång: ladda ner,
+leta rätt på filen, öppna, skriva ut, rensa mappen.
+
+**Utskrift går direkt till skrivaren.** `PrintButton` laddar dokumentet i en
+dold ram och ber webbläsaren skriva ut ramen. Exportrutten lämnar då ut det
+för VISNING (`visa=1`) och inte som nedladdning — en fil som kommer som
+`attachment` hamnar i nedladdningsmappen i stället för i skrivardialogen.
+Reservvägen är en ny flik, eftersom en knapp som inte gör någonting alls är
+det enda utfall som inte får inträffa.
+
+**Flera markerade ordrar ger EN FIL PER ORDER**, i ett zip-arkiv. Tidigare gavs
+ett dokument med en sida per order, med skälet att tio filer blir tio bilagor
+att hålla reda på. Det var fel håll: underlagen bifogas tio OLIKA fakturor
+till tio olika kunder, så den som fakturerar fick klippa isär dokumentet varje
+gång. Arkivet packas upp en gång. `src/lib/zip.ts` är egen kod och inget
+beroende, se kommentaren där.
+
+**Undantaget är utskrift.** Ska pappret till skrivaren är ett sammanhållet
+dokument hela poängen, och då gäller en sida per order som förut.
+
+**Efterkalkylen går att ta ut för flera ordrar**, inte bara en i taget. Den låg
+bara i menyn på en enskild order, vilket betydde tjugo besök i tjugo menyer
+för en vecka av färdiga jobb.
+
+**Att ta ut en efterkalkyl frågar om ordern ska avslutas**, med en kryssruta i
+samma meny. En efterkalkyl tas ut när jobbet är klart, och då är nästa
+handling nästan alltid att stänga ordern. Frågan går genom samma åtgärd som
+knappen längre ner i menyn och därmed genom samma mellansteg: står någon
+instämplad ändras ingenting förrän administratören sett vilka.
+
+**Förra veckan per anställd: en person per sida.** Utskriften delas ut till var
+och en, och flöt personerna ihop gick den inte att dela ut utan att någon fick
+läsa någon annans rader. Därför finns heller ingen slutsumma sist — den skulle
+hamna på den sista personens papper och påstå att raden ovanför gäller hen.
+Periodens totaler står på förstasidan. Knappen finns både under Rapporter och
+på Tidrapport, eftersom det är där man står på måndagen.
+
+**Stämplingar går inte att radera** (ändrat 2026-09-29). Knappen fanns för
+felregistreringar. En felaktig stämpling rättas i stället genom att skrivas om:
+tiden är både faktura- och löneunderlag, en ändrad post bär spår av vem som
+ändrade den, och en raderad post lämnar bara ett hål ingen kan förklara i
+efterhand. Ska en persons tid bort helt finns GDPR-raderingen i
+inställningarna.
 
 ## 4. Kritiska säkerhetskrav
 
