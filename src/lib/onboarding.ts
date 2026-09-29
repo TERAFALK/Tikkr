@@ -10,6 +10,14 @@ import type { CompanyDb } from "./tenant";
  *    längre klar, men flaggan skulle påstå det.
  * 2. Ingen kolumn att hålla i takt, och inget steg som kan bli "klart" utan
  *    att något faktiskt gjorts.
+ *
+ * STEGEN RÄKNAR ALLT SOM FINNS, inte bara det som är aktivt just nu (ändrat
+ * 2026-09-29). Frågan var tidigare "finns det en ÖPPEN order", och den dagen
+ * kunden levererat allt de hade sa guiden att uppsättningen var ogjord: en
+ * blå ruta på översikten och ett extra avsnitt i menyn, hos en kund som kört
+ * systemet i månader. Samma sak hade hänt när den sista anställda som slutat
+ * avaktiverades. Steget svarar på om kunden KAN lägga upp en order, och det
+ * har de bevisat den dag de gjort det en gång.
  */
 
 export interface OnboardingStep {
@@ -32,9 +40,9 @@ export async function getOnboardingState(
   db: CompanyDb
 ): Promise<OnboardingState> {
   const [employees, moments, orders, devices] = await Promise.all([
-    db.employee.count({ where: { active: true } }),
-    db.workMoment.count({ where: { active: true } }),
-    db.order.count({ where: { status: "OPEN" } }),
+    db.employee.count(),
+    db.workMoment.count(),
+    db.order.count(),
     db.kioskDevice.count(),
   ]);
 

@@ -98,6 +98,7 @@ export default function AdminSidebar({
   companyName: string;
   email: string;
   reviewCount: number;
+  /** Styr bara VAR "Kom igång" hamnar, inte om den syns. */
   showOnboarding: boolean;
   hasLogo: boolean;
   /** Företagets påslagna tillval. Länkar till avstängda moduler utelämnas. */
@@ -120,7 +121,15 @@ export default function AdminSidebar({
     ],
   };
 
-  const allSections = showOnboarding ? [setupSection, ...sections] : sections;
+  // "KOM IGÅNG" FINNS ALLTID (ändrat 2026-09-29). Den försvann när alla fyra
+  // stegen var klara, och dök upp igen så fort kunden levererat sina sista
+  // ordrar. Det såg ut som att systemet glömt bort dem. Nu står den kvar, och
+  // det enda som ändras är var: överst medan uppsättningen pågår, sist när
+  // den är klar. Sidan är ändå bra att komma åt senare, den lägger upp
+  // anställda och arbetsmoment lika bra i mars som i januari.
+  const allSections = showOnboarding
+    ? [setupSection, ...sections]
+    : [...sections, setupSection];
 
   // Avsnitt som blir tomma faller bort med sin rubrik. En rubrik utan länkar
   // under sig ser ut som ett fel.

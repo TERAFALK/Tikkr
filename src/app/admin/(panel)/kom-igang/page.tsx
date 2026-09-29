@@ -33,8 +33,10 @@ export default async function OnboardingPage() {
       select: { id: true, name: true },
     }),
     db.order.findMany({
-      where: { status: "OPEN" },
+      // Utan statusfilter, som steget självt. En kund som levererat allt de
+      // har ska inte se steget stå som ogjort igen. Se lib/onboarding.ts.
       orderBy: { orderNumber: "asc" },
+      take: 50,
       select: {
         id: true,
         orderNumber: true,
@@ -174,7 +176,7 @@ export default async function OnboardingPage() {
 
         {orders.length > 0 && (
           <ChipList
-            label={`${orders.length} öppna`}
+            label={`${orders.length} upplagda`}
             items={orders.map((order) =>
               order.customer
                 ? `${order.orderNumber} · ${order.customer.name}`
@@ -200,11 +202,10 @@ export default async function OnboardingPage() {
 
       {state.ready && (
         <Card className="mt-6 border-emerald-200 bg-emerald-50/60 p-5">
+          {/* Sa tidigare att guiden döljs i menyn. Den står kvar numera, och
+              då ska rutan inte påstå något annat. */}
           <p className="text-sm font-medium text-emerald-900">
             Allt är på plats
-          </p>
-          <p className="mt-1 text-[13px] text-emerald-800">
-            Guiden döljs i menyn och nås via Inställningar.
           </p>
         </Card>
       )}
