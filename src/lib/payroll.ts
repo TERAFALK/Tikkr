@@ -8,7 +8,7 @@ import {
   schedulesForEmployees,
   type Schedule,
 } from "./schedule";
-import { addDaysInZone, dayNumberIn } from "./time-zone";
+import { addDaysInZone, dayNumberIn, startOfDayIn } from "./time-zone";
 
 /**
  * LÖNEUNDERLAGET — TIDRAPPORTEN PER ANSTÄLLD.
@@ -438,6 +438,41 @@ export async function buildPayrollPeriod(
  * Kostnaden är en extra fråga per uppslag. Den är liten: en anställd har
  * några hundra dagar per år, inte miljoner.
  */
+/**
+ * DAGEN SALDOT RÄKNAS FRÅN.
+ *
+ * `balanceOpeningDate` när kunden flyttat in med befintliga timmar. Är den tom
+ * räknas personen från sin FÖRSTA STÄMPLING, vilket är vad fältet säger i
+ * schemat att tomt betyder.
+ *
+ * Funktionen finns för att de två vägarna in i saldot ska svara likadant.
+ * Tidrapporten utelämnade all historik före perioden, och saldot blev då
+ * periodens egen flex. Stämplingsskärmen räknade i stället ett år bakåt, och
+ * en nyanställd fick minus för varje schemalagd dag innan hen fanns — över två
+ * tusen timmar. Båda talen kallades saldo, och rutan som justerar det visade
+ * det ena medan den ändrade det andra.
+ *
+ * Null betyder att personen aldrig stämplat. Då finns ingen historik att
+ * härleda ur, och det ingående saldot står ensamt.
+ */
+async function balanceStart(
+  db: CompanyDb,
+  employee: { id: string; balanceOpeningDate: Date | null },
+  timeZone: string
+): Promise<Date | null> {
+  if (employee.balanceOpeningDate) return employee.balanceOpeningDate;
+
+  const first = await db.timeEntry.findFirst({
+    where: { employeeId: employee.id },
+    orderBy: { clockInAt: "asc" },
+    select: { clockInAt: true },
+  });
+
+  // Dygnets början, så att en första stämpling 15:30 räknar hela den dagen
+  // och inte halva.
+  return first ? startOfDayIn(first.clockInAt, timeZone) : null;
+}
+
 async function openingBalances(
   db: CompanyDb,
   employee: {
@@ -449,10 +484,10 @@ async function openingBalances(
   periodStart: Date,
   timeZone: string
 ): Promise<[number, number]> {
-  const since = employee.balanceOpeningDate;
+  const since = await balanceStart(db, employee, timeZone);
 
-  // Ingen historik att räkna: antingen saknas startdag, eller så börjar
-  // perioden på eller före den.
+  // Ingen historik att räkna: antingen har personen aldrig stämplat, eller så
+  // börjar perioden på eller före startdagen.
   if (!since || since >= periodStart) {
     return [employee.flexOpeningMinutes, employee.compOpeningMinutes];
   }
@@ -541,8 +576,14 @@ async function openingBalances(
  * Flexsaldot just nu, för en anställd.
  *
  * Används av stämplingsskärmen, som visar saldot när någon stämplar ut för
- * dagen. Räknar fram till och med gårdagen plus dagens poster — alltså samma
- * väg som tidrapporten, så att skärmen och kontoret aldrig visar olika tal.
+ * dagen, och av rutan som justerar saldot för hand. Räknar från startdagen
+ * fram till och med idag, alltså samma väg som tidrapporten — skärmen,
+ * kontoret och justeringsrutan ska aldrig visa olika tal.
+ *
+ * Fönstret var ett år bakåt när startdag saknades. Det räknade dagar innan
+ * personen var anställd som schemalagda dagar utan stämpling, alltså minus,
+ * och en ny person mötte tvåtusen minustimmar på skärmen i verkstaden. Nu
+ * avgör `balanceStart` var räkningen börjar.
  */
 export async function currentFlexMinutes(
   db: CompanyDb,
@@ -552,18 +593,18 @@ export async function currentFlexMinutes(
 ): Promise<number | null> {
   const employee = await db.employee.findFirst({
     where: { id: employeeId },
-    select: { balanceOpeningDate: true },
+    select: { id: true, balanceOpeningDate: true, flexOpeningMinutes: true },
   });
 
   if (!employee) return null;
 
-  const period = await buildPayrollPeriod(
-    db,
-    timeZone,
-    employeeId,
-    employee.balanceOpeningDate ?? addDaysInZone(now, -365, timeZone),
-    now
-  );
+  const since = await balanceStart(db, employee, timeZone);
+
+  // Aldrig stämplat. Då finns ingen dag att räkna, och saldot är det
+  // ingående — noll för alla utom den som flyttat in med timmar.
+  if (!since) return employee.flexOpeningMinutes;
+
+  const period = await buildPayrollPeriod(db, timeZone, employeeId, since, now);
 
   return period ? period.flex.closing : null;
 }

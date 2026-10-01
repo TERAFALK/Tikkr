@@ -445,4 +445,75 @@ describe("multi-tenant", () => {
       await currentFlexMinutes(forCompany(companyId), TZ, "finns-inte")
     ).toBeNull();
   });
+
+  /**
+   * SALDOT RÄKNAS FRÅN FÖRSTA STÄMPLINGEN, inte ett år bakåt.
+   *
+   * Fönstret var "idag minus 365 dagar" när startdag saknades. Varje
+   * schemalagd dag innan personen fanns räknades då som en dag utan
+   * stämpling, alltså minus, och en nyanställd mötte över två tusen
+   * minustimmar på stämplingsskärmen. Rutan som justerar saldot blev samtidigt
+   * omöjlig att använda: den visade periodens utgående saldo och ändrade det
+   * rullande, så ett inskrivet 0 lämnade tvåtusen timmar kvar.
+   */
+  it("en anställd som aldrig stämplat har saldo noll, inte ett år av minus", async () => {
+    const ny = (
+      await unsafeGlobalPrisma.employee.create({
+        data: { companyId, name: "Nyanställd Nilsson", scheduleId },
+      })
+    ).id;
+
+    expect(await currentFlexMinutes(forCompany(companyId), TZ, ny)).toBe(0);
+  });
+
+  it("ingående saldo står ensamt för den som aldrig stämplat", async () => {
+    const inflyttad = (
+      await unsafeGlobalPrisma.employee.create({
+        data: {
+          companyId,
+          name: "Inflyttad Ivarsson",
+          scheduleId,
+          flexOpeningMinutes: 300,
+        },
+      })
+    ).id;
+
+    expect(await currentFlexMinutes(forCompany(companyId), TZ, inflyttad)).toBe(
+      300
+    );
+  });
+
+  it("saldot räknar inte dagar före första stämplingen", async () => {
+    const sen = (
+      await unsafeGlobalPrisma.employee.create({
+        data: { companyId, name: "Sen Svensson", scheduleId },
+      })
+    ).id;
+
+    // En hel schemalagd dag, stämplad precis som schemat säger: 06:30-16:00
+    // med rasterna stämplade, alltså 8,5 timmar närvaro mot 8,5 planerat.
+    await unsafeGlobalPrisma.timeEntry.create({
+      data: {
+        companyId,
+        employeeId: sen,
+        kind: "ORDER",
+        orderId: order,
+        momentId: svetsning,
+        clockInAt: at(16, "06:30"),
+        clockOutAt: at(16, "16:00"),
+      },
+    });
+
+    const saldo = await currentFlexMinutes(
+      forCompany(companyId),
+      TZ,
+      sen,
+      at(16, "23:00")
+    );
+
+    // 9,5 timmar närvaro mot 8,5 planerat ger en timme flex. Det avgörande är
+    // att de 2019-dagar som ligger FÖRE den 16:e inte räknas med: gjorde de
+    // det vore saldot hundratals timmar minus.
+    expect(saldo).toBe(60);
+  });
 });

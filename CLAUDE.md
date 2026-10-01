@@ -368,6 +368,18 @@ stripe_prices    — item, month_price_id, year_price_id, updated_by_email
    skickas aldrig in från rutan — ett tal webbläsaren räknat på hinner bli
    gammalt medan rutan står öppen.
 
+   **Saldot räknas från `balance_opening_date`, och är den tom från personens
+   FÖRSTA STÄMPLING** (tillagt 2026-10-01). Dagen avgörs på ett ställe,
+   `balanceStart` i `payroll.ts`, eftersom två vägar in i samma saldo hann
+   säga olika saker: tidrapporten utelämnade all historik före perioden, så
+   saldot blev periodens egen flex, medan stämplingsskärmen räknade ett år
+   bakåt och gav en nyanställd minus för varje schemalagd dag innan hen fanns.
+   Rutan som justerar saldot visade det ena talet och ändrade det andra, och
+   ett inskrivet 0 lämnade tvåtusen timmar kvar.
+
+   Den som aldrig stämplat har inget härlett saldo. Då står det ingående
+   ensamt, vilket är noll för alla utom den som flyttat in med timmar.
+
    **Den anställde ser sitt eget saldo på stämplingsskärmen** (tillagt
    2026-10-01), efter att ha angett en personlig kod som administratören satt
    under Anställda. Koden ligger som bcrypt-hash, går inte att läsa tillbaka

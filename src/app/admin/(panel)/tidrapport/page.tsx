@@ -18,9 +18,10 @@ import {
   Select,
   Stat,
 } from "@/components/ui";
-import { buildPayrollPeriod } from "@/lib/payroll";
+import { buildPayrollPeriod, currentFlexMinutes } from "@/lib/payroll";
 import { formatDate, formatDecimalHours, formatTime } from "@/lib/format";
 import { startOfWeekIn, addDaysInZone, parseLocalDate, toDateInput } from "@/lib/time-zone";
+import { isoWeekNumber } from "@/lib/week";
 import { datePresets } from "@/lib/date-presets";
 import ActionDialog from "@/components/ui/ActionDialog";
 import { adjustFlexBalance, saveAbsence, type BalanceState } from "./actions";
@@ -88,6 +89,30 @@ export default async function TimesheetPage({
     ? await buildPayrollPeriod(db, timeZone, employeeId, from, to)
     : null;
 
+  // SALDOT IDAG, och inte periodens utgående. Rutan som justerar saldot
+  // ändrar det här talet, och ett annat tal i samma ruta hade gjort
+  // justeringen omöjlig att förutse: en period som slutar i framtiden stänger
+  // på ett annat saldo än det personen har just nu.
+  const flexToday = employeeId
+    ? await currentFlexMinutes(db, timeZone, employeeId)
+    : null;
+
+  /** Samma period, flyttad ett antal dagar. */
+  const shiftedHref = (days: number) =>
+    `/admin/tidrapport?anstalld=${employeeId}&from=${toDateInput(
+      addDaysInZone(from, days, timeZone),
+      timeZone
+    )}&to=${toDateInput(addDaysInZone(to, days, timeZone), timeZone)}`;
+
+  // Spänner perioden över flera veckor skrivs båda ut. En period som inte är
+  // en vecka ska inte få heta en vecka.
+  const firstWeek = isoWeekNumber(from, timeZone);
+  const lastWeekNumber = isoWeekNumber(to, timeZone);
+  const weekLabel =
+    firstWeek === lastWeekNumber
+      ? `Vecka ${firstWeek}`
+      : `Vecka ${firstWeek}–${lastWeekNumber}`;
+
   const filters = (
     <Card className="mb-6">
       <CardHeader title="Period" />
@@ -122,16 +147,28 @@ export default async function TimesheetPage({
           />
         </Field>
 
-        <div className="flex items-end gap-2">
-          <ButtonLink
-            href={`/admin/tidrapport?anstalld=${employeeId}&from=${toDateInput(
-              addDaysInZone(from, -7, timeZone),
-              timeZone
-            )}&to=${toDateInput(addDaysInZone(to, -7, timeZone), timeZone)}`}
-            tone="secondary"
-          >
-            Föregående vecka
-          </ButtonLink>
+        {/* STEGA EN VECKA I TAGET. Hela perioden flyttas, lika lång som den
+            var, så att den som valt en längre period behåller sin längd.
+            Ersätter knappen "Föregående vecka", som bara kunde gå åt ett
+            håll. */}
+        <div className="flex items-end">
+          <div className="flex w-full items-stretch overflow-hidden rounded-md bg-white ring-1 ring-inset ring-neutral-200">
+            <StepLink
+              href={shiftedHref(-7)}
+              direction="back"
+              label="Föregående vecka"
+            />
+
+            <span className="flex flex-1 items-center justify-center whitespace-nowrap px-2 text-[13px] font-medium text-neutral-900">
+              {weekLabel}
+            </span>
+
+            <StepLink
+              href={shiftedHref(7)}
+              direction="forward"
+              label="Nästa vecka"
+            />
+          </div>
         </div>
       </FilterForm>
     </Card>
@@ -225,9 +262,11 @@ export default async function TimesheetPage({
             <ActionDialog<BalanceState>
               trigger="Justera flexsaldo"
               title={`Flexsaldo för ${period.employee.name}`}
-              description={`Saldot är ${signedHours(
-                period.flex.closing
-              )} timmar idag.`}
+              description={
+                flexToday === null
+                  ? undefined
+                  : `Saldot är ${signedHours(flexToday)} timmar idag.`
+              }
               action={adjustFlexBalance}
               initial={{}}
               submitLabel="Spara"
@@ -374,4 +413,41 @@ function signedHours(minutes: number): string {
   if (Math.round(minutes) === 0) return "0,00";
   const sign = minutes > 0 ? "+" : "−";
   return `${sign}${formatDecimalHours(Math.abs(minutes))}`;
+}
+
+/** En pil i veckostegaren. */
+function StepLink({
+  href,
+  direction,
+  label,
+}: {
+  href: string;
+  direction: "back" | "forward";
+  label: string;
+}) {
+  return (
+    <Link
+      href={href}
+      aria-label={label}
+      title={label}
+      className="flex items-center px-2.5 py-1.5 text-neutral-600 hover:bg-neutral-50 hover:text-neutral-900"
+    >
+      <svg
+        viewBox="0 0 20 20"
+        className="h-4 w-4"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth={1.75}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        aria-hidden="true"
+      >
+        {direction === "back" ? (
+          <path d="M12 4 6 10l6 6" />
+        ) : (
+          <path d="m8 4 6 6-6 6" />
+        )}
+      </svg>
+    </Link>
+  );
 }
