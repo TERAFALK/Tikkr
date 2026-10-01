@@ -144,9 +144,21 @@ export default function AdminSidebar({
 
   const nav = (
     <nav className="flex h-full flex-col gap-6 p-3">
-      <CompanyHeader companyName={companyName} hasLogo={hasLogo} />
+      <div className="shrink-0">
+        <CompanyHeader companyName={companyName} hasLogo={hasLogo} />
+      </div>
 
-      <div className="flex-1 space-y-6">
+      {/* BARA LÄNKARNA RULLAR. Inställningar, Logga ut, adressen och
+          Tikkr-märket står still längst ner.
+
+          Menypunkterna blev fler än skärmen är hög, och eftersom hela
+          navigeringen växte trycktes botten utanför rutan: märket syntes inte
+          alls, och Logga ut låg utom räckhåll på en kort skärm.
+
+          `min-h-0` måste stå med. En flexrad vägrar annars bli mindre än sitt
+          innehåll, och då rullar ingenting — rutan växer i stället, vilket är
+          precis vad den gjorde. */}
+      <div className="min-h-0 flex-1 space-y-6 overflow-y-auto">
         {visibleSections.map((section) => (
           <div key={section.label}>
             <p className="mb-1 px-2 text-[11px] font-semibold uppercase tracking-wider text-neutral-400">
@@ -189,7 +201,7 @@ export default function AdminSidebar({
         ))}
       </div>
 
-      <div className="space-y-0.5 border-t border-neutral-200 pt-3">
+      <div className="shrink-0 space-y-0.5 border-t border-neutral-200 pt-3">
         <Link
           href="/admin/installningar"
           onClick={() => setOpen(false)}
