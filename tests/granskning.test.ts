@@ -117,12 +117,19 @@ afterAll(async () => {
   await unsafeGlobalPrisma.$disconnect();
 });
 
-/** Skickar formuläret med angiven sluttid, som fältet skriver den. */
+/**
+ * Skickar formuläret med angiven sluttid, som fältet skriver den.
+ *
+ * Svaret lämnas tillbaka. Åtgärden svarar sedan 2026-10-01 med ett
+ * felmeddelande i stället för att tiga när något är orimligt, och det är
+ * halva poängen med den — den som skrivit fel ska få veta det.
+ */
 async function submit(clockOutAt: string, id = entryId) {
   const form = new FormData();
   form.set("id", id);
   form.set("clockOutAt", clockOutAt);
-  await reviewEntry(form);
+
+  return reviewEntry({}, form);
 }
 
 const saved = () =>
@@ -188,26 +195,32 @@ describe("ändrad tid rättas", () => {
 });
 
 describe("orimligt avvisas", () => {
-  it("en sluttid före starttiden ändrar ingenting", async () => {
+  it("en sluttid före starttiden ändrar ingenting, och säger till", async () => {
     // 06:00 svensk tid, alltså före instämplingen 07:00. En negativ arbetsdag.
-    await submit("2026-09-21T06:00");
+    const state = await submit("2026-09-21T06:00");
 
     const entry = await saved();
 
     expect(entry.needsReview).toBe(true);
     expect(entry.clockOutAt?.toISOString()).toBe(AUTO_CLOSED.toISOString());
+
+    // Tystnaden var felet: posten stod kvar i listan utan förklaring, och
+    // den som skrivit 06:00 i stället för 16:00 trodde att knappen var trasig.
+    expect(state.error).toContain("efter starttiden");
   });
 
-  it("ett tomt fält ändrar ingenting", async () => {
-    await submit("");
+  it("ett tomt fält ändrar ingenting, och säger till", async () => {
+    const state = await submit("");
 
     expect((await saved()).needsReview).toBe(true);
+    expect(state.error).toBeTruthy();
   });
 
-  it("skräp i fältet ändrar ingenting", async () => {
-    await submit("i eftermiddags");
+  it("skräp i fältet ändrar ingenting, och säger till", async () => {
+    const state = await submit("i eftermiddags");
 
     expect((await saved()).needsReview).toBe(true);
+    expect(state.error).toBeTruthy();
   });
 
   it("en post hos ett annat företag går inte att röra", async () => {
