@@ -1,16 +1,15 @@
 import { requireAdmin } from "@/lib/admin-session";
 import { unsafeGlobalPrisma } from "@/lib/db";
 import OrdersTable from "@/components/admin/OrdersTable";
+import ReviewForm from "@/components/admin/ReviewForm";
 import { orderRows } from "@/lib/orders";
 import { customerOptions } from "@/lib/customers";
 import { toggleOrder, updateOrder } from "../ordrar/actions";
 import {
   Badge,
-  Button,
   Card,
   CardHeader,
   EmptyState,
-  Input,
   PageHeader,
   Table,
   Td,
@@ -160,21 +159,15 @@ export default async function ReviewPage() {
                         var lätt att göra fel, eftersom knapparna såg ut att
                         göra samma sak. Här finns en fråga att svara på: när
                         slutade arbetet? */}
-                    <form action={reviewEntry} className="flex gap-2">
-                      <input type="hidden" name="id" value={entry.id} />
-                      <Input
-                        type="datetime-local"
-                        name="clockOutAt"
-                        defaultValue={
-                          entry.clockOutAt
-                            ? toInputValue(entry.clockOutAt, timeZone)
-                            : ""
-                        }
-                        aria-label="Sluttid"
-                        className="w-52"
-                      />
-                      <Button type="submit">Godkänn</Button>
-                    </form>
+                    <ReviewForm
+                      id={entry.id}
+                      action={reviewEntry}
+                      defaultValue={
+                        entry.clockOutAt
+                          ? toInputValue(entry.clockOutAt, timeZone)
+                          : ""
+                      }
+                    />
                   </Td>
                 </Tr>
               ))}

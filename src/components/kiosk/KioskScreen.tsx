@@ -51,6 +51,13 @@ interface Employee {
   name: string;
   /** true när ett porträtt finns uppladdat. Bilden hämtas via sin adress. */
   hasPhoto: boolean;
+  /**
+   * true när administratören satt en personlig kod för personen.
+   *
+   * Styr BARA om knappen "Mitt flexsaldo" visas. Koden i sig lämnar aldrig
+   * servern, och saldot hämtas av /api/kiosk/flex först när koden stämmer.
+   */
+  hasFlexCode: boolean;
 }
 
 interface Order {
@@ -230,6 +237,14 @@ interface Props {
   hasLogo: boolean;
   /** Driftmeddelanden märkta för stämplingsskärmarna. */
   notices: KioskNotice[];
+  /**
+   * true när företaget har löneunderlaget.
+   *
+   * Utan modulen finns inget flexsaldo att visa, och knappen ritas inte. Att
+   * dölja den är kosmetik — rutten bakom svarar 404 oavsett, se
+   * src/lib/company-modules.ts.
+   */
+  payroll: boolean;
 }
 
 /** En rast som går att välja på skärmen. */
@@ -271,10 +286,14 @@ type View =
       customer: KioskCustomer | null;
     }
   | { name: "moment"; employee: Employee; order: Order }
-  | { name: "indirect"; employee: Employee };
+  | { name: "indirect"; employee: Employee }
+  | { name: "flex"; employee: Employee };
 
 /** Hur många siffror ett ordernummer får vara innan knappsatsen slutar ta emot. */
 const MAX_ORDER_DIGITS = 10;
+
+/** Hur lång den personliga koden får vara. Minst fyra siffror krävs. */
+const MAX_CODE_DIGITS = 8;
 
 /**
  * Ett unikt id för varje tryck, så att en omsändning inte blir en dubblett.
@@ -331,6 +350,7 @@ export default function KioskScreen({
   subscriptionWarning,
   hasLogo,
   notices,
+  payroll,
 }: Props) {
   const router = useRouter();
   const [view, setView] = useState<View>({ name: "employees" });
@@ -1022,13 +1042,17 @@ export default function KioskScreen({
             active={active}
             recent={recent}
             breaks={breaks}
+            // INSTÄMPLING BÖRJAR PÅ KNAPPSATSEN (ändrat 2026-10-01), precis
+            // som jobbytet. Den som ska börja på ett jobb har ordernumret på
+            // ritningen framför sig; rutnätet med öppna ordrar ligger kvar ett
+            // tryck bort, på "Visa öppna ordrar".
             onPick={(employee) =>
               setView(
                 active[employee.id]?.length ||
                 recent[employee.id] ||
                 breaks[employee.id]
                   ? { name: "action", employee }
-                  : { name: "order", employee }
+                  : { name: "orderNumber", employee }
               )
             }
           />
@@ -1058,7 +1082,9 @@ export default function KioskScreen({
               setView({ name: "orderNumber", employee: view.employee });
             }}
             onClockOutAll={(jobs) => punchOutAll(view.employee, jobs)}
-            onAdd={() => setView({ name: "order", employee: view.employee })}
+            onAdd={() => setView({ name: "orderNumber", employee: view.employee })}
+            onFlex={() => setView({ name: "flex", employee: view.employee })}
+            canShowFlex={payroll && view.employee.hasFlexCode}
             onResume={() => {
               const last = recent[view.employee.id];
               if (last) punchIn(view.employee, last.choice);
@@ -1164,7 +1190,20 @@ export default function KioskScreen({
                 from: "orderNumber",
               })
             }
+            // Knappsatsen är numera första vyn även vid instämpling, och den
+            // som bara ville se sitt saldo hamnar här. Därför finns vägen
+            // vidare på båda ställena: här och i åtgärdsvyn.
+            onFlex={() => setView({ name: "flex", employee: view.employee })}
+            canShowFlex={payroll && view.employee.hasFlexCode}
+            onIndirect={() =>
+              setView({ name: "indirect", employee: view.employee })
+            }
+            hasIndirect={indirectMoments.length > 0}
           />
+        )}
+
+        {view.name === "flex" && (
+          <FlexPad employee={view.employee} onDone={goHome} />
         )}
 
         {view.name === "quickCustomer" && (
@@ -1614,6 +1653,8 @@ function ActionChoice({
   onClockOutAll,
   onAdd,
   onResume,
+  onFlex,
+  canShowFlex,
 }: {
   employee: Employee;
   jobs: ActiveJob[];
@@ -1629,6 +1670,10 @@ function ActionChoice({
   onClockOutAll: (jobs: ActiveJob[]) => void;
   onAdd: () => void;
   onResume: () => void;
+  /** Vägen till det egna flexsaldot. Kräver personlig kod i nästa steg. */
+  onFlex: () => void;
+  /** false döljer knappen: företaget saknar modulen, eller personen en kod. */
+  canShowFlex: boolean;
 }) {
   const single = jobs.length === 1 ? jobs[0] : null;
 
@@ -1855,6 +1900,21 @@ function ActionChoice({
             Välj jobb
           </button>
         )}
+
+        {/* MITT FLEXSALDO. Sist, dämpat och alltid lika stort som de andra
+            raderna i rutnätet. Den som står vid skärmen är där för att
+            stämpla; saldot är något man tittar på när man ändå står där. */}
+        {canShowFlex && (
+          <button
+            onClick={onFlex}
+            className="kiosk-press min-h-20 rounded-xl border border-neutral-200 bg-white p-6 text-xl font-semibold text-neutral-600 active:bg-neutral-50 sm:col-span-2"
+          >
+            Mitt flexsaldo
+            <span className="mt-1.5 block text-base font-normal text-neutral-500">
+              Kräver din personliga kod
+            </span>
+          </button>
+        )}
       </div>
     </div>
   );
@@ -2013,6 +2073,10 @@ function OrderNumberPad({
   onPick,
   onBrowse,
   onCreate,
+  onFlex,
+  canShowFlex,
+  onIndirect,
+  hasIndirect,
 }: {
   employee: Employee;
   orders: Order[];
@@ -2022,6 +2086,14 @@ function OrderNumberPad({
   onBrowse: () => void;
   /** Numret som slagits in, eller tom sträng när inget angetts. */
   onCreate: (orderNumber: string) => void;
+  /** Vägen till det egna flexsaldot. Kräver personlig kod i nästa steg. */
+  onFlex: () => void;
+  /** false döljer knappen: företaget saknar modulen, eller personen en kod. */
+  canShowFlex: boolean;
+  /** Städning, möte, underhåll. Tid som aldrig når ett fakturaunderlag. */
+  onIndirect: () => void;
+  /** false döljer knappen: företaget har inga improduktiva moment upplagda. */
+  hasIndirect: boolean;
 }) {
   const [typed, setTyped] = useState("");
 
@@ -2174,11 +2246,217 @@ function OrderNumberPad({
         )}
       </button>
 
+      {/* Vägarna vidare under knappsatsen.
+          
+          Knappsatsen är första vyn sedan 2026-10-01, och allt som tidigare
+          låg i rutnätet med öppna ordrar måste därför gå att nå härifrån.
+          Improduktiv tid är det som annars hamnat längst bort, och den
+          registreras varje dag. */}
+      <div className="mt-2 flex shrink-0 flex-wrap gap-2">
+        <button
+          onClick={onBrowse}
+          className="kiosk-press min-h-11 flex-1 rounded-xl border border-neutral-200 bg-white px-4 py-2.5 text-lg font-semibold text-neutral-900 active:bg-neutral-50"
+        >
+          Visa öppna ordrar
+        </button>
+
+        {hasIndirect && (
+          <button
+            onClick={onIndirect}
+            className="kiosk-press min-h-11 rounded-xl border border-neutral-200 bg-white px-5 py-2.5 text-lg font-semibold text-neutral-600 active:bg-neutral-50"
+          >
+            Improduktiv tid
+          </button>
+        )}
+
+        {canShowFlex && (
+          <button
+            onClick={onFlex}
+            className="kiosk-press min-h-11 rounded-xl border border-neutral-200 bg-white px-5 py-2.5 text-lg font-semibold text-neutral-600 active:bg-neutral-50"
+          >
+            Flexsaldo
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * MITT FLEXSALDO.
+ *
+ * Den anställde anger sin personliga kod och ser sitt saldo. Koden sätts av
+ * administratören under Anställda; utan kod syns knappen hit aldrig.
+ *
+ * Saldot visas en kort stund och skärmen går sedan hem av sig själv. Ett
+ * saldo som står kvar på väggen tills nästa person råkar trycka bort det är
+ * en uppgift om en namngiven person uppsatt i en verkstad.
+ *
+ * Knappsatsen är densamma som för ordernummer, i mindre format. Samma
+ * handrörelse, och ingen ny sorts inmatning att lära sig.
+ */
+function FlexPad({
+  employee,
+  onDone,
+}: {
+  employee: Employee;
+  onDone: () => void;
+}) {
+  const [typed, setTyped] = useState("");
+  const [minutes, setMinutes] = useState<number | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  // Saldot försvinner av sig själv. Samma skäl som kvittensen efter en
+  // stämpling: nästa person vid skärmen ska inte se föregående persons tal.
+  useEffect(() => {
+    if (minutes === null) return;
+
+    const timer = setTimeout(onDone, 12_000);
+    return () => clearTimeout(timer);
+  }, [minutes, onDone]);
+
+  async function submit() {
+    if (busy || typed.length < 4) return;
+
+    setBusy(true);
+    setError(null);
+
+    try {
+      const response = await fetch("/api/kiosk/flex", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ employeeId: employee.id, code: typed }),
+      });
+
+      const data = (await response.json()) as {
+        minutes?: number | null;
+        error?: string;
+      };
+
+      if (!response.ok) {
+        setError(data.error ?? "Koden kunde inte kontrolleras.");
+        setTyped("");
+        return;
+      }
+
+      // Saknas schema finns ingen planerad tid, och därmed inget flexsaldo
+      // att visa. Det är inte ett fel, men det ska inte stå noll.
+      if (data.minutes === null || data.minutes === undefined) {
+        setError("Inget flexsaldo är uträknat. Kontakta kontoret.");
+        setTyped("");
+        return;
+      }
+
+      setMinutes(data.minutes);
+    } catch {
+      setError("Ingen kontakt med servern. Försök igen.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  if (minutes !== null) {
+    return (
+      <div className="mx-auto flex min-h-0 w-full max-w-xl flex-1 flex-col items-center justify-center">
+        <p className="text-xl font-semibold text-neutral-900 sm:text-2xl">
+          {employee.name}
+        </p>
+        <p className="mt-2 text-base text-neutral-500">Flexsaldo</p>
+        <p className="mt-6 text-6xl font-semibold tabular-nums text-neutral-900">
+          {formatFlex(minutes)}
+        </p>
+
+        <button
+          onClick={onDone}
+          className="kiosk-press mt-10 min-h-14 rounded-xl border border-neutral-200 bg-white px-10 py-3.5 text-xl font-semibold text-neutral-900 active:bg-neutral-50"
+        >
+          Klart
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="mx-auto flex min-h-0 w-full max-w-xl flex-1 flex-col">
+      <h2 className="kiosk-frame-title mb-2 shrink-0 text-xl font-semibold text-neutral-900 sm:mb-4 sm:text-2xl">
+        {employee.name}: ange din kod
+      </h2>
+
+      {/* Fast höjd på både ruta och besked, av samma skäl som i knappsatsen
+          för ordernummer: utan den hoppar siffrorna nedåt vid första trycket. */}
+      <div className="kiosk-frame-display flex h-16 shrink-0 items-center justify-center rounded-xl border-2 border-neutral-200 bg-white sm:h-24">
+        <span className="text-4xl font-semibold tracking-[0.4em] text-neutral-900">
+          {typed ? "•".repeat(typed.length) : (
+            <span className="text-neutral-300">– – – –</span>
+          )}
+        </span>
+      </div>
+
+      <div className="kiosk-frame-hint flex h-9 shrink-0 items-center justify-center sm:h-12">
+        {error && (
+          <span className="text-lg font-medium text-amber-700">{error}</span>
+        )}
+      </div>
+
+      <div className="grid min-h-0 flex-1 auto-rows-fr grid-cols-3 gap-2 sm:gap-3">
+        {["1", "2", "3", "4", "5", "6", "7", "8", "9"].map((digit) => (
+          <button
+            key={digit}
+            onClick={() =>
+              setTyped((current) =>
+                current.length >= MAX_CODE_DIGITS ? current : current + digit
+              )
+            }
+            className="kiosk-press min-h-12 rounded-xl border border-neutral-200 bg-white text-3xl font-semibold text-neutral-900 active:bg-neutral-50"
+          >
+            {digit}
+          </button>
+        ))}
+
+        <button
+          onClick={() => setTyped((current) => current.slice(0, -1))}
+          aria-label="Ta bort sista siffran"
+          className="kiosk-press flex min-h-12 items-center justify-center rounded-xl border border-neutral-200 bg-white text-neutral-500 active:bg-neutral-50"
+        >
+          <svg
+            viewBox="0 0 24 24"
+            className="h-8 w-8"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth={2}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+          >
+            <path d="M20 6H9l-5 6 5 6h11z" />
+            <path d="m15 10-4 4m0-4 4 4" />
+          </svg>
+        </button>
+        <button
+          onClick={() =>
+            setTyped((current) =>
+              current.length >= MAX_CODE_DIGITS ? current : current + "0"
+            )
+          }
+          className="kiosk-press min-h-12 rounded-xl border border-neutral-200 bg-white text-3xl font-semibold text-neutral-900 active:bg-neutral-50"
+        >
+          0
+        </button>
+        <button
+          onClick={() => setTyped("")}
+          className="kiosk-press min-h-12 rounded-xl border border-neutral-200 bg-white text-lg font-semibold text-neutral-500 active:bg-neutral-50"
+        >
+          Rensa
+        </button>
+      </div>
+
       <button
-        onClick={onBrowse}
-        className="kiosk-press mt-2 min-h-11 w-full shrink-0 rounded-xl border border-neutral-200 bg-white py-2.5 text-lg font-semibold text-neutral-900 active:bg-neutral-50"
+        onClick={() => void submit()}
+        disabled={typed.length < 4 || busy}
+        className="kiosk-frame-cta kiosk-press mt-2 min-h-14 w-full shrink-0 rounded-xl bg-blue-600 px-4 py-3.5 text-2xl font-semibold text-white active:bg-blue-700 disabled:bg-neutral-200 disabled:text-neutral-400"
       >
-        Visa öppna ordrar
+        {busy ? "Kontrollerar…" : "Visa saldo"}
       </button>
     </div>
   );

@@ -1,12 +1,14 @@
 "use client";
 
-import { useState } from "react";
+import { useActionState, useState } from "react";
 import type {
+  BulkCloseState,
   OrderFormState,
   OrderToggleState,
 } from "@/app/admin/(panel)/ordrar/actions";
 import OrderActions from "./OrderActions";
 import PrintButton from "./PrintButton";
+import AskDialog from "@/components/ui/AskDialog";
 import type { SearchSelectOption } from "./SearchSelect";
 import type { BudgetMomentOption } from "./BudgetMoments";
 import type { OrderRow } from "@/lib/orders";
@@ -48,6 +50,7 @@ export default function OrdersTable({
   title,
   hideCustomer = false,
   selectable = true,
+  closeAction,
 }: {
   orders: OrderRow[];
   /** Kunderna som går att välja i ändra-rutan. */
@@ -66,6 +69,14 @@ export default function OrdersTable({
   selectable?: boolean;
   /** Arbetsmomenten som går att beräkna tid på. */
   moments: BudgetMomentOption[];
+  /**
+   * Avslutar flera markerade ordrar. Utelämnad döljer frågan helt, vilket
+   * gäller listan på granskningssidan där inget markeringsläge finns.
+   */
+  closeAction?: (
+    state: BulkCloseState,
+    formData: FormData
+  ) => Promise<BulkCloseState>;
   updateAction: (
     state: OrderFormState,
     formData: FormData
@@ -77,6 +88,31 @@ export default function OrdersTable({
 }) {
   const [selecting, setSelecting] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
+
+  // Frågan om att avsluta de markerade ordrarna, som ställs när en
+  // efterkalkyl tagits ut. Samma fråga som för en enskild order, se
+  // OrderActions.
+  const [asking, setAsking] = useState(false);
+
+  // Reserven gör ingenting och används aldrig: knappen som leder hit finns
+  // bara i markeringsläget, och det läget finns bara där åtgärden skickats
+  // in. useActionState kräver ändå en funktion.
+  const [closeState, submitClose] = useActionState<BulkCloseState, FormData>(
+    closeAction ?? (async () => ({})),
+    {}
+  );
+
+  function askToClose() {
+    if (selected.size > 0) setAsking(true);
+  }
+
+  function confirmClose() {
+    const data = new FormData();
+    for (const id of selected) data.append("order", id);
+
+    setAsking(false);
+    submitClose(data);
+  }
 
   function toggle(id: string) {
     setSelected((current) => {
@@ -108,11 +144,7 @@ export default function OrdersTable({
           title ??
           `${orders.length} ${orders.length === 1 ? "order" : "ordrar"}`
         }
-        description={
-          selecting
-            ? "En fil per order i PDF, en flik per order i Excel."
-            : undefined
-        }
+        description={selecting ? "Varje order blir en egen fil." : undefined}
         action={
           selecting ? (
             <div className="flex flex-wrap items-center justify-end gap-2">
@@ -121,13 +153,19 @@ export default function OrdersTable({
               </span>
 
               {/* Utskriften först: det är den som gör att kalkylen kan tas ut
-                  för en hel vecka utan att en enda fil sparas. */}
+                  för en hel vecka utan att en enda fil sparas. Båda vägarna
+                  leder till samma fråga efteråt, se AskDialog nedan. */}
               <PrintButton
                 href={exportUrl("kalkyl")}
                 label="Skriv ut efterkalkyl"
                 disabled={count === 0}
+                onPrint={askToClose}
               />
-              <ExportLink href={exportUrl("kalkyl")} disabled={count === 0}>
+              <ExportLink
+                href={exportUrl("kalkyl")}
+                disabled={count === 0}
+                onPick={askToClose}
+              >
                 Efterkalkyl
               </ExportLink>
 
@@ -146,9 +184,6 @@ export default function OrdersTable({
               >
                 Underlag
               </ExportLink>
-              <ExportLink href={exportUrl("excel")} disabled={count === 0}>
-                Excel
-              </ExportLink>
               <Button type="button" tone="ghost" onClick={stopSelecting}>
                 Avbryt
               </Button>
@@ -164,6 +199,33 @@ export default function OrdersTable({
           ) : undefined
         }
       />
+
+      {/* Svaret på frågan om att avsluta. Står i listan och inte i en ruta
+          som måste tryckas bort: det är ett kvitto, inte ett beslut. */}
+      {(closeState.ok || closeState.error) && (
+        <p
+          className={`border-b border-neutral-200 px-5 py-3 text-[13px] ${
+            closeState.error ? "text-red-600" : "text-neutral-600"
+          }`}
+        >
+          {closeState.error ?? closeState.ok}
+        </p>
+      )}
+
+      <AskDialog
+        open={asking}
+        title={
+          selected.size === 1
+            ? "Avsluta ordern?"
+            : `Avsluta ${selected.size} ordrar?`
+        }
+        confirmLabel="Ja, avsluta"
+        onConfirm={confirmClose}
+        onClose={() => setAsking(false)}
+      >
+        Ordrarna döljs på stämplingsskärmen. Den registrerade tiden finns
+        kvar, och en order med pågående stämplingar står kvar öppen.
+      </AskDialog>
 
       <Table>
         <thead>
@@ -259,11 +321,14 @@ function ExportLink({
   href,
   disabled,
   primary = false,
+  onPick,
   children,
 }: {
   href: string;
   disabled: boolean;
   primary?: boolean;
+  /** Körs när filen begärts. Används för frågan om att avsluta ordrarna. */
+  onPick?: () => void;
   children: React.ReactNode;
 }) {
   const tone = disabled
@@ -276,7 +341,11 @@ function ExportLink({
     <a
       href={disabled ? undefined : href}
       onClick={(event) => {
-        if (disabled) event.preventDefault();
+        if (disabled) {
+          event.preventDefault();
+          return;
+        }
+        onPick?.();
       }}
       aria-disabled={disabled}
       className={`inline-flex items-center rounded-md px-3 py-1.5 text-[13px] font-medium transition-colors ${tone}`}

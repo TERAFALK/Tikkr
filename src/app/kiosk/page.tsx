@@ -111,7 +111,14 @@ export default async function KioskPage() {
       // photoMimeType i stallet for photoData: skarmen behover bara veta OM ett
       // portratt finns. Bilderna hamtas var for sig och mellanlagras av
       // webblasaren i stallet for att skickas med varje sidladdning.
-      select: { id: true, name: true, photoMimeType: true },
+      // photoMimeType och flexCodeHash lamnar aldrig servern. Skarmen far
+      // tva booleaner: om ett portratt finns, och om personen har en kod.
+      select: {
+        id: true,
+        name: true,
+        photoMimeType: true,
+        flexCodeHash: true,
+      },
     }),
     db.order.findMany({
       where: { status: "OPEN" },
@@ -255,6 +262,7 @@ export default async function KioskPage() {
         id: employee.id,
         name: employee.name,
         hasPhoto: Boolean(employee.photoMimeType),
+        hasFlexCode: Boolean(employee.flexCodeHash),
       }))}
       orders={orders.map((order) => ({
         id: order.id,
@@ -275,6 +283,9 @@ export default async function KioskPage() {
         access.level === "full" ? null : access.headline
       }
       hasLogo={Boolean(company?.logoSquareMimeType)}
+      // Styr om knappen till det egna flexsaldot ritas alls. Rutten bakom
+      // den fragar sjalv om modulen, se src/app/api/kiosk/flex/route.ts.
+      payroll={payroll}
       // Driftmeddelanden riktade till verkstaden. Bara de som markerats för
       // skärmarna — ett meddelande om rapporterna hör inte hemma på väggen.
       notices={notices.map((notice) => ({

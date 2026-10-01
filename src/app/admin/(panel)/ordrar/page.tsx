@@ -4,7 +4,7 @@ import OrdersTable from "@/components/admin/OrdersTable";
 import { Alert, EmptyState, PageHeader } from "@/components/ui";
 import { orderRows } from "@/lib/orders";
 import { customerOptions } from "@/lib/customers";
-import { createOrder, toggleOrder, updateOrder } from "./actions";
+import { closeOrders, createOrder, toggleOrder, updateOrder } from "./actions";
 
 export const dynamic = "force-dynamic";
 
@@ -66,6 +66,7 @@ export default async function OrdersPage() {
           moments={moments}
           updateAction={updateOrder}
           toggleAction={toggleOrder}
+          closeAction={closeOrders}
         />
       )}
     </>

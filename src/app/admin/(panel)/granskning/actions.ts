@@ -27,26 +27,36 @@ const PATH = "/admin/granskning";
  * såg ut att göra samma sak. Den som granskar ska svara på en fråga: när
  * slutade arbetet?
  */
-export async function reviewEntry(formData: FormData) {
+export interface ReviewState {
+  error?: string;
+  /** Sattes senast en post godkändes. Rensar felet i rutan. */
+  savedAt?: number;
+}
+
+export async function reviewEntry(
+  _previous: ReviewState,
+  formData: FormData
+): Promise<ReviewState> {
   const session = await requireAdmin();
   await assertWritable(session);
   const { db, companyId, email } = session;
 
   const id = String(formData.get("id") ?? "");
   const value = String(formData.get("clockOutAt") ?? "");
-  if (!id || !value) return;
+  if (!id) return { error: "Okänd post." };
+  if (!value) return { error: "Ange en sluttid." };
 
   // Fältet ger klockslag som det står på väggen, utan tidszon. Det måste
   // tolkas i företagets tidszon — annars hamnar en rättning gjord i juli en
   // timme fel mot en gjord i januari.
   const match = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})$/.exec(value);
-  if (!match) return;
+  if (!match) return { error: "Sluttiden går inte att läsa." };
 
   const company = await unsafeGlobalPrisma.company.findUnique({
     where: { id: companyId },
     select: { timezone: true },
   });
-  if (!company) return;
+  if (!company) return { error: "Företaget kunde inte läsas." };
 
   const clockOutAt = instantFromWallTime(
     {
@@ -60,10 +70,18 @@ export async function reviewEntry(formData: FormData) {
   );
 
   const entry = await db.timeEntry.findFirst({ where: { id } });
-  if (!entry) return;
+  if (!entry) return { error: "Posten finns inte kvar." };
 
-  // En sluttid före starttiden vore en negativ arbetsdag.
-  if (clockOutAt <= entry.clockInAt) return;
+  // EN SLUTTID FÖRE STARTTIDEN ÄR EN NEGATIV ARBETSDAG.
+  //
+  // Returnerade tyst tidigare. Posten stod då kvar i listan, utan att något
+  // hänt och utan att något sades — den som skrivit 07:00 i stället för
+  // 17:00 trodde att knappen var trasig.
+  if (clockOutAt <= entry.clockInAt) {
+    return {
+      error: "Sluttiden måste ligga efter starttiden.",
+    };
+  }
 
   // Jämförs på MINUTEN, eftersom fältet inte har sekunder. Utan avrundningen
   // hade varje godkännande räknats som en ändring, och då vore hela poängen
@@ -88,6 +106,8 @@ export async function reviewEntry(formData: FormData) {
   });
 
   revalidatePath(PATH);
+  revalidatePath("/admin");
+  return { savedAt: Date.now() };
 }
 
 /** Tidpunkten avrundad till hel minut, som millisekunder. */

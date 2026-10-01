@@ -66,7 +66,7 @@ export default function KioskSettings({
 
       <dialog
         ref={dialog}
-        className="w-[min(28rem,calc(100vw-2rem))] rounded-xl border border-neutral-200 bg-white p-0 shadow-xl backdrop:bg-neutral-900/50"
+        className="w-[min(40rem,calc(100vw-2rem))] rounded-xl border border-neutral-200 bg-white p-0 shadow-xl backdrop:bg-neutral-900/50"
       >
         <div className="border-b border-neutral-200 px-6 py-5">
           <h2 className="text-lg font-semibold text-neutral-900">

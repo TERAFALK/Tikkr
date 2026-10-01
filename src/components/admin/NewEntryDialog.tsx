@@ -58,7 +58,7 @@ export default function NewEntryDialog({
 
       <dialog
         ref={dialog}
-        className={`w-[min(34rem,calc(100vw-2rem))] ${dialogSurface}`}
+        className={`w-[min(40rem,calc(100vw-2rem))] ${dialogSurface}`}
       >
         <div className={`${dialogEdge} border-b border-neutral-200 px-5 py-4`}>
           <h2 className="text-sm font-semibold text-neutral-900">
@@ -95,6 +95,7 @@ export default function NewEntryDialog({
               <Field label="Order">
                 <SearchSelect
                   name="orderId"
+                  inDialog
                   options={orders}
                   placeholder="Sök order…"
                   emptyLabel="Välj order…"

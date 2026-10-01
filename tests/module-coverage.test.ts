@@ -70,6 +70,7 @@ const PAYROLL_SURFACE = [
   "app/admin/(panel)/installningar/schema/page.tsx",
   "app/admin/(panel)/installningar/schema/actions.ts",
   "app/api/admin/export/timesheet/route.ts",
+  "app/api/kiosk/flex/route.ts",
   "app/api/kiosk/punch/route.ts",
   "app/api/kiosk/state/route.ts",
   "app/kiosk/page.tsx",

@@ -1,7 +1,8 @@
 import { Prisma, type TimeEntry } from "@prisma/client";
 import { unsafeGlobalPrisma } from "./db";
 import { forCompany, type CompanyDb } from "./tenant";
-import { nextOccurrenceOf } from "./time-zone";
+import { nextOccurrenceOf, wallTimeIn } from "./time-zone";
+import { companyTimeZone } from "./company";
 import { describeEntry } from "./entry-label";
 import { endOpenBreak } from "./break-close";
 
@@ -37,6 +38,38 @@ export class ClockError extends Error {
     this.name = "ClockError";
   }
 }
+
+/* --- Helgstämpling -------------------------------------------------------
+ *
+ * ARBETE PÅ LÖRDAG ELLER SÖNDAG FLAGGAS FÖR GRANSKNING (tillagt 2026-10-01).
+ *
+ * Det är inte ett fel, och stämplingen går igenom precis som vanligt. Men
+ * helgtid är nästan alltid något som ska beslutas om innan den faktureras
+ * eller blir komp, och en post som ingen tittat på hinner annars bli både
+ * faktura och lön.
+ *
+ * Veckodagen räknas i FÖRETAGETS tidszon. En stämpling fredag 23:30 i
+ * Stockholm är 22:30 i UTC samma dag, men ett pass som börjar 01:00 natten
+ * till lördag är fredag i UTC — och det är väggen i verkstaden som avgör
+ * vilken dag det är.
+ *
+ * Räkningen är avsiktligt skriven här och inte hämtad från schedule.ts, som
+ * har en identisk `isoWeekdayIn`. Den filen hör till löneunderlaget, och
+ * clock.ts är basen: stämplingen får inte sluta fungera för att en modul
+ * stängs av. Fyra rader duplicerad kalenderräkning är ett lågt pris för den
+ * gränsen. */
+
+/** true när tidpunkten infaller på en lördag eller söndag i den tidszonen. */
+function isWeekend(at: Date, timeZone: string): boolean {
+  const wall = wallTimeIn(at, timeZone);
+  const day = new Date(Date.UTC(wall.year, wall.month - 1, wall.day)).getUTCDay();
+
+  // getUTCDay() ger 0 för söndag och 6 för lördag.
+  return day === 0 || day === 6;
+}
+
+const WEEKEND_NOTE =
+  "Stämplad på helg. Kontrollera posten innan den faktureras.";
 
 export interface PunchContext {
   /** Vilken fysisk skärm trycket kom ifrån. Sparas för audit-loggen. */
@@ -180,6 +213,9 @@ export async function clockIn(
 
   const rates = await assertBelongsToCompany(db, input);
 
+  // Helgen avgörs av väggklockan i verkstaden, inte av serverns tidszon.
+  const weekend = isWeekend(at, await companyTimeZone(companyId));
+
   // Att börja jobba avslutar rasten. Personen som kommer tillbaka från lunchen
   // och trycker på sin order ska inte behöva trycka "rast slut" först — det är
   // ett tryck som bara finns för datorns skull, och det skulle glömmas.
@@ -244,10 +280,19 @@ export async function clockIn(
         kioskDeviceId: input.kioskDeviceId ?? null,
         sourceIp: input.sourceIp ?? null,
         clientPunchId: input.clientPunchId ?? null,
-        ...(input.rejectedAt
+
+        // Två skäl kan flagga samma post, och båda ska stå i noten: den som
+        // rättar den behöver veta allt som var fel, inte det vi råkade
+        // kontrollera först.
+        ...(input.rejectedAt || weekend
           ? {
               needsReview: true,
-              reviewNote: clockSkewNote(input.rejectedAt),
+              reviewNote: [
+                input.rejectedAt ? clockSkewNote(input.rejectedAt) : null,
+                weekend ? WEEKEND_NOTE : null,
+              ]
+                .filter(Boolean)
+                .join(" "),
             }
           : {}),
       },
@@ -348,6 +393,13 @@ export async function clockOut(
   }
 
   if (input.rejectedAt) notes.push(clockSkewNote(input.rejectedAt));
+
+  // Utstämplingen är också ett tryck. Ett pass som börjat på fredagen och
+  // slutar på lördagen ska synas i granskningen, även om instämplingen inte
+  // gav någon flagga. Står noten redan där skrivs den inte två gånger.
+  if (isWeekend(at, await companyTimeZone(companyId)) && !target.needsReview) {
+    notes.push(WEEKEND_NOTE);
+  }
 
   // VILLKORET `clockOutAt: null` ÄR SJÄLVA POÄNGEN med updateMany här.
   //

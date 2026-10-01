@@ -63,6 +63,8 @@ export default function EmployeeDialog({
     employeeNumber: string | null;
     costRateOre: number | null;
     hasPhoto: boolean;
+    /** true när en kod för flexsaldot redan är satt. Koden går inte att läsa. */
+    hasFlexCode: boolean;
   };
   /**
    * Personens egna arbetstider, eller null när hen går på företagets schema.
@@ -113,8 +115,8 @@ export default function EmployeeDialog({
         ref={dialog}
         className={`${
           canEditSchedule
-            ? "w-[min(36rem,calc(100vw-2rem))]"
-            : "w-[min(30rem,calc(100vw-2rem))]"
+            ? "w-[min(42rem,calc(100vw-2rem))]"
+            : "w-[min(42rem,calc(100vw-2rem))]"
         } ${dialogSurface}`}
       >
         <div className={`${dialogEdge} border-b border-neutral-200 px-5 py-4`}>
@@ -227,6 +229,42 @@ export default function EmployeeDialog({
                 }
               />
             </Field>
+
+            {/* KODEN FÖR FLEXSALDOT.
+                
+                Hör till löneunderlaget och visas bara för den som har det.
+                Fältet är tomt varje gång rutan öppnas: en sparad kod går inte
+                att läsa tillbaka, bara att ersätta. */}
+            {canEditSchedule && (
+              <div className="border-t border-neutral-200 pt-4">
+                <Field
+                  label="Kod för flexsaldo"
+                  hint={
+                    employee?.hasFlexCode
+                      ? "En kod är satt. Skriv en ny för att ersätta den"
+                      : "4 till 8 siffror. Tomt betyder ingen kod"
+                  }
+                >
+                  <Input
+                    name="flexCode"
+                    inputMode="numeric"
+                    autoComplete="off"
+                    placeholder={employee?.hasFlexCode ? "••••" : "1234"}
+                  />
+                </Field>
+
+                {employee?.hasFlexCode && (
+                  <label className="mt-2 flex items-center gap-2 text-xs text-neutral-600">
+                    <input
+                      type="checkbox"
+                      name="removeFlexCode"
+                      className="h-3.5 w-3.5 rounded border-neutral-300 text-blue-600 focus:ring-blue-600"
+                    />
+                    Ta bort koden
+                  </label>
+                )}
+              </div>
+            )}
 
             {canEditSchedule && (
               <div className="border-t border-neutral-200 pt-4">

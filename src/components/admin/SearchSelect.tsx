@@ -50,6 +50,7 @@ export default function SearchSelect({
   emptyLabel,
   required = false,
   variant = "select",
+  inDialog = false,
 }: {
   name: string;
   options: SearchSelectOption[];
@@ -63,6 +64,19 @@ export default function SearchSelect({
    * "search" ser ut som ett sökfält och visar platshållaren. Se toppen.
    */
   variant?: "select" | "search";
+  /**
+   * SÄTTS NÄR VÄLJAREN LIGGER I EN RUTA.
+   *
+   * Listan ritas då i flödet i stället för ovanpå innehållet. Skälet är att
+   * en ruta skrollar sitt innehåll (overflow-y-auto, se dialogBody i
+   * designsystemet), och allt som ligger absolut positionerat KLIPPS vid
+   * rutans kant. Ordervaljaren i "Ny stämpling" hamnade därför halvt utanför
+   * och gick knappt att läsa.
+   *
+   * I ett filter på en sida finns ingen sådan kant, och där är en lista som
+   * lägger sig ovanpå bättre: den knuffar inte ned resten av formuläret.
+   */
+  inDialog?: boolean;
 }) {
   const listId = useId();
   const wrapper = useRef<HTMLDivElement>(null);
@@ -206,7 +220,9 @@ export default function SearchSelect({
         <ul
           id={listId}
           role="listbox"
-          className="absolute z-20 mt-1 max-h-64 w-full overflow-y-auto rounded-md border border-neutral-200 bg-white py-1 shadow-lg"
+          className={`max-h-64 w-full overflow-y-auto rounded-md border border-neutral-200 bg-white py-1 ${
+            inDialog ? "relative mt-1" : "absolute z-20 mt-1 shadow-lg"
+          }`}
         >
           {/* "Ingen vald" står först och inte sist. Den som vill tömma ett fält
               ska inte behöva skrolla förbi tvåhundra rader för att göra det. */}

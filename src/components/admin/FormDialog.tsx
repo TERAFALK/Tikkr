@@ -56,7 +56,7 @@ export default function FormDialog({
 
       <dialog
         ref={dialog}
-        className={`w-[min(30rem,calc(100vw-2rem))] ${dialogSurface}`}
+        className={`w-[min(42rem,calc(100vw-2rem))] ${dialogSurface}`}
       >
         <div className={`${dialogEdge} border-b border-neutral-200 px-5 py-4`}>
           <h2 className="text-sm font-semibold text-neutral-900">{title}</h2>

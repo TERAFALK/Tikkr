@@ -101,6 +101,20 @@ export default async function ReportsPage({
   const fromDate = params.from ? parseLocalDate(params.from, timeZone) : null;
   const toDate = params.to ? parseLocalDate(params.to, timeZone) : null;
 
+  // SORTS TID VISAR BÅDA SOM STANDARD (ändrat 2026-10-01). Rapportvyn är
+  // till för att se vad som hänt, och den som öppnar den utan att röra
+  // filtren ska se hela bilden — inte en delmängd hen inte vet att hen
+  // tittar på.
+  //
+  // Biblioteket har kvar sin egen regel: `ReportFilters.kind` utelämnad
+  // betyder ORDER, så en export som görs utan att någon tänkt på saken
+  // innehåller bara fakturerbar tid. Därför skickas valet uttryckligen
+  // härifrån, både till rapporten och till uttagen nedan.
+  const kind =
+    params.kind === "ORDER" || params.kind === "INDIRECT"
+      ? params.kind
+      : "ALL";
+
   const report = await buildReport(db, {
     from: fromDate ? startOfDayIn(fromDate, timeZone) : undefined,
     to: toDate ? endOfDayIn(toDate, timeZone) : undefined,
@@ -108,12 +122,7 @@ export default async function ReportsPage({
     orderId: params.orderId,
     customerId: params.customerId,
     momentId: params.momentId,
-    // Utelämnad betyder fakturerbar tid. Se ReportFilters.kind — glömska ska
-    // ge det som hör hemma i en faktura, aldrig tvärtom.
-    kind:
-      params.kind === "INDIRECT" || params.kind === "ALL"
-        ? params.kind
-        : "ORDER",
+    kind,
   });
 
   // "detalj" är standard: den som öppnar en rapport vill oftast se raderna.
@@ -130,9 +139,15 @@ export default async function ReportsPage({
   const employeeGroups =
     view === "persondetalj" ? groupByEmployee(report.rows) : [];
 
-  const exportHref = `/api/admin/export?${new URLSearchParams(
+  // Uttaget ska innehålla det skärmen visar. Valet skrivs därför alltid ut,
+  // även när det inte står i adressen — annars hade en export gjord på en
+  // orörd sida saknat den improduktiva tiden som syns i tabellen.
+  const exportParams = new URLSearchParams(
     Object.entries(params).filter(([, value]) => value) as [string, string][]
-  ).toString()}`;
+  );
+  exportParams.set("kind", kind);
+
+  const exportHref = `/api/admin/export?${exportParams.toString()}`;
 
   return (
     <>
@@ -252,7 +267,7 @@ export default async function ReportsPage({
           </Field>
 
           <Field label="Sorts tid">
-            <Select name="kind" defaultValue={params.kind ?? "ORDER"}>
+            <Select name="kind" defaultValue={kind}>
               <option value="ORDER">Fakturerbar tid</option>
               <option value="INDIRECT">Improduktiv tid</option>
               <option value="ALL">Båda</option>

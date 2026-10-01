@@ -3,7 +3,7 @@ import SearchSelect from "@/components/admin/SearchSelect";
 import { requireAdmin } from "@/lib/admin-session";
 import { companyTimeZone } from "@/lib/company";
 import NewEntryDialog from "@/components/admin/NewEntryDialog";
-import FormDialog from "@/components/admin/FormDialog";
+import ActionDialog from "@/components/ui/ActionDialog";
 import FilterForm from "@/components/admin/FilterForm";
 import {
   Badge,
@@ -30,7 +30,7 @@ import {
   toLocalDateTimeInput,
 } from "@/lib/time-zone";
 import { datePresets } from "@/lib/date-presets";
-import { editEntry } from "./actions";
+import { editEntry, type EditEntryState } from "./actions";
 
 export const dynamic = "force-dynamic";
 
@@ -327,11 +327,17 @@ export default async function EntriesPage({
                         // ändrad post bär dessutom spår av vem som ändrade
                         // den, vilket en raderad inte gör.
                         <div className="flex justify-end gap-2">
-                          <FormDialog
+                          {/* ActionDialog och inte FormDialog: den här rutan
+                              KAN avvisas. En sluttid före starttiden, en
+                              överlappande post eller en stängd order ska
+                              synas inuti rutan i stället för att stänga den
+                              som om allt gått bra. */}
+                          <ActionDialog<EditEntryState>
                             trigger="Ändra"
                             triggerTone="ghost"
                             title={`Ändra stämpling: ${entry.employee.name}`}
                             action={editEntry}
+                            initial={{}}
                             submitLabel="Spara"
                           >
                             <input type="hidden" name="id" value={entry.id} />
@@ -370,6 +376,7 @@ export default async function EntriesPage({
                                 <Field label="Order">
                                   <SearchSelect
                                     name="orderId"
+                                    inDialog
                                     options={orderOptions}
                                     defaultValue={entry.orderId}
                                     placeholder="Sök order…"
@@ -415,7 +422,7 @@ export default async function EntriesPage({
                                 />
                               </Field>
                             </div>
-                          </FormDialog>
+                          </ActionDialog>
                         </div>
                       )}
                     </Td>

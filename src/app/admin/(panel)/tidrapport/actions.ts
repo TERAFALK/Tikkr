@@ -12,6 +12,7 @@ import {
   removeAbsence,
   removeCompAdjustment,
 } from "@/lib/absence";
+import { currentFlexMinutes } from "@/lib/payroll";
 import { parseLocalDate } from "@/lib/time-zone";
 
 const PATH = "/admin/tidrapport";
@@ -164,6 +165,79 @@ export async function deleteCompEarned(formData: FormData) {
 
   await removeCompAdjustment(session.db, id);
   revalidatePath(PATH);
+}
+
+
+/** Svaret från rutan som ändrar saldot. ActionDialog stänger på `ok`. */
+export interface BalanceState {
+  error?: string;
+  ok?: string;
+}
+
+/**
+ * ÄNDRAR FLEXSALDOT FÖR HAND.
+ *
+ * Administratören skriver vad saldot SKA vara idag. Servern räknar ut hur
+ * mycket det skiljer sig från det framräknade och lägger skillnaden på det
+ * ingående saldot.
+ *
+ * Varför inte spara saldot rakt av: saldon lagras aldrig i Tikkr, de härleds
+ * ur stämplingar, frånvaro och schema (se CLAUDE.md § 3 regel 7). Ett sparat
+ * saldo och en uppsättning poster är två ställen som säger samma sak, och de
+ * hinner alltid sluta göra det. Det ingående saldot är den enda siffran som
+ * hör till personen och inte till en dag, och därför den som ska flyttas.
+ *
+ * Nuvärdet räknas fram HÄR och skickas inte in från rutan. Ett tal som
+ * webbläsaren fått räkna på hinner bli gammalt medan rutan står öppen, och då
+ * hade justeringen landat fel utan att någon märkt det.
+ */
+export async function adjustFlexBalance(
+  _previous: BalanceState,
+  formData: FormData
+): Promise<BalanceState> {
+  const session = await requireAdmin();
+  await assertWritable(session);
+  await requireModule(session, "PAYROLL");
+  const { db, companyId } = session;
+
+  const employeeId = String(formData.get("employeeId") ?? "");
+  if (!employeeId) return { error: "Ingen anställd vald." };
+
+  const target = decimalHoursToMinutes(formData.get("flex"));
+
+  if (target === "error" || target === null) {
+    return { error: "Skriv saldot som timmar, till exempel 12,5 eller −3." };
+  }
+
+  const employee = await db.employee.findFirst({
+    where: { id: employeeId },
+    select: { flexOpeningMinutes: true },
+  });
+
+  if (!employee) return { error: "Personen finns inte kvar." };
+
+  const timeZone = await timeZoneOf(companyId);
+  const current = await currentFlexMinutes(db, timeZone, employeeId);
+
+  // Utan schema finns ingen planerad tid, och då finns inget saldo att
+  // justera. Att skriva en siffra ändå hade gett ett tal som försvinner i
+  // samma stund som ett schema läggs upp.
+  if (current === null) {
+    return {
+      error:
+        "Flexsaldot går inte att räkna fram. Lägg upp ett arbetstidsschema först.",
+    };
+  }
+
+  await db.employee.updateMany({
+    where: { id: employeeId },
+    data: {
+      flexOpeningMinutes: employee.flexOpeningMinutes + (target - current),
+    },
+  });
+
+  revalidatePath(PATH);
+  return { ok: "Flexsaldot är ändrat." };
 }
 
 /** Ingående saldon, för en kund som flyttar in med befintliga timmar. */

@@ -74,7 +74,7 @@ export default function PairingCodeDialog({
 
       <dialog
         ref={dialog}
-        className="w-[min(30rem,calc(100vw-2rem))] rounded-xl border border-neutral-200 bg-white p-0 shadow-xl backdrop:bg-neutral-900/40"
+        className="w-[min(42rem,calc(100vw-2rem))] rounded-xl border border-neutral-200 bg-white p-0 shadow-xl backdrop:bg-neutral-900/40"
       >
         <Body
           key={opening}

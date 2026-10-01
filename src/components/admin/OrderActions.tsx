@@ -18,9 +18,10 @@ import BudgetBar from "./BudgetBar";
 import type { BudgetMomentOption } from "./BudgetMoments";
 import OrderFields from "./OrderFields";
 import PrintButton from "./PrintButton";
+import AskDialog from "@/components/ui/AskDialog";
 import type { OrderBudgetRow } from "@/lib/orders";
 import type { SearchSelectOption } from "./SearchSelect";
-import { IconOrder, IconReport } from "@/components/ui/icons";
+import { IconOrder } from "@/components/ui/icons";
 
 /**
  * Menyn som öppnas när man klickar på en order.
@@ -68,13 +69,13 @@ export default function OrderActions({
   const [withPrice, setWithPrice] = useState(false);
   const priceParam = withPrice ? "&belopp=1" : "";
 
-  // "Avsluta ordern" i kalkylavsnittet. En efterkalkyl tas ut när jobbet är
-  // klart, och då är nästa handling nästan alltid att stänga ordern. Frågan
-  // ställs därför där, i stället för att bli ett andra besök i menyn.
+  // FRÅGAN OM ATT AVSLUTA ORDERN (ändrat 2026-10-01).
   //
-  // Nollställs inte mellan öppningar, av samma skäl som kryssrutan för
-  // belopp: den som går igenom veckans färdiga ordrar gör samma sak på alla.
-  const [closeAfterCalc, setCloseAfterCalc] = useState(false);
+  // Var en kryssruta i menyn. En kryssruta kräver att man bestämt sig innan
+  // man tryckt, och den som missade den fick aldrig veta att valet fanns.
+  // Nu ställs frågan när kalkylen är uttagen, vilket också är när man vet
+  // svaret.
+  const [asking, setAsking] = useState(false);
 
   const menu = useRef<HTMLDialogElement>(null);
   const edit = useRef<HTMLDialogElement>(null);
@@ -117,16 +118,20 @@ export default function OrderActions({
     if (toggleState.savedAt) closeConfirm.current?.close();
   }, [toggleState.savedAt]);
 
+  /** Frågar om ordern ska avslutas. En redan stängd order frågar inget. */
+  function askToClose() {
+    if (isOpen) setAsking(true);
+  }
+
   /**
-   * Stänger ordern när kryssrutan i kalkylavsnittet är i.
+   * Avslutar ordern.
    *
    * Går genom samma åtgärd som knappen längre ner i menyn, och därmed genom
    * samma mellansteg: står någon instämplad ändras ingenting, utan rutan med
-   * de instämplade öppnas. Kalkylen är redan på väg till skrivaren när det
-   * sker, vilket är rätt ordning — dokumentet är det man bad om.
+   * de instämplade öppnas.
    */
-  function closeOrderIfAsked() {
-    if (!closeAfterCalc || !isOpen) return;
+  function closeOrder() {
+    setAsking(false);
 
     const data = new FormData();
     data.set("id", order.id);
@@ -147,7 +152,7 @@ export default function OrderActions({
       {/* Meny */}
       <dialog
         ref={menu}
-        className={`w-[min(26rem,calc(100vw-2rem))] ${dialogSurface}`}
+        className={`w-[min(38rem,calc(100vw-2rem))] ${dialogSurface}`}
       >
         <div className={`${dialogEdge} border-b border-neutral-200 px-5 py-4`}>
           <h2 className="text-sm font-semibold text-neutral-900">
@@ -228,14 +233,6 @@ export default function OrderActions({
             description="Bilaga till faktura"
             onPick={() => menu.current?.close()}
           />
-          <MenuLink
-            href={`${exportBase}&format=excel${priceParam}`}
-            icon={<IconReport />}
-            title="Ladda ner Excel"
-            description="Samma innehåll som PDF"
-            onPick={() => menu.current?.close()}
-          />
-
           <p className="px-3 pb-1 pt-3 text-[11px] font-semibold uppercase tracking-wider text-neutral-400">
             Internt
           </p>
@@ -243,25 +240,6 @@ export default function OrderActions({
           {/* Egen rubrik och egen knapp, inte ett kryss i rutan ovanför.
               Kalkylen innehåller självkostnad och marginal och får aldrig
               förväxlas med underlaget som skickas till kunden. */}
-          {isOpen && (
-            <label className="flex cursor-pointer items-start gap-2 rounded-md px-3 py-2 text-[13px] hover:bg-neutral-50">
-              <input
-                type="checkbox"
-                checked={closeAfterCalc}
-                onChange={(event) => setCloseAfterCalc(event.target.checked)}
-                className="mt-0.5 h-3.5 w-3.5 rounded border-neutral-300 text-blue-600 focus:ring-blue-600"
-              />
-              <span>
-                <span className="block font-medium text-neutral-900">
-                  Avsluta ordern
-                </span>
-                <span className="block text-neutral-500">
-                  Sker när kalkylen tagits ut
-                </span>
-              </span>
-            </label>
-          )}
-
           <PrintButton
             href={`${exportBase}&format=kalkyl`}
             variant="menu"
@@ -269,7 +247,7 @@ export default function OrderActions({
             description="Går direkt till skrivaren"
             onPrint={() => {
               menu.current?.close();
-              closeOrderIfAsked();
+              askToClose();
             }}
           />
           <MenuLink
@@ -279,17 +257,7 @@ export default function OrderActions({
             description="Kostnad och marginal. Internt"
             onPick={() => {
               menu.current?.close();
-              closeOrderIfAsked();
-            }}
-          />
-          <MenuLink
-            href={`${exportBase}&format=kalkyl-excel`}
-            icon={<IconReport />}
-            title="Efterkalkyl som Excel"
-            description="Kostnad och marginal. Internt"
-            onPick={() => {
-              menu.current?.close();
-              closeOrderIfAsked();
+              askToClose();
             }}
           />
 
@@ -355,10 +323,23 @@ export default function OrderActions({
         </div>
       </dialog>
 
+      {/* Frågan som ersatte kryssrutan. Ställs först när kalkylen är
+          uttagen, eftersom det är då man vet om jobbet är färdigt. */}
+      <AskDialog
+        open={asking}
+        title={`Avsluta order ${order.orderNumber}?`}
+        confirmLabel="Ja, avsluta ordern"
+        onConfirm={closeOrder}
+        onClose={() => setAsking(false)}
+      >
+        Ordern döljs på stämplingsskärmen. Den registrerade tiden finns kvar,
+        och ordern går att öppna igen.
+      </AskDialog>
+
       {/* Ändra uppgifter */}
       <dialog
         ref={edit}
-        className={`w-[min(28rem,calc(100vw-2rem))] ${dialogSurface}`}
+        className={`w-[min(40rem,calc(100vw-2rem))] ${dialogSurface}`}
       >
         <div className={`${dialogEdge} border-b border-neutral-200 px-5 py-4`}>
           <h2 className="text-sm font-semibold text-neutral-900">
@@ -408,7 +389,7 @@ export default function OrderActions({
           behövs för att våga trycka på knappen. */}
       <dialog
         ref={closeConfirm}
-        className={`w-[min(28rem,calc(100vw-2rem))] ${dialogSurface}`}
+        className={`w-[min(40rem,calc(100vw-2rem))] ${dialogSurface}`}
       >
         <div className={`${dialogEdge} border-b border-neutral-200 px-5 py-4`}>
           <h2 className="text-sm font-semibold text-neutral-900">

@@ -660,14 +660,17 @@ export function ExportMockup({ className = "" }: { className?: string }) {
 /**
  * Efterkalkylen.
  *
- * Bandet överst är produktens eget och står på varje sida. Satserna redovisas
- * uppdelade i person och maskin, som i systemet.
+ * Bandet överst är produktens eget och står på varje sida.
+ *
+ * INGA TIMKOSTNADER, som i dokumentet: pappret rör sig, och vad en namngiven
+ * person kostar i timmen hör inte hemma på ett bord i verkstaden. Kvar står
+ * tiden och kostnaden per arbetsmoment.
  */
 export function CalcMockup({ className = "" }: { className?: string }) {
   const rows = [
-    ["Svetsning", "12:30", "850", "10 625"],
-    ["Fräsning", "8:00", "900", "7 200"],
-    ["Montering", "4:15", "600", "2 550"],
+    ["Svetsning", "12:30", "10 625"],
+    ["Fräsning", "8:00", "7 200"],
+    ["Montering", "4:15", "2 550"],
   ];
 
   return (
@@ -689,7 +692,6 @@ export function CalcMockup({ className = "" }: { className?: string }) {
             <tr className="border-b border-neutral-200 text-neutral-500">
               <th className="py-1 text-left font-medium">Arbetsmoment</th>
               <th className="py-1 text-right font-medium">Tid</th>
-              <th className="py-1 text-right font-medium">kr/tim</th>
               <th className="py-1 text-right font-medium">Kostnad</th>
             </tr>
           </thead>
@@ -700,20 +702,13 @@ export function CalcMockup({ className = "" }: { className?: string }) {
                 <td className="py-1 text-right tabular-nums text-neutral-600">
                   {row[1]}
                 </td>
-                <td className="py-1 text-right tabular-nums text-neutral-600">
-                  {row[2]}
-                </td>
                 <td className="py-1 text-right tabular-nums text-neutral-900">
-                  {row[3]}
+                  {row[2]}
                 </td>
               </tr>
             ))}
           </tbody>
         </table>
-
-        <p className="mt-1 text-[8px] text-neutral-400">
-          person 350 + maskin 500
-        </p>
 
         <dl className="mt-3 space-y-1 text-[10px]">
           <Line label="Självkostnad" value="20 375 kr" />

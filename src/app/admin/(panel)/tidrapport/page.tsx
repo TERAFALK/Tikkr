@@ -13,6 +13,7 @@ import {
   CardHeader,
   EmptyState,
   Field,
+  Input,
   PageHeader,
   Select,
   Stat,
@@ -22,7 +23,8 @@ import { ABSENCE_LABELS } from "@/lib/absence";
 import { formatDate, formatDecimalHours, formatTime } from "@/lib/format";
 import { startOfWeekIn, addDaysInZone, parseLocalDate, toDateInput } from "@/lib/time-zone";
 import { datePresets } from "@/lib/date-presets";
-import { saveAbsence } from "./actions";
+import ActionDialog from "@/components/ui/ActionDialog";
+import { adjustFlexBalance, saveAbsence, type BalanceState } from "./actions";
 
 /**
  * TIDRAPPORT PER ANSTÄLLD — LÖNEUNDERLAGET.
@@ -208,6 +210,30 @@ export default async function TimesheetPage({
         )} – ${formatDate(to, timeZone)}`}
         action={
           <div className="flex flex-wrap gap-2">
+            {/* JUSTERA SALDOT FÖR HAND. Skriv vad det ska vara; servern
+                räknar ut skillnaden mot det framräknade och flyttar det
+                ingående saldot. Se adjustFlexBalance. */}
+            <ActionDialog<BalanceState>
+              trigger="Justera flexsaldo"
+              title={`Flexsaldo för ${period.employee.name}`}
+              description={`Saldot är ${signedHours(
+                period.flex.closing
+              )} timmar idag.`}
+              action={adjustFlexBalance}
+              initial={{}}
+              submitLabel="Spara"
+            >
+              <input type="hidden" name="employeeId" value={employeeId} />
+              <Field label="Nytt saldo" hint="Timmar, t.ex. 12,5 eller −3">
+                <Input
+                  name="flex"
+                  inputMode="decimal"
+                  autoComplete="off"
+                  placeholder="0"
+                />
+              </Field>
+            </ActionDialog>
+
             <PrintButton
               href={lastWeekHref}
               label="Förra veckan per anställd"

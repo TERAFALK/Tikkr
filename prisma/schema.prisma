@@ -246,6 +246,21 @@ model Employee {
   /// är det normala — en verkstad har oftast ett enda schema som alla följer.
   scheduleId String? @map("schedule_id")
 
+  /// Personlig kod för att se SITT EGET flexsaldo på stämplingsskärmen.
+  ///
+  /// Sätts av administratören under Anställda och är tom som standard. Utan
+  /// kod finns ingen knapp på skärmen.
+  ///
+  /// Lagras som bcrypt-hash trots att den bara skyddar ett saldo. Skälet är
+  /// inte att saldot är hemligt utan att koden är en kod: folk återanvänder
+  /// sådana, och en fyrsiffrig sträng i klartext i en databas är en kod på
+  /// vift. Att den inte går att visa igen är avsiktligt — glömd kod ersätts
+  /// med en ny.
+  ///
+  /// STÄMPLINGEN KRÄVER ALDRIG KOD. Den här öppnar bara flexsaldot, och
+  /// regeln "ett tryck ska räcka" gäller oförändrad för att registrera tid.
+  flexCodeHash String? @map("flex_code_hash")
+
   /// Flexsaldot när Tikkr togs i bruk, i minuter. Kan vara negativt.
   ///
   /// Finns för att en kund som byter system har saldon sedan tidigare. Utan

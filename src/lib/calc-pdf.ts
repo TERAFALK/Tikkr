@@ -41,21 +41,28 @@ export interface CalcCompany {
   logo: { data: Buffer; mimeType: string } | null;
 }
 
-// Summan måste bli CONTENT_WIDTH. Anställdkolumnen fick ge plats åt kr/tim:
-// en timkostnad som inte står på raden går inte att kontrollräkna, och det är
-// just kontrollräkningen en efterkalkyl finns för.
+// TIMKOSTNADEN STÅR INTE PÅ RADEN (ändrat 2026-10-01).
+//
+// Kolumnen "kr/tim" fanns här, och under varje rad stod dessutom hur summan
+// delade sig mellan person och maskin. Båda är borta. Skälet är att pappret
+// rör sig: en efterkalkyl skrivs ut, läggs på ett bord och läses av fler än
+// den som tog ut den. Vad en namngiven person kostar i timmen hör inte hemma
+// där, och en maskinkostnad bredvid gör personens sats möjlig att räkna ut.
+//
+// Kvar står tiden och kostnaden per rad. Det är vad kalkylen ska svara på.
+//
+// Summan måste bli CONTENT_WIDTH.
 const COLUMNS = [
-  { label: "Anställd", width: 118, align: "left" as const },
-  { label: "Datum", width: 70, align: "left" as const },
-  { label: "Start", width: 46, align: "left" as const },
-  { label: "Stopp", width: 46, align: "left" as const },
+  { label: "Anställd", width: 150, align: "left" as const },
+  { label: "Datum", width: 78, align: "left" as const },
+  { label: "Start", width: 52, align: "left" as const },
+  { label: "Stopp", width: 52, align: "left" as const },
   { label: "Tid (tim:min)", width: 78, align: "right" as const },
-  { label: "kr/tim", width: 57, align: "right" as const },
-  { label: "Kostnad", width: 80, align: "right" as const },
+  { label: "Kostnad", width: 85, align: "right" as const },
 ];
 
 /** Kolumnen som markeras i gult när raden saknar underlag. */
-const COST_COLUMN = 6;
+const COST_COLUMN = 5;
 
 export function buildOrderCalcPdf(
   company: CalcCompany,
@@ -384,7 +391,6 @@ function drawGroup(
       formatTime(entry.clockInAt, company.timezone),
       entry.ongoing ? "pågår" : formatTime(entry.clockOutAt!, company.timezone),
       formatDuration(entry.minutes),
-      entry.costRateOre === null ? "–" : formatCurrency(entry.costRateOre),
       entry.costOre === null ? "saknas" : formatCurrency(entry.costOre),
     ];
 
@@ -406,26 +412,6 @@ function drawGroup(
     });
 
     y += 18;
-
-    // Uppdelningen står på en egen rad, och BARA när båda satserna finns.
-    //
-    // "850,00" i kolumnen går inte att ifrågasätta; "person 350,00 + maskin
-    // 500,00" går att kontrollera mot vad man själv skrivit in. Har raden bara
-    // en sats finns ingenting att förklara, och då sparas raden in — en
-    // efterkalkyl med hundra stämplingar blir annars dubbelt så lång.
-    if (
-      entry.employeeCostRateOre !== null &&
-      entry.momentCostRateOre !== null
-    ) {
-      doc.font("Helvetica").fontSize(7).fillColor("#737373");
-      doc.text(
-        `person ${formatCurrency(entry.employeeCostRateOre)} + maskin ${formatCurrency(entry.momentCostRateOre)}`,
-        MARGIN + 8,
-        y - 4,
-        { width: 260, lineBreak: false }
-      );
-      y += 9;
-    }
 
     doc
       .moveTo(MARGIN, y)
@@ -460,12 +446,11 @@ function drawGroup(
     align: "right",
     lineBreak: false,
   });
-  doc.text(
-    formatCurrency(group.costOre),
-    timeX + COLUMNS[4].width + COLUMNS[5].width,
-    y + 6,
-    { width: COLUMNS[6].width - 12, align: "right", lineBreak: false }
-  );
+  doc.text(formatCurrency(group.costOre), timeX + COLUMNS[4].width, y + 6, {
+    width: COLUMNS[5].width - 12,
+    align: "right",
+    lineBreak: false,
+  });
 
   return y + 24;
 }

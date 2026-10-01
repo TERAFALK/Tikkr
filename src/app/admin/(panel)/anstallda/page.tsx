@@ -55,6 +55,8 @@ export default async function EmployeesPage() {
       // Bara OM ett foto finns, aldrig själva bytena. En lista med tjugo
       // porträtt skulle annars bli flera megabyte i sidans svar.
       photoMimeType: true,
+      // Bara OM en kod finns. Hashen lamnar aldrig servern.
+      flexCodeHash: true,
       _count: { select: { timeEntries: true } },
     },
   });
@@ -150,6 +152,7 @@ export default async function EmployeesPage() {
                           employeeNumber: employee.employeeNumber,
                           costRateOre: employee.costRateOre,
                           hasPhoto: Boolean(employee.photoMimeType),
+                          hasFlexCode: Boolean(employee.flexCodeHash),
                         }}
                         canEditSchedule={payroll}
                         scheduleDays={toDayValues(schedules.get(employee.id))}

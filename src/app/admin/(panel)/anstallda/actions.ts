@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import bcrypt from "bcryptjs";
 import { assertWritable, requireAdmin } from "@/lib/admin-session";
 import { hasModule } from "@/lib/company-modules";
 import { parseOre } from "@/lib/money";
@@ -130,15 +131,47 @@ async function saveSchedule(
   db: CompanyDb,
   companyId: string,
   employeeId: string,
-  formData: FormData
+  formData: FormData,
+  payroll: boolean
 ): Promise<string | null> {
-  if (!(await hasModule(companyId, "PAYROLL"))) return null;
+  if (!payroll) return null;
 
   const read = readScheduleDays(formData);
   if ("error" in read) return read.error;
 
   await saveOwnScheduleDays(db, companyId, employeeId, read.days);
   return null;
+}
+
+/**
+ * Koden som låser upp det egna flexsaldot på stämplingsskärmen.
+ *
+ * Tomt fält betyder "rör inte koden", kryssrutan betyder "ta bort den". Samma
+ * mönster som porträttet ovan, och av samma skäl: den som sparar namnet ska
+ * inte råka nollställa något annat.
+ *
+ * Hashas med bcrypt. En fyrsiffrig kod är inget lösenord, men den är en kod
+ * folk återanvänder, och en sådan ska inte ligga i klartext i en databas.
+ *
+ * Ger ett felmeddelande att visa, eller fälten att skriva.
+ */
+async function flexCodeFields(
+  formData: FormData,
+  payroll: boolean
+): Promise<{ error: string } | { flexCodeHash?: string | null }> {
+  // Utan lönemodulen finns ingen kod att sätta, och rutan visar inget fält.
+  if (!payroll) return {};
+
+  if (formData.get("removeFlexCode") === "on") return { flexCodeHash: null };
+
+  const code = String(formData.get("flexCode") ?? "").trim();
+  if (!code) return {};
+
+  if (!/^\d{4,8}$/.test(code)) {
+    return { error: "Koden ska vara 4 till 8 siffror." };
+  }
+
+  return { flexCodeHash: await bcrypt.hash(code, 12) };
 }
 
 function photoFields(
@@ -174,6 +207,11 @@ export async function createEmployee(
   const photo = await readPhoto(formData);
   if (photo && "error" in photo) return { error: photo.error };
 
+  const payroll = await hasModule(companyId, "PAYROLL");
+
+  const flexCode = await flexCodeFields(formData, payroll);
+  if ("error" in flexCode) return { error: flexCode.error };
+
   let created: { id: string };
 
   try {
@@ -184,6 +222,7 @@ export async function createEmployee(
         employeeNumber: readNumber(formData),
         costRateOre: parseOre(formData.get("costRate")),
         ...photoFields(photo, false),
+        ...flexCode,
       },
       select: { id: true },
     });
@@ -193,7 +232,13 @@ export async function createEmployee(
 
   // Efter personen och inte i samma anrop: schemat pekar på den anställda,
   // som får sitt id först när raden finns.
-  const scheduleError = await saveSchedule(db, companyId, created.id, formData);
+  const scheduleError = await saveSchedule(
+    db,
+    companyId,
+    created.id,
+    formData,
+    payroll
+  );
   if (scheduleError) return { error: scheduleError };
 
   revalidatePath(PATH);
@@ -225,6 +270,11 @@ export async function updateEmployee(
 
   const removePhoto = formData.get("removePhoto") === "on";
 
+  const payroll = await hasModule(companyId, "PAYROLL");
+
+  const flexCode = await flexCodeFields(formData, payroll);
+  if ("error" in flexCode) return { error: flexCode.error };
+
   try {
     // updateMany och inte update: id:t kommer från formuläret och får aldrig
     // kunna peka på en annan kunds anställd. Företagsfiltret ser till att en
@@ -236,13 +286,14 @@ export async function updateEmployee(
         employeeNumber: readNumber(formData),
         costRateOre: parseOre(formData.get("costRate")),
         ...photoFields(photo, removePhoto),
+        ...flexCode,
       },
     });
   } catch (error) {
     return { error: describeError(error) };
   }
 
-  const scheduleError = await saveSchedule(db, companyId, id, formData);
+  const scheduleError = await saveSchedule(db, companyId, id, formData, payroll);
   if (scheduleError) return { error: scheduleError };
 
   revalidatePath(PATH);

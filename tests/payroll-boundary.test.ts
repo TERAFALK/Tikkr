@@ -42,7 +42,6 @@ const INVOICE_FILES = [
   "lib/order-price.ts",
   "lib/pdf.ts",
   "lib/calc-pdf.ts",
-  "lib/calc-excel.ts",
   "lib/report.ts",
   "lib/report-pdf.ts",
   // Rutterna som faktiskt lämnar ut dokumenten.

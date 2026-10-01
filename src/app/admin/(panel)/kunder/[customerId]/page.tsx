@@ -28,7 +28,7 @@ import {
   Tr,
 } from "@/components/ui";
 import { updateCustomer } from "../actions";
-import { toggleOrder, updateOrder } from "../../ordrar/actions";
+import { closeOrders, toggleOrder, updateOrder } from "../../ordrar/actions";
 
 /**
  * KUNDSIDAN.
@@ -296,6 +296,7 @@ export default async function CustomerPage({
               moments={moments}
               updateAction={updateOrder}
               toggleAction={toggleOrder}
+              closeAction={closeOrders}
               title="Ordrar"
               hideCustomer
             />

@@ -242,3 +242,75 @@ export async function toggleOrder(
   revalidateOrders();
   return { savedAt: Date.now() };
 }
+
+export interface BulkCloseState {
+  error?: string;
+  ok?: string;
+}
+
+/**
+ * AVSLUTAR FLERA ORDRAR PÅ EN GÅNG.
+ *
+ * Frågan ställs efter att en efterkalkyl tagits ut för markerade ordrar. Den
+ * som tagit ut kalkylen för veckans färdiga jobb ska inte behöva öppna tio
+ * menyer för att stänga dem.
+ *
+ * ORDRAR MED PÅGÅENDE STÄMPLINGAR HOPPAS ÖVER, och svaret säger hur många.
+ * Den enskilda ordern har ett mellansteg som visar VILKA som står instämplade
+ * innan de stämplas ut (se toggleOrder); den listan går inte att visa för tio
+ * ordrar på ett begripligt sätt. Att i stället stämpla ut folk tyst, i bulk,
+ * vore att göra precis det mellansteget finns för att förhindra.
+ */
+export async function closeOrders(
+  _previous: BulkCloseState,
+  formData: FormData
+): Promise<BulkCloseState> {
+  const session = await requireAdmin();
+  await assertWritable(session);
+  const { db, companyId, email } = session;
+
+  const ids = formData.getAll("order").map(String).filter(Boolean);
+  if (ids.length === 0) return { error: "Ingen order vald." };
+
+  // Bara de som är öppna, och bara företagets egna. Filtreringslagret ser
+  // till det senare; `status` till det förra.
+  const orders = await db.order.findMany({
+    where: { id: { in: ids }, status: "OPEN" },
+    select: { id: true },
+  });
+
+  let closed = 0;
+  let busy = 0;
+
+  for (const order of orders) {
+    const blockers = await openEntriesOnOrder(companyId, order.id);
+
+    if (blockers.length > 0) {
+      busy += 1;
+      continue;
+    }
+
+    try {
+      await closeOrder(companyId, order.id, { byEmail: email });
+      closed += 1;
+    } catch (error) {
+      if (error instanceof ClockError) return { error: error.message };
+      throw error;
+    }
+  }
+
+  revalidateOrders();
+  revalidatePath("/admin/granskning");
+
+  if (busy > 0) {
+    return {
+      ok:
+        `${closed} av ${orders.length} ordrar avslutades. ` +
+        `${busy} har pågående stämplingar och står kvar öppna.`,
+    };
+  }
+
+  return {
+    ok: closed === 1 ? "Ordern är avslutad." : `${closed} ordrar är avslutade.`,
+  };
+}

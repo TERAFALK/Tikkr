@@ -57,7 +57,10 @@ dyrare än den var, och kunden betalar för golvet.
 Den hålls isär på fyra sätt, och alla fyra ska finnas kvar:
 1. Eget register (`indirect_moments`), inte en bock på arbetsmomenten.
 2. `ReportFilters.kind` utelämnad betyder ORDER. Glömska ger fakturerbar tid,
-   aldrig tvärtom.
+   aldrig tvärtom. **Rapportvyn på skärmen visar däremot BÅDA som standard**
+   (ändrat 2026-10-01) och skickar då sitt val uttryckligen, både till
+   rapporten och till uttaget. Biblioteksregeln står kvar orörd: den som
+   glömmer skicka något får fakturerbar tid.
 3. Importgrafen: `pdf.ts` och `calc-pdf.ts` ser bara orderdata, aldrig
    rapporttyperna. Ingen fil ser båda.
 4. `order-export.ts` och `order-calc.ts` filtrerar uttryckligen på
@@ -72,7 +75,12 @@ nytt jobb **på samma arbetsmoment** stämplas hen automatiskt ut från det för
 läggs det till bredvid, och båda löper parallellt.
 
 **Ingen PIN-kod. Ingen bekräftelseruta.** Ett tryck ska räcka och det ska kännas
-omedelbart (optimistisk UI-uppdatering).
+omedelbart (optimistisk UI-uppdatering). Den enda koden på skärmen är den som
+visar en anställds eget flexsaldo, och den rör inte stämplingen — se regel 7.
+
+**Ordervalet börjar på knappsatsen** (ändrat 2026-10-01). Den som ska börja
+eller byta jobb har ordernumret på ritningen framför sig; rutnätet med öppna
+ordrar ligger ett tryck bort, på "Visa öppna ordrar".
 
 ### Adminflöde
 
@@ -193,6 +201,15 @@ stripe_prices    — item, month_price_id, year_price_id, updated_by_email
    tryck som får 4xx och arbetstid då går förlorad.
 
 3. **Glömd utstämpling stängs vid ett fast klockslag OCH flaggas.**
+
+   **Helgstämpling flaggas också** (tillagt 2026-10-01). En stämpling som görs
+   på en lördag eller söndag går igenom precis som vanligt, men hamnar i
+   granskningen. Helgtid är nästan alltid något som ska beslutas om innan den
+   faktureras eller blir komp, och en post som ingen tittat på hinner annars
+   bli både faktura och lön. Veckodagen räknas i företagets tidszon, och både
+   in- och utstämplingen prövas: ett pass som börjar fredag kväll och slutar på
+   lördagen flaggas.
+
    `companies.auto_close_at` (standard "18:00", per företag) styr när. Posten
    får `source = AUTO_CLOSE`, `needs_review = true` och en `review_note` i
    klartext. Systemet fyller aldrig i en tid i tysthet — admin får en lista
@@ -320,7 +337,22 @@ stripe_prices    — item, month_price_id, year_price_id, updated_by_email
 
    **Saldon lagras aldrig, de härleds.** Ett cachat saldo och en uppsättning
    poster är två ställen som säger samma sak. `employees.flex_opening_minutes`
-   finns bara för kunder som flyttar in med befintliga timmar.
+   finns för kunder som flyttar in med befintliga timmar, och är sedan
+   2026-10-01 också vägen in för en **manuell rättelse**: administratören
+   skriver vad saldot ska vara idag, och servern lägger skillnaden mot det
+   framräknade på det ingående saldot. Nuvärdet räknas fram på servern och
+   skickas aldrig in från rutan — ett tal webbläsaren räknat på hinner bli
+   gammalt medan rutan står öppen.
+
+   **Den anställde ser sitt eget saldo på stämplingsskärmen** (tillagt
+   2026-10-01), efter att ha angett en personlig kod som administratören satt
+   under Anställda. Koden ligger som bcrypt-hash, går inte att läsa tillbaka
+   och bromsas av samma räknare som inloggningarna.
+
+   Att STÄMPLA kräver fortfarande ingen kod, och det är hela skillnaden: ett
+   tryck ska räcka för att registrera tid, annars slutar folk stämpla. Ett
+   flexsaldo är något annat — en uppgift om en namngiven person, på en skärm
+   i en verkstad där vem som helst går förbi.
 
    Facit för hela räkningen är kundens egen tidrapport från Monitor, avskriven
    som fixtur i `tests/payroll.test.ts`: 33,75 närvaro mot 34,00 planerat ger
@@ -469,12 +501,34 @@ hamna på den sista personens papper och påstå att raden ovanför gäller hen.
 Periodens totaler står på förstasidan. Knappen finns både under Rapporter och
 på Tidrapport, eftersom det är där man står på måndagen.
 
-**Excel-arken ska gå att skriva ut.** Efterkalkylens ark skalas till EN sida,
-liggande, och kundnamnet spänner över hela sin rad. Ett långt kundnamn klipptes
-förut mitt i, eftersom Excel bara visar den text som får plats när grannrutan
-är upptagen, och arket blev två sidor där den andra var en remsa med en enda
-kolumn på. Kolumnbredderna styrs av det längsta som ska stå i kolumnen, inte av
-vad som råkade se bra ut.
+**Underlaget och efterkalkylen finns BARA som PDF** (ändrat 2026-10-01). Båda
+fanns också som Excel-ark, och kunden använde dem inte: det ena bifogas en
+faktura, det andra läses på ett bord, och ett kalkylark är varken det ena eller
+det andra. Rapportexporten är kvar som Excel, eftersom den är till för att
+räkna vidare i. `calc-excel.ts` är borttagen.
+
+**Efterkalkylen visar ingen timkostnad** (ändrat 2026-10-01). Kolumnen kr/tim
+och raden "person 350 + maskin 500" är borta; kvar står tid och kostnad per
+rad, delsumma per arbetsmoment och totalen.
+
+Det är ett avsteg från regel 4 ovan, som ville att beloppet skulle gå att bryta
+ned. Skälet väger tyngre: pappret rör sig. En efterkalkyl skrivs ut, läggs på
+ett bord och läses av fler än den som tog ut den, och **en anställd ska aldrig
+se sin egen timpeng** — eller kunna räkna ut den ur en maskinkostnad bredvid.
+Uppdelningen finns kvar i databasen och i panelen, för den som ska försvara ett
+pris.
+
+**Att ta ut en efterkalkyl ställer en fråga, inte en kryssruta** (ändrat
+2026-10-01). När kalkylen är uttagen frågar systemet om ordern ska avslutas.
+Det gäller en enskild order och flera markerade lika. En kryssruta kräver att
+man bestämt sig innan man tryckt, och den som missade den fick aldrig veta att
+valet fanns.
+
+Flera ordrar avslutas i ett svep, men ordrar med PÅGÅENDE stämplingar hoppas
+över och svaret säger hur många. Den enskilda ordern har ett mellansteg som
+visar VILKA som står instämplade innan de stämplas ut; den listan går inte att
+visa för tio ordrar på ett begripligt sätt, och att stämpla ut folk tyst i bulk
+vore att göra precis det mellansteget finns för att förhindra.
 
 **Stämplingar går inte att radera** (ändrat 2026-09-29). Knappen fanns för
 felregistreringar. En felaktig stämpling rättas i stället genom att skrivas om:

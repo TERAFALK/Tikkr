@@ -146,14 +146,22 @@ function renderPeriod(
   y = drawRowHeader(doc, y);
 
   for (const day of period.days) {
-    // Dagar helt utan innehåll utelämnas. En tidrapport som listar fyra tomma
-    // helgdagar gör den verkliga veckan svårare att läsa.
+    // DAGAR UTAN RADER UTELÄMNAS HELT (ändrat 2026-10-01).
+    //
+    // Villkoret krävde tidigare att dagen också saknade planerad tid. En
+    // vecka med stämplingar på tisdagen och schema resten av dagarna ritade
+    // därför fyra dagar som inte hade något att visa: inga rader, men väl
+    // varsin avskiljande linje. Resultatet blev en trave streck ovanför
+    // periodsumman, vilket var precis vad kunden skickade bild på.
+    //
+    // Den planerade tiden försvinner inte med dagen. Den står i summeringen
+    // längre ned, som är där man läser den.
     const empty =
       day.entries.length === 0 &&
       day.breaks.length === 0 &&
       day.absences.length === 0;
 
-    if (empty && day.plannedMinutes === 0) continue;
+    if (empty) continue;
 
     if (y > 690) {
       doc.addPage();

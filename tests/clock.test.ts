@@ -144,6 +144,56 @@ describe("stämpla in", () => {
   });
 });
 
+describe("stämpling på helg flaggas för granskning", () => {
+  // 2026-08-08 är en lördag och 2026-08-09 en söndag. Veckodagen räknas i
+  // företagets tidszon, som är Europe/Stockholm i det här testet.
+  it("instämpling på lördag ger en flaggad post", async () => {
+    const { started } = await clockIn(companyId, {
+      kind: "ORDER",
+      employeeId: anna,
+      orderId: orderA,
+      momentId: svetsning,
+      at: new Date("2026-08-08T06:00:00Z"),
+    });
+
+    expect(started.needsReview).toBe(true);
+    expect(started.reviewNote).toContain("helg");
+  });
+
+  it("instämpling på en vardag flaggas inte", async () => {
+    const { started } = await clockIn(companyId, {
+      kind: "ORDER",
+      employeeId: anna,
+      orderId: orderA,
+      momentId: montering,
+      at: new Date("2026-08-05T06:00:00Z"),
+    });
+
+    expect(started.needsReview).toBe(false);
+  });
+
+  it("ett pass som slutar på lördagen flaggas vid utstämplingen", async () => {
+    // Fredag 23:30 svensk tid är 21:30 i UTC. Passet slutar 01:00 natten till
+    // lördag, alltså 23:00 UTC på fredagen — det är väggklockan som avgör.
+    await clockIn(companyId, {
+      kind: "ORDER",
+      employeeId: anna,
+      orderId: orderA,
+      momentId: svetsning,
+      at: new Date("2026-08-07T21:30:00Z"),
+    });
+
+    const closed = await clockOut(companyId, {
+      employeeId: anna,
+      momentId: svetsning,
+      at: new Date("2026-08-07T23:00:00Z"),
+    });
+
+    expect(closed?.needsReview).toBe(true);
+    expect(closed?.reviewNote).toContain("helg");
+  });
+});
+
 describe("automatisk utstämpling vid byte av jobb på samma maskin", () => {
   it("stänger det förra jobbet i samma ögonblick som det nya börjar", async () => {
     const morgon = new Date("2026-08-05T06:00:00Z");

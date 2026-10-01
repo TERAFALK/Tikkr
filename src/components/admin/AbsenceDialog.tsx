@@ -58,7 +58,7 @@ export default function AbsenceDialog({
     <dialog
       ref={dialog}
       onClose={onClose}
-      className={`w-[min(28rem,calc(100vw-2rem))] ${dialogSurface}`}
+      className={`w-[min(40rem,calc(100vw-2rem))] ${dialogSurface}`}
     >
       <div className={`${dialogEdge} border-b border-neutral-200 px-5 py-4`}>
         <h2 className="text-sm font-semibold text-neutral-900">

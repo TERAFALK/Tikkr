@@ -80,7 +80,29 @@ export async function addEntry(
   return { ok: "Stämplingen är inlagd." };
 }
 
-export async function editEntry(formData: FormData) {
+/**
+ * Svaret från ändra-rutan.
+ *
+ * `ok` i stället för `savedAt`, eftersom ActionDialog stänger sig på just det
+ * fältet. Se src/components/ui/ActionDialog.tsx.
+ */
+export interface EditEntryState {
+  error?: string;
+  ok?: string;
+}
+
+/**
+ * Ändrar en stämpling.
+ *
+ * SVARAR MED FEL, och det är nytt. Åtgärden gav tidigare ingenting tillbaka:
+ * en sluttid före starttiden, en överlappande post eller en stängd order
+ * ledde till att rutan stängdes och ingenting hände. Den som skrivit fel såg
+ * en oförändrad lista och ingen förklaring.
+ */
+export async function editEntry(
+  _previous: EditEntryState,
+  formData: FormData
+): Promise<EditEntryState> {
   const session = await requireAdmin();
   await assertWritable(session);
   const { companyId, email } = session;
@@ -88,7 +110,16 @@ export async function editEntry(formData: FormData) {
 
   const id = String(formData.get("id") ?? "");
   const input = readForm(formData, timeZone);
-  if (!id || !input.clockInAt || !input.clockOutAt) return;
+
+  if (!id) return { error: "Okänd post." };
+
+  if (!input.clockInAt || !input.clockOutAt) {
+    return { error: "Fyll i både start- och sluttid." };
+  }
+
+  if (input.clockOutAt <= input.clockInAt) {
+    return { error: "Sluttiden måste ligga efter starttiden." };
+  }
 
   // Posten behåller sin sort. Formuläret visar bara fälten som hör till den,
   // och ändringen får aldrig flytta en post mellan ordertid och improduktiv
@@ -110,7 +141,14 @@ export async function editEntry(formData: FormData) {
       ? Boolean(job.indirectMomentId)
       : Boolean(job.orderId && job.momentId);
 
-  if (!complete) return;
+  if (!complete) {
+    return {
+      error:
+        job.kind === "INDIRECT"
+          ? "Välj ett improduktivt moment."
+          : "Välj både order och arbetsmoment.",
+    };
+  }
 
   try {
     await updateEntryManually(companyId, id, {
@@ -121,11 +159,15 @@ export async function editEntry(formData: FormData) {
       byEmail: email,
     });
   } catch (error) {
-    if (error instanceof ClockError) return;
+    // ClockError bär ett meddelande skrivet för att läsas av en människa:
+    // överlappande tider, stängd order, avaktiverat moment.
+    if (error instanceof ClockError) return { error: error.message };
     throw error;
   }
 
   revalidatePath(PATH);
+  revalidatePath("/admin");
+  return { ok: "Stämplingen är ändrad." };
 }
 
 /*

@@ -424,7 +424,7 @@ export function Documents() {
     {
       kicker: "Internt",
       title: "Efterkalkyl",
-      body: "Självkostnad, påslag, rabatt och pris per order. Timkostnaden är personens sats plus arbetsmomentets, hämtad från den tidpunkt arbetet utfördes.",
+      body: "Självkostnad, påslag, rabatt och pris per order. Kostnaden räknas ur de timkostnader som gällde när arbetet utfördes, och redovisas per arbetsmoment.",
       mockup: <CalcMockup className="h-full" />,
     },
     {

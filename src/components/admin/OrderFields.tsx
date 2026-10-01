@@ -55,6 +55,7 @@ export default function OrderFields({
         <SearchSelect
           name="customerId"
           variant="search"
+          inDialog
           options={customers}
           defaultValue={defaults?.customerId ?? null}
           emptyLabel="Ingen kund"
