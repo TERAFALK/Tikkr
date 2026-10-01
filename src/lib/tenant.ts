@@ -54,6 +54,7 @@ export const TENANT_SCOPED_MODELS = [
   "ScheduleBreak",
   "BreakType",
   "BreakEntry",
+  "AbsenceReason",
   "Absence",
   "CompAdjustment",
   // Tillvalen. Se company-modules.ts — skrivningarna sker via
