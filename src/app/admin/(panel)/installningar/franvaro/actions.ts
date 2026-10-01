@@ -70,6 +70,58 @@ export async function addAbsenceReason(
 }
 
 /**
+ * Byter namn på en orsak.
+ *
+ * Namnet, och ingenting annat. Kryssrutan som drar på komptidssaldot sätts när
+ * orsaken läggs upp och ändras inte i efterhand: den styr en RÄKNING, och
+ * frånvaro som redan registrerats har skrivit sina komprader utifrån det läge
+ * som gällde då. Att vända den i efterhand hade gjort gamla poster
+ * oförklarliga utan att röra en siffra på skärmen. Är den fel läggs orsaken
+ * upp på nytt och den gamla avaktiveras.
+ *
+ * Omdöpningen når varje post som redan ligger på orsaken, eftersom frånvaron
+ * pekar på raden och inte bär en kopia av namnet. Det är meningen: ett stavfel
+ * ska gå att rätta en gång, inte post för post.
+ */
+export async function renameAbsenceReason(
+  _previous: ReasonState,
+  formData: FormData
+): Promise<ReasonState> {
+  const session = await requireAdmin();
+  await assertWritable(session);
+  await requireModule(session, "PAYROLL");
+  const { db } = session;
+
+  const id = String(formData.get("id") ?? "");
+  const name = String(formData.get("name") ?? "").trim();
+
+  if (!id) return { error: "Ingen orsak vald." };
+  if (!name) return { error: "Ange ett namn." };
+
+  try {
+    // updateMany och inte update: `where` får då företagsfiltret med sig, och
+    // ett id från ett annat företag träffar ingenting. Samma skäl som i
+    // toggleAbsenceReason nedan.
+    const { count } = await db.absenceReason.updateMany({
+      where: { id },
+      data: { name },
+    });
+
+    if (count === 0) return { error: "Orsaken finns inte längre." };
+  } catch (error) {
+    // P2002: namnet är unikt per företag.
+    if ((error as { code?: string } | null)?.code === "P2002") {
+      return { error: "Det finns redan en orsak med det namnet." };
+    }
+    throw error;
+  }
+
+  revalidatePath(PATH);
+  revalidatePath("/admin/tidrapport");
+  return { ok: "Namnet är ändrat." };
+}
+
+/**
  * Avaktiverar eller återaktiverar en orsak.
  *
  * Raderar aldrig. En orsak med registrerad frånvaro hör till poster som ska

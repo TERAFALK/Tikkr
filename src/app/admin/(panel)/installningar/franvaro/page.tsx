@@ -20,6 +20,7 @@ import {
   addAbsenceReason,
   addDefaultAbsenceReasons,
   moveAbsenceReason,
+  renameAbsenceReason,
   toggleAbsenceReason,
   type ReasonState,
 } from "./actions";
@@ -166,25 +167,49 @@ export default async function AbsenceReasonsPage() {
                 </Td>
 
                 <Td>
-                  <form action={toggleAbsenceReason} className="flex justify-end">
-                    <input type="hidden" name="id" value={reason.id} />
-                    <input
-                      type="hidden"
-                      name="active"
-                      value={String(reason.active)}
-                    />
-                    <ConfirmButton
-                      type="submit"
-                      tone={reason.active ? "danger" : "secondary"}
-                      question={
-                        reason.active
-                          ? `Avaktivera ${reason.name}? Den går då inte att välja, och registrerad frånvaro finns kvar.`
-                          : `Aktivera ${reason.name} igen?`
-                      }
+                  <div className="flex items-center justify-end gap-2">
+                    {/* ActionDialog och inte FormDialog: ett namn som redan
+                        finns ska svara inuti rutan. */}
+                    <ActionDialog<ReasonState>
+                      trigger="Ändra"
+                      triggerTone="ghost"
+                      title={`Ändra ${reason.name}`}
+                      action={renameAbsenceReason}
+                      initial={{}}
+                      submitLabel="Spara"
                     >
-                      {reason.active ? "Avaktivera" : "Aktivera"}
-                    </ConfirmButton>
-                  </form>
+                      <input type="hidden" name="id" value={reason.id} />
+
+                      <Field label="Namn">
+                        <Input
+                          name="name"
+                          defaultValue={reason.name}
+                          required
+                          autoFocus
+                        />
+                      </Field>
+                    </ActionDialog>
+
+                    <form action={toggleAbsenceReason}>
+                      <input type="hidden" name="id" value={reason.id} />
+                      <input
+                        type="hidden"
+                        name="active"
+                        value={String(reason.active)}
+                      />
+                      <ConfirmButton
+                        type="submit"
+                        tone={reason.active ? "danger" : "secondary"}
+                        question={
+                          reason.active
+                            ? `Avaktivera ${reason.name}? Den går då inte att välja, och registrerad frånvaro finns kvar.`
+                            : `Aktivera ${reason.name} igen?`
+                        }
+                      >
+                        {reason.active ? "Avaktivera" : "Aktivera"}
+                      </ConfirmButton>
+                    </form>
+                  </div>
                 </Td>
               </Tr>
             ))}
