@@ -393,7 +393,10 @@ stripe_prices    — item, month_price_id, year_price_id, updated_by_email
 
    **Den anställde ser sitt eget saldo på stämplingsskärmen** (tillagt
    2026-10-01), efter att ha angett en personlig kod som administratören satt
-   under Anställda. Koden ligger som bcrypt-hash, går inte att läsa tillbaka
+   under Anställda. Vägen dit är ett **i uppe till höger**, bredvid Avbryt,
+   och syns först när man tryckt på sitt namn. Knappen låg en kort tid som en
+   egen rad i åtgärdsrutnätet, bredvid Stämpla ut och Byt jobb, och tog lika
+   mycket plats som de — fast den inte är en stämpling. Koden ligger som bcrypt-hash, går inte att läsa tillbaka
    och bromsas av samma räknare som inloggningarna.
 
    Att STÄMPLA kräver fortfarande ingen kod, och det är hela skillnaden: ett
