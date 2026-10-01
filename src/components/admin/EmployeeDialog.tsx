@@ -45,7 +45,7 @@ export default function EmployeeDialog({
   submitLabel,
   employee,
   scheduleDays,
-  canEditSchedule = false,
+  payroll = false,
 }: {
   trigger: string;
   triggerTone?: "primary" | "secondary" | "ghost";
@@ -72,8 +72,14 @@ export default function EmployeeDialog({
    * inte alls.
    */
   scheduleDays?: ScheduleDayValue[] | null;
-  /** true när lönemodulen är påslagen. Avgör om arbetstiderna går att sätta. */
-  canEditSchedule?: boolean;
+  /**
+   * true när företaget har löneunderlaget.
+   *
+   * Styr BÅDA de lönerelaterade fälten i rutan: koden för flexsaldot och de
+   * egna arbetstiderna. Utan modulen finns ingetdera, och serveråtgärden
+   * frågar själv om modulen innan den skriver något av dem.
+   */
+  payroll?: boolean;
 }) {
   const dialog = useRef<HTMLDialogElement>(null);
   const [state, submit] = useActionState<EmployeeState, FormData>(action, {});
@@ -107,17 +113,11 @@ export default function EmployeeDialog({
         {trigger}
       </Button>
 
-      {/* Bredare när arbetstiderna får plats i rutan: en dagrad är två
-          klockslagsfält bredvid varandra, och de ska inte behöva radbrytas.
-          Klasserna skrivs ut i sin helhet, eftersom Tailwind läser dem som
-          text i filen och inte kan sätta ihop dem åt oss. */}
+      {/* Bred nog för arbetstiderna: en dagrad är två klockslagsfält bredvid
+          varandra, och de ska inte behöva radbrytas. */}
       <dialog
         ref={dialog}
-        className={`${
-          canEditSchedule
-            ? "w-[min(42rem,calc(100vw-2rem))]"
-            : "w-[min(42rem,calc(100vw-2rem))]"
-        } ${dialogSurface}`}
+        className={`w-[min(42rem,calc(100vw-2rem))] ${dialogSurface}`}
       >
         <div className={`${dialogEdge} border-b border-neutral-200 px-5 py-4`}>
           <h2 className="text-sm font-semibold text-neutral-900">{title}</h2>
@@ -235,7 +235,7 @@ export default function EmployeeDialog({
                 Hör till löneunderlaget och visas bara för den som har det.
                 Fältet är tomt varje gång rutan öppnas: en sparad kod går inte
                 att läsa tillbaka, bara att ersätta. */}
-            {canEditSchedule && (
+            {payroll && (
               <div className="border-t border-neutral-200 pt-4">
                 <Field
                   label="Kod för flexsaldo"
@@ -266,7 +266,7 @@ export default function EmployeeDialog({
               </div>
             )}
 
-            {canEditSchedule && (
+            {payroll && (
               <div className="border-t border-neutral-200 pt-4">
                 <label className="flex cursor-pointer items-start gap-2 text-[13px]">
                   <input

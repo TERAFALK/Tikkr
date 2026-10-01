@@ -19,7 +19,6 @@ import {
   Stat,
 } from "@/components/ui";
 import { buildPayrollPeriod } from "@/lib/payroll";
-import { ABSENCE_LABELS } from "@/lib/absence";
 import { formatDate, formatDecimalHours, formatTime } from "@/lib/format";
 import { startOfWeekIn, addDaysInZone, parseLocalDate, toDateInput } from "@/lib/time-zone";
 import { datePresets } from "@/lib/date-presets";
@@ -59,10 +58,20 @@ export default async function TimesheetPage({
   const timeZone = company?.timezone ?? "Europe/Stockholm";
   const now = new Date();
 
-  const employees = await db.employee.findMany({
-    orderBy: [{ active: "desc" }, { name: "asc" }],
-    select: { id: true, name: true, employeeNumber: true, active: true },
-  });
+  const [employees, reasons] = await Promise.all([
+    db.employee.findMany({
+      orderBy: [{ active: "desc" }, { name: "asc" }],
+      select: { id: true, name: true, employeeNumber: true, active: true },
+    }),
+    // Kundens egna frånvaroorsaker. Bara de aktiva går att registrera ny
+    // frånvaro på; en avaktiverad finns kvar för att gamla poster ska gå att
+    // läsa.
+    db.absenceReason.findMany({
+      where: { active: true },
+      orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
+      select: { id: true, name: true },
+    }),
+  ]);
 
   // Förvald period är innevarande vecka. Det är den period en verkstad tänker
   // i, och kundens gamla rapport är också veckovis.
@@ -308,6 +317,7 @@ export default async function TimesheetPage({
           days={days}
           employeeId={employeeId}
           employeeName={period.employee.name}
+          reasons={reasons}
           absenceAction={saveAbsence}
         />
       </div>
@@ -332,18 +342,16 @@ export default async function TimesheetPage({
           </Card>
         )}
 
-        {period.absenceByType.length > 0 && (
+        {period.absenceByReason.length > 0 && (
           <Card>
             <CardHeader title="Frånvaro" />
             <ul className="divide-y divide-neutral-100">
-              {period.absenceByType.map((row) => (
+              {period.absenceByReason.map((row) => (
                 <li
-                  key={row.type}
+                  key={row.reason}
                   className="flex items-baseline justify-between gap-3 px-5 py-2.5 text-[13px]"
                 >
-                  <span className="text-neutral-700">
-                    {ABSENCE_LABELS[row.type]}
-                  </span>
+                  <span className="text-neutral-700">{row.reason}</span>
                   <span className="tabular-nums font-medium text-neutral-900">
                     {formatDecimalHours(row.minutes)}
                   </span>

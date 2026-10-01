@@ -1,4 +1,3 @@
-import type { AbsenceType } from "@prisma/client";
 import type { CompanyDb } from "./tenant";
 import { plannedMinutesForDay, isoWeekdayIn, schedulesForEmployees } from "./schedule";
 
@@ -26,34 +25,67 @@ export class AbsenceError extends Error {
   }
 }
 
-/** Frånvarotyperna i den ordning de visas, med svensk etikett. */
-export const ABSENCE_LABELS: Record<AbsenceType, string> = {
-  SJUK: "Sjuk",
-  VAB: "Vård av barn",
-  SEMESTER: "Semester",
-  FORALDRALEDIG: "Föräldraledig",
-  TJANSTLEDIG: "Tjänstledig",
-  PERMISSION: "Permission",
-  KOMP_UTTAG: "Uttagen komp",
-  OVRIGT: "Övrigt",
-};
-
-export const ABSENCE_ORDER: AbsenceType[] = [
-  "SJUK",
-  "VAB",
-  "SEMESTER",
-  "FORALDRALEDIG",
-  "TJANSTLEDIG",
-  "PERMISSION",
-  "KOMP_UTTAG",
-  "OVRIGT",
+/**
+ * ORSAKERNA ÄR KUNDENS EGNA (ändrat 2026-10-01).
+ *
+ * De låg som en enum i koden: sjuk, vab, semester och fem till. Det höll
+ * tills första kunden hade en orsak vi inte tänkt på, och en ny rad i en enum
+ * kräver en driftsättning. Orsakerna hör till kundens verksamhet.
+ *
+ * Listan nedan är vad en ny arbetsyta får att börja med, inte vad som finns.
+ * Den som vill ha "arbetsskada" lägger till den själv under Inställningar.
+ *
+ * `countsAsComp` är den enda raden som betyder något för räkningen: frånvaro
+ * på en sådan orsak skriver samtidigt ett uttag i komptidsboken. Utan den
+ * kopplingen skulle en uttagen komptimme räknas två gånger.
+ */
+export const DEFAULT_ABSENCE_REASONS: {
+  name: string;
+  countsAsComp?: boolean;
+}[] = [
+  { name: "Sjuk" },
+  { name: "Vård av barn" },
+  { name: "Semester" },
+  { name: "Föräldraledig" },
+  { name: "Tjänstledig" },
+  { name: "Permission" },
+  { name: "Uttagen komp", countsAsComp: true },
+  { name: "Övrigt" },
 ];
+
+/**
+ * Lägger upp standardorsakerna.
+ *
+ * Anropas när en arbetsyta skapas, och från inställningarna för den kund som
+ * börjat utan dem. Skriver ingenting om det redan finns orsaker: listan är
+ * kundens, och en "återställning" som dyker upp av sig själv vore en
+ * överraskning.
+ */
+export async function createDefaultAbsenceReasons(
+  db: CompanyDb,
+  companyId: string
+): Promise<number> {
+  const existing = await db.absenceReason.count();
+  if (existing > 0) return 0;
+
+  await db.absenceReason.createMany({
+    data: DEFAULT_ABSENCE_REASONS.map((reason, index) => ({
+      companyId,
+      name: reason.name,
+      countsAsComp: reason.countsAsComp ?? false,
+      sortOrder: index,
+    })),
+  });
+
+  return DEFAULT_ABSENCE_REASONS.length;
+}
 
 export interface MarkAbsenceInput {
   employeeId: string;
   /** Dagen, vid dygnets början i företagets tidszon. */
   date: Date;
-  type: AbsenceType;
+  /** Orsaken, ur kundens egen lista. */
+  reasonId: string;
   /** Tomt betyder hela den schemalagda dagen. */
   minutes?: number | null;
   note?: string | null;
@@ -68,10 +100,10 @@ export interface MarkAbsenceInput {
  * dag är däremot tillåtet: halva dagen semester och halva VAB är ett verkligt
  * fall.
  *
- * KOMP_UTTAG skriver dessutom en rad i komptidsboken, så att saldot minskar.
- * Raderna hänger ihop via `absenceId`, vilket gör att en borttagen frånvaro
- * städar bort sitt eget uttag i stället för att lämna kvar ett avdrag för en
- * ledighet som aldrig blev av.
+ * En orsak märkt `countsAsComp` skriver dessutom en rad i komptidsboken, så
+ * att saldot minskar. Raderna hänger ihop via `absenceId`, vilket gör att en
+ * borttagen frånvaro städar bort sitt eget uttag i stället för att lämna kvar
+ * ett avdrag för en ledighet som aldrig blev av.
  */
 export async function markAbsence(
   db: CompanyDb,
@@ -79,12 +111,23 @@ export async function markAbsence(
   timeZone: string,
   input: MarkAbsenceInput
 ): Promise<void> {
-  const employee = await db.employee.findFirst({
-    where: { id: input.employeeId },
-    select: { id: true },
-  });
+  const [employee, reason] = await Promise.all([
+    db.employee.findFirst({
+      where: { id: input.employeeId },
+      select: { id: true },
+    }),
+    // Slås upp genom det filtrerade lagret i stället för att lita på id:t.
+    // Det kommer från ett formulär och får aldrig peka på en annan kunds
+    // orsak. En avaktiverad orsak går inte heller att registrera ny frånvaro
+    // på — den finns kvar för att gamla poster ska gå att läsa.
+    db.absenceReason.findFirst({
+      where: { id: input.reasonId, active: true },
+      select: { id: true, countsAsComp: true },
+    }),
+  ]);
 
   if (!employee) throw new AbsenceError("Okänd anställd.");
+  if (!reason) throw new AbsenceError("Välj en frånvaroorsak.");
 
   if (input.minutes !== null && input.minutes !== undefined) {
     if (!Number.isFinite(input.minutes) || input.minutes <= 0) {
@@ -97,17 +140,17 @@ export async function markAbsence(
 
   const absence = await db.absence.upsert({
     where: {
-      employeeId_date_type: {
+      employeeId_date_reasonId: {
         employeeId: input.employeeId,
         date: input.date,
-        type: input.type,
+        reasonId: reason.id,
       },
     },
     create: {
       companyId,
       employeeId: input.employeeId,
       date: input.date,
-      type: input.type,
+      reasonId: reason.id,
       minutes: input.minutes ?? null,
       note: input.note?.trim() || null,
       createdByEmail: input.byEmail,
@@ -118,7 +161,7 @@ export async function markAbsence(
     },
   });
 
-  if (input.type !== "KOMP_UTTAG") return;
+  if (!reason.countsAsComp) return;
 
   // Uttaget ska motsvara de timmar personen faktiskt är ledig. Är inget antal
   // angivet gäller hela den schemalagda dagen, samma siffra som frånvaron

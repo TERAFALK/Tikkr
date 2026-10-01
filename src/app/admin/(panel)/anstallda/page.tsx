@@ -76,7 +76,7 @@ export default async function EmployeesPage() {
       title="Lägg till anställd"
       action={createEmployee}
       submitLabel="Lägg till"
-      canEditSchedule={payroll}
+      payroll={payroll}
     />
   );
 
@@ -154,7 +154,7 @@ export default async function EmployeesPage() {
                           hasPhoto: Boolean(employee.photoMimeType),
                           hasFlexCode: Boolean(employee.flexCodeHash),
                         }}
-                        canEditSchedule={payroll}
+                        payroll={payroll}
                         scheduleDays={toDayValues(schedules.get(employee.id))}
                       />
 

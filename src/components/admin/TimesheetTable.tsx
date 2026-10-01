@@ -1,9 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import type { AbsenceType } from "@prisma/client";
 import { Badge, Button, Card, CardHeader, Table, Td, Th, Tr } from "@/components/ui";
-import { ABSENCE_LABELS } from "@/lib/absence";
 import { formatDuration } from "@/lib/format";
 
 /**
@@ -30,7 +28,13 @@ export interface TimesheetDayRow {
   breakMinutes: number;
   absenceMinutes: number;
   flexMinutes: number;
-  absences: { id: string; type: AbsenceType; minutes: number; note: string | null }[];
+  absences: {
+    id: string;
+    /** Orsakens namn, som kunden själv skrivit det. */
+    reason: string;
+    minutes: number;
+    note: string | null;
+  }[];
   entries: {
     id: string;
     from: string;
@@ -102,7 +106,7 @@ export default function TimesheetTable({
                   </button>
                   {day.absences.map((absence) => (
                     <span key={absence.id} className="ml-2">
-                      <Badge tone="warning">{ABSENCE_LABELS[absence.type]}</Badge>
+                      <Badge tone="warning">{absence.reason}</Badge>
                     </span>
                   ))}
                 </Td>

@@ -1,4 +1,3 @@
-import type { AbsenceType } from "@prisma/client";
 import type { CompanyDb } from "./tenant";
 import { mainMinutes, type Span } from "./spans";
 import { minutesBetween } from "./format";
@@ -92,7 +91,13 @@ export interface PayrollDay {
   indirectMinutes: number;
   breakMinutes: number;
   absenceMinutes: number;
-  absences: { id: string; type: AbsenceType; minutes: number; note: string | null }[];
+  absences: {
+    id: string;
+    /** Orsakens namn, som kunden själv skrivit det. */
+    reason: string;
+    minutes: number;
+    note: string | null;
+  }[];
   compEarnedMinutes: number;
   compTakenMinutes: number;
   flexMinutes: number;
@@ -129,7 +134,8 @@ export interface PayrollPeriod {
   totals: PayrollTotals;
   /** "Städ Verstad 33,58" — vad den improduktiva tiden gick till. */
   indirectByMoment: { name: string; minutes: number }[];
-  absenceByType: { type: AbsenceType; minutes: number }[];
+  /** Summerad frånvaro per orsak, mest först. */
+  absenceByReason: { reason: string; minutes: number }[];
   flex: Balance;
   comp: Balance & { earned: number; taken: number };
 }
@@ -199,7 +205,13 @@ export async function buildPayrollPeriod(
     db.absence.findMany({
       where: { employeeId, date: { gte: from, lt: periodEnd } },
       orderBy: { date: "asc" },
-      select: { id: true, date: true, type: true, minutes: true, note: true },
+      select: {
+        id: true,
+        date: true,
+        minutes: true,
+        note: true,
+        reason: { select: { name: true } },
+      },
     }),
     db.compAdjustment.findMany({
       where: { employeeId, date: { gte: from, lt: periodEnd } },
@@ -341,7 +353,7 @@ export async function buildPayrollPeriod(
       absenceMinutes,
       absences: dayAbsences.map((absence) => ({
         id: absence.id,
-        type: absence.type,
+        reason: absence.reason.name,
         minutes: absence.minutes ?? plannedMinutes,
         note: absence.note,
       })),
@@ -370,11 +382,11 @@ export async function buildPayrollPeriod(
     (row) => row.minutes
   );
 
-  const absenceByType = groupSum(
+  const absenceByReason = groupSum(
     days.flatMap((day) => day.absences),
-    (row) => row.type,
+    (row) => row.reason,
     (row) => row.minutes
-  ).map((row) => ({ type: row.name as AbsenceType, minutes: row.minutes }));
+  ).map((row) => ({ reason: row.name, minutes: row.minutes }));
 
   const [flexOpening, compOpening] = await openingBalances(
     db,
@@ -398,7 +410,7 @@ export async function buildPayrollPeriod(
     days,
     totals,
     indirectByMoment,
-    absenceByType,
+    absenceByReason,
     flex: {
       opening: flexOpening,
       period: totals.flex,

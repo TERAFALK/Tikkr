@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { requireAdmin } from "@/lib/admin-session";
+import { hasModule } from "@/lib/company-modules";
 import SaveForm from "@/components/admin/SaveForm";
 import {
   Alert,
@@ -15,7 +16,12 @@ import { anonymizeEmployee } from "../actions";
 export const dynamic = "force-dynamic";
 
 export default async function DataProtectionPage() {
-  const { db } = await requireAdmin();
+  const { db, companyId } = await requireAdmin();
+
+  // VAD SOM SPARAS BEROR PÅ TILLVALET, och texten nedan måste säga rätt sak.
+  // Med löneunderlaget registreras frånvaro med orsak, vilket kan vara en
+  // uppgift om hälsa. Utan det finns ingen sådan uppgift i systemet alls.
+  const payroll = await hasModule(companyId, "PAYROLL");
 
   const employees = await db.employee.findMany({
     orderBy: { name: "asc" },
@@ -96,9 +102,24 @@ export default async function DataProtectionPage() {
             Per stämpling sparas tidpunkt, order, arbetsmoment, skärm och
             IP-adress.
           </p>
-          <p>
-            Ingen löneinformation, frånvaro eller sjukdom registreras.
-          </p>
+          {payroll ? (
+            <>
+              <p>
+                Med löneunderlaget registreras även arbetstidsschema, raster,
+                frånvaro med orsak och komptid.
+              </p>
+              <p>
+                Frånvaro med orsak kan vara en uppgift om hälsa eller familj.
+                Den registreras bara i panelen, aldrig på stämplingsskärmen,
+                och varje post bär vem som skrev in den.
+              </p>
+              <p>Inga belopp, lönearter eller löneavdrag registreras.</p>
+            </>
+          ) : (
+            <p>
+              Ingen löneinformation, frånvaro eller sjukdom registreras.
+            </p>
+          )}
           <p>
             Ert företag är personuppgiftsansvarigt och TERAFALK AB är
             personuppgiftsbiträde. Villkoren för det står i{" "}

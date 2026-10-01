@@ -1,4 +1,5 @@
 import bcrypt from "bcryptjs";
+import { DEFAULT_ABSENCE_REASONS } from "./absence";
 import { unsafeGlobalPrisma } from "./db";
 import { trialEndDate } from "./subscription";
 
@@ -95,6 +96,20 @@ export async function createCompanyWithOwner(input: SignupInput) {
         passwordHash: await bcrypt.hash(input.password, 12),
         role: "OWNER",
       },
+    });
+
+    // FRÅNVAROORSAKERNA FÖLJER MED FRÅN START. De är kundens egna och går att
+    // ändra, men en tom lista vid första inloggningen ser ut som att
+    // funktionen saknas. Skrivs här och inte vid första besöket på sidan: en
+    // sida som skriver när den läses går inte att öppna i supportläge, där
+    // allt skrivande avvisas.
+    await tx.absenceReason.createMany({
+      data: DEFAULT_ABSENCE_REASONS.map((reason, index) => ({
+        companyId: company.id,
+        name: reason.name,
+        countsAsComp: reason.countsAsComp ?? false,
+        sortOrder: index,
+      })),
     });
 
     return { company, owner };

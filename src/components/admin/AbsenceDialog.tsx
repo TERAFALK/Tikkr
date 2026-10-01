@@ -13,7 +13,6 @@ import {
   Input,
   Select,
 } from "@/components/ui";
-import { ABSENCE_LABELS, ABSENCE_ORDER } from "@/lib/absence";
 
 /**
  * RUTAN DÄR FRÅNVARO REGISTRERAS.
@@ -30,6 +29,7 @@ export default function AbsenceDialog({
   employeeId,
   employeeName,
   date,
+  reasons,
   onClose,
 }: {
   action: (
@@ -40,6 +40,8 @@ export default function AbsenceDialog({
   employeeName: string;
   /** "2026-09-21", eller null när rutan är stängd. */
   date: string | null;
+  /** Kundens egna orsaker, de aktiva, i sin ordning. */
+  reasons: { id: string; name: string }[];
   onClose: () => void;
 }) {
   const dialog = useRef<HTMLDialogElement>(null);
@@ -73,15 +75,25 @@ export default function AbsenceDialog({
 
           <input type="hidden" name="employeeId" value={employeeId} />
 
-          <Field label="Orsak">
-            <Select name="type" defaultValue="SJUK" required>
-              {ABSENCE_ORDER.map((type) => (
-                <option key={type} value={type}>
-                  {ABSENCE_LABELS[type]}
-                </option>
-              ))}
-            </Select>
-          </Field>
+          {/* Orsakerna är kundens egna och läggs upp under Inställningar.
+              Finns inga går det inte att registrera frånvaro, och rutan säger
+              var man lägger upp dem i stället för att visa en tom lista. */}
+          {reasons.length === 0 ? (
+            <Alert tone="warning">
+              Inga frånvaroorsaker upplagda. Lägg upp dem under Inställningar,
+              Frånvaroorsaker.
+            </Alert>
+          ) : (
+            <Field label="Orsak">
+              <Select name="reasonId" required>
+                {reasons.map((reason) => (
+                  <option key={reason.id} value={reason.id}>
+                    {reason.name}
+                  </option>
+                ))}
+              </Select>
+            </Field>
+          )}
 
           <div className="grid gap-4 sm:grid-cols-2">
             <Field label="Från och med">
@@ -118,18 +130,18 @@ export default function AbsenceDialog({
           <Button type="button" tone="secondary" onClick={onClose}>
             Avbryt
           </Button>
-          <SaveButton />
+          <SaveButton disabled={reasons.length === 0} />
         </div>
       </form>
     </dialog>
   );
 }
 
-function SaveButton() {
+function SaveButton({ disabled }: { disabled: boolean }) {
   const { pending } = useFormStatus();
 
   return (
-    <Button type="submit" disabled={pending}>
+    <Button type="submit" disabled={pending || disabled}>
       {pending ? "Sparar…" : "Spara"}
     </Button>
   );

@@ -51,6 +51,13 @@ const pages: SettingsPage[] = [
     module: "PAYROLL",
   },
   {
+    href: "/admin/installningar/franvaro",
+    label: "Frånvaroorsaker",
+    description: "Sjuk, semester, komp",
+    icon: IconPeople,
+    module: "PAYROLL",
+  },
+  {
     href: "/admin/installningar/prenumeration",
     label: "Prenumeration",
     description: "Betalning och skärmar",

@@ -74,25 +74,6 @@ enum TimeEntrySource {
   AUTO_CLOSE
 }
 
-/// Varför en anställd inte var på plats.
-///
-/// Tikkr räknar TIMMAR, aldrig kronor. Typen finns för att timmarna ska kunna
-/// redovisas var för sig i tidrapporten och för att en frånvarodag inte ska
-/// straffa flexsaldot — vad frånvaron är värd i lön avgörs i lönesystemet, av
-/// kollektivavtalet. Se CLAUDE.md § 3 regel 7.
-enum AbsenceType {
-  SJUK
-  VAB
-  SEMESTER
-  FORALDRALEDIG
-  TJANSTLEDIG
-  PERMISSION
-
-  /// Uttagen komptid. Drar även på komptidssaldot, se comp_adjustments.
-  KOMP_UTTAG
-
-  OVRIGT
-}
 
 /// Ett kundföretag. Detta är den enda tabellen utan company_id — den ÄR tenanten.
 model Company {
@@ -183,6 +164,7 @@ model Company {
   scheduleBreaks  ScheduleBreak[]
   breakTypes      BreakType[]
   breakEntries    BreakEntry[]
+  absenceReasons  AbsenceReason[]
   absences        Absence[]
   compAdjustments CompAdjustment[]
 
@@ -1175,7 +1157,8 @@ model Absence {
   /// Dagen frånvaron gäller, vid dygnets början i företagets tidszon.
   date DateTime
 
-  type AbsenceType
+  /// Orsaken, ur kundens egen lista. Se AbsenceReason.
+  reasonId String @map("reason_id")
 
   /// Antal minuter, för halvdagar. Tomt betyder hela den schemalagda dagen —
   /// vilket är något annat än noll, och det vanliga fallet.
@@ -1193,12 +1176,56 @@ model Absence {
   company  Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
   employee Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
 
-  // En person kan inte vara sjuk och sjuk samma dag. Två OLIKA sorter samma
+  /// Orsaker med registrerad frånvaro går inte att radera. De avaktiveras i
+  /// stället, precis som arbetsmoment med registrerad tid.
+  reason AbsenceReason @relation(fields: [reasonId], references: [id], onDelete: Restrict)
+
+  // En person kan inte vara sjuk och sjuk samma dag. Två OLIKA orsaker samma
   // dag är däremot rimligt: halva dagen semester, halva dagen VAB.
-  @@unique([employeeId, date, type])
+  @@unique([employeeId, date, reasonId])
   @@index([companyId, employeeId, date])
   @@index([companyId, date])
   @@map("absences")
+}
+
+
+/// EN FRÅNVAROORSAK, SOM KUNDEN SJÄLV LÄGGER UPP.
+///
+/// Var en enum i koden: sjuk, vab, semester och fem till. Det höll tills första
+/// kunden hade en orsak vi inte tänkt på — "arbetsskada", "fackligt uppdrag",
+/// "studieledig" — och en ny rad i en enum kräver en driftsättning. Orsakerna
+/// hör till kundens verksamhet och inte till vår kod.
+///
+/// Tikkr räknar fortfarande TIMMAR, aldrig kronor. Orsaken finns för att
+/// timmarna ska gå att redovisa var för sig i tidrapporten och för att en
+/// frånvarodag inte ska straffa flexsaldot. Vad frånvaron är värd i lön avgörs
+/// i lönesystemet, av kollektivavtalet. Se CLAUDE.md § 3 regel 7.
+model AbsenceReason {
+  id        String  @id @default(cuid())
+  companyId String  @map("company_id")
+  name      String
+  active    Boolean @default(true)
+
+  /// Ordningen i listan. Den vanligaste orsaken ska stå först.
+  sortOrder Int @default(0) @map("sort_order")
+
+  /// DRAR ÄVEN PÅ KOMPTIDSSALDOT.
+  ///
+  /// Sätts på den orsak som betyder "jag tar ut komp". Registreras frånvaro på
+  /// den skrivs samtidigt ett uttag i komptidsboken, så att saldot minskar.
+  /// Utan den kopplingen skulle en uttagen komptimme räknas två gånger: en
+  /// gång som frånvaro och en gång som ett saldo som aldrig minskar.
+  countsAsComp Boolean @default(false) @map("counts_as_comp")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  company  Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  absences Absence[]
+
+  @@unique([companyId, name])
+  @@index([companyId, active])
+  @@map("absence_reasons")
 }
 
 /// En post i komptidsboken. Plus är intjänat, minus är uttaget.
@@ -1208,7 +1235,8 @@ model Absence {
 /// att någon BESLUTAT att den är övertid, och det beslutet fattas av en
 /// människa, inte av en stämplingsklocka.
 ///
-/// Uttaget skrivs automatiskt när en frånvaro av typen KOMP_UTTAG registreras.
+/// Uttaget skrivs automatiskt när en frånvaro registreras på en orsak som är
+/// märkt `countsAsComp`, exempelvis "Uttagen komp".
 model CompAdjustment {
   id         String @id @default(cuid())
   companyId  String @map("company_id")

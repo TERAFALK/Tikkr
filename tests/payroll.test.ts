@@ -2,7 +2,11 @@ import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { unsafeGlobalPrisma } from "@/lib/db";
 import { forCompany } from "@/lib/tenant";
 import { buildPayrollPeriod, currentFlexMinutes } from "@/lib/payroll";
-import { markAbsence, addCompEarned } from "@/lib/absence";
+import {
+  addCompEarned,
+  createDefaultAbsenceReasons,
+  markAbsence,
+} from "@/lib/absence";
 import { parseMinuteOfDay } from "@/lib/schedule";
 
 /**
@@ -28,6 +32,9 @@ let scheduleId: string;
 let stadning: string;
 let order: string;
 let svetsning: string;
+/** Orsakerna är kundens egna rader sedan 2026-10-01, inte en enum. */
+let sjuk: string;
+let kompUttag: string;
 
 /** "2019-04-15 06:23" i företagets tidszon. */
 function at(day: number, time: string): Date {
@@ -109,6 +116,17 @@ beforeAll(async () => {
       data: { companyId, name: "Svetsning" },
     })
   ).id;
+
+  // Standardorsakerna, precis som en ny arbetsyta får dem.
+  await createDefaultAbsenceReasons(forCompany(companyId), companyId);
+
+  const reasons = await unsafeGlobalPrisma.absenceReason.findMany({
+    where: { companyId },
+    select: { id: true, name: true },
+  });
+
+  sjuk = reasons.find((reason) => reason.name === "Sjuk")!.id;
+  kompUttag = reasons.find((reason) => reason.name === "Uttagen komp")!.id;
 
   order = (
     await unsafeGlobalPrisma.order.create({
@@ -292,7 +310,7 @@ describe("flexformeln", () => {
     await markAbsence(db, companyId, TZ, {
       employeeId: johan,
       date: dayStart(23),
-      type: "SJUK",
+      reasonId: sjuk,
       byEmail: "admin@test.se",
     });
 
@@ -300,7 +318,7 @@ describe("flexformeln", () => {
 
     expect(hours(period!.totals.absence)).toBe(8.5);
     expect(hours(period!.totals.flex)).toBe(0);
-    expect(period!.absenceByType).toEqual([{ type: "SJUK", minutes: 510 }]);
+    expect(period!.absenceByReason).toEqual([{ reason: "Sjuk", minutes: 510 }]);
   });
 
   it("godkänd övertid flyttas ur flex och in i komptiden", async () => {
@@ -339,7 +357,7 @@ describe("flexformeln", () => {
     await markAbsence(db, companyId, TZ, {
       employeeId: johan,
       date: dayStart(25),
-      type: "KOMP_UTTAG",
+      reasonId: kompUttag,
       byEmail: "admin@test.se",
     });
 

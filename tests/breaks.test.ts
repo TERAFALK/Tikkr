@@ -8,7 +8,11 @@ import {
   getOpenBreak,
   autoCloseForgottenBreaks,
 } from "@/lib/breaks";
-import { markAbsence, removeAbsence, ABSENCE_LABELS } from "@/lib/absence";
+import {
+  createDefaultAbsenceReasons,
+  markAbsence,
+  removeAbsence,
+} from "@/lib/absence";
 import { buildPayrollPeriod } from "@/lib/payroll";
 
 /**
@@ -28,6 +32,11 @@ let frukost: string;
 let order: string;
 let svetsning: string;
 let fräsning: string;
+/** Orsakerna är kundens egna rader sedan 2026-10-01, inte en enum. */
+let sjuk: string;
+let semester: string;
+let vab: string;
+let kompUttag: string;
 
 beforeEach(async () => {
   const unique = Math.random().toString(36).slice(2, 8);
@@ -69,6 +78,22 @@ beforeEach(async () => {
       data: { companyId, name: "Fräsning" },
     })
   ).id;
+
+  // Standardorsakerna, precis som en ny arbetsyta får dem.
+  await createDefaultAbsenceReasons(forCompany(companyId), companyId);
+
+  const reasons = await unsafeGlobalPrisma.absenceReason.findMany({
+    where: { companyId },
+    select: { id: true, name: true },
+  });
+
+  const byName = (name: string) =>
+    reasons.find((reason) => reason.name === name)!.id;
+
+  sjuk = byName("Sjuk");
+  semester = byName("Semester");
+  vab = byName("Vård av barn");
+  kompUttag = byName("Uttagen komp");
 });
 
 afterEach(async () => {
@@ -249,20 +274,20 @@ describe("glömd rast", () => {
 });
 
 describe("frånvaro", () => {
-  it("samma dag och typ två gånger är en rättelse, inte två poster", async () => {
+  it("samma dag och orsak två gånger är en rättelse, inte två poster", async () => {
     const db = forCompany(companyId);
     const day = new Date("2026-09-20T22:00:00Z");
 
     await markAbsence(db, companyId, TZ, {
       employeeId: anna,
       date: day,
-      type: "SJUK",
+      reasonId: sjuk,
       byEmail: "admin@test.se",
     });
     await markAbsence(db, companyId, TZ, {
       employeeId: anna,
       date: day,
-      type: "SJUK",
+      reasonId: sjuk,
       minutes: 240,
       byEmail: "admin@test.se",
     });
@@ -272,21 +297,21 @@ describe("frånvaro", () => {
     expect(all[0].minutes).toBe(240);
   });
 
-  it("två olika typer samma dag är tillåtet", async () => {
+  it("två olika orsaker samma dag är tillåtet", async () => {
     const db = forCompany(companyId);
     const day = new Date("2026-09-20T22:00:00Z");
 
     await markAbsence(db, companyId, TZ, {
       employeeId: anna,
       date: day,
-      type: "SEMESTER",
+      reasonId: semester,
       minutes: 240,
       byEmail: "admin@test.se",
     });
     await markAbsence(db, companyId, TZ, {
       employeeId: anna,
       date: day,
-      type: "VAB",
+      reasonId: vab,
       minutes: 270,
       byEmail: "admin@test.se",
     });
@@ -301,7 +326,7 @@ describe("frånvaro", () => {
     await markAbsence(db, companyId, TZ, {
       employeeId: anna,
       date: day,
-      type: "KOMP_UTTAG",
+      reasonId: kompUttag,
       minutes: 480,
       byEmail: "admin@test.se",
     });
@@ -317,10 +342,35 @@ describe("frånvaro", () => {
     expect(await db.absence.findMany({ where: { employeeId: anna } })).toEqual([]);
   });
 
-  it("varje frånvarotyp har en svensk etikett", () => {
-    for (const label of Object.values(ABSENCE_LABELS)) {
-      expect(label.length).toBeGreaterThan(0);
-    }
+  it("en ny arbetsyta får standardorsakerna, och en av dem drar på komptid", async () => {
+    const reasons = await unsafeGlobalPrisma.absenceReason.findMany({
+      where: { companyId },
+    });
+
+    expect(reasons.length).toBeGreaterThan(0);
+    for (const reason of reasons) expect(reason.name.length).toBeGreaterThan(0);
+
+    // Precis en orsak ska dra på komptidssaldot. Två hade gjort att samma
+    // uttag räknades två gånger, ingen att saldot aldrig minskade.
+    expect(reasons.filter((reason) => reason.countsAsComp)).toHaveLength(1);
+  });
+
+  it("en avaktiverad orsak går inte att registrera på", async () => {
+    const db = forCompany(companyId);
+
+    await unsafeGlobalPrisma.absenceReason.update({
+      where: { id: sjuk },
+      data: { active: false },
+    });
+
+    await expect(
+      markAbsence(db, companyId, TZ, {
+        employeeId: anna,
+        date: new Date("2026-09-20T22:00:00Z"),
+        reasonId: sjuk,
+        byEmail: "admin@test.se",
+      })
+    ).rejects.toThrow();
   });
 });
 

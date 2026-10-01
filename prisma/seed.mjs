@@ -119,6 +119,36 @@ async function main() {
     },
   });
 
+  // FRÅNVAROORSAKERNA ÄR KUNDENS EGNA RADER sedan 2026-10-01, inte en enum.
+  // En arbetsyta som skapas via registreringen får dem automatiskt; seedens
+  // företag skapas med upsert och behöver därför sina egna.
+  //
+  // Bara demoföretaget, som har löneunderlaget. Grannen ska se ut som en kund
+  // utan modulen ser ut.
+  const FRANVARO = [
+    ["Sjuk", false],
+    ["Vård av barn", false],
+    ["Semester", false],
+    ["Föräldraledig", false],
+    ["Tjänstledig", false],
+    ["Permission", false],
+    ["Uttagen komp", true],
+    ["Övrigt", false],
+  ];
+
+  for (const [index, [name, countsAsComp]] of FRANVARO.entries()) {
+    await prisma.absenceReason.upsert({
+      where: { companyId_name: { companyId: demo.id, name } },
+      update: {},
+      create: {
+        companyId: demo.id,
+        name,
+        countsAsComp,
+        sortOrder: index,
+      },
+    });
+  }
+
   // KUNDERNA SKAPAS EFTER FÖRETAGEN och inte inuti deras create-block.
   //
   // Skälet är upserten ovan: `update: {}` betyder att ingenting händer när

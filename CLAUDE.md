@@ -132,7 +132,8 @@ admin-UI m.m.). Kraftfullt, men det motsäger målet om *ett* enkelt paket.
 
 ```
 companies      — id, name, subscription_status, created_at
-employees      — id, company_id, name, active, cost_rate_ore
+employees      — id, company_id, name, active, cost_rate_ore,
+                 schedule_id?, flex_opening_minutes, flex_code_hash?
 customers      — id, company_id, name, customer_number, org_number,
                  contact_name, email, phone,
                  address_line, postal_code, city,
@@ -157,7 +158,8 @@ schedule_breaks  — id, company_id, schedule_day_id, start_minute, end_minute
 break_types      — id, company_id, name, active, sort_order
 break_entries    — id, company_id, employee_id, break_type_id,
                    started_at, ended_at, source, needs_review
-absences         — id, company_id, employee_id, date, type, minutes,
+absence_reasons  — id, company_id, name, active, sort_order, counts_as_comp
+absences         — id, company_id, employee_id, date, reason_id, minutes,
                    note, created_by_email
 comp_adjustments — id, company_id, employee_id, date, minutes,
                    note, created_by_email, absence_id
@@ -333,7 +335,29 @@ stripe_prices    — item, month_price_id, year_price_id, updated_by_email
 
    **Intjänad komp uppstår aldrig av sig själv.** Tid utöver schemat är flex
    till dess att en människa beslutat att den är övertid. Uttagen komp är en
-   frånvarotyp som också drar på komptidssaldot.
+   frånvaroorsak som också drar på komptidssaldot.
+
+   **Frånvaroorsakerna är kundens egna rader** (ändrat 2026-10-01), i
+   `absence_reasons`, och läggs upp under Inställningar. Var en enum i koden,
+   vilket betydde att en kund som behövde "arbetsskada" fick vänta på en
+   driftsättning. Orsakerna följer deras verksamhet och deras kollektivavtal,
+   inte vår kod.
+
+   Den enda av dem som betyder något för räkningen är `counts_as_comp`: står
+   den ikryssad skriver frånvaron samtidigt ett uttag i komptidsboken. Utan
+   den kopplingen räknades en uttagen komptimme två gånger, en gång som
+   frånvaro och en gång som ett saldo som aldrig minskade. Alla övriga orsaker
+   är etiketter, och `payroll.ts` summerar dem per namn utan att veta vad de
+   heter.
+
+   En orsak RADERAS aldrig, den avaktiveras. En post från i mars ska gå att
+   läsa i oktober, och databasen vägrar dessutom (`onDelete: Restrict`). Samma
+   princip som att ordrar och moment med registrerad tid stängs i stället för
+   att raderas, se regel 1.
+
+   Nya arbetsytor får de vanliga åtta vid registreringen, inte vid första
+   sidvisningen. En läsning som skriver skulle falla i supportläget, som
+   avvisar varje skrivande operation, se § 4 punkt 5.
 
    **Saldon lagras aldrig, de härleds.** Ett cachat saldo och en uppsättning
    poster är två ställen som säger samma sak. `employees.flex_opening_minutes`
@@ -353,6 +377,18 @@ stripe_prices    — item, month_price_id, year_price_id, updated_by_email
    tryck ska räcka för att registrera tid, annars slutar folk stämpla. Ett
    flexsaldo är något annat — en uppgift om en namngiven person, på en skärm
    i en verkstad där vem som helst går förbi.
+
+   **Allt i det här stycket är modulens, och ingenting av det finns utan
+   modulen** (tillagt 2026-10-01). Koden i rutan under Anställda, knappen på
+   stämplingsskärmen, rutten som svarar med saldot och sidan med
+   frånvaroorsaker: alla fyra är grindade, och rutten svarar 404 även om
+   knappen av något skäl skulle visas. Se § 3.1 om varför grinden ligger i
+   koden och inte i menyn.
+
+   Även dataskyddstexten under Inställningar följer modulen. Den påstod att
+   ingen frånvaro eller sjukdom registreras, vilket är sant för en kund utan
+   löneunderlaget och fel för en kund med det — och just den texten är den
+   kunden visar sina anställda.
 
    Facit för hela räkningen är kundens egen tidrapport från Monitor, avskriven
    som fixtur i `tests/payroll.test.ts`: 33,75 närvaro mot 34,00 planerat ger

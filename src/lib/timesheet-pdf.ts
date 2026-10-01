@@ -1,6 +1,5 @@
 import PDFDocument from "pdfkit";
 import type { PayrollPeriod } from "./payroll";
-import { ABSENCE_LABELS } from "./absence";
 import { formatDate, formatDecimalHours, formatTime } from "./format";
 import { drawFooter } from "./pdf-footer";
 
@@ -174,7 +173,7 @@ function renderPeriod(
     for (const absence of day.absences) {
       doc.font("Helvetica").fontSize(9).fillColor("#a16207");
       doc.text(label, MARGIN + 4, y + 4, { width: 90, lineBreak: false });
-      doc.text(ABSENCE_LABELS[absence.type], MARGIN + 100, y + 4, {
+      doc.text(absence.reason, MARGIN + 100, y + 4, {
         width: 200,
         lineBreak: false,
       });

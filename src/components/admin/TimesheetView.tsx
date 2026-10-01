@@ -17,10 +17,13 @@ export default function TimesheetView({
   employeeId,
   employeeName,
   absenceAction,
+  reasons,
 }: {
   days: TimesheetDayRow[];
   employeeId: string;
   employeeName: string;
+  /** Kundens egna frånvaroorsaker, de aktiva. */
+  reasons: { id: string; name: string }[];
   absenceAction: (
     previous: TimesheetState,
     formData: FormData
@@ -37,6 +40,7 @@ export default function TimesheetView({
         employeeId={employeeId}
         employeeName={employeeName}
         date={absenceDate}
+        reasons={reasons}
         onClose={() => setAbsenceDate(null)}
       />
     </>

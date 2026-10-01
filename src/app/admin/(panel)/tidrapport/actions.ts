@@ -1,7 +1,6 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import type { AbsenceType } from "@prisma/client";
 import { assertWritable, requireAdmin } from "@/lib/admin-session";
 import { requireModule } from "@/lib/company-modules";
 import { unsafeGlobalPrisma } from "@/lib/db";
@@ -57,12 +56,12 @@ export async function saveAbsence(
   const { db, companyId, email } = session;
 
   const employeeId = String(formData.get("employeeId") ?? "");
-  const type = String(formData.get("type") ?? "") as AbsenceType;
+  const reasonId = String(formData.get("reasonId") ?? "");
   const rawFrom = String(formData.get("from") ?? "");
   const rawTo = String(formData.get("to") ?? "").trim();
 
   if (!employeeId) return { error: "Ingen anställd vald." };
-  if (!type) return { error: "Välj en frånvaroorsak." };
+  if (!reasonId) return { error: "Välj en frånvaroorsak." };
 
   const timeZone = await timeZoneOf(companyId);
 
@@ -90,7 +89,7 @@ export async function saveAbsence(
       await markAbsence(db, companyId, timeZone, {
         employeeId,
         date,
-        type,
+        reasonId,
         minutes,
         note: String(formData.get("note") ?? ""),
         byEmail: email,
