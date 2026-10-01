@@ -333,6 +333,17 @@ stripe_prices    — item, month_price_id, year_price_id, updated_by_email
    **Arbetad tid är HUVUDSTÄMPLINGEN** (`mainMinutes` i `spans.ts`), aldrig
    råsumman. Det är här de två underlagen skiljer sig, se avgränsningen överst.
 
+   Den räknas i HELA MINUTER (tillagt 2026-10-01). En stämpling bär sekunder,
+   eftersom den sätts när någon trycker, och det syns ingenstans utom i
+   saldot: det lagras som hela minuter och läses tillbaka, så en justering gick
+   inte ihop. Administratören skrev 2 och fick 1,99.
+
+   Avrundningen sker en gång per dag och person, i `mainMinutes`, och inte per
+   pass — annars växer felet med antalet stämplingar. **Fakturasidan rörs
+   inte:** rapporterna och efterkalkylen summerar rått med `minutesBetween` och
+   vet inte att `spans.ts` finns. Ett belopp som redan fakturerats ska inte
+   ändras av att löneunderlaget räknar jämna minuter.
+
    **Intjänad komp uppstår aldrig av sig själv.** Tid utöver schemat är flex
    till dess att en människa beslutat att den är övertid. Uttagen komp är en
    frånvaroorsak som också drar på komptidssaldot.

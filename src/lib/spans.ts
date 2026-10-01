@@ -33,7 +33,7 @@ export interface Span {
 }
 
 /**
- * Huvudstämplingarnas sammanlagda längd, i minuter.
+ * Huvudstämplingarnas sammanlagda längd, i HELA minuter.
  *
  * Sorterar på starttid och sveper igenom. Ett pass som börjar innan allt
  * tidigare hunnit ta slut är ett sidojobb och hoppas över helt; övriga räknas
@@ -43,6 +43,25 @@ export interface Span {
  * huvudpassets. Annars hade ett jobb som startade medan ett långt sidojobb
  * fortfarande pågick räknats som ett nytt huvudjobb, fastän personen redan
  * stod vid en maskin.
+ *
+ * ── VARFÖR HELA MINUTER ──────────────────────────────────────────────────
+ *
+ * En stämpling bär sekunder, eftersom den sätts när någon trycker. Summan blir
+ * därmed nästan alltid brutet, och det syns ingenstans: en tidkolumn visar
+ * timmar och minuter, och sekunderna försvinner i formateringen.
+ *
+ * Flexsaldot är undantaget. Det LAGRAS som hela minuter i
+ * `employees.flex_opening_minutes` och läses tillbaka, och en justering gick
+ * därför inte ihop: administratören skrev 2 och fick 1,99 tillbaka, eftersom
+ * brådelen föll bort i kolumnen men fanns kvar i räkningen.
+ *
+ * Avrundningen sker EN gång per dag och person, här, och inte per pass —
+ * annars hade felet vuxit med antalet stämplingar. Högst en halv minut per
+ * dag, vilket är mindre än den tid det tar att gå fram till skärmen.
+ *
+ * FAKTURASIDAN RÖRS INTE. Rapporterna och efterkalkylen summerar rått med
+ * `minutesBetween` och vet inte att den här filen finns. Ett belopp som redan
+ * fakturerats ska inte ändras av att löneunderlaget räknar jämna minuter.
  */
 export function mainMinutes(spans: Span[]): number {
   const sorted = spans
@@ -64,5 +83,5 @@ export function mainMinutes(spans: Span[]): number {
     busyUntil = span.to;
   }
 
-  return total / 60000;
+  return Math.round(total / 60000);
 }

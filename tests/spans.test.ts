@@ -83,3 +83,39 @@ describe("sidojobb räknas inte", () => {
     expect(mainMinutes([span(8, 12), span(11, 15), span(16, 18)])).toBe(360);
   });
 });
+
+/**
+ * HELA MINUTER.
+ *
+ * En stämpling bär sekunder, eftersom den sätts när någon trycker. Flexsaldot
+ * lagras som hela minuter och läses tillbaka, och utan avrundningen här gick
+ * en justering inte ihop: administratören skrev 2 och fick 1,99.
+ */
+describe("sekunderna avrundas bort", () => {
+  const SECOND = 1000;
+
+  it("ett pass på 59 sekunder är en minut", () => {
+    expect(mainMinutes([{ from: 0, to: 59 * SECOND }])).toBe(1);
+  });
+
+  it("ett pass på 29 sekunder är noll minuter", () => {
+    expect(mainMinutes([{ from: 0, to: 29 * SECOND }])).toBe(0);
+  });
+
+  it("avrundningen sker en gång på summan, inte per pass", () => {
+    // Tre pass på 40 sekunder var. Per pass hade var och en blivit en minut,
+    // alltså tre. Summan är två minuter, och det är svaret: felet ska inte
+    // växa med antalet stämplingar.
+    expect(
+      mainMinutes([
+        { from: 0, to: 40 * SECOND },
+        { from: 60 * SECOND, to: 100 * SECOND },
+        { from: 120 * SECOND, to: 160 * SECOND },
+      ])
+    ).toBe(2);
+  });
+
+  it("hela minuter lämnas i fred", () => {
+    expect(mainMinutes([span(6.5, 16)])).toBe(570);
+  });
+});
