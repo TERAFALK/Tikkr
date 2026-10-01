@@ -108,6 +108,32 @@ describe("timfältet", () => {
     expect(parseHours("-5")).toBeNull();
     expect(parseHours("i morgon")).toBeNull();
   });
+
+  /**
+   * TIM:MIN GÅR OCKSÅ ATT SKRIVA.
+   *
+   * Systemet visar beräknad tid som "7:30" i orderlistan och i underlaget. Att
+   * kräva "7,5" i fältet vore att be någon räkna om talet för att skriva
+   * tillbaka det hen just läste.
+   */
+  it("godtar tim:min", () => {
+    expect(parseHours("7:30")).toBe(7 * 60 + 30);
+    expect(parseHours("0:45")).toBe(45);
+    expect(parseHours("40:00")).toBe(40 * 60);
+    expect(parseHours("8:5")).toBe(8 * 60 + 5);
+  });
+
+  it("punkt är ett decimaltecken, inte ett kolon", () => {
+    // "7.30" är sju timmar och arton minuter. Läste den som 7:30 skulle en
+    // beräkning bli tolv minuter fel varje gång någon skrev punkt av vana.
+    expect(parseHours("7.30")).toBe(7 * 60 + 18);
+    expect(parseHours("7:30")).toBe(7 * 60 + 30);
+  });
+
+  it("mer än 59 minuter är inte tim:min", () => {
+    // "7:75" är ingenting. Att tolka det som 8:15 vore att gissa.
+    expect(parseHours("7:75")).toBeNull();
+  });
 });
 
 describe("läsa raderna ur formuläret", () => {

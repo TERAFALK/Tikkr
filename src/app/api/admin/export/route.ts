@@ -2,7 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import ExcelJS from "exceljs";
 import { requireAdmin } from "@/lib/admin-session";
 import { buildReport, type ReportGroup } from "@/lib/report";
-import { formatDate, toDecimalHours } from "@/lib/format";
+import { formatDate, formatDuration, toDecimalHours } from "@/lib/format";
 import { unsafeGlobalPrisma } from "@/lib/db";
 import { buildReportPdf, type ReportView } from "@/lib/report-pdf";
 import type { ReportResult } from "@/lib/report";
@@ -73,6 +73,11 @@ export async function GET(request: NextRequest) {
     { header: "Arbetsmoment", key: "moment", width: 20 },
     { header: "Instämplad", key: "in", width: 20 },
     { header: "Utstämplad", key: "out", width: 20 },
+    // BÅDA FORMATEN, och tim:min först. Det är formatet hela systemet visar,
+    // och den som jämför arket mot en skärm ska hitta samma tal utan att
+    // räkna om. Decimalkolumnen står bredvid för den som ska summera eller
+    // multiplicera med en timpeng, vilket inte går i tim:min.
+    { header: "Tid (tim:min)", key: "duration", width: 14 },
     { header: "Timmar (decimal)", key: "hours", width: 16 },
     { header: "Anmärkning", key: "note", width: 28 },
   ];
@@ -91,6 +96,7 @@ export async function GET(request: NextRequest) {
       moment: row.momentName,
       in: row.clockInAt,
       out: row.clockOutAt ?? "",
+      duration: formatDuration(row.minutes),
       hours: toDecimalHours(row.minutes),
       note: notes.join(". "),
     });
@@ -102,11 +108,19 @@ export async function GET(request: NextRequest) {
 
   // Summarad sist, med en riktig SUMMA-formel så den räknar om ifall någon
   // ändrar en rad i efterhand.
+  //
+  // Kolumnbokstaven hämtas ur arket och skrivs inte som en bokstav i koden.
+  // Den stod som "H" och pekade fel i samma stund som en kolumn lades till
+  // före den — formeln summerade då grannkolumnen, utan att något såg trasigt
+  // ut.
   const lastRow = details.rowCount;
+  const hoursLetter = details.getColumn("hours").letter;
+  const lastLetter = details.getColumn("note").letter;
+
   if (lastRow > 1) {
     const total = details.addRow({
       moment: "TOTALT",
-      hours: { formula: `SUM(H2:H${lastRow})` },
+      hours: { formula: `SUM(${hoursLetter}2:${hoursLetter}${lastRow})` },
     });
     total.font = { bold: true };
     total.getCell("hours").numFmt = "0.00";
@@ -114,7 +128,10 @@ export async function GET(request: NextRequest) {
 
   styleHeader(details);
   details.views = [{ state: "frozen", ySplit: 1 }];
-  details.autoFilter = { from: "A1", to: `I${Math.max(1, lastRow)}` };
+  details.autoFilter = {
+    from: "A1",
+    to: `${lastLetter}${Math.max(1, lastRow)}`,
+  };
 
   /* --- Flik 2–4: sammanställningar ---------------------------------------- */
 
@@ -165,6 +182,7 @@ function addSummarySheet(
       ? [{ header: "Kund", key: "sublabel", width: 26 }]
       : []),
     { header: "Stämplingar", key: "entries", width: 14 },
+    { header: "Tid (tim:min)", key: "duration", width: 14 },
     { header: "Timmar (decimal)", key: "hours", width: 16 },
   ];
 
@@ -173,6 +191,7 @@ function addSummarySheet(
       label: group.label,
       sublabel: group.sublabel ?? "",
       entries: group.entries,
+      duration: formatDuration(group.minutes),
       hours: toDecimalHours(group.minutes),
     });
   }
@@ -180,12 +199,13 @@ function addSummarySheet(
   sheet.getColumn("hours").numFmt = "0.00";
 
   if (groups.length > 0) {
+    const totalMinutes = groups.reduce((sum, group) => sum + group.minutes, 0);
+
     const total = sheet.addRow({
       label: "TOTALT",
       entries: groups.reduce((sum, group) => sum + group.entries, 0),
-      hours: toDecimalHours(
-        groups.reduce((sum, group) => sum + group.minutes, 0)
-      ),
+      duration: formatDuration(totalMinutes),
+      hours: toDecimalHours(totalMinutes),
     });
     total.font = { bold: true };
     total.getCell("hours").numFmt = "0.00";

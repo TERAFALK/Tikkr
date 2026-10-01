@@ -1,6 +1,11 @@
 import PDFDocument from "pdfkit";
 import type { PayrollPeriod } from "./payroll";
-import { formatDate, formatDecimalHours, formatTime } from "./format";
+import {
+  formatDate,
+  formatDuration,
+  formatSignedDuration,
+  formatTime,
+} from "./format";
 import { drawFooter } from "./pdf-footer";
 
 /**
@@ -17,12 +22,18 @@ import { drawFooter } from "./pdf-footer";
  * produktiv och improduktiv tid, flex och komp — och sist vad den improduktiva
  * tiden gick till.
  *
- * TID SKRIVS SOM DECIMALTIMMAR i sammanställningen (33,75) och som klockslag i
- * raderna (06:23). Det är inte en inkonsekvens utan kundens eget format: de
- * summerar vidare på sammanställningen i Excel, och 33:45 går inte att
- * addera. Klockslagen skrivs däremot som klockslag och inte som "6,23" — den
- * gamla rapportens sätt att skriva 06:23 som ett decimaltal är en fälla som
- * inte ska ärvas.
+ * TID SKRIVS SOM TIM:MIN (33:45), som i hela resten av applikationen. Se
+ * `format.ts`: det som ska läsas skrivs tim:min, det som ska räknas skrivs
+ * decimalt och bara i Excel-arket.
+ *
+ * Stod i decimaltimmar till 2026-10-01, med skälet att kunden summerade
+ * vidare på sammanställningen. Det vägde lättare än att samma tal såg olika
+ * ut på skärmen och på pappret: "1,99" lästes som 1:59, vilket är fyra
+ * minuter fel, och den som jämförde fick räkna om i huvudet.
+ *
+ * Klockslagen i raderna skrivs som klockslag och inte som "6,23" — den gamla
+ * rapportens sätt att skriva 06:23 som ett decimaltal är en fälla som inte
+ * ska ärvas.
  *
  * INGA BELOPP. Varken timkostnad, lön eller lönearter. Tikkr räknar tid; vad
  * tiden är värd avgörs av kollektivavtalet i lönesystemet.
@@ -177,7 +188,7 @@ function renderPeriod(
         width: 200,
         lineBreak: false,
       });
-      doc.text(formatDecimalHours(absence.minutes), A4_WIDTH - MARGIN - 64, y + 4, {
+      doc.text(formatDuration(absence.minutes), A4_WIDTH - MARGIN - 64, y + 4, {
         width: 60,
         align: "right",
         lineBreak: false,
@@ -208,7 +219,7 @@ function renderPeriod(
         width: 20,
         lineBreak: false,
       });
-      doc.text(formatDecimalHours(entry.minutes), A4_WIDTH - MARGIN - 64, y + 4, {
+      doc.text(formatDuration(entry.minutes), A4_WIDTH - MARGIN - 64, y + 4, {
         width: 60,
         align: "right",
         lineBreak: false,
@@ -231,7 +242,7 @@ function renderPeriod(
         y + 4,
         { width: 46, lineBreak: false }
       );
-      doc.text(formatDecimalHours(rest.minutes), A4_WIDTH - MARGIN - 64, y + 4, {
+      doc.text(formatDuration(rest.minutes), A4_WIDTH - MARGIN - 64, y + 4, {
         width: 60,
         align: "right",
         lineBreak: false,
@@ -243,7 +254,7 @@ function renderPeriod(
     if (day.workedMinutes > 0) {
       doc.font("Helvetica-Bold").fontSize(9).fillColor("#0a0a0a");
       doc.text(
-        formatDecimalHours(day.workedMinutes),
+        formatDuration(day.workedMinutes),
         A4_WIDTH - MARGIN - 64,
         y + 2,
         { width: 60, align: "right", lineBreak: false }
@@ -271,7 +282,7 @@ function renderPeriod(
   doc.font("Helvetica-Bold").fontSize(10).fillColor("#0a0a0a");
   doc.text("Totalt för perioden", MARGIN + 8, y + 7, { width: 240 });
   doc.text(
-    formatDecimalHours(period.totals.worked),
+    formatDuration(period.totals.worked),
     A4_WIDTH - MARGIN - 68,
     y + 7,
     { width: 60, align: "right" }
@@ -293,7 +304,7 @@ function renderPeriod(
     for (const row of period.indirectByMoment) {
       doc.font("Helvetica").fontSize(9).fillColor("#404040");
       doc.text(row.name, MARGIN + 8, y, { width: 300, lineBreak: false });
-      doc.text(formatDecimalHours(row.minutes), A4_WIDTH - MARGIN - 68, y, {
+      doc.text(formatDuration(row.minutes), A4_WIDTH - MARGIN - 68, y, {
         width: 60,
         align: "right",
         lineBreak: false,
@@ -356,9 +367,8 @@ function drawRowHeader(doc: PDFKit.PDFDocument, y: number): number {
   // P och I i stället för orden. Kolumnen är smal, och förkortningen förklaras
   // i foten på sammanställningen.
   doc.text("P/I", MARGIN + 408, y, { width: 20, lineBreak: false });
-  // Enheten i rubriken och inte i en fotnot, av samma skäl som pdf.ts skriver
-  // "Tid (tim:min)": 33,75 läses annars som ett klockslag.
-  doc.text("Tim (decimal)", A4_WIDTH - MARGIN - 74, y, {
+  // Enheten i rubriken och inte i en fotnot, precis som i pdf.ts.
+  doc.text("Tid (tim:min)", A4_WIDTH - MARGIN - 74, y, {
     width: 70,
     align: "right",
     lineBreak: false,
@@ -387,26 +397,26 @@ function drawSummary(
 ): number {
   const rows: [string, string][][] = [
     [
-      ["Planerad tid", formatDecimalHours(period.totals.planned)],
-      ["Närvarotid", formatDecimalHours(period.totals.worked)],
+      ["Planerad tid", formatDuration(period.totals.planned)],
+      ["Närvarotid", formatDuration(period.totals.worked)],
     ],
     [
-      ["Produktiv tid", formatDecimalHours(period.totals.productive)],
-      ["Improduktiv tid", formatDecimalHours(period.totals.indirect)],
+      ["Produktiv tid", formatDuration(period.totals.productive)],
+      ["Improduktiv tid", formatDuration(period.totals.indirect)],
     ],
     [
-      ["Frånvaro", formatDecimalHours(period.totals.absence)],
-      ["Rast", formatDecimalHours(period.totals.breaks)],
+      ["Frånvaro", formatDuration(period.totals.absence)],
+      ["Rast", formatDuration(period.totals.breaks)],
     ],
     [
-      ["Flextid, perioden", signed(period.totals.flex)],
-      ["Flexsaldo", signed(period.flex.closing)],
+      ["Flextid, perioden", pdfSigned(period.totals.flex)],
+      ["Flexsaldo", pdfSigned(period.flex.closing)],
     ],
     [
-      ["Intjänad komp", formatDecimalHours(period.comp.earned)],
-      ["Uttagen komp", formatDecimalHours(period.comp.taken)],
+      ["Intjänad komp", formatDuration(period.comp.earned)],
+      ["Uttagen komp", formatDuration(period.comp.taken)],
     ],
-    [["Komptidssaldo", signed(period.comp.closing)], ["", ""]],
+    [["Komptidssaldo", pdfSigned(period.comp.closing)], ["", ""]],
   ];
 
   const height = rows.length * 16 + 14;
@@ -448,10 +458,20 @@ function drawSummary(
   return doc.y + 4;
 }
 
-function signed(minutes: number): string {
-  if (Math.round(minutes) === 0) return "0,00";
-  const sign = minutes > 0 ? "+" : "-";
-  return `${sign}${formatDecimalHours(Math.abs(minutes))}`;
+/**
+ * Ett saldo som det ska stå i PDF:en.
+ *
+ * Samma text som på skärmen, men med vanligt bindestreck. pdfkits inbyggda
+ * Helvetica kodas som WinAnsi, där det typografiska minustecknet (U+2212)
+ * inte finns. Det skulle ritas som ingenting alls, och "0:45" i stället för
+ * "−0:45" är ett saldo med fel tecken — en halvtimme skuld som ser ut som en
+ * halvtimme till godo.
+ *
+ * Skärmen behåller det riktiga minustecknet. Det är bara fonten här som inte
+ * kan rita det.
+ */
+function pdfSigned(minutes: number): string {
+  return formatSignedDuration(minutes).replace("−", "-");
 }
 
 function dayName(weekday: number): string {

@@ -24,17 +24,34 @@ export const BUDGET_HOURS_FIELD = "budgetHours";
 /**
  * Läser ett timfält och ger minuter.
  *
- * Administratören tänker i timmar, systemet räknar i minuter. Både punkt och
- * komma godtas som decimaltecken — ett svenskt tangentbord ger komma, och att
- * avvisa "7,5" hade varit att kräva att kunden skriver som datorn vill.
+ * Administratören tänker i timmar, systemet räknar i minuter.
+ *
+ * TAR BÅDA FORMEN: "7:30" och "7,5". Systemet VISAR tim:min överallt, och det
+ * vore oanständigt att kräva att man räknar om det till decimaltimmar för att
+ * skriva tillbaka samma tal. Decimalformen står kvar eftersom en rund siffra
+ * är enklare att skriva: "8" är åtta timmar.
+ *
+ * Både punkt och komma godtas som decimaltecken — ett svenskt tangentbord ger
+ * komma. Bara kolon skiljer timmar från minuter, så "7.30" är sju timmar och
+ * arton minuter och inte sju och en halv.
  *
  * Tomt fält betyder ingen beräknad tid, vilket är något annat än noll timmar.
  */
 export function parseHours(raw: FormDataEntryValue | null): number | null {
-  const text = String(raw ?? "").trim().replace(",", ".");
+  const text = String(raw ?? "").trim();
   if (!text) return null;
 
-  const hours = Number(text);
+  const colon = text.match(/^(\d+):(\d{1,2})$/);
+
+  if (colon) {
+    const minutes = Number(colon[2]);
+    if (minutes > 59) return null;
+
+    const total = Number(colon[1]) * 60 + minutes;
+    return total > 0 ? total : null;
+  }
+
+  const hours = Number(text.replace(",", "."));
   if (!Number.isFinite(hours) || hours <= 0) return null;
 
   return Math.round(hours * 60);

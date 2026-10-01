@@ -4,6 +4,7 @@ import { useState } from "react";
 import { TimeField } from "@/components/ui";
 import { IconClose, IconPlus } from "@/components/ui/icons";
 import { parseMinuteOfDay } from "@/lib/schedule";
+import { formatDuration } from "@/lib/format";
 
 /**
  * VECKANS DAGAR SOM FÄLT.
@@ -274,6 +275,13 @@ export default function ScheduleDays({
   );
 }
 
+/**
+ * Planerad tid som text.
+ *
+ * Tim:min, som all visad tid i systemet. Stod i decimaltimmar till
+ * 2026-10-01, vilket gjorde att en dag på 8,50 och ett flexsaldo på 8:30 såg
+ * ut som olika tal fastän de är samma. Se format.ts.
+ */
 function hours(minutes: number): string {
-  return (minutes / 60).toFixed(2).replace(".", ",");
+  return formatDuration(minutes);
 }

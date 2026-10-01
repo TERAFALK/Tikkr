@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Badge, Button, Card, CardHeader, Table, Td, Th, Tr } from "@/components/ui";
-import { formatDuration } from "@/lib/format";
+import { formatDuration, formatSignedDuration } from "@/lib/format";
 
 /**
  * TIDRAPPORTEN, DAG FÖR DAG.
@@ -208,8 +208,7 @@ function Flex({ minutes }: { minutes: number }) {
         positive ? "text-emerald-700" : "text-amber-700"
       }`}
     >
-      {positive ? "+" : "−"}
-      {formatDuration(Math.abs(minutes))}
+      {formatSignedDuration(minutes)}
     </span>
   );
 }

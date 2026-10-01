@@ -60,9 +60,9 @@ export default function BudgetMoments({
     defaultRows.map((row, index) => ({
       key: index,
       momentId: row.momentId,
-      // Heltimmar ska stå som "8" och inte "8,0" — det är så man skulle
-      // skrivit det själv. Komma och inte punkt, eftersom det är svenska.
-      hours: String(row.minutes / 60).replace(".", ","),
+      // Tim:min, som tiden visas överallt annars. Fältet tar emot "8" lika
+      // gärna, se parseHours.
+      hours: formatDuration(row.minutes),
     }))
   );
 
@@ -145,8 +145,9 @@ export default function BudgetMoments({
               ))}
             </Select>
 
-            {/* Timfältet är smalt med flit: det rymmer "7,5" och signalerar
-                därmed att det inte är ett klockslag som ska skrivas in. */}
+            {/* Fältet tar både "7:30" och "7,5". Tim:min står förifyllt,
+                eftersom det är formatet den beräknade tiden visas i på
+                orderlistan och i underlaget. */}
             <div className="relative w-24 shrink-0">
               <input
                 name={BUDGET_HOURS_FIELD}
@@ -154,9 +155,9 @@ export default function BudgetMoments({
                 onChange={(event) =>
                   update(row.key, { hours: event.target.value })
                 }
-                inputMode="decimal"
-                placeholder="8"
-                aria-label="Beräknad tid i timmar"
+                inputMode="text"
+                placeholder="8:00"
+                aria-label="Beräknad tid"
                 // HÅLLER LÖSENORDSHANTERARE BORTA FRÅN FÄLTET.
                 //
                 // Ett kort numeriskt fält i ett formulär med belopp i tolkas

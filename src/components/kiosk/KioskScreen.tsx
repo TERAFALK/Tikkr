@@ -13,6 +13,7 @@ import CompanyBadge from "@/components/ui/CompanyBadge";
 import { LogoMark } from "@/components/ui/Logo";
 import NoticeBanner from "@/components/ui/NoticeBanner";
 import EmployeeAvatar from "@/components/ui/EmployeeAvatar";
+import { formatSignedDuration } from "@/lib/format";
 import KioskSettings from "./KioskSettings";
 
 /**
@@ -1012,7 +1013,7 @@ export default function KioskScreen({
             personens egen arbetstid och är något annat. */}
         {flexMinutes !== null && (
           <Toast tone="ok" visible>
-            Flexsaldo {formatFlex(flexMinutes)}
+            Flexsaldo {formatSignedDuration(flexMinutes)}
           </Toast>
         )}
 
@@ -2364,7 +2365,7 @@ function FlexPad({
         </p>
         <p className="mt-2 text-base text-neutral-500">Flexsaldo</p>
         <p className="mt-6 text-6xl font-semibold tabular-nums text-neutral-900">
-          {formatFlex(minutes)}
+          {formatSignedDuration(minutes)}
         </p>
 
         <button
@@ -2522,19 +2523,4 @@ function Empty({ children }: { children: React.ReactNode }) {
   );
 }
 
-/**
- * Flexsaldot som text: "+2:15" eller "−0:45".
- *
- * Tecknet skrivs alltid ut, så att noll inte läses som plus, och timmar och
- * minuter i stället för decimaltimmar — den som ska veta om hen kan gå hem
- * tidigt läser "+2:15" snabbare än "+2,25".
- */
-function formatFlex(minutes: number): string {
-  const rounded = Math.round(minutes);
-  if (rounded === 0) return "0:00";
 
-  const sign = rounded > 0 ? "+" : "−";
-  const abs = Math.abs(rounded);
-
-  return `${sign}${Math.floor(abs / 60)}:${String(abs % 60).padStart(2, "0")}`;
-}

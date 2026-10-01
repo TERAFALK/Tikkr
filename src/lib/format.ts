@@ -3,6 +3,19 @@
  *
  * Ligger samlat för att samma sak ska se likadan ut överallt. Blandade format
  * i en rapport gör att man börjar tvivla på siffrorna.
+ *
+ * ── ETT FORMAT PÅ SKÄRMEN, ETT I KALKYLARKET ─────────────────────────────
+ *
+ * Tid som någon ska LÄSA skrivs som tim:min: `formatDuration` och
+ * `formatSignedDuration`. Det gäller hela panelen, kiosken och varje PDF.
+ *
+ * Tid som någon ska RÄKNA MED skrivs som decimaltimmar: `toDecimalHours`, och
+ * bara i Excel-exporten. En kolumn som ska summeras eller multipliceras med en
+ * timpeng kan inte stå i tim:min.
+ *
+ * Tidrapporten bröt mot det här till 2026-10-01: rutorna överst stod i
+ * decimaltimmar och tabellen under i tim:min, på samma sida om samma dag.
+ * "1,99" lästes dessutom som 1:59, vilket är fyra minuter fel.
  */
 
 const DEFAULT_TIME_ZONE = "Europe/Stockholm";
@@ -65,6 +78,23 @@ export function formatDuration(minutes: number): string {
   const rest = rounded % 60;
 
   return `${hours}:${String(rest).padStart(2, "0")}`;
+}
+
+/**
+ * Ett saldo som text: "+2:15", "−0:45" eller "0:00".
+ *
+ * Tecknet skrivs alltid ut, så att noll inte läses som plus.
+ *
+ * Samma tim:min som `formatDuration`, eftersom ett saldo är en tid någon ska
+ * LÄSA: den som vill veta om hen kan gå hem tidigt läser "+2:15" snabbare än
+ * "+2,25". Fanns i fyra egna kopior — i kiosken, i tidrapportens tabell, i
+ * dess PDF och på sidan — och de hann börja visa olika saker på samma dag.
+ */
+export function formatSignedDuration(minutes: number): string {
+  const rounded = Math.round(minutes);
+  if (rounded === 0) return "0:00";
+
+  return `${rounded > 0 ? "+" : "−"}${formatDuration(Math.abs(rounded))}`;
 }
 
 /** Decimaltimmar med två decimaler — formatet fakturaunderlag räknas i. */

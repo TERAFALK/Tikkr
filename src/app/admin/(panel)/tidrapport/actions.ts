@@ -202,10 +202,10 @@ export async function adjustFlexBalance(
   const employeeId = String(formData.get("employeeId") ?? "");
   if (!employeeId) return { error: "Ingen anställd vald." };
 
-  const target = decimalHoursToMinutes(formData.get("flex"));
+  const target = hoursInputToMinutes(formData.get("flex"));
 
   if (target === "error" || target === null) {
-    return { error: "Skriv saldot som timmar, till exempel 12,5 eller −3." };
+    return { error: "Skriv saldot som 2:15 eller 2,25." };
   }
 
   const employee = await db.employee.findFirst({
@@ -255,8 +255,8 @@ export async function saveOpeningBalances(
   const timeZone = await timeZoneOf(companyId);
 
   // Saldon får vara negativa — ett minussaldo är ett helt normalt läge.
-  const flex = decimalHoursToMinutes(formData.get("flex"));
-  const comp = decimalHoursToMinutes(formData.get("comp"));
+  const flex = hoursInputToMinutes(formData.get("flex"));
+  const comp = hoursInputToMinutes(formData.get("comp"));
 
   if (flex === "error" || comp === "error") {
     return { error: "Skriv saldona som timmar, till exempel 12,5 eller −3." };
@@ -280,14 +280,43 @@ export async function saveOpeningBalances(
   return { savedAt: Date.now() };
 }
 
-function decimalHoursToMinutes(
+/**
+ * Ett saldo som skrivits för hand, till minuter.
+ *
+ * Tar BÅDA formen: "2:15" och "2,25". Skärmen visar tim:min, och det vore
+ * oanständigt att kräva att man räknar om det till decimaltimmar för att
+ * kunna skriva tillbaka samma tal. Decimalformen står kvar eftersom den som
+ * har en siffra ur ett gammalt system ofta har den så.
+ *
+ * Minuttecknet får vara både det vanliga och det långa, som Word gärna byter
+ * till — ett klistrat "−3" ska inte bli ett fel.
+ */
+function hoursInputToMinutes(
   raw: FormDataEntryValue | null
 ): number | null | "error" {
-  // Både vanligt minustecken och det långa som Word gärna byter till.
-  const text = String(raw ?? "").trim().replace(",", ".").replace("−", "-");
+  const text = String(raw ?? "")
+    .trim()
+    .replace("−", "-")
+    .replace(/\s/g, "");
+
   if (!text) return null;
 
-  const hours = Number(text);
+  // Tim:min. BARA kolon räknas som avskiljare: punkt är ett decimaltecken,
+  // och "2.25" ska vara två och en kvarts timme och inte 2 timmar 25 minuter.
+  //
+  // Minuterna är alltid positiva; tecknet hör till hela saldot, så "−0:45" är
+  // minus trekvart och inte minus noll plus trekvart.
+  const colon = text.match(/^(-?)(\d+):(\d{1,2})$/);
+
+  if (colon) {
+    const minutes = Number(colon[3]);
+    if (minutes > 59) return "error";
+
+    const total = Number(colon[2]) * 60 + minutes;
+    return colon[1] === "-" ? -total : total;
+  }
+
+  const hours = Number(text.replace(",", "."));
   if (!Number.isFinite(hours)) return "error";
 
   return Math.round(hours * 60);

@@ -735,11 +735,32 @@ får gärna vara utförliga.
    Knappar är verb i imperativ: "Lägg till", "Spara", "Koppla om".
 
 6. **Fälthjälp bara vid format eller konsekvens**, i en kort mening utan
-   punkt om den är ofullständig: "Timmar, t.ex. 7,5", "Minst 10 tecken",
+   punkt om den är ofullständig: "Tim:min, t.ex. 7:30", "Minst 10 tecken",
    "Kan inte ångras". Inte varför fältet finns.
 
 7. **Felmeddelanden säger vad som är fel och vad som rättar det.** Ett led,
    inte tre.
+
+8. **TID SKRIVS ALLTID SOM TIM:MIN** (bestämt 2026-10-01). "8:30", aldrig
+   "8,50". Gäller varje yta kunden ser: panelen, kioskskärmen och varenda
+   PDF. Saldon får sitt tecken utskrivet: "+2:15", "−0:45", "0:00".
+
+   Decimaltimmar finns kvar, men BARA i Excel-arket. En kolumn som ska
+   summeras eller multipliceras med en timpeng kan inte stå i tim:min, och
+   arket finns just för att räkna vidare i. Där står båda formaten bredvid
+   varandra, tim:min först.
+
+   Skälet är en bugg: tidrapporten stod i decimaltimmar medan tabellen under
+   den stod i tim:min, på samma sida om samma dag, och "1,99" lästes som 1:59
+   — fyra minuter fel. Flexsaldot gick dessutom inte att justera, eftersom
+   rutan visade ett format och räknade i ett annat.
+
+   Fälten där tid skrivs in tar BÅDA formen, så att ingen behöver räkna om
+   det hen just läst: "7:30" och "7,5" ger samma sak. Bara kolon skiljer
+   timmar från minuter — "7.30" är sju timmar och arton minuter.
+
+   `src/lib/format.ts` äger båda formaten, och
+   `tests/format.test.ts` fäller en ny sida som visar decimaltimmar.
 
 Där något verkligen är svårt — GDPR-radering, fast pris kontra påslag — får
 en mening stå kvar. Den ska då vara skriven för en verkstadschef, inte för en

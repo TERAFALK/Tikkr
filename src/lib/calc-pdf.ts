@@ -232,7 +232,10 @@ function renderCalc(
       doc,
       y,
       `Rabatt ${order.price.discountPercent} % (kundens)`,
-      `−${formatCurrency(order.price.discountOre)}`
+      // Vanligt bindestreck och inte det typografiska minustecknet: pdfkits
+      // Helvetica kodas som WinAnsi, där U+2212 inte finns och ritas som
+      // ingenting. Ett avdrag utan tecken ser ut som ett påslag.
+      `-${formatCurrency(order.price.discountOre)}`
     );
   }
 

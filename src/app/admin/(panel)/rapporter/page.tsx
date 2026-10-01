@@ -27,7 +27,7 @@ import {
   Th,
   Tr,
 } from "@/components/ui";
-import { formatDateTime, formatDuration, formatDecimalHours } from "@/lib/format";
+import { formatDateTime, formatDuration } from "@/lib/format";
 import { datePresets } from "@/lib/date-presets";
 import { customerOptions } from "@/lib/customers";
 import type { ReportResult, ReportRow } from "@/lib/report";
@@ -298,7 +298,7 @@ export default async function ReportsPage({
         <Stat
           label="Total tid"
           value={formatDuration(report.totalMinutes)}
-          hint={`${formatDecimalHours(report.totalMinutes)} timmar`}
+          hint="tim:min"
         />
         <Stat label="Stämplingar" value={report.rows.length} />
         <Stat

@@ -19,7 +19,12 @@ import {
   Stat,
 } from "@/components/ui";
 import { buildPayrollPeriod, currentFlexMinutes } from "@/lib/payroll";
-import { formatDate, formatDecimalHours, formatTime } from "@/lib/format";
+import {
+  formatDate,
+  formatDuration,
+  formatSignedDuration,
+  formatTime,
+} from "@/lib/format";
 import { startOfWeekIn, addDaysInZone, parseLocalDate, toDateInput } from "@/lib/time-zone";
 import { isoWeekNumber } from "@/lib/week";
 import { datePresets } from "@/lib/date-presets";
@@ -265,14 +270,14 @@ export default async function TimesheetPage({
               description={
                 flexToday === null
                   ? undefined
-                  : `Saldot är ${signedHours(flexToday)} timmar idag.`
+                  : `Saldot är ${formatSignedDuration(flexToday)} idag.`
               }
               action={adjustFlexBalance}
               initial={{}}
               submitLabel="Spara"
             >
               <input type="hidden" name="employeeId" value={employeeId} />
-              <Field label="Nytt saldo" hint="Timmar, t.ex. 12,5 eller −3">
+              <Field label="Nytt saldo" hint="Tim:min, t.ex. 2:15 eller −0:45">
                 <Input
                   name="flex"
                   inputMode="decimal"
@@ -313,24 +318,24 @@ export default async function TimesheetPage({
       <div className="mb-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <Stat
           label="Planerad tid"
-          value={formatDecimalHours(period.totals.planned)}
-          hint="timmar"
+          value={formatDuration(period.totals.planned)}
+          hint="tim:min"
         />
         <Stat
           label="Närvarotid"
-          value={formatDecimalHours(period.totals.worked)}
-          hint="timmar"
+          value={formatDuration(period.totals.worked)}
+          hint="tim:min"
         />
         <Stat
           label="Flextid, perioden"
-          value={signedHours(period.totals.flex)}
+          value={formatSignedDuration(period.totals.flex)}
           tone={period.totals.flex >= 0 ? "active" : "warning"}
-          hint={`saldo ${signedHours(period.flex.closing)}`}
+          hint={`saldo ${formatSignedDuration(period.flex.closing)}`}
         />
         <Stat
           label="Komptid"
-          value={signedHours(period.comp.closing)}
-          hint={`${signedHours(period.comp.earned)} intjänat, ${formatDecimalHours(
+          value={formatSignedDuration(period.comp.closing)}
+          hint={`${formatSignedDuration(period.comp.earned)} intjänat, ${formatDuration(
             period.comp.taken
           )} uttaget`}
         />
@@ -339,15 +344,15 @@ export default async function TimesheetPage({
       <div className="mb-6 grid gap-4 sm:grid-cols-3">
         <Stat
           label="Produktiv tid"
-          value={formatDecimalHours(period.totals.productive)}
+          value={formatDuration(period.totals.productive)}
         />
         <Stat
           label="Improduktiv tid"
-          value={formatDecimalHours(period.totals.indirect)}
+          value={formatDuration(period.totals.indirect)}
         />
         <Stat
           label="Frånvaro"
-          value={formatDecimalHours(period.totals.absence)}
+          value={formatDuration(period.totals.absence)}
         />
       </div>
 
@@ -373,7 +378,7 @@ export default async function TimesheetPage({
                 >
                   <span className="text-neutral-700">{row.name}</span>
                   <span className="tabular-nums font-medium text-neutral-900">
-                    {formatDecimalHours(row.minutes)}
+                    {formatDuration(row.minutes)}
                   </span>
                 </li>
               ))}
@@ -392,7 +397,7 @@ export default async function TimesheetPage({
                 >
                   <span className="text-neutral-700">{row.reason}</span>
                   <span className="tabular-nums font-medium text-neutral-900">
-                    {formatDecimalHours(row.minutes)}
+                    {formatDuration(row.minutes)}
                   </span>
                 </li>
               ))}
@@ -406,13 +411,6 @@ export default async function TimesheetPage({
 
 function dayName(weekday: number): string {
   return ["Må", "Ti", "On", "To", "Fr", "Lö", "Sö"][weekday - 1];
-}
-
-/** Decimaltimmar med tecken. Plus skrivs ut, så att noll inte läses som plus. */
-function signedHours(minutes: number): string {
-  if (Math.round(minutes) === 0) return "0,00";
-  const sign = minutes > 0 ? "+" : "−";
-  return `${sign}${formatDecimalHours(Math.abs(minutes))}`;
 }
 
 /** En pil i veckostegaren. */
