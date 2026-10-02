@@ -10,7 +10,7 @@ import {
   restartApp,
 } from "@/lib/fully";
 import CompanyBadge from "@/components/ui/CompanyBadge";
-import { LogoMark } from "@/components/ui/Logo";
+import { LogoMark, WordmarkOnly } from "@/components/ui/Logo";
 import NoticeBanner from "@/components/ui/NoticeBanner";
 import EmployeeAvatar from "@/components/ui/EmployeeAvatar";
 import { formatSignedDuration } from "@/lib/format";
@@ -151,10 +151,15 @@ function jobKey(choice: KioskJobChoice): string {
 const JOB_TONE = {
   order: "border-emerald-600 bg-emerald-600 active:bg-emerald-700",
   indirect: "border-amber-500 bg-amber-500 active:bg-amber-600",
-  // Rast är BLÅ och inte grå eller vit. Under rasten finns ingen öppen
+  // Rast är MÖRK och inte grå eller vit. Under rasten finns ingen öppen
   // stämpling, och kortet såg därför ut precis som för den som gått hem —
   // vilket är fel svar på den enda fråga skärmen finns för att besvara.
-  break: "border-sky-600 bg-sky-600 active:bg-sky-700",
+  //
+  // Tonen är Fjord, varumärkets primärfärg för mörka ytor. Den var tidigare
+  // ljusblå, en färg som inte finns i paletten. Fjord säger samma sak: personen
+  // är på plats, men ingen tid löper. Fyra tydligt skilda kort, alla ur
+  // paletten — vitt hemma, grönt på order, gult improduktivt, Fjord på rast.
+  break: "border-blue-600 bg-blue-600 active:bg-blue-700",
 } as const;
 
 /**
@@ -1452,11 +1457,9 @@ function Header({
           <div className="absolute right-3 flex items-center gap-3 sm:right-4">
             {/* Ordmärket får vika på en liten skärm. Kugghjulet får det inte —
                 det är enda vägen ut ur ett låst kiosk-läge. */}
-            <span className="hidden items-center gap-2 opacity-55 sm:flex">
+            <span className="hidden items-center gap-2 text-neutral-500 opacity-55 sm:flex">
               <LogoMark size={24} />
-              <span className="text-[13px] font-semibold text-neutral-500">
-                Tikkr
-              </span>
+              <WordmarkOnly height={11} tone="current" />
             </span>
 
             {/* Kugghjulet sitter längst ut, dämpat. Den som letar efter det
@@ -1732,7 +1735,7 @@ function ActionChoice({
             <span className="block text-2xl font-semibold leading-snug text-neutral-900 sm:text-3xl">
               {onBreak.name}
             </span>
-            <span className="mt-2 inline-flex items-center gap-2 rounded-md bg-sky-600 px-3 py-1.5 text-[15px] font-semibold text-white">
+            <span className="mt-2 inline-flex items-center gap-2 rounded-md bg-blue-600 px-3 py-1.5 text-[15px] font-semibold text-white">
               <span className="h-2 w-2 rounded-full bg-white" />
               Rast pågår
             </span>
@@ -1923,10 +1926,10 @@ function ActionChoice({
         {!onBreak && hasBreaks && jobs.length > 0 && (
           <button
             onClick={onTakeBreak}
-            className="kiosk-press min-h-20 rounded-xl border border-sky-200 bg-sky-50 p-6 text-xl font-semibold text-sky-900 active:bg-sky-100 sm:col-span-2"
+            className="kiosk-press min-h-20 rounded-xl border border-blue-300 bg-blue-100 p-6 text-xl font-semibold text-blue-900 active:bg-blue-200 sm:col-span-2"
           >
             Rast
-            <span className="mt-1.5 block text-base font-normal text-sky-700">
+            <span className="mt-1.5 block text-base font-normal text-blue-700">
               Stämplar ut från {jobs.length === 1 ? "jobbet" : "alla jobb"}
             </span>
           </button>

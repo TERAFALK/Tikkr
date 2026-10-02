@@ -19,7 +19,7 @@ export default function PlatformLoginPage() {
           Är du kund?{" "}
           <Link
             href="/admin/login"
-            className="font-medium text-blue-600 hover:underline"
+            className="font-medium text-tick-deep hover:underline"
           >
             Logga in här
           </Link>

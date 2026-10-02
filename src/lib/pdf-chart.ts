@@ -11,6 +11,8 @@
  * dem.
  */
 
+import { DOC } from "./brand";
+
 export interface BarChartItem {
   label: string;
   /** Styr stapelns längd. Skalas mot det största värdet i listan. */
@@ -30,7 +32,7 @@ export interface BarChartOptions {
   bottomLimit: number;
   /** Y-läge där innehållet börjar på en ny sida, dvs. övre marginalen. */
   pageTopY: number;
-  /** Stapelns färg. Blå för tid, mörkare för belopp. */
+  /** Stapelns färg. Accentgrönt för tid, Fjord för belopp. */
   barColor?: string;
 }
 
@@ -55,7 +57,7 @@ export function drawBarChart(
   if (items.length < 2 || largest <= 0) return options.startY;
 
   const barWidth = contentWidth - LABEL_WIDTH - VALUE_WIDTH - 16;
-  const barColor = options.barColor ?? "#2563eb";
+  const barColor = options.barColor ?? DOC.accent;
 
   let y = options.startY;
 
@@ -66,7 +68,7 @@ export function drawBarChart(
     y = pageTopY;
   }
 
-  doc.font("Helvetica-Bold").fontSize(9).fillColor("#525252");
+  doc.font("Helvetica-Bold").fontSize(9).fillColor(DOC.muted);
   doc.text(options.title, marginLeft, y);
   y += 16;
 
@@ -76,7 +78,7 @@ export function drawBarChart(
       y = pageTopY;
     }
 
-    doc.font("Helvetica").fontSize(9).fillColor("#404040");
+    doc.font("Helvetica").fontSize(9).fillColor(DOC.body);
     doc.text(item.label, marginLeft, y + 2, {
       width: LABEL_WIDTH,
       ellipsis: true,
@@ -84,12 +86,12 @@ export function drawBarChart(
 
     // Bakgrunden visar hela skalan, så att en kort stapel läses som "lite av
     // totalen" i stället för som ett tomt fält.
-    doc.rect(marginLeft + LABEL_WIDTH, y + 3, barWidth, 8).fill("#f5f5f5");
+    doc.rect(marginLeft + LABEL_WIDTH, y + 3, barWidth, 8).fill(DOC.tint);
 
     const width = Math.max(2, (item.value / largest) * barWidth);
     doc.rect(marginLeft + LABEL_WIDTH, y + 3, width, 8).fill(barColor);
 
-    doc.font("Helvetica").fontSize(9).fillColor("#525252");
+    doc.font("Helvetica").fontSize(9).fillColor(DOC.muted);
     doc.text(item.valueText, pageWidth - marginLeft - VALUE_WIDTH, y + 2, {
       width: VALUE_WIDTH,
       align: "right",

@@ -1,5 +1,136 @@
 @import "tailwindcss";
 
+/* ==========================================================================
+   VARUMÄRKET, SOM TAILWIND-TOKENS.
+
+   Tikkr brand guidelines v1.0 (oktober 2026). Originalet ligger i
+   `brand/Tikkr-brand-guidelines.pdf`, hela materialet under `brand/`, och
+   samma sex färger som TypeScript i `src/lib/brand.ts` — dokumenten ritas av
+   pdfkit och kan inte läsa en stilmall.
+
+   Guiden ger SEX färger:
+
+     Fjord      #0E1A2B   primär: text, logotyp, mörka ytor
+     Tick       #2ED196   accent på mörkt: markeringar, knappar
+     Tick Deep  #0F9E68   accent på ljusa bakgrunder
+     Snö        #F5F6F2   ljus bakgrund
+     Skiffer    #5B6573   sekundär text
+     Lav        #D9DDD6   linjer, ramar, tysta ytor
+
+   VARFÖR SKALORNA SKRIVS ÖVER I STÄLLET FÖR ATT DÖPAS OM.
+
+   Panelen, kiosken och säljsidan använder `neutral-*`, `blue-*` och
+   `emerald-*` på drygt niohundra ställen. Att byta namn på dem hade varit
+   niohundra ändringar i ett åttiotal filer, utan möjlighet att köra ett bygge
+   på den här maskinen — se CLAUDE.md § 9. Att i stället ge skalorna nya
+   VÄRDEN rebrandar allt på en gång, och färgen ägs därefter av den här filen
+   ensam.
+
+   Priset är att namnet `blue-600` inte längre beskriver en blå färg. Det är
+   skälet till kommentaren vid varje skala nedan, och till att ny kod hellre
+   använder de varumärkesnamngivna tokens längst ner (`text-fjord`,
+   `bg-tick-deep`).
+
+   FÄRGREGLERNA SOM GÄLLER ÖVERALLT (samma som i src/components/ui/index.tsx):
+
+     Fjord  = något går att göra här   (knappar, markerat läge)
+     grön   = pågår just nu            (instämplad, sparat, positivt saldo)
+     gul    = kräver din uppmärksamhet
+     röd    = går inte att ångra
+
+   Grönt är ACCENT och aldrig huvudfärg — det står som ett uttryckligt förbud i
+   guiden. Därför bär Fjord knapparna, och grönt är reserverat för tid som
+   löper. Länkad text är det enda undantaget: Fjord ligger för nära brödtexten
+   för att en länk skulle gå att se, så inline-länkar får accentgrönt mot ljus
+   bakgrund, precis som guiden anger för Tick Deep.
+   ========================================================================== */
+
+@theme {
+  /* ---------------------------------------------------------------------- */
+  /* Varumärkets färger med sina egna namn. Föredras i ny kod.              */
+  /* ---------------------------------------------------------------------- */
+  --color-fjord: #0e1a2b;
+  --color-tick: #2ed196;
+  --color-tick-deep: #0f9e68;
+  --color-sno: #f5f6f2;
+  --color-skiffer: #5b6573;
+  --color-lav: #d9ddd6;
+
+  /* ---------------------------------------------------------------------- */
+  /* GRÅSKALAN: Snö → Lav → Skiffer → Fjord.                                */
+  /*                                                                         */
+  /* De fyra varumärkesfärgerna ligger på de steg där koden redan använde    */
+  /* dem till just den uppgiften: 50 är bakgrunden, 200 är ramarna, 500 är   */
+  /* sekundär text, 900 är brödtexten. Stegen mellan är interpolerade.       */
+  /* ---------------------------------------------------------------------- */
+  --color-neutral-50: #f5f6f2; /* Snö */
+  --color-neutral-100: #eceee7;
+  --color-neutral-200: #d9ddd6; /* Lav */
+  --color-neutral-300: #afb5b5;
+  --color-neutral-400: #858d94;
+  --color-neutral-500: #5b6573; /* Skiffer */
+  --color-neutral-600: #485261;
+  --color-neutral-700: #35404f;
+  --color-neutral-800: #212d3d;
+  --color-neutral-900: #0e1a2b; /* Fjord */
+  --color-neutral-950: #08101a;
+
+  /* ---------------------------------------------------------------------- */
+  /* "BLÅ" ÄR FJORD. Skalan bär allt som går att göra: knappar, markerat     */
+  /* läge, kryssrutor, fokusringar. Stegen är toner av Fjord mot vitt, inget */
+  /* annat — ingen färg är hittad på.                                        */
+  /* ---------------------------------------------------------------------- */
+  --color-blue-50: #f3f4f4;
+  --color-blue-100: #e7e8ea;
+  --color-blue-200: #cfd1d5;
+  --color-blue-300: #abafb5;
+  --color-blue-400: #7b818a;
+  --color-blue-500: #4a5360;
+  --color-blue-600: #0e1a2b; /* Fjord */
+  --color-blue-700: #0a1422;
+  --color-blue-800: #08101a;
+  --color-blue-900: #060c13;
+  --color-blue-950: #03070c;
+
+  /* ---------------------------------------------------------------------- */
+  /* GRÖNT ÄR TICK. Skalan bär tid som löper: instämplad, sparat, positivt   */
+  /* flexsaldo. 400 är Tick (accent på mörkt), 600 är Tick Deep (accent på   */
+  /* ljust).                                                                 */
+  /* ---------------------------------------------------------------------- */
+  --color-emerald-50: #e9faf2;
+  --color-emerald-100: #ccf3e2;
+  --color-emerald-200: #9de8c8;
+  --color-emerald-300: #62dcac;
+  --color-emerald-400: #2ed196; /* Tick */
+  --color-emerald-500: #18b87e;
+  --color-emerald-600: #0f9e68; /* Tick Deep */
+  --color-emerald-700: #0c7e53;
+  --color-emerald-800: #0a6343;
+  --color-emerald-900: #085138;
+  --color-emerald-950: #032e1f;
+
+  /* ---------------------------------------------------------------------- */
+  /* TYPOGRAFI.                                                              */
+  /*                                                                         */
+  /* Geist är enda typsnittet. Variablerna sätts av next/font i              */
+  /* src/app/layout.tsx, som packar med filerna i bygget — en kioskskärm utan */
+  /* nät ska inte tappa typsnittet.                                           */
+  /*                                                                         */
+  /* Knipningen kommer ur guiden: rubriker −3 %, etiketter +8 %. Att skriva   */
+  /* om Tailwinds egna steg i stället för att ändra varje rubrik gör att de    */
+  /* `tracking-tight` och `tracking-wider` som redan står i koden blir rätt.   */
+  /* ---------------------------------------------------------------------- */
+  --font-sans:
+    var(--font-geist-sans), ui-sans-serif, system-ui, -apple-system,
+    "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-mono:
+    var(--font-geist-mono), ui-monospace, "SFMono-Regular", Menlo, Consolas,
+    monospace;
+
+  --tracking-tight: -0.03em;
+  --tracking-wider: 0.08em;
+}
+
 :root {
   color-scheme: light;
 }
@@ -155,7 +286,8 @@ dialog {
     under fingret, vilket är vad som faktiskt händer när man trycker på något.
   */
   transform: translateY(2px);
-  box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.25);
+  /* Fjord, varumärkets primärfärg. Ringen ska läsas som "du träffade rätt". */
+  box-shadow: 0 0 0 4px rgba(14, 26, 43, 0.25);
 }
 
 @media (prefers-reduced-motion: reduce) {

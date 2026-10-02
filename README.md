@@ -4,7 +4,8 @@ Molnbaserat stämplingssystem för touchskärm. Anställda stämplar in och ut p
 order och arbetsmoment med ett enda tryck. Byggt för svenska verkstads- och
 tillverkningsföretag.
 
-Teknisk projektkontext finns i [CLAUDE.md](CLAUDE.md).
+Teknisk projektkontext finns i [CLAUDE.md](CLAUDE.md). Logotyp, färger och
+typografi ligger i [brand/](brand/README.md).
 
 ---
 

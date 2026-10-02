@@ -58,7 +58,7 @@ const sections: Section[] = [
           stämplingsskärm. Antalet anställda, ordrar och registrerade stämplingar
           påverkar inte priset, och ingen grundavgift tillkommer. Gällande pris
           framgår av{" "}
-          <Link href="/#pris" className="text-blue-600 hover:underline">
+          <Link href="/#pris" className="text-tick-deep hover:underline">
             prissidan
           </Link>
           . Samtliga priser anges exklusive moms.
@@ -165,7 +165,7 @@ const sections: Section[] = [
           av personuppgifter regleras i{" "}
           <Link
             href="/personuppgiftsbitradesavtal"
-            className="text-blue-600 hover:underline"
+            className="text-tick-deep hover:underline"
           >
             personuppgiftsbiträdesavtalet
           </Link>

@@ -16,11 +16,19 @@ import { TimeInput } from "./TimeInput";
  * siffrorna man är här för.
  *
  * Färgregler som gäller överallt:
- *   blå   = något går att göra här
- *   grön  = pågår just nu
+ *   Fjord = något går att göra här   (knappar, markerat läge, kryssrutor)
+ *   grön  = pågår just nu            (instämplad, sparat, positivt saldo)
  *   gul   = kräver din uppmärksamhet
  *   röd   = går inte att ångra
- * Allt annat är gråskala.
+ * Allt annat är gråskala, och gråskalan är Snö → Lav → Skiffer → Fjord.
+ *
+ * Färgerna är varumärkets sex, och de ligger som Tailwind-tokens i
+ * src/app/globals.css. Där står också varför `blue-*` numera är Fjord och
+ * `emerald-*` varumärkets grönt. Grönt är ACCENT och aldrig huvudfärg — det är
+ * därför Fjord och inte grönt bär knapparna.
+ *
+ * Länkad text är det enda undantaget. Fjord ligger för nära brödtexten för att
+ * en länk skulle gå att se, så inline-länkar får accentgrönt (`text-tick-deep`).
  */
 
 /* -------------------------------------------------------------------------- */

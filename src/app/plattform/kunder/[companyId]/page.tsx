@@ -109,7 +109,7 @@ export default async function CompanyPage({
     <PlatformShell email={email}>
       <Link
         href="/plattform/kunder"
-        className="text-[13px] font-medium text-blue-600 hover:underline"
+        className="text-[13px] font-medium text-tick-deep hover:underline"
       >
         ← Kunder
       </Link>
@@ -271,7 +271,7 @@ export default async function CompanyPage({
                       <Td>
                         <a
                           href={`mailto:${admin.email}`}
-                          className="font-medium text-blue-600 hover:underline"
+                          className="font-medium text-tick-deep hover:underline"
                         >
                           {admin.email}
                         </a>

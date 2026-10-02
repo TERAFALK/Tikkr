@@ -769,6 +769,85 @@ Där något verkligen är svårt — GDPR-radering, fast pris kontra påslag —
 en mening stå kvar. Den ska då vara skriven för en verkstadschef, inte för en
 nybörjare.
 
+### 7.2 Utseendet (Tikkr brand guidelines v1.0, infört 2026-10-02)
+
+Gäller ALLT kunden och kundens kund ser: adminpanelen, kioskskärmen,
+säljsidan, plattformspanelen, varje PDF och varje mejl.
+
+Hela materialet ligger i **`brand/`** med `brand/README.md` som ingång, och
+riktlinjerna i sin helhet i `brand/Tikkr-brand-guidelines.pdf`. Mappen är
+källan och ändras inte för hand — kommer en ny version byts den ut, och
+kopiorna i `public/` kopieras om.
+
+**SEX FÄRGER, OCH INGA FLER.**
+
+| Namn | HEX | Roll |
+|---|---|---|
+| Fjord | `#0E1A2B` | Primär. Text, logotyp, mörka ytor, knappar |
+| Tick | `#2ED196` | Accent på mörkt |
+| Tick Deep | `#0F9E68` | Accent på ljust: länkar, markerat läge |
+| Snö | `#F5F6F2` | Ljus bakgrund |
+| Skiffer | `#5B6573` | Sekundär text |
+| Lav | `#D9DDD6` | Linjer, ramar, tysta ytor |
+
+Fjord och Snö bär de flesta ytorna. **Grönt är accent och aldrig huvudfärg** —
+det är den enda regeln i guiden som står utskriven som ett förbud, och skälet
+att Fjord och inte grönt bär knapparna.
+
+Färgreglerna som gäller överallt, oförändrade i betydelse:
+
+```
+Fjord = något går att göra här   (knappar, markerat läge, kryssrutor)
+grön  = pågår just nu            (instämplad, sparat, positivt saldo)
+gul   = kräver din uppmärksamhet
+röd   = går inte att ångra
+```
+
+Gult och rött har ingen motsvarighet i guiden och är kvar som funktionella
+färger. En varning som ser ut som allt annat är ingen varning.
+
+**Paletten ägs av två filer, och de ska hållas i takt.**
+`src/app/globals.css` har tokens för gränssnittet; `src/lib/brand.ts` har
+samma sex färger som TypeScript, för dokumenten som ritas av pdfkit och inte
+kan läsa en stilmall. `brand.ts` har **inga importer och ska inte få några** —
+både fakturasidan och lönesidan läser den, precis som `modules.ts`, se
+avgränsningen överst.
+
+**Tailwinds skalor `neutral-*`, `blue-*` och `emerald-*` är omskrivna** till
+gråskalan Snö→Fjord, till Fjord respektive till Tick. Namnet `blue-600`
+beskriver alltså inte längre en blå färg. Skälet står i globals.css: de tre
+skalorna används på drygt niohundra ställen, och nya värden rebrandar allt på
+en gång utan niohundra ändringar som inte går att bygga på den här maskinen.
+Ny kod använder hellre `text-fjord`, `bg-tick-deep` och de andra
+varumärkesnamnen.
+
+**Typsnittet är Geist**, och ingenting annat. Laddas av `next/font` i
+`src/app/layout.tsx`, som packar filerna med bygget — en kioskskärm utan nät
+ska inte tappa typsnittet, och säljsidans besökare ska inte lämna spår hos
+Google. Konsekvens: **bygget behöver nå fonts.gstatic.com.** Semibold 600 för
+rubriker, Medium 500 för knappar och etiketter, Regular 400 för brödtext.
+Knipningen ligger i `--tracking-tight` (−3 %) och `--tracking-wider` (+8 %),
+så de klasser som redan står i koden blir rätt.
+
+**Ordmärket sätts ALDRIG som text.** Guiden förbjuder att det sätts om i ett
+annat typsnitt, och vanlig text blir just det så fort Geist inte hunnit
+laddas. `src/components/ui/Logo.tsx` ritar konturerna ur
+`brand.ts`. Enda undantaget är mejlen, som inte får innehålla externa bilder
+och inte kan hämta ett typsnitt — där står ordmärket som gement "tikkr" med
+guidens knipning, och skälet står i `emails.ts`.
+
+Logotypens mått **härleds** ur varumärkesfilerna och väljs inte: app-ikonens
+rundning är 24 % av sidan och symbolen 60 % av bredden, det vågräta märkets
+ordmärke 86 % av symbolens höjd med 34 % mellanrum. En handplockad siffra ger
+en logotyp som nästan stämmer, vilket är svårare att upptäcka än en som är
+uppenbart fel.
+
+Bevisas av **`tests/brand.test.ts`**: den fäller en färg utanför paletten, ett
+token som glidit från guidens hexkod, och ett ordmärke som satts som text.
+Samma sorts skyddsnät som `format.test.ts` och `ui-text.test.ts`, och av samma
+skäl — Tailwind levererar tjugotvå färgskalor som alla är ett klassnamn bort,
+och `bg-sky-600` ser lika rimlig ut i en kodgranskning som `bg-blue-600`.
+
 ## 8. Affärsmodell (kontext, inte kod)
 
 ### Pris (beslutat 2026-08-11)

@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState, type ReactNode } from "react";
-import { LogoMark } from "@/components/ui/Logo";
+import { LogoMark, WordmarkOnly } from "@/components/ui/Logo";
 import ReloadOnDeploy from "@/components/ui/ReloadOnDeploy";
 import {
   IconBuilding,
@@ -23,7 +23,7 @@ import { platformLogout } from "@/app/plattform/login/actions";
  * är inte smak: två olika skal i samma produkt lär ögat att det är två olika
  * produkter, och panelen är Tikkr sett från andra hållet — inte något annat.
  * Måtten här är AdminSidebars: 240 px, grupprubriker i versaler, grå platta
- * och blå ikon på aktiv länk.
+ * och grön ikon på aktiv länk.
  *
  * Det som skiljer är märkningen överst. Den räcker för att veta var man står,
  * och är ärligare än en avvikande färg — färgen sa "annan produkt" när
@@ -118,7 +118,7 @@ export default function PlatformShell({
             <path d="M4 6h16M4 12h16M4 18h16" />
           </svg>
         </button>
-        <span className="text-sm font-semibold">Tikkr</span>
+        <WordmarkOnly height={11} />
         <span className="ml-auto rounded-md bg-neutral-100 px-2 py-0.5 text-[11px] font-medium uppercase tracking-wider text-neutral-500">
           Plattform
         </span>
@@ -159,10 +159,10 @@ function Nav({
       <div className="flex items-center gap-2.5 rounded-lg px-2 py-1.5">
         <LogoMark size={32} />
         <span className="min-w-0">
-          <span className="block truncate text-[13px] font-semibold leading-tight text-neutral-900">
-            Tikkr
+          <span className="block leading-tight">
+            <WordmarkOnly height={10} />
           </span>
-          <span className="block text-[11px] leading-tight text-neutral-400">
+          <span className="mt-0.5 block text-[11px] leading-tight text-neutral-400">
             Plattform
           </span>
         </span>
@@ -193,7 +193,7 @@ function Nav({
                       }`}
                     >
                       <Icon
-                        className={active ? "text-blue-600" : "text-neutral-400"}
+                        className={active ? "text-tick-deep" : "text-neutral-400"}
                       />
                       <span className="flex-1 truncate">{link.label}</span>
                     </Link>

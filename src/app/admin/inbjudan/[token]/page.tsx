@@ -25,7 +25,7 @@ export default async function InvitePage({
         footer={
           <Link
             href="/admin/login"
-            className="font-medium text-blue-600 hover:underline"
+            className="font-medium text-tick-deep hover:underline"
           >
             Till inloggningen
           </Link>

@@ -18,6 +18,8 @@
  * ingenting "nedanför sidan" längre, och foten hamnar där den ska.
  */
 
+import { DOC } from "./brand";
+
 export interface FooterOptions {
   marginLeft: number;
   contentWidth: number;
@@ -33,7 +35,7 @@ export function drawFooter(
   const bottom = doc.page.margins.bottom;
   doc.page.margins.bottom = 0;
 
-  doc.font("Helvetica").fontSize(7).fillColor("#a3a3a3");
+  doc.font("Helvetica").fontSize(7).fillColor(DOC.faint);
   doc.text(text, options.marginLeft, options.y, {
     width: options.contentWidth,
     align: "center",

@@ -20,7 +20,7 @@ import {
 } from "@/components/ui/icons";
 import type { ModuleKey } from "@/lib/modules";
 import CompanyBadge from "@/components/ui/CompanyBadge";
-import { LogoMark } from "@/components/ui/Logo";
+import { LogoMark, WordmarkOnly } from "@/components/ui/Logo";
 
 /**
  * Vänsternavigeringen.
@@ -183,7 +183,7 @@ export default function AdminSidebar({
                       }`}
                     >
                       <Icon
-                        className={active ? "text-blue-600" : "text-neutral-400"}
+                        className={active ? "text-tick-deep" : "text-neutral-400"}
                       />
                       <span className="flex-1 truncate">{link.label}</span>
 
@@ -214,7 +214,7 @@ export default function AdminSidebar({
           <IconSettings
             className={
               pathname.startsWith("/admin/installningar")
-                ? "text-blue-600"
+                ? "text-tick-deep"
                 : "text-neutral-400"
             }
           />
@@ -235,11 +235,9 @@ export default function AdminSidebar({
 
         {/* Tikkr-märket nedtonat. Panelen tillhör kunden — deras logotyp står
             överst, vår står i marginalen. */}
-        <div className="flex items-center gap-2 px-2 pt-2.5">
+        <div className="flex items-center gap-2 px-2 pt-2.5 text-neutral-400">
           <LogoMark size={22} />
-          <span className="text-[13px] font-semibold text-neutral-400">
-            Tikkr
-          </span>
+          <WordmarkOnly height={10} tone="current" />
         </div>
       </div>
     </nav>
@@ -259,7 +257,7 @@ export default function AdminSidebar({
             <path d="M4 6h16M4 12h16M4 18h16" />
           </svg>
         </button>
-        <span className="text-sm font-semibold">Tikkr</span>
+        <WordmarkOnly height={11} />
         {reviewCount > 0 && (
           <span className="ml-auto rounded bg-amber-100 px-1.5 py-0.5 text-[11px] font-semibold text-amber-700">
             {reviewCount} att granska

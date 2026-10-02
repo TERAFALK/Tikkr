@@ -10,3 +10,7 @@ coverage
 backups
 caddy_data
 caddy_config
+
+# Varumärkesmaterialet. Källfilerna behövs varken vid bygget eller i
+# drift — det appen levererar ligger kopierat i public/.
+brand

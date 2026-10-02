@@ -96,7 +96,7 @@ export function EndingTrialList({ trials }: { trials: EndingTrial[] }) {
   if (trials.length === 0) return null;
 
   return (
-    <Card className="border-blue-200">
+    <Card className="border-blue-300">
       <CardHeader
         title={`Provperioder som upphör (${trials.length})`}
         description="Inom sju dagar. Antalet stämplingar visar i vilken grad tjänsten tagits i bruk."

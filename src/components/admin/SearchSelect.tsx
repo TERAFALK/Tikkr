@@ -252,7 +252,7 @@ export default function SearchSelect({
                   onClick={() => pick(option.id)}
                   className={`w-full px-3 py-2 text-left text-[13px] hover:bg-neutral-50 ${
                     option.id === selected
-                      ? "font-medium text-blue-700"
+                      ? "font-medium text-tick-deep"
                       : "text-neutral-900"
                   }`}
                 >

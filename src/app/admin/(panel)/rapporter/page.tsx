@@ -358,7 +358,7 @@ export default async function ReportsPage({
                               vad den tiden gick till. */}
                           <Link
                             href={`/admin/kunder/${group.key}`}
-                            className="font-medium text-blue-600 hover:underline"
+                            className="font-medium text-tick-deep hover:underline"
                           >
                             {group.label}
                           </Link>

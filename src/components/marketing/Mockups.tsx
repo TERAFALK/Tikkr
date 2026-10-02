@@ -21,6 +21,8 @@
  * på bär mer information och ljuger inte.
  */
 
+import { WordmarkOnly } from "@/components/ui/Logo";
+
 export function Frame({
   label,
   meta,
@@ -35,7 +37,7 @@ export function Frame({
 }) {
   return (
     <div
-      className={`overflow-hidden rounded-lg border border-neutral-200 bg-white shadow-[0_1px_1px_rgba(15,23,42,0.04),0_24px_48px_-28px_rgba(15,23,42,0.35)] ${className}`}
+      className={`overflow-hidden rounded-lg border border-neutral-200 bg-white shadow-[0_1px_1px_rgba(14,26,43,0.04),0_24px_48px_-28px_rgba(14,26,43,0.35)] ${className}`}
     >
       <div className="flex items-center justify-between gap-3 border-b border-neutral-200 bg-neutral-50 px-3 py-2">
         <span className="truncate text-[10px] font-semibold uppercase tracking-[0.12em] text-neutral-400">
@@ -79,8 +81,11 @@ export function KioskChrome({ children }: { children?: React.ReactNode }) {
 
       <span className="ml-auto flex items-center gap-2">
         {children}
-        <span className="text-[10px] font-semibold text-neutral-400">
-          tikkr
+        {/* Riktiga ordmärket och inte ordet skrivet som text. Mockupen är en
+            bild av produkten, och en logotyp som skiljer sig från produktens
+            syns först när någon jämför en skärmdump med säljsidan. */}
+        <span className="text-neutral-400">
+          <WordmarkOnly height={8} tone="current" />
         </span>
       </span>
     </div>
@@ -197,17 +202,17 @@ export const PEOPLE: KioskPerson[] = [
     job: "2603 · Montering",
     tone: "bg-amber-100 text-amber-700",
   },
-  { name: "David Dahl", job: null, tone: "bg-violet-100 text-violet-700" },
+  { name: "David Dahl", job: null, tone: "bg-blue-200 text-blue-800" },
   {
     name: "Erik Ek",
     job: "2601 · Fräsning",
-    tone: "bg-rose-100 text-rose-700",
+    tone: "bg-emerald-200 text-emerald-800",
   },
   {
     name: "Frida Falk",
     job: null,
     last: "2603 · Kapning",
-    tone: "bg-cyan-100 text-cyan-700",
+    tone: "bg-neutral-200 text-neutral-700",
   },
   {
     name: "Gustav Gran",

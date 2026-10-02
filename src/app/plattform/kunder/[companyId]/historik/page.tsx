@@ -39,7 +39,7 @@ export default async function CompanyHistoryPage({
     <PlatformShell email={email}>
       <Link
         href={`/plattform/kunder/${companyId}`}
-        className="text-[13px] font-medium text-blue-600 hover:underline"
+        className="text-[13px] font-medium text-tick-deep hover:underline"
       >
         ← {company.name}
       </Link>

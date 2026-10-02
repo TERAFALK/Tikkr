@@ -61,7 +61,7 @@ const sections: Section[] = [
         <p>
           Avtalet reglerar biträdets behandling av personuppgifter för den
           ansvariges räkning, och utgör en del av{" "}
-          <Link href="/villkor" className="text-blue-600 hover:underline">
+          <Link href="/villkor" className="text-tick-deep hover:underline">
             användarvillkoren
           </Link>
           . Det ingås när en arbetsyta skapas och gäller så länge biträdet
@@ -189,7 +189,7 @@ const sections: Section[] = [
           behandlingsort, lämnas på begäran till{" "}
           <a
             href="mailto:support@tikkr.se"
-            className="font-medium text-blue-600 hover:underline"
+            className="font-medium text-tick-deep hover:underline"
           >
             support@tikkr.se
           </a>
@@ -299,7 +299,7 @@ const sections: Section[] = [
         dokumentation lämnas det på begäran till{" "}
         <a
           href="mailto:support@tikkr.se"
-          className="font-medium text-blue-600 hover:underline"
+          className="font-medium text-tick-deep hover:underline"
         >
           support@tikkr.se
         </a>

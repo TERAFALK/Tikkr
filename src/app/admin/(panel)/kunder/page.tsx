@@ -131,7 +131,7 @@ export default async function CustomersPage({
                           platsen där tid, pengar och ordrar står samlade. */}
                       <Link
                         href={`/admin/kunder/${customer.id}`}
-                        className="font-medium text-blue-600 hover:underline"
+                        className="font-medium text-tick-deep hover:underline"
                       >
                         {customer.name}
                       </Link>

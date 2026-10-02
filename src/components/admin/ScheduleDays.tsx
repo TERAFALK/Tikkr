@@ -261,7 +261,7 @@ export default function ScheduleDays({
                 <button
                   type="button"
                   onClick={() => addBreak(day.weekday)}
-                  className="inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-[13px] font-medium text-blue-700 hover:bg-blue-50"
+                  className="inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-[13px] font-medium text-tick-deep hover:bg-emerald-50"
                 >
                   <IconPlus />
                   Lägg till rast

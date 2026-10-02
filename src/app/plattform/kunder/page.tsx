@@ -126,7 +126,7 @@ export default async function CompaniesPage({
                   <Td>
                     <Link
                       href={`/plattform/kunder/${company.id}`}
-                      className="font-medium text-blue-600"
+                      className="font-medium text-tick-deep"
                     >
                       {company.name}
                     </Link>
@@ -166,7 +166,7 @@ export default async function CompaniesPage({
           {matches.length === 0 && (
             <p className="px-5 py-6 text-center text-[13px] text-neutral-500">
               Ingen kund matchar ”{query}”.{" "}
-              <Link href="/plattform/kunder" className="text-blue-600">
+              <Link href="/plattform/kunder" className="text-tick-deep">
                 Visa alla
               </Link>
             </p>

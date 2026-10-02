@@ -15,7 +15,12 @@
  * ändå, så länge sidan inte laddas om.
  */
 
-const CACHE = "tikkr-v1";
+/*
+  Versionen bumpas när något som ligger sparat här har bytt innehåll utan att
+  byta namn. Vid v2: logotyp och ikoner enligt Tikkr brand guidelines v1.0.
+  Gamla cachen städas bort i "activate" nedan, och skärmen hämtar det nya.
+*/
+const CACHE = "tikkr-v2";
 
 self.addEventListener("install", (event) => {
   event.waitUntil(

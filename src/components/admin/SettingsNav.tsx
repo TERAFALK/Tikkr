@@ -104,7 +104,7 @@ export default function SettingsNav({ modules }: { modules: ModuleKey[] }) {
                 }`}
               >
                 <Icon
-                  className={`mt-0.5 ${active ? "text-blue-600" : "text-neutral-400"}`}
+                  className={`mt-0.5 ${active ? "text-tick-deep" : "text-neutral-400"}`}
                 />
                 <span className="min-w-0">
                   <span className="block text-[13px] font-medium">

@@ -109,7 +109,7 @@ export default function SubscriptionLocked({
         <p className="mt-6 text-xs text-neutral-400">
           {companyName}
           {" · "}
-          <Link href="/kiosk" className="text-blue-600">
+          <Link href="/kiosk" className="text-tick-deep">
             till stämplingsskärmen
           </Link>
         </p>

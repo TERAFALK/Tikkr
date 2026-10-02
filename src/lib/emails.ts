@@ -31,17 +31,42 @@ import type { EmailMessage } from "./email";
 /* Utformning                                                                  */
 /* -------------------------------------------------------------------------- */
 
+/**
+ * Varumärkets färger, med namn efter vad de gör i mejlet.
+ *
+ * Värdena står utskrivna och importeras INTE från `brand.ts`. Skälet är att
+ * mejlet byggs som en textsträng där varje färg står inne i ett `style`-attribut
+ * — ett namn som behöver slås upp vid varje rad gör mallen svårare att läsa än
+ * den redan är, och det är mallen som ska gå att granska. Ändras paletten står
+ * det i `brand.ts` vilka sex färgerna är.
+ */
 const COLORS = {
-  page: "#f4f4f5",
-  card: "#ffffff",
-  border: "#e5e5e5",
-  heading: "#171717",
-  body: "#525252",
-  muted: "#a3a3a3",
-  accent: "#2563eb",
-  linkBox: "#fafafa",
+  page: "#F5F6F2", // Snö
+  card: "#FFFFFF",
+  border: "#D9DDD6", // Lav
+  heading: "#0E1A2B", // Fjord
+  body: "#35404F",
+  muted: "#5B6573", // Skiffer
+  /*
+    Knappen är Fjord och inte grönt.
+
+    Paletten ger grönt som accent på ljus bakgrund, men vit text på Tick Deep
+    når inte läsbarhetskravet, och ett mejl om ett glömt lösenord läses av någon
+    som har bråttom. Fjord är dessutom samma färg som panelens knappar, vilket
+    gör att mejlet och systemet ser ut att komma från samma avsändare.
+  */
+  accent: "#0E1A2B", // Fjord
+  linkBox: "#F5F6F2", // Snö
 };
 
+/**
+ * Typsnittet är mottagarens eget, inte Geist.
+ *
+ * Varumärket föreskriver Geist överallt, men ett mejl kan inte hämta ett
+ * typsnitt: Outlook renderar med Words motor, och webbtypsnitt i mejl blockeras
+ * eller ignoreras. Samma avvägning som regel 4 ovan — hellre ett mejl som
+ * fungerar överallt än ett som ser rätt ut hos några.
+ */
 const FONT =
   "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif";
 
@@ -137,8 +162,13 @@ function render(layout: Layout): string {
         <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:560px;">
 
           <tr>
-            <td style="padding:0 0 18px;font-family:${FONT};font-size:19px;font-weight:600;letter-spacing:-0.3px;color:${COLORS.heading};">
-              Tikkr
+          <!-- Ordmärket: gement "tikkr", halvfet, knipning −5 % enligt
+               varumärkesguiden. Satt som TEXT och inte som bild, eftersom
+               regel 4 ovan säger att mejlet inte får innehålla externa bilder —
+               ett ordmärke som försvinner när bildvisning är avstängd är värre
+               än ett i mottagarens eget typsnitt. -->
+            <td style="padding:0 0 18px;font-family:${FONT};font-size:19px;font-weight:600;letter-spacing:-0.95px;color:${COLORS.heading};">
+              tikkr
             </td>
           </tr>
 

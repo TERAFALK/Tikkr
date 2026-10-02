@@ -17,7 +17,7 @@ export default function ForgotPasswordPage() {
           Kom du på det?{" "}
           <Link
             href="/admin/login"
-            className="font-medium text-blue-600 hover:underline"
+            className="font-medium text-tick-deep hover:underline"
           >
             Tillbaka till inloggningen
           </Link>

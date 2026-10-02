@@ -49,7 +49,7 @@ export default async function NoticesPage({
       <PlatformShell email={email}>
         <Link
           href="/plattform/meddelanden"
-          className="text-[13px] font-medium text-blue-600 hover:underline"
+          className="text-[13px] font-medium text-tick-deep hover:underline"
         >
           ← Driftmeddelanden
         </Link>

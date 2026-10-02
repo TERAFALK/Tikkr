@@ -11,14 +11,26 @@
  * gång sidan uppdateras.
  */
 
-/** Färg ur namnet, så att samma person alltid får samma ton. */
+/**
+ * Färg ur namnet, så att samma person alltid får samma ton.
+ *
+ * Tonerna ligger inom paletten: Fjord, grönt och Lav i två styrkor vardera,
+ * plus gult. Tre av dem var tidigare violett, rosa och cyan — färger som inte
+ * finns i varumärket, och som syntes desto mer eftersom resten av gränssnittet
+ * är Fjord och Snö.
+ *
+ * Sex toner ur två kulörer betyder att ett par av dem skiljer sig i styrka och
+ * inte i färg. Det räcker: uppgiften är att SAMMA person alltid får samma ton
+ * så att ögat hittar rätt knapp på formen, inte att sex personer ska gå att
+ * skilja åt på färgen ensam. Namnet står bredvid.
+ */
 const TONES = [
   "bg-blue-100 text-blue-700",
   "bg-emerald-100 text-emerald-700",
   "bg-amber-100 text-amber-700",
-  "bg-violet-100 text-violet-700",
-  "bg-rose-100 text-rose-700",
-  "bg-cyan-100 text-cyan-700",
+  "bg-blue-200 text-blue-800",
+  "bg-emerald-200 text-emerald-800",
+  "bg-neutral-200 text-neutral-700",
 ];
 
 function toneFor(name: string): string {

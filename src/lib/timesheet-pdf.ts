@@ -7,6 +7,7 @@ import {
   formatTime,
 } from "./format";
 import { drawFooter } from "./pdf-footer";
+import { DOC } from "./brand";
 
 /**
  * TIDRAPPORTEN SOM PDF — LÖNEUNDERLAGET.
@@ -84,7 +85,7 @@ export function buildTimesheetPdf(
   if (periods.length === 0) {
     doc
       .fontSize(11)
-      .fillColor("#525252")
+      .fillColor(DOC.body)
       .text("Ingen anställd vald.", MARGIN, MARGIN);
   }
 
@@ -112,18 +113,18 @@ function renderPeriod(
     }
   }
 
-  doc.font("Helvetica-Bold").fontSize(20).fillColor("#0a0a0a");
+  doc.font("Helvetica-Bold").fontSize(20).fillColor(DOC.heading);
   doc.text("Tidrapport", MARGIN, y);
 
   // Anställningsnumret till höger, som i kundens rapport. Det är så två
   // personer med samma namn hålls isär i lönekörningen.
   if (period.employee.employeeNumber) {
-    doc.font("Helvetica").fontSize(10).fillColor("#525252");
+    doc.font("Helvetica").fontSize(10).fillColor(DOC.body);
     doc.text("Anställd", A4_WIDTH - MARGIN - 160, y + 4, {
       width: 100,
       align: "right",
     });
-    doc.font("Helvetica-Bold").fontSize(14).fillColor("#0a0a0a");
+    doc.font("Helvetica-Bold").fontSize(14).fillColor(DOC.heading);
     doc.text(period.employee.employeeNumber, A4_WIDTH - MARGIN - 60, y, {
       width: 60,
       align: "right",
@@ -132,13 +133,13 @@ function renderPeriod(
 
   y = doc.y + 10;
 
-  doc.rect(MARGIN, y, CONTENT_WIDTH, 30).fill("#f5f5f5");
-  doc.font("Helvetica").fontSize(8).fillColor("#737373");
+  doc.rect(MARGIN, y, CONTENT_WIDTH, 30).fill(DOC.tint);
+  doc.font("Helvetica").fontSize(8).fillColor(DOC.muted);
   doc.text("Namn", MARGIN + 8, y + 5);
-  doc.font("Helvetica-Bold").fontSize(11).fillColor("#0a0a0a");
+  doc.font("Helvetica-Bold").fontSize(11).fillColor(DOC.heading);
   doc.text(period.employee.name, MARGIN + 8, y + 15);
 
-  doc.font("Helvetica").fontSize(8).fillColor("#737373");
+  doc.font("Helvetica").fontSize(8).fillColor(DOC.muted);
   doc.text(
     `${company.name}   ·   ${formatDate(period.from, tz)} – ${formatDate(
       period.to,
@@ -182,7 +183,7 @@ function renderPeriod(
     const label = `${dayName(day.weekday)} ${formatDate(day.date, tz)}`;
 
     for (const absence of day.absences) {
-      doc.font("Helvetica").fontSize(9).fillColor("#a16207");
+      doc.font("Helvetica").fontSize(9).fillColor(DOC.warn);
       doc.text(label, MARGIN + 4, y + 4, { width: 90, lineBreak: false });
       doc.text(absence.reason, MARGIN + 100, y + 4, {
         width: 200,
@@ -197,7 +198,7 @@ function renderPeriod(
     }
 
     for (const entry of day.entries) {
-      doc.font("Helvetica").fontSize(9).fillColor("#171717");
+      doc.font("Helvetica").fontSize(9).fillColor(DOC.heading);
       doc.text(label, MARGIN + 4, y + 4, { width: 90, lineBreak: false });
 
       const what = entry.momentName
@@ -229,7 +230,7 @@ function renderPeriod(
     }
 
     for (const rest of day.breaks) {
-      doc.font("Helvetica").fontSize(8).fillColor("#a3a3a3");
+      doc.font("Helvetica").fontSize(8).fillColor(DOC.faint);
       doc.text(label, MARGIN + 4, y + 4, { width: 90, lineBreak: false });
       doc.text(rest.name, MARGIN + 100, y + 4, { width: 200, lineBreak: false });
       doc.text(formatTime(rest.startedAt, tz), MARGIN + 305, y + 4, {
@@ -252,7 +253,7 @@ function renderPeriod(
 
     // Dagssumman, som i kundens rapport: en fet siffra under dagens rader.
     if (day.workedMinutes > 0) {
-      doc.font("Helvetica-Bold").fontSize(9).fillColor("#0a0a0a");
+      doc.font("Helvetica-Bold").fontSize(9).fillColor(DOC.heading);
       doc.text(
         formatDuration(day.workedMinutes),
         A4_WIDTH - MARGIN - 64,
@@ -265,7 +266,7 @@ function renderPeriod(
     doc
       .moveTo(MARGIN, y)
       .lineTo(A4_WIDTH - MARGIN, y)
-      .strokeColor("#e5e5e5")
+      .strokeColor(DOC.rule)
       .stroke();
     y += 4;
   }
@@ -278,8 +279,8 @@ function renderPeriod(
   }
 
   y += 4;
-  doc.rect(MARGIN, y, CONTENT_WIDTH, 24).fill("#f5f5f5");
-  doc.font("Helvetica-Bold").fontSize(10).fillColor("#0a0a0a");
+  doc.rect(MARGIN, y, CONTENT_WIDTH, 24).fill(DOC.tint);
+  doc.font("Helvetica-Bold").fontSize(10).fillColor(DOC.heading);
   doc.text("Totalt för perioden", MARGIN + 8, y + 7, { width: 240 });
   doc.text(
     formatDuration(period.totals.worked),
@@ -297,12 +298,12 @@ function renderPeriod(
 
   if (period.indirectByMoment.length > 0) {
     y += 10;
-    doc.font("Helvetica-Bold").fontSize(9).fillColor("#0a0a0a");
+    doc.font("Helvetica-Bold").fontSize(9).fillColor(DOC.heading);
     doc.text("Improduktiv tid", MARGIN, y);
     y += 14;
 
     for (const row of period.indirectByMoment) {
-      doc.font("Helvetica").fontSize(9).fillColor("#404040");
+      doc.font("Helvetica").fontSize(9).fillColor(DOC.body);
       doc.text(row.name, MARGIN + 8, y, { width: 300, lineBreak: false });
       doc.text(formatDuration(row.minutes), A4_WIDTH - MARGIN - 68, y, {
         width: 60,
@@ -329,7 +330,7 @@ function renderPeriod(
     y = MARGIN;
   }
 
-  doc.font("Helvetica").fontSize(9).fillColor("#525252");
+  doc.font("Helvetica").fontSize(9).fillColor(DOC.body);
 
   // Fälten är kundens egna, från blanketten de använt i tio år.
   const fields = [
@@ -347,7 +348,7 @@ function renderPeriod(
     doc
       .moveTo(x, y + 26)
       .lineTo(x + width - 16, y + 26)
-      .strokeColor("#a3a3a3")
+      .strokeColor(DOC.faint)
       .stroke();
   });
 
@@ -359,7 +360,7 @@ function renderPeriod(
 }
 
 function drawRowHeader(doc: PDFKit.PDFDocument, y: number): number {
-  doc.font("Helvetica-Bold").fontSize(8).fillColor("#737373");
+  doc.font("Helvetica-Bold").fontSize(8).fillColor(DOC.muted);
   doc.text("Dag", MARGIN + 4, y, { width: 90, lineBreak: false });
   doc.text("Order / improduktivt", MARGIN + 100, y, { width: 200, lineBreak: false });
   doc.text("Start", MARGIN + 305, y, { width: 46, lineBreak: false });
@@ -378,7 +379,7 @@ function drawRowHeader(doc: PDFKit.PDFDocument, y: number): number {
   doc
     .moveTo(MARGIN, y)
     .lineTo(A4_WIDTH - MARGIN, y)
-    .strokeColor("#d4d4d4")
+    .strokeColor(DOC.rule)
     .stroke();
 
   return y + 2;
@@ -420,7 +421,7 @@ function drawSummary(
   ];
 
   const height = rows.length * 16 + 14;
-  doc.rect(MARGIN, y, CONTENT_WIDTH, height).fill("#fafafa");
+  doc.rect(MARGIN, y, CONTENT_WIDTH, height).fill(DOC.tint);
 
   let cursor = y + 8;
   const half = CONTENT_WIDTH / 2;
@@ -431,10 +432,10 @@ function drawSummary(
 
       const x = MARGIN + 8 + half * column;
 
-      doc.font("Helvetica").fontSize(9).fillColor("#525252");
+      doc.font("Helvetica").fontSize(9).fillColor(DOC.body);
       doc.text(label, x, cursor, { width: half - 90, lineBreak: false });
 
-      doc.font("Helvetica-Bold").fontSize(9).fillColor("#0a0a0a");
+      doc.font("Helvetica-Bold").fontSize(9).fillColor(DOC.heading);
       doc.text(value, x + half - 100, cursor, {
         width: 70,
         align: "right",
@@ -450,7 +451,7 @@ function drawSummary(
   // Teckenförklaring, inte en förklaring av räkningen. Två bokstäver i en smal
   // kolumn är inte självförklarande; hur flexen räknas fram hör hemma i
   // payroll.ts och i CLAUDE.md, inte på kundens papper.
-  doc.font("Helvetica").fontSize(7).fillColor("#a3a3a3");
+  doc.font("Helvetica").fontSize(7).fillColor(DOC.faint);
   doc.text("P = produktiv, I = improduktiv", MARGIN, y, {
     width: CONTENT_WIDTH,
   });

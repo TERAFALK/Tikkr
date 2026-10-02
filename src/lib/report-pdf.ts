@@ -3,6 +3,7 @@ import type { ReportResult, ReportGroup } from "./report";
 import { formatDate, formatDateTime, formatDuration } from "./format";
 import { drawBarChart } from "./pdf-chart";
 import { drawFooter } from "./pdf-footer";
+import { DOC } from "./brand";
 
 /**
  * RAPPORTEN SOM PDF.
@@ -112,17 +113,17 @@ function render(
     }
   }
 
-  doc.font("Helvetica-Bold").fontSize(10).fillColor("#171717");
+  doc.font("Helvetica-Bold").fontSize(10).fillColor(DOC.heading);
   doc.text(company.name, MARGIN, y);
   y = doc.y + 14;
 
-  doc.font("Helvetica-Bold").fontSize(20).fillColor("#0a0a0a");
+  doc.font("Helvetica-Bold").fontSize(20).fillColor(DOC.heading);
   doc.text("Tidrapport", MARGIN, y);
   y = doc.y + 6;
 
   // Filtren i klartext. En rapport utan sina villkor är en siffra utan fråga,
   // och den som hittar utskriften om ett halvår ska veta vad den visar.
-  doc.font("Helvetica").fontSize(9).fillColor("#737373");
+  doc.font("Helvetica").fontSize(9).fillColor(DOC.muted);
   doc.text(
     [...options.filterLines, `Skapad ${formatDate(new Date(), company.timezone)}`].join(
       "   ·   "
@@ -136,7 +137,7 @@ function render(
 
   /* --- Summering ----------------------------------------------------------- */
 
-  doc.rect(MARGIN, y, CONTENT_WIDTH, 54).fill("#f5f5f5");
+  doc.rect(MARGIN, y, CONTENT_WIDTH, 54).fill(DOC.tint);
 
   const stats: [string, string][] = [
     ["Att fakturera", formatDuration(report.billableMinutes)],
@@ -150,17 +151,17 @@ function render(
   stats.forEach(([label, value], index) => {
     const x = MARGIN + statWidth * index + 10;
 
-    doc.font("Helvetica").fontSize(8).fillColor("#737373");
+    doc.font("Helvetica").fontSize(8).fillColor(DOC.muted);
     doc.text(label.toUpperCase(), x, y + 10, { width: statWidth - 20 });
 
-    doc.font("Helvetica-Bold").fontSize(14).fillColor("#0a0a0a");
+    doc.font("Helvetica-Bold").fontSize(14).fillColor(DOC.heading);
     doc.text(value, x, y + 24, { width: statWidth - 20 });
   });
 
   y += 66;
 
   if (report.ongoingCount > 0) {
-    doc.font("Helvetica").fontSize(8).fillColor("#a16207");
+    doc.font("Helvetica").fontSize(8).fillColor(DOC.warn);
     doc.text(
       `${report.ongoingCount} stämpling${report.ongoingCount === 1 ? "" : "ar"} ` +
         `pågår och är räknad till och med utskriftstillfället.`,
@@ -179,7 +180,7 @@ function render(
     report.byMoment,
     report.billableMinutes,
     y,
-    "#2563eb"
+    DOC.accent
   );
 
   // Egen stapel, egen färg, egen rubrik. Improduktiv tid ska synas men aldrig
@@ -190,7 +191,7 @@ function render(
     report.byIndirect,
     report.indirectMinutes,
     y,
-    "#a16207"
+    DOC.warn
   );
 
   /* --- Tabellen ------------------------------------------------------------ */
@@ -269,7 +270,7 @@ function drawGroupTable(
   let y = startY + 6;
 
   if (groups.length === 0) {
-    doc.font("Helvetica").fontSize(9).fillColor("#737373");
+    doc.font("Helvetica").fontSize(9).fillColor(DOC.muted);
     doc.text("Ingen registrerad tid i perioden.", MARGIN, y);
     return doc.y + 10;
   }
@@ -323,7 +324,7 @@ function drawDetailTable(
   let y = startY + 6;
 
   if (report.rows.length === 0) {
-    doc.font("Helvetica").fontSize(9).fillColor("#737373");
+    doc.font("Helvetica").fontSize(9).fillColor(DOC.muted);
     doc.text("Ingen registrerad tid i perioden.", MARGIN, y);
     return doc.y + 10;
   }
@@ -351,7 +352,7 @@ function drawDetailTable(
         formatDuration(row.minutes),
       ],
       y,
-      row.billable ? "#404040" : "#a16207"
+      row.billable ? DOC.body : DOC.warn
     );
 
     y += 20;
@@ -375,8 +376,8 @@ function drawHead(
   columns: Column[],
   y: number
 ): number {
-  doc.rect(MARGIN, y, CONTENT_WIDTH, 22).fill("#0a0a0a");
-  doc.font("Helvetica-Bold").fontSize(9).fillColor("#ffffff");
+  doc.rect(MARGIN, y, CONTENT_WIDTH, 22).fill(DOC.band);
+  doc.font("Helvetica-Bold").fontSize(9).fillColor(DOC.onBand);
 
   let x = MARGIN + 8;
   for (const column of columns) {
@@ -396,7 +397,7 @@ function drawRow(
   columns: Column[],
   values: string[],
   y: number,
-  color = "#404040"
+  color = DOC.body
 ) {
   doc.font("Helvetica").fontSize(9).fillColor(color);
 
@@ -422,8 +423,8 @@ function drawTotal(
     y = MARGIN;
   }
 
-  doc.rect(MARGIN, y, CONTENT_WIDTH, 24).fill("#f5f5f5");
-  doc.font("Helvetica-Bold").fontSize(10).fillColor("#0a0a0a");
+  doc.rect(MARGIN, y, CONTENT_WIDTH, 24).fill(DOC.tint);
+  doc.font("Helvetica-Bold").fontSize(10).fillColor(DOC.heading);
 
   let x = MARGIN + 8;
   values.forEach((value, index) => {
@@ -442,7 +443,7 @@ function line(doc: PDFKit.PDFDocument, y: number) {
   doc
     .moveTo(MARGIN, y)
     .lineTo(A4_WIDTH - MARGIN, y)
-    .strokeColor("#f0f0f0")
+    .strokeColor(DOC.hairline)
     .stroke();
 }
 
@@ -481,7 +482,7 @@ function drawEmployeeDetailTable(
   let y = startY + 6;
 
   if (report.rows.length === 0) {
-    doc.font("Helvetica").fontSize(9).fillColor("#737373");
+    doc.font("Helvetica").fontSize(9).fillColor(DOC.muted);
     doc.text("Ingen registrerad tid i perioden.", MARGIN, y);
     return doc.y + 10;
   }
@@ -513,13 +514,13 @@ function drawEmployeeDetailTable(
     doc.addPage();
     y = MARGIN;
 
-    doc.font("Helvetica-Bold").fontSize(11).fillColor("#0a0a0a");
+    doc.font("Helvetica-Bold").fontSize(11).fillColor(DOC.heading);
     doc.text(heading, MARGIN, y);
     y += 15;
 
     // Företag och period under namnet. Ett löst papper ska svara på vem det
     // gäller, var det kommer ifrån och vilken vecka det är.
-    doc.font("Helvetica").fontSize(8).fillColor("#737373");
+    doc.font("Helvetica").fontSize(8).fillColor(DOC.muted);
     doc.text(`${company.name}   ·   ${period}`, MARGIN, y, {
       width: CONTENT_WIDTH,
     });
@@ -549,7 +550,7 @@ function drawEmployeeDetailTable(
         y,
         // Improduktiv tid i samma gula som överallt annars. Den ska synas i
         // listan utan att läsas som något som ska faktureras.
-        row.billable ? "#404040" : "#a16207"
+        row.billable ? DOC.body : DOC.warn
       );
 
       y += 20;

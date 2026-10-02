@@ -12,3 +12,6 @@ Dockerfile text eol=lf
 *.jpg binary
 *.ico binary
 *.woff2 binary
+# Riktlinjerna i brand/. Utan raden avgör Gits gissning om filen är
+# text, och en PDF som får sina radbrytningar bytta går inte att öppna.
+*.pdf binary

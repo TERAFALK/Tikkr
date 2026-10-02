@@ -200,7 +200,7 @@ export default function BudgetMoments({
           type="button"
           onClick={add}
           disabled={available.length === 0}
-          className="inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-[13px] font-medium text-blue-700 hover:bg-blue-50 disabled:cursor-not-allowed disabled:text-neutral-400 disabled:hover:bg-transparent"
+          className="inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-[13px] font-medium text-tick-deep hover:bg-emerald-50 disabled:cursor-not-allowed disabled:text-neutral-400 disabled:hover:bg-transparent"
         >
           <IconPlus />
           Lägg till arbetsmoment

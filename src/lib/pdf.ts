@@ -4,6 +4,7 @@ import { formatDate, formatDateTime, formatDuration } from "./format";
 import { formatCurrency } from "./money";
 import { drawBarChart } from "./pdf-chart";
 import { drawFooter } from "./pdf-footer";
+import { DOC } from "./brand";
 
 /**
  * UNDERLAG SOM PDF.
@@ -85,7 +86,7 @@ export function buildOrderPdf(
   if (orders.length === 0) {
     doc
       .fontSize(11)
-      .fillColor("#525252")
+      .fillColor(DOC.body)
       .text("Inga ordrar valda.", MARGIN, MARGIN);
   }
 
@@ -117,19 +118,19 @@ function renderOrder(
   doc
     .font("Helvetica-Bold")
     .fontSize(11)
-    .fillColor("#171717")
+    .fillColor(DOC.heading)
     .text(company.name, MARGIN, y);
 
   y = doc.y + 18;
 
   /* --- Rubrik ------------------------------------------------------------- */
 
-  doc.font("Helvetica-Bold").fontSize(20).fillColor("#0a0a0a");
+  doc.font("Helvetica-Bold").fontSize(20).fillColor(DOC.heading);
   doc.text(`Order ${order.orderNumber}`, MARGIN, y);
   y = doc.y + 2;
 
   if (order.customer) {
-    doc.font("Helvetica").fontSize(13).fillColor("#525252");
+    doc.font("Helvetica").fontSize(13).fillColor(DOC.body);
     doc.text(order.customer.name, MARGIN, y);
     y = doc.y;
 
@@ -145,7 +146,7 @@ function renderOrder(
     ].filter((line): line is string => Boolean(line));
 
     if (lines.length > 0) {
-      doc.font("Helvetica").fontSize(9).fillColor("#737373");
+      doc.font("Helvetica").fontSize(9).fillColor(DOC.muted);
       for (const line of lines) {
         doc.text(line, MARGIN, y + 2);
         y = doc.y;
@@ -160,7 +161,7 @@ function renderOrder(
       ? `${formatDate(order.firstEntryAt, company.timezone)} – ${formatDate(order.lastEntryAt, company.timezone)}`
       : "Ingen registrerad tid";
 
-  doc.font("Helvetica").fontSize(9).fillColor("#737373");
+  doc.font("Helvetica").fontSize(9).fillColor(DOC.muted);
   doc.text(
     `Period: ${period}   ·   Underlag skapat ${formatDate(new Date(), company.timezone)}`,
     MARGIN,
@@ -171,8 +172,8 @@ function renderOrder(
 
   /* --- Tabellhuvud -------------------------------------------------------- */
 
-  doc.rect(MARGIN, y, CONTENT_WIDTH, 22).fill("#0a0a0a");
-  doc.font("Helvetica-Bold").fontSize(9).fillColor("#ffffff");
+  doc.rect(MARGIN, y, CONTENT_WIDTH, 22).fill(DOC.band);
+  doc.font("Helvetica-Bold").fontSize(9).fillColor(DOC.onBand);
 
   let x = MARGIN + 8;
   for (const column of COLUMNS) {
@@ -196,7 +197,7 @@ function renderOrder(
       y = MARGIN;
     }
 
-    doc.fillColor("#404040");
+    doc.fillColor(DOC.body);
 
     const values = [
       // Numret bakom namnet, inte i en egen kolumn. Underlaget går vidare
@@ -227,7 +228,7 @@ function renderOrder(
     // Mottagaren har rätt att veta vilka rader som inte kommer från en riktig
     // stämpling — att dölja det vore att lura någon som betalar.
     if (row.needsReview || row.manual) {
-      doc.fillColor("#a16207").fontSize(7);
+      doc.fillColor(DOC.warn).fontSize(7);
       doc.text(
         row.needsReview ? "beräknad sluttid" : "manuellt registrerad",
         MARGIN + 8,
@@ -240,7 +241,7 @@ function renderOrder(
       y += 20;
     }
 
-    doc.moveTo(MARGIN, y).lineTo(A4_WIDTH - MARGIN, y).strokeColor("#e5e5e5").stroke();
+    doc.moveTo(MARGIN, y).lineTo(A4_WIDTH - MARGIN, y).strokeColor(DOC.rule).stroke();
   }
 
   /* --- Summa -------------------------------------------------------------- */
@@ -251,9 +252,9 @@ function renderOrder(
   }
 
   y += 4;
-  doc.rect(MARGIN, y, CONTENT_WIDTH, 26).fill("#f5f5f5");
+  doc.rect(MARGIN, y, CONTENT_WIDTH, 26).fill(DOC.tint);
 
-  doc.font("Helvetica-Bold").fontSize(10).fillColor("#0a0a0a");
+  doc.font("Helvetica-Bold").fontSize(10).fillColor(DOC.heading);
   doc.text("TOTALT", MARGIN + 8, y + 8, { width: 200 });
   doc.text(
     formatDuration(order.totalMinutes),
@@ -268,7 +269,7 @@ function renderOrder(
     const over = order.totalMinutes > order.budgetMinutes;
     const share = Math.round((order.totalMinutes / order.budgetMinutes) * 100);
 
-    doc.font("Helvetica").fontSize(8).fillColor(over ? "#a16207" : "#525252");
+    doc.font("Helvetica").fontSize(8).fillColor(over ? DOC.warn : DOC.body);
     doc.text(
       `Beräknad tid ${formatDuration(order.budgetMinutes)}. Upparbetat ${share} %.`,
       MARGIN,
@@ -297,7 +298,7 @@ function renderOrder(
     }
 
     for (const [label, amount] of rows) {
-      doc.font("Helvetica").fontSize(9).fillColor("#525252");
+      doc.font("Helvetica").fontSize(9).fillColor(DOC.body);
       doc.text(label, MARGIN + 8, y, { width: 200 });
       doc.text(formatCurrency(amount), A4_WIDTH - MARGIN - 158, y, {
         width: 150,
@@ -306,8 +307,8 @@ function renderOrder(
       y += 14;
     }
 
-    doc.rect(MARGIN, y, CONTENT_WIDTH, 26).fill("#0a0a0a");
-    doc.font("Helvetica-Bold").fontSize(10).fillColor("#ffffff");
+    doc.rect(MARGIN, y, CONTENT_WIDTH, 26).fill(DOC.band);
+    doc.font("Helvetica-Bold").fontSize(10).fillColor(DOC.onBand);
     doc.text("ATT BETALA", MARGIN + 8, y + 8, { width: 200 });
     doc.text(
       formatCurrency(order.price.priceOre),
@@ -319,7 +320,7 @@ function renderOrder(
     y += 30;
 
     if (order.price.isFixed) {
-      doc.font("Helvetica").fontSize(8).fillColor("#737373");
+      doc.font("Helvetica").fontSize(8).fillColor(DOC.muted);
       doc.text("Avtalat fast pris.", MARGIN, y, { width: CONTENT_WIDTH });
       y += 12;
     }
@@ -345,7 +346,7 @@ function renderOrder(
       );
     }
 
-    doc.font("Helvetica").fontSize(8).fillColor("#a16207");
+    doc.font("Helvetica").fontSize(8).fillColor(DOC.warn);
     doc.text(`Anmärkning: ${notes.join(". ")}.`, MARGIN, y, {
       width: CONTENT_WIDTH,
     });

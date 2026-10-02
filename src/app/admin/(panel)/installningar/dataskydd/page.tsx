@@ -125,7 +125,7 @@ export default async function DataProtectionPage() {
             personuppgiftsbiträde. Villkoren för det står i{" "}
             <Link
               href="/personuppgiftsbitradesavtal"
-              className="font-medium text-blue-600 hover:underline"
+              className="font-medium text-tick-deep hover:underline"
             >
               personuppgiftsbiträdesavtalet
             </Link>

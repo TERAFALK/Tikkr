@@ -101,25 +101,25 @@ export default function LegalPage({
             Kontakta{" "}
             <a
               href="mailto:support@tikkr.se"
-              className="font-medium text-blue-600 hover:underline"
+              className="font-medium text-tick-deep hover:underline"
             >
               support@tikkr.se
             </a>
             . Övriga dokument:{" "}
-            <Link href="/villkor" className="text-blue-600 hover:underline">
+            <Link href="/villkor" className="text-tick-deep hover:underline">
               användarvillkor
             </Link>
             ,{" "}
             <Link
               href="/integritetspolicy"
-              className="text-blue-600 hover:underline"
+              className="text-tick-deep hover:underline"
             >
               integritetspolicy
             </Link>{" "}
             och{" "}
             <Link
               href="/personuppgiftsbitradesavtal"
-              className="text-blue-600 hover:underline"
+              className="text-tick-deep hover:underline"
             >
               personuppgiftsbiträdesavtal
             </Link>

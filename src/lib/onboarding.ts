@@ -14,9 +14,9 @@ import type { CompanyDb } from "./tenant";
  * STEGEN RÄKNAR ALLT SOM FINNS, inte bara det som är aktivt just nu (ändrat
  * 2026-09-29). Frågan var tidigare "finns det en ÖPPEN order", och den dagen
  * kunden levererat allt de hade sa guiden att uppsättningen var ogjord: en
- * blå ruta på översikten och ett extra avsnitt i menyn, hos en kund som kört
- * systemet i månader. Samma sak hade hänt när den sista anställda som slutat
- * avaktiverades. Steget svarar på om kunden KAN lägga upp en order, och det
+ * markerad ruta på översikten och ett extra avsnitt i menyn, hos en kund som
+ * kört systemet i månader. Samma sak hade hänt när den sista anställda som
+ * slutat avaktiverades. Steget svarar på om kunden KAN lägga upp en order, och det
  * har de bevisat den dag de gjort det en gång.
  *
  * TVÅ GRUPPER, OCH BARA DEN FÖRSTA AVGÖR OM GUIDEN ÄR KLAR (ändrat

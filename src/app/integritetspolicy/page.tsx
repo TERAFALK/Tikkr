@@ -204,7 +204,7 @@ const sections: Section[] = [
           aktuell förteckning över underleverantörerna lämnas på begäran till{" "}
           <a
             href="mailto:support@tikkr.se"
-            className="font-medium text-blue-600 hover:underline"
+            className="font-medium text-tick-deep hover:underline"
           >
             support@tikkr.se
           </a>
@@ -267,7 +267,7 @@ const sections: Section[] = [
           TERAFALK AB, {" "}
           <a
             href="mailto:support@tikkr.se"
-            className="font-medium text-blue-600 hover:underline"
+            className="font-medium text-tick-deep hover:underline"
           >
             support@tikkr.se
           </a>

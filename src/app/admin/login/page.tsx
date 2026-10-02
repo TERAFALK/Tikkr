@@ -16,7 +16,7 @@ export default function LoginPage() {
           Nytt företag?{" "}
           <Link
             href="/registrera"
-            className="font-medium text-blue-600 hover:underline"
+            className="font-medium text-tick-deep hover:underline"
           >
             Skapa en arbetsyta
           </Link>
@@ -26,7 +26,7 @@ export default function LoginPage() {
         <>
           <Link
             href="/admin/glomt-losenord"
-            className="font-medium text-blue-600 hover:underline"
+            className="font-medium text-tick-deep hover:underline"
           >
             Glömt lösenordet?
           </Link>

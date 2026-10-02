@@ -14,7 +14,7 @@ export default function SignupPage() {
           Har du redan ett konto?{" "}
           <Link
             href="/admin/login"
-            className="font-medium text-blue-600 hover:underline"
+            className="font-medium text-tick-deep hover:underline"
           >
             Logga in
           </Link>
@@ -25,20 +25,20 @@ export default function SignupPage() {
         // efteråt är för sent.
         <>
           Genom att skapa en arbetsyta godkänner du{" "}
-          <Link href="/villkor" className="text-blue-600 hover:underline">
+          <Link href="/villkor" className="text-tick-deep hover:underline">
             användarvillkoren
           </Link>
           ,{" "}
           <Link
             href="/integritetspolicy"
-            className="text-blue-600 hover:underline"
+            className="text-tick-deep hover:underline"
           >
             integritetspolicyn
           </Link>{" "}
           och{" "}
           <Link
             href="/personuppgiftsbitradesavtal"
-            className="text-blue-600 hover:underline"
+            className="text-tick-deep hover:underline"
           >
             personuppgiftsbiträdesavtalet
           </Link>

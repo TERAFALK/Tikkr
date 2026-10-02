@@ -35,17 +35,17 @@ const START: KioskPerson[] = [
     job: "2603 · Montering",
     tone: "bg-amber-100 text-amber-700",
   },
-  { name: "David Dahl", job: null, tone: "bg-violet-100 text-violet-700" },
+  { name: "David Dahl", job: null, tone: "bg-blue-200 text-blue-800" },
   {
     name: "Erik Ek",
     job: "2601 · Fräsning",
-    tone: "bg-rose-100 text-rose-700",
+    tone: "bg-emerald-200 text-emerald-800",
   },
   {
     name: "Frida Falk",
     job: null,
     last: "2603 · Kapning",
-    tone: "bg-cyan-100 text-cyan-700",
+    tone: "bg-neutral-200 text-neutral-700",
   },
   {
     name: "Gustav Gran",

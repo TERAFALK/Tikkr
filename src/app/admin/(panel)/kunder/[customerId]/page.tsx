@@ -95,7 +95,7 @@ export default async function CustomerPage({
     <>
       <Link
         href="/admin/kunder"
-        className="text-[13px] font-medium text-blue-600 hover:underline"
+        className="text-[13px] font-medium text-tick-deep hover:underline"
       >
         ← Kundregistret
       </Link>

@@ -83,5 +83,14 @@ export function middleware(request: NextRequest) {
 export const config = {
   // Statiska filer och API-anrop lämnas i fred. En omdirigering där skulle
   // bara göra sidan långsammare utan att lösa något.
-  matcher: ["/((?!_next/static|_next/image|api|favicon.ico|icon.svg|manifest.json|sw.js).*)"],
+  //
+  // RADEN MÅSTE VARA EN ENDA STRÄNGLITERAL. Next läser mönstret när appen
+  // byggs, innan någon kod körts, och begriper därför varken variabler eller
+  // strängar som satts ihop med plus. Den sortens rad blir inte ett fel vid
+  // bygget utan en matcher som tystnar, vilket syns först som att
+  // omdirigeringen mellan säljsidan och portalen slutat fungera.
+  //
+  // Därför står ikonerna och logotyperna uppräknade med namn, trots längden.
+  // prettier-ignore
+  matcher: ["/((?!_next/static|_next/image|api|favicon.ico|favicon.svg|icon.svg|apple-touch-icon.png|icon-192.png|icon-512.png|icon-maskable-512.png|og.png|brand/|manifest.json|sw.js).*)"],
 };

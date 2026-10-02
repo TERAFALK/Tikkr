@@ -372,7 +372,7 @@ function ChipList({
       </div>
       <Link
         href={href}
-        className="mt-2 inline-block text-[13px] font-medium text-blue-600"
+        className="mt-2 inline-block text-[13px] font-medium text-tick-deep"
       >
         Hantera
       </Link>

@@ -109,13 +109,13 @@ export default async function OverviewPage() {
       />
 
       {!onboarding.ready && (
-        <Card className="mb-6 border-blue-200 bg-blue-50/60 p-4">
+        <Card className="mb-6 border-blue-300 bg-blue-100 p-4">
           <div className="flex flex-wrap items-center justify-between gap-4">
             <div>
               <p className="text-sm font-medium text-blue-900">
                 {onboarding.completed} av {onboarding.total} steg klara
               </p>
-              <p className="mt-0.5 text-[13px] text-blue-800">
+              <p className="mt-0.5 text-[13px] text-blue-700">
                 Stämplingsskärmen kan användas när stegen är klara.
               </p>
             </div>

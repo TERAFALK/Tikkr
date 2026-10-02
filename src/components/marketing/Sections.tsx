@@ -866,9 +866,13 @@ export function FinalCta({ pricing }: { pricing: ScreenPricing }) {
 
           <div className="lg:justify-self-end">
             <div className="flex flex-wrap gap-3">
+              {/* Grönt, inte vitt. Avsnittet ligger på Fjord, och Tick är
+                  varumärkets accent på mörk yta. Det är sidans enda plats där
+                  accenten bär en knapp, vilket är precis vad guiden menar med
+                  att grönt aldrig är huvudfärg. */}
               <Link
                 href="/registrera"
-                className="rounded-md bg-white px-5 py-3 text-sm font-semibold text-neutral-900 transition-colors hover:bg-neutral-200"
+                className="rounded-md bg-tick px-5 py-3 text-sm font-semibold text-fjord transition-colors hover:bg-emerald-300"
               >
                 Skapa arbetsyta
               </Link>

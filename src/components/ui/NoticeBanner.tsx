@@ -34,11 +34,23 @@ const TONES = {
     body: "text-amber-800",
     dot: "bg-amber-500",
   },
+  /*
+    Planerat underhåll är den tystaste av de tre, men får inte se ut som ett
+    informationsmeddelande.
+
+    Tonen är Fjord: fastare ram, en aning mörkare yta och en Fjord-punkt, mot
+    INFO:s Snö-yta och gråa punkt. Den syns utan att ta plats, vilket är rätt
+    för ett besked om något som ska hända och inte om något som är fel.
+
+    Att göra den grön vore att låna "pågår just nu" till ett läge som inte
+    pågår, och grönt ligger dessutom närmast "allt är bra" för den som läser
+    snabbt.
+  */
   MAINTENANCE: {
-    wrapper: "border-blue-200 bg-blue-50",
+    wrapper: "border-blue-300 bg-blue-100",
     title: "text-blue-900",
-    body: "text-blue-800",
-    dot: "bg-blue-500",
+    body: "text-blue-700",
+    dot: "bg-blue-600",
   },
   INFO: {
     wrapper: "border-neutral-200 bg-neutral-50",
