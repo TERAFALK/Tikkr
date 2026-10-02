@@ -62,31 +62,55 @@ export const BRAND = {
  * ingen av dem betyder "det här saknar underlag", vilket är precis vad gult
  * säger i en efterkalkyl. Att tolka Fjord eller grönt som en varning hade varit
  * att göra pappret svårare att läsa för att en palett skulle stämma.
+ *
+ * VARJE FÄLT ÄR `string`, och typen står utskriven nedan i stället för att
+ * härledas. Utan den blir fälten sin egen hexkod som typ — dels för att
+ * `BRAND` är `as const`, dels för att en bokstavlig sträng smalnar av på vägen
+ * — och då smittar det vidare: en ritfunktion med `color = DOC.body` som
+ * standardvärde får parametertypen `"#35404F"` och vägrar ta emot `DOC.warn`
+ * när en rad saknar underlag. Det fällde bygget en gång.
+ *
+ * Färgerna här ÄR utbytbara med varandra. Det är hela poängen med att de har
+ * roller i stället för hexkoder, och typen ska säga samma sak.
  */
-export const DOC = {
+export interface DocPalette {
   /** Rubrikband och summarader: Fjord med vit text. */
-  band: BRAND.fjord,
+  readonly band: string;
   /** Texten på ett band. */
-  onBand: "#FFFFFF",
+  readonly onBand: string;
   /** Rubriker och belopp. */
-  heading: BRAND.fjord,
+  readonly heading: string;
   /** Löptext och tabellceller. */
-  body: "#35404F",
+  readonly body: string;
   /** Ledtexter, kolumnrubriker, fotnoter. */
-  muted: BRAND.skiffer,
+  readonly muted: string;
   /** Sidfoten, det finstilta. */
-  faint: "#858D94",
+  readonly faint: string;
   /** Tysta ytor: delsummor, infoblock. */
-  tint: BRAND.sno,
+  readonly tint: string;
   /** Linjer mellan rader. */
-  rule: BRAND.lav,
+  readonly rule: string;
   /** Hårfina linjer inuti en tabell. */
-  hairline: "#ECEEE7",
+  readonly hairline: string;
   /** Accent: staplar i ett diagram, markerad tid. */
-  accent: BRAND.tickDeep,
+  readonly accent: string;
   /** Kräver uppmärksamhet: saknad timkostnad, överskriden beräkning. */
+  readonly warn: string;
+}
+
+export const DOC: DocPalette = {
+  band: BRAND.fjord,
+  onBand: "#FFFFFF",
+  heading: BRAND.fjord,
+  body: "#35404F",
+  muted: BRAND.skiffer,
+  faint: "#858D94",
+  tint: BRAND.sno,
+  rule: BRAND.lav,
+  hairline: "#ECEEE7",
+  accent: BRAND.tickDeep,
   warn: "#A16207",
-} as const;
+};
 
 /* -------------------------------------------------------------------------- */
 /* Symbolen                                                                    */
