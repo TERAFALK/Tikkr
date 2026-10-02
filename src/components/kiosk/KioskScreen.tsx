@@ -367,15 +367,45 @@ export default function KioskScreen({
   const [receiptVisible, setReceiptVisible] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Optimistisk bild av vem som är instämplad. Uppdateras direkt vid tryck och
-  // ersätts av serverns bild när sidan hämtats om.
-  const [active, setActive] = useState(activeByEmployee);
-  useEffect(() => setActive(activeByEmployee), [activeByEmployee]);
+  /**
+   * ANTALET TRYCK SOM LIGGER I KÖN, läsbart direkt.
+   *
+   * Står här uppe och inte nere vid kön, eftersom det är den här siffran som
+   * avgör om serverns bild får tillämpas — se de tre effekterna nedan. Den
+   * sätts synkront i takt med `waiting`: ett tryck och en inkommande bild kan
+   * hamna i samma rendering, och en ref som uppdateras i en effekt hinner då
+   * läsas med gammalt värde.
+   */
+  const waitingRef = useRef(0);
 
-  // Vilka som är på rast. Samma optimistiska mönster som stämplingarna: sätts
-  // direkt vid trycket och ersätts av serverns bild vid nästa hämtning.
+  /**
+   * SERVERNS BILD TILLÄMPAS BARA NÄR KÖN ÄR TOM.
+   *
+   * Ligger det tryck kvar är den lokala bilden NYARE: trycket har hänt men
+   * ännu inte nått fram. Att skriva över den då får kortet att hoppa tillbaka
+   * till sitt gamla läge framför den som just tryckt.
+   *
+   * Regeln är samma som i `syncActive` längre ner, och den stod länge bara
+   * där. Props är den andra vägen in för samma data — `router.refresh()` byter
+   * ut dem — och en regel som gäller på ena vägen men inte den andra är ingen
+   * regel.
+   *
+   * Ingenting går förlorat av att hoppa över: `drain()` hämtar om så fort
+   * trycket kommit fram, och `syncActive` går var femte sekund.
+   */
+  const [active, setActive] = useState(activeByEmployee);
+  useEffect(() => {
+    if (waitingRef.current > 0) return;
+    setActive(activeByEmployee);
+  }, [activeByEmployee]);
+
+  // Vilka som är på rast. Samma optimistiska mönster som stämplingarna, och
+  // samma regel om kön.
   const [breaks, setBreaks] = useState(breaksByEmployee);
-  useEffect(() => setBreaks(breaksByEmployee), [breaksByEmployee]);
+  useEffect(() => {
+    if (waitingRef.current > 0) return;
+    setBreaks(breaksByEmployee);
+  }, [breaksByEmployee]);
 
   // Flexsaldot efter dagens sista utstämpling. Visas en kort stund som kvitto.
   const [flexMinutes, setFlexMinutes] = useState<number | null>(null);
@@ -387,7 +417,10 @@ export default function KioskScreen({
   // det ändå kontrollerar servern ordern på vanligt sätt. Svaret från
   // /api/kiosk/state ska förbli så litet som det är.
   const [recent, setRecent] = useState(recentByEmployee);
-  useEffect(() => setRecent(recentByEmployee), [recentByEmployee]);
+  useEffect(() => {
+    if (waitingRef.current > 0) return;
+    setRecent(recentByEmployee);
+  }, [recentByEmployee]);
 
   /**
    * Jobbet man håller på att byta FRÅN, medan man väljer det nya.
@@ -398,18 +431,38 @@ export default function KioskScreen({
    */
   const [replacing, setReplacing] = useState<ActiveJob | null>(null);
 
-  const goHome = useCallback(() => {
+  /**
+   * TILLBAKA TILL NAMNRUTNÄTET, utan att röra serverns bild.
+   *
+   * Vägen hem för den som JUST STÄMPLAT. Hämtas sidan om här svarar servern
+   * med läget FÖRE stämplingen: trycket ligger i kön och har inte nått fram
+   * ännu, eftersom det skickas först efter att vyn bytts. Den bilden skrev
+   * över den optimistiska, och kortet hann bli grönt, vitt och grönt igen på
+   * en halv sekund. Det blinkandet är det som fick folk att trycka en gång
+   * till.
+   *
+   * Listorna hämtas ändå om: `drain()` gör det så fort trycket kommit fram,
+   * och då är svaret riktigt.
+   */
+  const backToGrid = useCallback(() => {
     setView({ name: "employees" });
     setError(null);
     // Avbrutet byte. Ingenting har hänt, och ingenting ska hända.
     setReplacing(null);
+  }, []);
 
-    // Hämtar listorna på nytt medan ingen står vid skärmen. Nästa person ska
-    // se de ordrar som är öppna nu, inte de som var öppna när sidan laddades.
-    // Det är den billigaste stunden att göra det på: ingen väntar, och inget
-    // val står halvfärdigt.
+  /**
+   * Tillbaka till rutnätet OCH hämta listorna på nytt.
+   *
+   * Vägen hem när INGENTING har hänt: avbrott och tomgång. Det är den
+   * billigaste stunden att hämta på — ingen väntar, och inget val står
+   * halvfärdigt. Nästa person ska se de ordrar som är öppna nu, inte de som
+   * var öppna när sidan laddades.
+   */
+  const goHome = useCallback(() => {
+    backToGrid();
     router.refresh();
-  }, [router]);
+  }, [backToGrid, router]);
 
   // Skärmen återgår själv om någon lämnar den mitt i ett val.
   useEffect(() => {
@@ -457,13 +510,19 @@ export default function KioskScreen({
     return () => clearTimeout(timer);
   }, [waiting, stuck]);
 
-  // Samma värde som waiting, läsbart utan att göra om funktionen varje gång det
-  // ändras. Synkningen behöver veta om kön är tom, men ska inte startas om var
-  // gång ett tryck läggs till.
-  const waitingRef = useRef(0);
-  useEffect(() => {
-    waitingRef.current = waiting;
-  }, [waiting]);
+  /**
+   * Sätter kölängden på båda ställena samtidigt.
+   *
+   * `waiting` ritar bannern, `waitingRef` avgör om serverns bild får
+   * tillämpas. Refen uppdaterades tidigare i en effekt, alltså EFTER
+   * renderingen — och en inkommande bild som hamnade i samma rendering som ett
+   * tryck läste då den gamla nollan och skrev över stämplingen. Här sätts den
+   * synkront, i samma andetag som tillståndet.
+   */
+  const setQueueLength = useCallback((next: number) => {
+    waitingRef.current = next;
+    setWaiting(next);
+  }, []);
 
   /**
    * Tömmer kön och rapporterar läget.
@@ -474,7 +533,7 @@ export default function KioskScreen({
    */
   const drain = useCallback(async () => {
     const result = await flush();
-    setWaiting(result.waiting);
+    setQueueLength(result.waiting);
 
     if (result.rejected.length > 0) {
       const first = result.rejected[0];
@@ -492,7 +551,7 @@ export default function KioskScreen({
 
     // Hämtar serverns bild, så att optimistiska gissningar rättas.
     if (result.sent > 0) router.refresh();
-  }, [router]);
+  }, [router, setQueueLength]);
 
   // Saldot står kvar några sekunder och försvinner sedan av sig själv. Ingen
   // ska behöva trycka bort det, och nästa person vid skärmen ska inte se
@@ -512,16 +571,28 @@ export default function KioskScreen({
    */
   const send = useCallback(
     async (punch: Omit<QueuedPunch, "clientPunchId" | "at">) => {
+      // Kön räknas upp FÖRE skrivningen till IndexedDB, inte efter.
+      //
+      // Trycket är ett åtagande i samma stund som fingret träffar; skrivningen
+      // är bokföring. Räknades det upp efteråt fanns en lucka på några
+      // millisekunder där servern fortfarande räknades som sanning, och en
+      // hämtning som råkade landa just där skrev över stämplingen.
+      //
+      // Skulle skrivningen fallera står siffran kvar för hög, och skärmen
+      // slutar ta emot serverns bild. Det reder ut sig självt: `drain()` går
+      // var trettionde sekund och sätter längden efter vad som faktiskt ligger
+      // i kön.
+      setQueueLength(waitingRef.current + 1);
+
       await enqueue({
         ...punch,
         clientPunchId: newPunchId(),
         at: new Date().toISOString(),
       });
 
-      setWaiting((count) => count + 1);
       await drain();
     },
-    [drain]
+    [drain, setQueueLength]
   );
 
   // Låter skärmen laddas om utan nät. Kräver HTTPS — över vanlig http händer
@@ -537,7 +608,7 @@ export default function KioskScreen({
 
   // Töm kön när nätet kommer tillbaka, och regelbundet som skyddsnät.
   useEffect(() => {
-    void pending().then((queue) => setWaiting(queue.length));
+    void pending().then((queue) => setQueueLength(queue.length));
     void drain();
 
     const onOnline = () => void drain();
@@ -548,7 +619,7 @@ export default function KioskScreen({
       window.removeEventListener("online", onOnline);
       clearInterval(timer);
     };
-  }, [drain]);
+  }, [drain, setQueueLength]);
 
   /* ---------------------------------------------------------------------- */
   /* Skärmen som enhet — bara på skärmar vi sålt                             */
@@ -789,7 +860,7 @@ export default function KioskScreen({
 
       setReceipt(`${employee.name}: ${label}`);
       setReceiptVisible(true);
-      goHome();
+      backToGrid();
 
       if (left) {
         void send({
@@ -807,7 +878,7 @@ export default function KioskScreen({
         label: `${employee.name}, ${label}`,
       });
     },
-    [goHome, replacing, send]
+    [backToGrid, replacing, send]
   );
 
   /**
@@ -841,7 +912,7 @@ export default function KioskScreen({
       setReceipt(`${employee.name} utstämplad från ${job.label}`);
       setReceiptVisible(true);
 
-      goHome();
+      backToGrid();
 
       void send({
         action: "out",
@@ -850,7 +921,7 @@ export default function KioskScreen({
         label: `${employee.name}, utstämpling`,
       });
     },
-    [goHome, send]
+    [backToGrid, send]
   );
 
   /**
@@ -882,7 +953,7 @@ export default function KioskScreen({
           : `${employee.name} utstämplad`
       );
       setReceiptVisible(true);
-      goHome();
+      backToGrid();
 
       void send({
         action: "out-all",
@@ -890,7 +961,7 @@ export default function KioskScreen({
         label: `${employee.name}, utstämpling från allt`,
       });
     },
-    [goHome, send]
+    [backToGrid, send]
   );
 
   /**
@@ -927,7 +998,7 @@ export default function KioskScreen({
 
       setReceipt(`${employee.name}: ${breakType.name}`);
       setReceiptVisible(true);
-      goHome();
+      backToGrid();
 
       void send({
         action: "break",
@@ -936,7 +1007,7 @@ export default function KioskScreen({
         label: `${employee.name}, ${breakType.name}`,
       });
     },
-    [active, goHome, send]
+    [active, backToGrid, send]
   );
 
   /**
@@ -956,7 +1027,7 @@ export default function KioskScreen({
 
       setReceipt(`${employee.name}: rasten slut`);
       setReceiptVisible(true);
-      goHome();
+      backToGrid();
 
       void send({
         action: "break-end",
@@ -964,7 +1035,7 @@ export default function KioskScreen({
         label: `${employee.name}, rasten slut`,
       });
     },
-    [goHome, send]
+    [backToGrid, send]
   );
 
   return (
