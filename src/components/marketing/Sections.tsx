@@ -11,6 +11,7 @@ import {
   TimesheetMockup,
 } from "./Mockups";
 import LiveKiosk from "./LiveKiosk";
+import Motif from "./Motif";
 import type { ModulePricing, ScreenPricing } from "@/lib/stripe";
 import { MODULES } from "@/lib/modules";
 import Reveal from "./Reveal";
@@ -18,11 +19,17 @@ import Reveal from "./Reveal";
 /**
  * SÄLJSIDANS AVSNITT.
  *
- * FORMGIVNINGEN ÄR ETT SPECIFIKATIONSBLAD, inte en produktsida i allmänhet.
- * Läsaren är en verkstadschef som köper verktyg efter vad de gör, och sidan är
- * satt därefter: numrerade avsnitt, hårfina linjer och siffror i tabellsiffror.
- * Svart, vitt och grått hela vägen; färg förekommer bara inuti produktbilderna,
- * där grönt betyder pågår och gult behöver granskas precis som i systemet.
+ * FORMGIVNINGEN ÄR ETT SPECIFIKATIONSBLAD SOM ÖPPNAR HÖGT. Läsaren är en
+ * verkstadschef som köper verktyg efter vad de gör, och sidans stomme är satt
+ * därefter: numrerade avsnitt, hårfina linjer och siffror i tabellsiffror.
+ * Ovanpå den stommen ligger varumärkets eget formspråk, hämtat ur bannerna i
+ * `brand/03-social/`: stora staplade påståenden, Fjord och Snö som bärande
+ * ytor, och symbolen uppförstorad som bakgrundsgeometri — se `Motif.tsx`.
+ *
+ * YTORNAS ORDNING ÄR MEDVETEN. Fjord, Snö, vit, Snö, vit, Fjord, vit, Snö,
+ * Tick. Två mörka ytor med fem avsnitt emellan, och grönt som hel yta exakt en
+ * gång, sist. Grönt är accent och aldrig huvudfärg; ett enda grönt block i
+ * slutet är vad varumärkets egen delningsbild gör.
  *
  * SPRÅKET FÖLJER CLAUDE.md § 7.1, och det gäller här lika hårt som i panelen:
  *
@@ -46,12 +53,48 @@ function kr(amount: number): string {
   return amount.toLocaleString("sv-SE");
 }
 
+/** Innehållets bredd och luft. Samma i varje avsnitt, så sidan står i spalt. */
+const SHELL = "mx-auto max-w-6xl px-6 py-24 sm:py-32";
+
+/**
+ * Knappen som leder vidare.
+ *
+ * Fjord på ljus yta, Tick på mörk. Det är guidens egen uppdelning: grönt är
+ * accent på mörkt, och på en ljus yta bär primärfärgen knappen.
+ */
+function Cta({
+  href,
+  children,
+  onDark,
+}: {
+  href: string;
+  children: string;
+  onDark?: boolean;
+}) {
+  return (
+    <Link
+      href={href}
+      className={`rounded-lg px-6 py-3.5 text-[15px] font-semibold transition-colors ${
+        onDark
+          ? "bg-tick text-neutral-900 hover:bg-emerald-300"
+          : "bg-neutral-900 text-white hover:bg-neutral-800"
+      }`}
+    >
+      {children}
+    </Link>
+  );
+}
+
 /**
  * Avsnittets huvud.
  *
  * Nummer, linje, etikett. Sedan rubriken och högst ett par rader text. Samma
  * uppbyggnad hela vägen ned, så att sidan läses som ett dokument och inte som
  * en trave olika sidor staplade på varandra.
+ *
+ * Numret står i grönt. Det är sidans minsta accent och den enda färg som följer
+ * med hela vägen ned — ögat hittar nästa avsnitt på färgen i stället för att
+ * leta efter en linje.
  */
 function SectionHead({
   index,
@@ -67,22 +110,20 @@ function SectionHead({
   onDark?: boolean;
 }) {
   return (
-    <div className="max-w-2xl">
-      <p className="flex items-center gap-3 font-mono text-[11px] uppercase tracking-[0.18em]">
-        <span className={onDark ? "text-neutral-500" : "text-neutral-400"}>
-          {index}
-        </span>
+    <div className="max-w-3xl">
+      <p className="flex items-center gap-3 text-[11px] font-medium uppercase tracking-wider">
+        <span className={onDark ? "text-tick" : "text-tick-deep"}>{index}</span>
         <span
           aria-hidden="true"
           className={`h-px w-8 ${onDark ? "bg-neutral-700" : "bg-neutral-300"}`}
         />
-        <span className={onDark ? "text-neutral-300" : "text-neutral-500"}>
+        <span className={onDark ? "text-neutral-400" : "text-neutral-500"}>
           {eyebrow}
         </span>
       </p>
 
       <h2
-        className={`mt-5 text-[28px] font-semibold leading-[1.15] tracking-tight sm:text-[36px] ${
+        className={`mt-6 text-[32px] font-semibold leading-[1.08] tracking-tight sm:text-[44px] ${
           onDark ? "text-white" : "text-neutral-900"
         }`}
       >
@@ -91,7 +132,7 @@ function SectionHead({
 
       {intro && (
         <p
-          className={`mt-4 max-w-xl text-[15px] leading-relaxed ${
+          className={`mt-5 max-w-xl text-[16px] leading-relaxed ${
             onDark ? "text-neutral-400" : "text-neutral-600"
           }`}
         >
@@ -123,72 +164,86 @@ function SpecRow({ term, children }: { term: string; children: string }) {
 /* Hero                                                                        */
 /* -------------------------------------------------------------------------- */
 
+/**
+ * SIDANS FÖRSTA YTA ÄR FJORD.
+ *
+ * Rubriken säger vad produkten gör och inte vad varumärket heter: den som
+ * landar här från en sökning har ännu inte hört talas om Tikkr, och "Rätt tid
+ * på rätt order" är det enda som svarar på varför de ska läsa vidare.
+ * Varumärkets egen rad står kvar som etikett ovanför.
+ */
 export function Hero() {
   return (
-    <section className="border-b border-neutral-200 bg-white">
-      <div className="mx-auto max-w-6xl px-6 pb-20 pt-14 sm:pb-24 sm:pt-20">
-        <div className="grid items-center gap-14 lg:grid-cols-[0.9fr_1.1fr] lg:gap-16">
-          <div>
-            <p className="animate-rise font-mono text-[11px] uppercase tracking-[0.18em] text-neutral-500">
-              Stämplingssystem för verkstad
-            </p>
+    <section className="relative overflow-hidden bg-neutral-900">
+      <Motif tone="onDark" className="-right-56 -top-40 h-[52rem] w-[52rem]" />
 
-            <h1
-              className="animate-rise mt-6 text-[40px] font-semibold leading-[1.02] tracking-[-0.02em] text-neutral-900 sm:text-[56px]"
-              style={{ animationDelay: "60ms" }}
-            >
-              Rätt tid på rätt order.
-            </h1>
+      <div className="relative mx-auto grid max-w-6xl items-center gap-16 px-6 pb-24 pt-20 sm:pb-28 sm:pt-24 lg:grid-cols-[0.95fr_1.05fr]">
+        <div>
+          <p className="animate-rise text-[11px] font-medium uppercase tracking-wider text-tick">
+            Stämpla in. Stämpla ut. Klart.
+          </p>
 
-            <p
-              className="animate-rise mt-6 max-w-lg text-[17px] leading-relaxed text-neutral-600"
-              style={{ animationDelay: "120ms" }}
-            >
-              En pekskärm i verkstaden och en panel på kontoret. Personalen
-              registrerar tiden med ett tryck, den hamnar på rätt order och
-              arbetsmoment, och underlaget kan skickas samma dag.
-            </p>
-
-            <div
-              className="animate-rise mt-9 flex flex-wrap items-center gap-3"
-              style={{ animationDelay: "180ms" }}
-            >
-              <Link
-                href="/registrera"
-                className="rounded-md bg-neutral-900 px-5 py-3 text-sm font-semibold text-white transition-colors hover:bg-neutral-800"
-              >
-                Prova i 30 dagar
-              </Link>
-              <a
-                href="#sa-funkar-det"
-                className="rounded-md px-5 py-3 text-sm font-semibold text-neutral-700 underline decoration-neutral-300 underline-offset-4 transition-colors hover:text-neutral-900 hover:decoration-neutral-900"
-              >
-                Se hur det fungerar
-              </a>
-            </div>
-
-            <p
-              className="animate-rise mt-6 text-[13px] text-neutral-500"
-              style={{ animationDelay: "240ms" }}
-            >
-              Inget betalkort. Ingen bindningstid.
-            </p>
-          </div>
-
-          {/* Stämplingsskärmen, levande. Den som tittar i tio sekunder ser
-              någon stämpla in utan att läsa en rad text.
-
-              Låg en period i en tecknad skärm på stativ. Den togs bort: en
-              ritad hårdvara blir en teckning av en skärm, och det är
-              gränssnittet som ska synas. */}
-          <div
-            className="animate-rise-soft"
-            style={{ animationDelay: "300ms" }}
+          <h1
+            className="animate-rise mt-7 text-[46px] font-semibold leading-none tracking-tight text-white sm:text-[68px]"
+            style={{ animationDelay: "60ms" }}
           >
-            <Frame label="Stämplingsskärmen">
-              <LiveKiosk />
-            </Frame>
+            Rätt tid
+            <br />
+            på rätt order.
+          </h1>
+
+          <p
+            className="animate-rise mt-7 max-w-lg text-[17px] leading-relaxed text-neutral-400"
+            style={{ animationDelay: "120ms" }}
+          >
+            En pekskärm i verkstaden och en panel på kontoret. Personalen
+            registrerar tiden med ett tryck, den hamnar på rätt order och
+            arbetsmoment, och underlaget kan skickas samma dag.
+          </p>
+
+          <div
+            className="animate-rise mt-10 flex flex-wrap items-center gap-3"
+            style={{ animationDelay: "180ms" }}
+          >
+            <Cta href="/registrera" onDark>
+              Prova i 30 dagar
+            </Cta>
+            <a
+              href="#sa-funkar-det"
+              className="rounded-lg border border-neutral-700 px-6 py-3.5 text-[15px] font-semibold text-neutral-200 transition-colors hover:bg-neutral-800"
+            >
+              Se hur det fungerar
+            </a>
           </div>
+
+          <p
+            className="animate-rise mt-7 text-[13px] text-neutral-400"
+            style={{ animationDelay: "240ms" }}
+          >
+            Inget betalkort. Ingen bindningstid.
+          </p>
+        </div>
+
+        {/* Stämplingsskärmen, levande. Den som tittar i tio sekunder ser
+            någon stämpla in utan att läsa en rad text.
+
+            Låg en period i en tecknad skärm på stativ. Den togs bort: en
+            ritad hårdvara blir en teckning av en skärm, och det är
+            gränssnittet som ska synas.
+
+            Skuggan ligger på en ruta UTANFÖR kortet och inte på kortet
+            självt. Ett vitt kort mot Fjord behöver lyftas för att läsas som ett
+            föremål framför ytan i stället för som ett hål i den, men `Frame`
+            har redan en egen skugga: två `shadow-[...]` på samma element är två
+            lika starka regler, och vilken som vinner avgörs av i vilken ordning
+            Tailwind råkar skriva ut dem. */}
+        <div
+          className="animate-rise-soft rounded-lg shadow-[0_40px_80px_-40px_rgba(0,0,0,0.65)]"
+          style={{ animationDelay: "300ms" }}
+        >
+          <Frame label="Stämplingsskärmen">
+            <LiveKiosk />
+          </Frame>
         </div>
       </div>
     </section>
@@ -204,6 +259,9 @@ export function Hero() {
  *
  * Står där andra sidor har en rad kundlogotyper. Vi har en pilotkund och inga
  * logotyper att visa.
+ *
+ * Ligger kvar på Fjord och blir därmed hero:s fot i stället för en egen remsa.
+ * Siffrorna hör till löftet ovanför, inte till avsnittet under.
  */
 export function Facts() {
   const facts = [
@@ -214,17 +272,19 @@ export function Facts() {
   ];
 
   return (
-    <section className="border-b border-neutral-200 bg-white">
-      {/* Hårlinjerna ritas med gap-px mot en grå botten i stället för med
-          kantlinjer på varje ruta. Kantlinjer på ett rutnät som byter antal
-          kolumner ger alltid en linje för mycket någonstans. */}
-      <dl className="mx-auto grid max-w-6xl grid-cols-2 gap-px bg-neutral-200 lg:grid-cols-4">
-        {facts.map((fact) => (
-          <div key={fact.label} className="bg-white px-6 py-7">
-            <dt className="text-[22px] font-semibold tracking-tight text-neutral-900">
+    <section className="border-t border-neutral-800 bg-neutral-900">
+      <dl className="mx-auto grid max-w-6xl grid-cols-2 px-6 lg:grid-cols-4">
+        {facts.map((fact, index) => (
+          <div
+            key={fact.label}
+            className={`py-8 ${
+              index > 0 ? "border-neutral-800 lg:border-l lg:pl-8" : ""
+            }`}
+          >
+            <dt className="text-[24px] font-semibold tracking-tight text-white">
               {fact.value}
             </dt>
-            <dd className="mt-1 text-[13px] leading-relaxed text-neutral-500">
+            <dd className="mt-1.5 text-[13px] leading-relaxed text-neutral-400">
               {fact.label}
             </dd>
           </div>
@@ -239,11 +299,12 @@ export function Facts() {
 /* -------------------------------------------------------------------------- */
 
 /**
- * Sidans enda mörka avsnitt.
+ * Perspektivbytet: det enda avsnittet som beskriver ett problem.
  *
- * Det är också det enda som beskriver ett problem i stället för en lösning.
- * Brytningen gör att läsaren registrerar perspektivbytet i stället för att
- * skumma vidare genom ännu ett vitt fält.
+ * Låg tidigare på Fjord, som sidans enda mörka yta. Hero bär den rollen nu, och
+ * ännu en mörk yta direkt efter hade läst som att sidan inte kommit igång.
+ * Brytningen görs i stället med Snö och ett stort motiv, så att läsaren
+ * registrerar att perspektivet bytts utan att ytan skriker om det.
  */
 export function Problem() {
   const points = [
@@ -262,23 +323,34 @@ export function Problem() {
   ];
 
   return (
-    <section className="border-b border-neutral-800 bg-neutral-900">
-      <div className="mx-auto max-w-6xl px-6 py-20 sm:py-24">
+    <section className="relative overflow-hidden bg-neutral-50">
+      <Motif
+        tone="onLight"
+        className="-bottom-80 -left-64 h-[46rem] w-[46rem]"
+      />
+
+      <div className={`relative ${SHELL}`}>
         <SectionHead
-          onDark
           index="01"
           eyebrow="Problemet"
           title="Tid som inte registreras när arbetet utförs går inte att rekonstruera"
         />
 
-        <div className="mt-14 grid gap-px overflow-hidden rounded-lg bg-neutral-800 sm:grid-cols-3">
+        <div className="mt-16 grid border-t border-neutral-200 sm:grid-cols-3">
           {points.map((point, index) => (
             <Reveal key={point.title} delay={index * 90} className="h-full">
-              <div className="h-full bg-neutral-900 p-6">
-                <h3 className="text-[15px] font-semibold text-white">
+              <div
+                className={`h-full py-8 sm:pr-8 ${
+                  index > 0 ? "sm:border-l sm:border-neutral-200 sm:pl-8" : ""
+                }`}
+              >
+                <p className="text-[11px] font-semibold tracking-wider text-tick-deep">
+                  {String(index + 1).padStart(2, "0")}
+                </p>
+                <h3 className="mt-4 text-[18px] font-semibold tracking-tight text-neutral-900">
                   {point.title}
                 </h3>
-                <p className="mt-3 text-[13px] leading-relaxed text-neutral-400">
+                <p className="mt-3 text-[14px] leading-relaxed text-neutral-600">
                   {point.body}
                 </p>
               </div>
@@ -317,11 +389,8 @@ const STEPS = [
 
 export function HowItWorks() {
   return (
-    <section
-      id="sa-funkar-det"
-      className="border-b border-neutral-200 bg-white"
-    >
-      <div className="mx-auto max-w-6xl px-6 py-20 sm:py-24">
+    <section id="sa-funkar-det" className="bg-white">
+      <div className={SHELL}>
         <SectionHead
           index="02"
           eyebrow="I verkstaden"
@@ -329,20 +398,20 @@ export function HowItWorks() {
           intro="De två första stegen sker vid maskinen och kräver ingen inloggning."
         />
 
-        <div className="mt-16 space-y-16">
+        <div className="mt-20 space-y-20">
           {STEPS.map((step, index) => (
             <Reveal key={step.number}>
-              <div className="grid items-center gap-8 border-t border-neutral-200 pt-10 lg:grid-cols-2 lg:gap-16">
+              <div className="grid items-center gap-10 border-t border-neutral-200 pt-12 lg:grid-cols-2 lg:gap-16">
                 {/* Vartannat avsnitt speglas, så att blicken flyttas i sidled
                     på vägen ned i stället för att falla rakt igenom. */}
                 <div className={index % 2 === 1 ? "lg:order-2" : ""}>
-                  <p className="font-mono text-[11px] tracking-[0.18em] text-neutral-400">
-                    STEG {step.number}
+                  <p className="text-[11px] font-semibold uppercase tracking-wider text-tick-deep">
+                    Steg {step.number}
                   </p>
-                  <h3 className="mt-3 text-xl font-semibold tracking-tight text-neutral-900 sm:text-2xl">
+                  <h3 className="mt-4 text-[24px] font-semibold tracking-tight text-neutral-900 sm:text-[28px]">
                     {step.title}
                   </h3>
-                  <p className="mt-4 max-w-md text-[15px] leading-relaxed text-neutral-600">
+                  <p className="mt-5 max-w-md text-[15px] leading-relaxed text-neutral-600">
                     {step.body}
                   </p>
                 </div>
@@ -365,8 +434,8 @@ export function HowItWorks() {
 
 export function AdminSection() {
   return (
-    <section id="panelen" className="border-b border-neutral-200 bg-neutral-50">
-      <div className="mx-auto max-w-6xl px-6 py-20 sm:py-24">
+    <section id="panelen" className="bg-neutral-50">
+      <div className={SHELL}>
         <SectionHead
           index="03"
           eyebrow="På kontoret"
@@ -374,7 +443,7 @@ export function AdminSection() {
           intro="Registrerad tid finns i panelen i samma stund som den registreras."
         />
 
-        <div className="mt-14 grid items-start gap-10 lg:grid-cols-2 lg:gap-16">
+        <div className="mt-16 grid items-start gap-12 lg:grid-cols-2 lg:gap-16">
           <dl>
             <SpecRow term="Rapporter">
               Filtrera på period, order, kund, anställd och arbetsmoment. Ta ut
@@ -436,8 +505,8 @@ export function Documents() {
   ];
 
   return (
-    <section id="underlag" className="border-b border-neutral-200 bg-white">
-      <div className="mx-auto max-w-6xl px-6 py-20 sm:py-24">
+    <section id="underlag" className="bg-white">
+      <div className={SHELL}>
         <SectionHead
           index="04"
           eyebrow="Dokumenten"
@@ -445,7 +514,7 @@ export function Documents() {
           intro="Tid som registrerats en gång blir underlag till kundens faktura, till er egen efterkalkyl och till lönen."
         />
 
-        <div className="mt-14 grid gap-10 lg:grid-cols-3 lg:gap-8">
+        <div className="mt-16 grid gap-10 lg:grid-cols-3 lg:gap-8">
           {docs.map((doc, index) => (
             /* h-full hela vägen ned: de tre pappersytorna blir lika höga även
                när en tabell har en rad mer, och rubrikerna under dem hamnar på
@@ -455,13 +524,13 @@ export function Documents() {
                 <div className="flex-1">{doc.mockup}</div>
 
                 <div className="mt-6 border-t border-neutral-200 pt-5">
-                  <p className="font-mono text-[11px] uppercase tracking-[0.18em] text-neutral-400">
+                  <p className="text-[11px] font-medium uppercase tracking-wider text-tick-deep">
                     {doc.kicker}
                   </p>
-                  <h3 className="mt-2 text-[17px] font-semibold tracking-tight text-neutral-900">
+                  <h3 className="mt-2.5 text-[18px] font-semibold tracking-tight text-neutral-900">
                     {doc.title}
                   </h3>
-                  <p className="mt-2 text-[13px] leading-relaxed text-neutral-600">
+                  <p className="mt-2.5 text-[14px] leading-relaxed text-neutral-600">
                     {doc.body}
                   </p>
                 </div>
@@ -485,6 +554,13 @@ interface Capability {
   tillval?: boolean;
 }
 
+/**
+ * Sidans andra mörka yta, och den enda som är en ren uppräkning.
+ *
+ * Fjord gör att listan läses som ett datablad i stället för som ännu ett ljust
+ * avsnitt att skumma. Den ligger dessutom mitt emellan hero och slutblocket,
+ * vilket ger sidan tre mörka hållpunkter på jämnt avstånd.
+ */
 export function Capabilities() {
   const groups: { title: string; rows: Capability[] }[] = [
     {
@@ -568,34 +644,41 @@ export function Capabilities() {
   return (
     <section
       id="funktioner"
-      className="border-b border-neutral-200 bg-neutral-50"
+      className="relative overflow-hidden bg-neutral-900"
     >
-      <div className="mx-auto max-w-6xl px-6 py-20 sm:py-24">
-        <SectionHead index="05" eyebrow="Innehåll" title="Vad som ingår" />
+      <Motif tone="onDark" className="-right-72 -top-56 h-[50rem] w-[50rem]" />
 
-        <div className="mt-14 grid gap-12 lg:grid-cols-3 lg:gap-10">
+      <div className={`relative ${SHELL}`}>
+        <SectionHead
+          onDark
+          index="05"
+          eyebrow="Innehåll"
+          title="Vad som ingår"
+        />
+
+        <div className="mt-16 grid gap-12 lg:grid-cols-3 lg:gap-10">
           {groups.map((group, index) => (
             <Reveal key={group.title} delay={index * 80}>
               <div>
-                <h3 className="font-mono text-[11px] uppercase tracking-[0.18em] text-neutral-500">
+                <h3 className="text-[11px] font-medium uppercase tracking-wider text-tick">
                   {group.title}
                 </h3>
 
-                <dl className="mt-4">
+                <dl className="mt-5">
                   {group.rows.map((row) => (
                     <div
                       key={row.term}
-                      className="border-t border-neutral-200 py-4"
+                      className="border-t border-neutral-800 py-4"
                     >
-                      <dt className="flex items-center gap-2 text-[14px] font-medium text-neutral-900">
+                      <dt className="flex items-center gap-2 text-[14px] font-medium text-white">
                         {row.term}
                         {row.tillval && (
-                          <span className="rounded border border-neutral-300 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-[0.12em] text-neutral-500">
+                          <span className="rounded border border-neutral-700 px-1.5 py-0.5 text-[9px] uppercase tracking-wider text-neutral-400">
                             Tillval
                           </span>
                         )}
                       </dt>
-                      <dd className="mt-1 text-[13px] leading-relaxed text-neutral-600">
+                      <dd className="mt-1.5 text-[13px] leading-relaxed text-neutral-400">
                         {row.body}
                       </dd>
                     </div>
@@ -634,8 +717,8 @@ export function Pricing({
   const payroll = modules.PAYROLL;
 
   return (
-    <section id="pris" className="border-b border-neutral-200 bg-white">
-      <div className="mx-auto max-w-6xl px-6 py-20 sm:py-24">
+    <section id="pris" className="bg-white">
+      <div className={SHELL}>
         <SectionHead
           index="06"
           eyebrow="Pris"
@@ -643,28 +726,28 @@ export function Pricing({
           intro="Antalet anställda, ordrar och stämplingar påverkar inte priset."
         />
 
-        <div className="mt-14 overflow-hidden rounded-lg border border-neutral-200">
+        <div className="mt-16 overflow-hidden rounded-xl border border-neutral-200">
           {/* Basen. Den stora siffran till vänster och innehållet till höger,
               som en rad i en prislista snarare än ett paketkort. */}
-          <div className="grid gap-8 border-b border-neutral-200 bg-white p-6 sm:p-8 lg:grid-cols-[20rem_1fr] lg:gap-12">
+          <div className="grid gap-8 border-b border-neutral-200 bg-white p-7 sm:p-10 lg:grid-cols-[20rem_1fr] lg:gap-12">
             <div>
-              <p className="font-mono text-[11px] uppercase tracking-[0.18em] text-neutral-500">
+              <p className="text-[11px] font-medium uppercase tracking-wider text-tick-deep">
                 Bas
               </p>
-              <p className="mt-4 flex items-baseline gap-2">
-                <span className="text-[44px] font-semibold leading-none tracking-tight tabular-nums text-neutral-900">
+              <p className="mt-5 flex items-baseline gap-2">
+                <span className="text-[56px] font-semibold leading-none tracking-tight tabular-nums text-neutral-900">
                   {kr(pricing.month)}
                 </span>
                 <span className="text-[15px] text-neutral-500">
                   kr per skärm och månad
                 </span>
               </p>
-              <p className="mt-2 text-[13px] text-neutral-500">
+              <p className="mt-3 text-[13px] text-neutral-500">
                 Exklusive moms. Ingen bindningstid.
               </p>
 
               {pricing.year !== null && (
-                <p className="mt-4 inline-flex flex-wrap items-center gap-2 rounded-md border border-neutral-200 bg-neutral-50 px-3 py-1.5 text-[13px] text-neutral-700">
+                <p className="mt-5 inline-flex flex-wrap items-center gap-2 rounded-md border border-neutral-200 bg-neutral-50 px-3 py-1.5 text-[13px] text-neutral-700">
                   <span className="font-medium tabular-nums">
                     {kr(pricing.year)} kr per år
                   </span>
@@ -703,13 +786,13 @@ export function Pricing({
 
           {/* Tillvalet. Egen rad med tonad botten, så att det syns att det är
               något annat än basen och inte ett paket till. */}
-          <div className="grid gap-6 bg-neutral-50 p-6 sm:p-8 lg:grid-cols-[20rem_1fr] lg:gap-12">
+          <div className="grid gap-6 bg-neutral-50 p-7 sm:p-10 lg:grid-cols-[20rem_1fr] lg:gap-12">
             <div>
-              <p className="font-mono text-[11px] uppercase tracking-[0.18em] text-neutral-500">
+              <p className="text-[11px] font-medium uppercase tracking-wider text-neutral-500">
                 Tillval
               </p>
-              <p className="mt-4 flex items-baseline gap-2">
-                <span className="text-[28px] font-semibold leading-none tracking-tight tabular-nums text-neutral-900">
+              <p className="mt-5 flex items-baseline gap-2">
+                <span className="text-[32px] font-semibold leading-none tracking-tight tabular-nums text-neutral-900">
                   {kr(payroll.month)}
                 </span>
                 <span className="text-[14px] text-neutral-500">
@@ -717,7 +800,7 @@ export function Pricing({
                 </span>
               </p>
               {payroll.year !== null && (
-                <p className="mt-2 text-[13px] text-neutral-500">
+                <p className="mt-3 text-[13px] text-neutral-500">
                   eller {kr(payroll.year)} kr per år
                 </p>
               )}
@@ -727,7 +810,7 @@ export function Pricing({
               <p className="text-[14px] font-medium text-neutral-900">
                 {MODULES.PAYROLL.name}
               </p>
-              <p className="mt-2 max-w-xl text-[13px] leading-relaxed text-neutral-600">
+              <p className="mt-2.5 max-w-xl text-[13px] leading-relaxed text-neutral-600">
                 Arbetstidsschema, stämplade raster, flex, komp, frånvaro och
                 tidrapport per anställd. Priset gäller hela företaget oavsett
                 antal skärmar och anställda. Kan slås på och av, och
@@ -737,13 +820,8 @@ export function Pricing({
           </div>
         </div>
 
-        <div className="mt-8 flex flex-wrap items-center gap-4">
-          <Link
-            href="/registrera"
-            className="rounded-md bg-neutral-900 px-5 py-3 text-sm font-semibold text-white transition-colors hover:bg-neutral-800"
-          >
-            Prova i 30 dagar
-          </Link>
+        <div className="mt-10 flex flex-wrap items-center gap-5">
+          <Cta href="/registrera">Prova i 30 dagar</Cta>
           <p className="text-[13px] text-neutral-500">
             Inget betalkort. Provperioden övergår inte i betalning av sig själv.
           </p>
@@ -806,20 +884,20 @@ export function Faq({ modules }: { modules: ModulePricing }) {
   ];
 
   return (
-    <section id="fragor" className="border-b border-neutral-200 bg-neutral-50">
-      <div className="mx-auto max-w-6xl px-6 py-20 sm:py-24">
+    <section id="fragor" className="bg-neutral-50">
+      <div className={SHELL}>
         <SectionHead index="07" eyebrow="Frågor" title="Vanliga frågor" />
 
         {/* <details> ger utfällbara svar utan JavaScript. Fungerar även om
             något går fel, och går att söka i med webbläsarens egen funktion. */}
-        <div className="mt-12 border-t border-neutral-200">
+        <div className="mt-14 border-t border-neutral-200">
           {questions.map((item) => (
             <details key={item.q} className="group border-b border-neutral-200">
-              <summary className="flex cursor-pointer list-none items-center justify-between gap-6 py-5 text-[15px] font-medium text-neutral-900 [&::-webkit-details-marker]:hidden">
+              <summary className="flex cursor-pointer list-none items-center justify-between gap-6 py-5 text-[16px] font-medium text-neutral-900 [&::-webkit-details-marker]:hidden">
                 {item.q}
                 <span
                   aria-hidden="true"
-                  className="shrink-0 text-neutral-400 transition-transform group-open:rotate-45"
+                  className="shrink-0 text-neutral-400 transition-transform group-open:rotate-45 group-open:text-tick-deep"
                 >
                   <svg
                     viewBox="0 0 20 20"
@@ -848,16 +926,27 @@ export function Faq({ modules }: { modules: ModulePricing }) {
 /* Avslutande uppmaning                                                        */
 /* -------------------------------------------------------------------------- */
 
+/**
+ * Sidans enda gröna yta.
+ *
+ * Grönt är accent och aldrig huvudfärg. Ett block, sist, är precis vad
+ * varumärkets egen delningsbild gör — och det blir sidans starkaste yta just
+ * för att färgen inte förekommit som yta tidigare.
+ */
 export function FinalCta({ pricing }: { pricing: ScreenPricing }) {
   return (
-    <section className="bg-neutral-900">
-      <div className="mx-auto max-w-6xl px-6 py-20 sm:py-24">
-        <div className="grid items-end gap-10 lg:grid-cols-2">
+    <section className="relative overflow-hidden bg-tick">
+      <Motif tone="onTick" className="-right-48 -top-64 h-[48rem] w-[48rem]" />
+
+      <div className={`relative ${SHELL}`}>
+        <div className="grid items-end gap-12 lg:grid-cols-2">
           <div>
-            <h2 className="text-[28px] font-semibold leading-[1.15] tracking-tight text-white sm:text-[36px]">
-              Prova i er egen verkstad
+            <h2 className="text-[40px] font-semibold leading-[1.02] tracking-tight text-neutral-900 sm:text-[56px]">
+              Prova i er
+              <br />
+              egen verkstad.
             </h2>
-            <p className="mt-5 max-w-lg text-[15px] leading-relaxed text-neutral-400">
+            <p className="mt-7 max-w-lg text-[16px] leading-relaxed text-emerald-900">
               Lägg upp anställda, arbetsmoment och ordrar, koppla skärmen och
               börja registrera tid. Uppsättningen tar cirka femton minuter och
               kräver inga kortuppgifter.
@@ -866,25 +955,16 @@ export function FinalCta({ pricing }: { pricing: ScreenPricing }) {
 
           <div className="lg:justify-self-end">
             <div className="flex flex-wrap gap-3">
-              {/* Grönt, inte vitt. Avsnittet ligger på Fjord, och Tick är
-                  varumärkets accent på mörk yta. Det är sidans enda plats där
-                  accenten bär en knapp, vilket är precis vad guiden menar med
-                  att grönt aldrig är huvudfärg. */}
-              <Link
-                href="/registrera"
-                className="rounded-md bg-tick px-5 py-3 text-sm font-semibold text-fjord transition-colors hover:bg-emerald-300"
-              >
-                Skapa arbetsyta
-              </Link>
+              <Cta href="/registrera">Skapa arbetsyta</Cta>
               <Link
                 href="/admin/login"
-                className="rounded-md border border-neutral-700 px-5 py-3 text-sm font-semibold text-neutral-200 transition-colors hover:bg-neutral-800"
+                className="rounded-lg border border-emerald-700/30 px-6 py-3.5 text-[15px] font-semibold text-emerald-900 transition-colors hover:bg-emerald-300"
               >
                 Logga in
               </Link>
             </div>
 
-            <p className="mt-5 text-[13px] text-neutral-500">
+            <p className="mt-6 text-[13px] text-emerald-900">
               30 dagar utan betalkort, därefter {kr(pricing.month)} kr per skärm
               och månad.
             </p>

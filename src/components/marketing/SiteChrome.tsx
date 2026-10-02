@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Wordmark } from "@/components/ui/Logo";
+import Motif from "./Motif";
 import { activeNotices } from "@/lib/notices";
 
 /**
@@ -8,8 +9,16 @@ import { activeNotices } from "@/lib/notices";
  * Menyn följer med när man skrollar. På en sida där beslutet fattas långt ner
  * ska knappen som leder vidare aldrig vara utanför skärmen.
  *
- * Formspråket är sidans: hårfina linjer, raka hörn och en enda mörk knapp.
- * Ingen färg används för att skapa uppmärksamhet — det gör placeringen.
+ * BÅDA ÄR FJORD, och det är avsiktligt desamma. Sidan växlar mellan ljusa och
+ * mörka ytor på vägen ned; ramar man in den med samma mörka yta i topp och
+ * botten blir växlingen ett innehåll och inte ett lapptäcke.
+ *
+ * Menyn ligger kvar som halvgenomskinlig med oskärpa bakom sig. Över hero syns
+ * den knappt alls, vilket är rätt — där ska rubriken ta plats. Över ett vitt
+ * avsnitt blir den en tydlig mörk list, vilket också är rätt, eftersom det är
+ * då man letar efter den.
+ *
+ * Enda färgen är knappen som leder vidare: Tick på mörkt, enligt guiden.
  */
 
 /**
@@ -81,23 +90,21 @@ async function SiteNotices() {
   if (notices.length === 0) return null;
 
   return (
-    <div className="border-b border-neutral-200 bg-neutral-50">
+    <div className="border-b border-neutral-800 bg-neutral-950">
       <div className="mx-auto max-w-6xl px-6 py-2.5">
         {notices.map((notice) => (
           <p
             key={notice.id}
-            className="flex items-start gap-2 text-[13px] leading-relaxed text-neutral-600"
+            className="flex items-start gap-2 text-[13px] leading-relaxed text-neutral-400"
           >
             <span
               aria-hidden="true"
               className={`mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full ${
-                notice.kind === "INCIDENT" ? "bg-amber-500" : "bg-neutral-400"
+                notice.kind === "INCIDENT" ? "bg-amber-500" : "bg-neutral-500"
               }`}
             />
             <span>
-              <span className="font-medium text-neutral-900">
-                {notice.title}.
-              </span>{" "}
+              <span className="font-medium text-white">{notice.title}.</span>{" "}
               {notice.body}
             </span>
           </p>
@@ -118,10 +125,10 @@ export function SiteHeader() {
 
 function SiteHeaderBar() {
   return (
-    <header className="sticky top-0 z-50 border-b border-neutral-200 bg-white/90 backdrop-blur">
+    <header className="sticky top-0 z-50 border-b border-white/10 bg-neutral-900/85 backdrop-blur">
       <div className="mx-auto flex max-w-6xl items-center gap-8 px-6 py-3.5">
         <Link href="/" aria-label="Tikkr, till startsidan">
-          <Wordmark size={28} />
+          <Wordmark size={26} tone="reversed" />
         </Link>
 
         <nav className="hidden gap-6 md:flex">
@@ -129,7 +136,7 @@ function SiteHeaderBar() {
             <a
               key={item.href}
               href={item.href}
-              className="text-[13px] text-neutral-600 transition-colors hover:text-neutral-900"
+              className="text-[13px] text-neutral-400 transition-colors hover:text-white"
             >
               {item.label}
             </a>
@@ -139,13 +146,13 @@ function SiteHeaderBar() {
         <div className="ml-auto flex items-center gap-4">
           <Link
             href="/admin/login"
-            className="text-[13px] text-neutral-600 transition-colors hover:text-neutral-900"
+            className="text-[13px] text-neutral-400 transition-colors hover:text-white"
           >
             Logga in
           </Link>
           <Link
             href="/registrera"
-            className="rounded-md bg-neutral-900 px-3.5 py-2 text-[13px] font-semibold text-white transition-colors hover:bg-neutral-800"
+            className="rounded-md bg-tick px-3.5 py-2 text-[13px] font-semibold text-neutral-900 transition-colors hover:bg-emerald-300"
           >
             Prova gratis
           </Link>
@@ -169,24 +176,28 @@ export function SiteFooter() {
   ];
 
   return (
-    <footer className="border-t border-neutral-200 bg-white">
-      <div className="mx-auto max-w-6xl px-6 py-14">
+    <footer className="relative overflow-hidden bg-neutral-900">
+      {/* Motivet en sista gång, nedsänkt i hörnet. Sidan började med det och
+          slutar med det. */}
+      <Motif tone="onDark" className="-bottom-72 -left-40 h-[36rem] w-[36rem]" />
+
+      <div className="relative mx-auto max-w-6xl px-6 py-16">
         <div className="grid gap-10 sm:grid-cols-2 lg:grid-cols-[1.5fr_1fr_1fr_1fr]">
           <div className="max-w-xs">
-            <Wordmark size={28} />
-            <p className="mt-4 text-[13px] leading-relaxed text-neutral-500">
+            <Wordmark size={26} tone="reversed" />
+            <p className="mt-5 text-[13px] leading-relaxed text-neutral-400">
               Tidregistrering per order och arbetsmoment för svensk
               verkstadsindustri. Drift och support i Sverige.
             </p>
-            <p className="mt-4 text-[13px] text-neutral-500">
+            <p className="mt-4 text-[13px] text-neutral-400">
               En del av{" "}
-              <span className="font-medium text-neutral-700">TERAFALK AB</span>
+              <span className="font-medium text-neutral-300">TERAFALK AB</span>
             </p>
           </div>
 
           {columns.map((column) => (
             <div key={column.title}>
-              <p className="font-mono text-[11px] uppercase tracking-[0.18em] text-neutral-400">
+              <p className="text-[11px] font-medium uppercase tracking-wider text-tick">
                 {column.title}
               </p>
               <ul className="mt-4 space-y-2.5 text-[13px]">
@@ -197,14 +208,14 @@ export function SiteFooter() {
                     {item.href.startsWith("/#") ? (
                       <a
                         href={item.href}
-                        className="text-neutral-600 transition-colors hover:text-neutral-900"
+                        className="text-neutral-400 transition-colors hover:text-white"
                       >
                         {item.label}
                       </a>
                     ) : (
                       <Link
                         href={item.href}
-                        className="text-neutral-600 transition-colors hover:text-neutral-900"
+                        className="text-neutral-400 transition-colors hover:text-white"
                       >
                         {item.label}
                       </Link>
@@ -216,13 +227,13 @@ export function SiteFooter() {
           ))}
         </div>
 
-        <div className="mt-12 flex flex-wrap items-center justify-between gap-4 border-t border-neutral-200 pt-6">
+        <div className="mt-14 flex flex-wrap items-center justify-between gap-4 border-t border-neutral-800 pt-6">
           <p className="text-xs text-neutral-400">
             © {new Date().getFullYear()} TERAFALK AB. Priser exklusive moms.
           </p>
           <a
             href="mailto:support@tikkr.se"
-            className="text-xs text-neutral-500 transition-colors hover:text-neutral-900"
+            className="text-xs text-neutral-400 transition-colors hover:text-white"
           >
             support@tikkr.se
           </a>
