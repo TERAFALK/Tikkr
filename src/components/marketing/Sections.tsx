@@ -389,7 +389,7 @@ const STEPS = [
 
 export function HowItWorks() {
   return (
-    <section id="sa-funkar-det" className="bg-white">
+    <section id="sa-funkar-det" className="scroll-mt-16 bg-white">
       <div className={SHELL}>
         <SectionHead
           index="02"
@@ -434,7 +434,7 @@ export function HowItWorks() {
 
 export function AdminSection() {
   return (
-    <section id="panelen" className="bg-neutral-50">
+    <section id="panelen" className="scroll-mt-16 bg-neutral-50">
       <div className={SHELL}>
         <SectionHead
           index="03"
@@ -505,7 +505,7 @@ export function Documents() {
   ];
 
   return (
-    <section id="underlag" className="bg-white">
+    <section id="underlag" className="scroll-mt-16 bg-white">
       <div className={SHELL}>
         <SectionHead
           index="04"
@@ -644,7 +644,7 @@ export function Capabilities() {
   return (
     <section
       id="funktioner"
-      className="relative overflow-hidden bg-neutral-900"
+      className="relative scroll-mt-16 overflow-hidden bg-neutral-900"
     >
       <Motif tone="onDark" className="-right-72 -top-56 h-[50rem] w-[50rem]" />
 
@@ -717,7 +717,7 @@ export function Pricing({
   const payroll = modules.PAYROLL;
 
   return (
-    <section id="pris" className="bg-white">
+    <section id="pris" className="scroll-mt-16 bg-white">
       <div className={SHELL}>
         <SectionHead
           index="06"
@@ -884,7 +884,7 @@ export function Faq({ modules }: { modules: ModulePricing }) {
   ];
 
   return (
-    <section id="fragor" className="bg-neutral-50">
+    <section id="fragor" className="scroll-mt-16 bg-neutral-50">
       <div className={SHELL}>
         <SectionHead index="07" eyebrow="Frågor" title="Vanliga frågor" />
 

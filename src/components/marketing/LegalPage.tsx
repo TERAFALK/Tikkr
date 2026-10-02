@@ -36,7 +36,7 @@ export default function LegalPage({
   sections: Section[];
 }) {
   return (
-    <div className="bg-white">
+    <div className="marketing-page bg-white">
       <SiteHeader />
 
       <main className="mx-auto max-w-3xl px-6 py-16">

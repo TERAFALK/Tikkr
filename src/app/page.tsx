@@ -67,7 +67,7 @@ export default async function Home() {
   ]);
 
   return (
-    <div className="bg-white">
+    <div className="marketing-page bg-white">
       <SiteHeader />
 
       {/* Hero och sifferraden animeras vid inladdning — de syns direkt och

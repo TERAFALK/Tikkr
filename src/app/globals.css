@@ -160,6 +160,36 @@ html {
 }
 
 /*
+  MJUK RULLNING TILL ANKARLÄNKAR.
+
+  Säljsidans meny pekar på avsnitt längre ned — Pris, Frågor, Så fungerar det.
+  Utan den här raden byter sidan läge i ett hopp, och den som tryckte tappar
+  var hen var: ingenting rörde sig, allt stod bara någon annanstans.
+
+  BARA PÅ DE SIDOR SOM HAR ANKARLÄNKAR. Rullningen måste sitta på `html`,
+  eftersom det är det elementet som rullar — men `html` är gemensamt för hela
+  produkten, och panelen rullar till toppen vid varje sidbyte. Skulle den
+  resan animeras började varje klick i menyn med en åktur uppför den förra
+  sidan.
+
+  Next stänger visserligen av mjuk rullning medan routern flyttar sig, men det
+  är ett internt beteende i ramverket och inte något vi kommit överens om med
+  det. Att i stället säga var rullningen SKA gälla är en regel som står kvar
+  över en uppgradering.
+
+  `:has()` saknas i äldre webbläsare. Då hoppar sidan som förut, vilket är
+  precis vad den gjorde innan — ingen funktion går förlorad.
+
+  Ankarmålen bär sin egen `scroll-mt`, så att det fastnitade sidhuvudet inte
+  lägger sig över rubriken man just hoppat till.
+*/
+@media (prefers-reduced-motion: no-preference) {
+  html:has(.marketing-page) {
+    scroll-behavior: smooth;
+  }
+}
+
+/*
   Dialogrutor centreras av webbläsaren genom "margin: auto". Tailwinds
   återställning nollar marginaler på alla element, så centreringen försvann
   och rutorna hamnade uppe till vänster. Här får de tillbaka den.
