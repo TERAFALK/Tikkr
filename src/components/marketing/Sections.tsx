@@ -956,9 +956,12 @@ export function FinalCta({ pricing }: { pricing: ScreenPricing }) {
           <div className="lg:justify-self-end">
             <div className="flex flex-wrap gap-3">
               <Cta href="/registrera">Skapa arbetsyta</Cta>
+              {/* Ramen är Fjord och inte en mörkare grön. Grönt mot grönt
+                  skiljer sig för lite för att läsas som en kant, och knappen
+                  såg ut att sakna ram tills man letade efter den. */}
               <Link
                 href="/admin/login"
-                className="rounded-lg border border-emerald-700/30 px-6 py-3.5 text-[15px] font-semibold text-emerald-900 transition-colors hover:bg-emerald-300"
+                className="rounded-lg border border-neutral-900/55 px-6 py-3.5 text-[15px] font-semibold text-neutral-900 transition-colors hover:border-neutral-900 hover:bg-neutral-900/5"
               >
                 Logga in
               </Link>
