@@ -11,6 +11,7 @@ import {
   TimesheetMockup,
 } from "./Mockups";
 import LiveKiosk from "./LiveKiosk";
+import { SLOGAN } from "@/lib/brand";
 import ContactLine from "./ContactLine";
 import Motif from "./Motif";
 import PriceCalculator from "./PriceCalculator";
@@ -183,7 +184,7 @@ export function Hero() {
       <div className="relative mx-auto grid max-w-6xl items-center gap-16 px-6 pb-24 pt-20 sm:pb-28 sm:pt-24 lg:grid-cols-[0.95fr_1.05fr]">
         <div>
           <p className="animate-rise text-[11px] font-medium uppercase tracking-wider text-tick">
-            Stämpla in. Stämpla ut. Klart.
+            {SLOGAN}
           </p>
 
           <h1

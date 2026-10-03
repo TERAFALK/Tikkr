@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
+import { SLOGAN } from "@/lib/brand";
 import { siteUrl } from "@/lib/site-url";
 import "./globals.css";
 
@@ -96,7 +97,7 @@ export const metadata: Metadata = {
   */
   openGraph: {
     title: "Tikkr",
-    description: "Stämpla in. Stämpla ut. Klart.",
+    description: SLOGAN,
     siteName: "Tikkr",
     locale: "sv_SE",
     type: "website",

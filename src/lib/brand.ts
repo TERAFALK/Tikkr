@@ -48,6 +48,23 @@ export const BRAND = {
 } as const;
 
 /* -------------------------------------------------------------------------- */
+/* Sloganen                                                                    */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * "Tiden tickar. Tikkr räknar."
+ *
+ * Står här och inte som en sträng på de ställen den visas. Den stod på två
+ * ställen när den byttes ut förra gången — hero-etiketten och delningstexten i
+ * rot-layouten — och den sortens par hinner alltid sluta säga samma sak.
+ *
+ * TVÅ KORTA MENINGAR, med punkt efter båda. Guiden anger formen uttryckligen,
+ * och en slogan som skrivs med komma eller utan slutpunkt är inte längre
+ * samma slogan.
+ */
+export const SLOGAN = "Tiden tickar. Tikkr räknar.";
+
+/* -------------------------------------------------------------------------- */
 /* Dokumentens palett                                                          */
 /* -------------------------------------------------------------------------- */
 

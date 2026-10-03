@@ -829,6 +829,13 @@ rubriker, Medium 500 för knappar och etiketter, Regular 400 för brödtext.
 Knipningen ligger i `--tracking-tight` (−3 %) och `--tracking-wider` (+8 %),
 så de klasser som redan står i koden blir rätt.
 
+**Sloganen är "Tiden tickar. Tikkr räknar."** (bytt 2026-10-03, var
+tidigare "Stämpla in. Stämpla ut. Klart."). Två korta meningar med punkt efter
+båda — guiden anger formen, och en slogan skriven med komma är inte längre
+samma slogan. Den står som `SLOGAN` i `brand.ts` och skrivs inte av för hand:
+den låg på två ställen vid bytet, och den sortens par hinner alltid sluta säga
+samma sak.
+
 **Ordmärket sätts ALDRIG som text.** Guiden förbjuder att det sätts om i ett
 annat typsnitt, och vanlig text blir just det så fort Geist inte hunnit
 laddas. `src/components/ui/Logo.tsx` ritar konturerna ur
