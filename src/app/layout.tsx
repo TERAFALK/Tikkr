@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
+import { siteUrl } from "@/lib/site-url";
 import "./globals.css";
 
 /**
@@ -46,7 +47,24 @@ const geistMono = Geist_Mono({
   display: "swap",
 });
 
+/** Säljsidans publika adress, eller null i ett labb utan sådan. */
+const base = siteUrl();
+
 export const metadata: Metadata = {
+  /*
+    Basadressen som relativa adresser räknas mot.
+
+    Utan den kan `/og.png` inte göras absolut, och en delningsbild måste vara
+    absolut för att en crawler ska kunna hämta den. Den satt tidigare bara i
+    säljsidans egen metadata, vilket betydde att startsidan hade en bas och
+    ingen annan sida hade det.
+
+    Saknas MARKETING_HOST finns ingen publik adress att peka ut. Next faller då
+    tillbaka på localhost och varnar vid bygget — vilket är rätt besked i ett
+    labb utan publik adress, och inget att dölja.
+  */
+  ...(base && { metadataBase: new URL(base) }),
+
   title: "Tikkr",
   description: "Stämplingssystem för verkstads- och tillverkningsindustri",
   manifest: "/manifest.json",

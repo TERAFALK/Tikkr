@@ -11,7 +11,9 @@ import {
   TimesheetMockup,
 } from "./Mockups";
 import LiveKiosk from "./LiveKiosk";
+import ContactLine from "./ContactLine";
 import Motif from "./Motif";
+import { faqQuestions } from "./faq-data";
 import type { ModulePricing, ScreenPricing } from "@/lib/stripe";
 import { MODULES } from "@/lib/modules";
 import Reveal from "./Reveal";
@@ -273,12 +275,21 @@ export function Facts() {
 
   return (
     <section className="border-t border-neutral-800 bg-neutral-900">
-      <dl className="mx-auto grid max-w-6xl grid-cols-2 px-6 lg:grid-cols-4">
+      {/* Rännilen och linjerna gäller från den smalaste skärmen och inte först
+          vid lg. I 2x2-läget stod de fyra fakta kant i kant utan vare sig
+          mellanrum eller avgränsare, och lästes som ett enda textblock.
+
+          Linjen sitter till VÄNSTER om varje ruta utom den första i sin rad.
+          I två kolumner är det var annan ruta, i fyra är det alla utom en —
+          därav de två villkoren. */}
+      <dl className="mx-auto grid max-w-6xl grid-cols-2 gap-x-6 px-6 sm:gap-x-10 lg:grid-cols-4">
         {facts.map((fact, index) => (
           <div
             key={fact.label}
             className={`py-8 ${
-              index > 0 ? "border-neutral-800 lg:border-l lg:pl-8" : ""
+              index % 2 === 1 ? "border-l border-neutral-800 pl-6 sm:pl-10" : ""
+            } ${
+              index > 0 ? "lg:border-l lg:border-neutral-800 lg:pl-10" : ""
             }`}
           >
             <dt className="text-[24px] font-semibold tracking-tight text-white">
@@ -820,12 +831,31 @@ export function Pricing({
           </div>
         </div>
 
-        <div className="mt-10 flex flex-wrap items-center gap-5">
+        {/* RÄKNAT EXEMPEL, INTE EN KALKYLATOR.
+
+            Frågan "vad kostar det för oss" är den enda som står kvar efter
+            tabellen ovan, och den besvaras av en rad. Ett reglage som utför
+            399 gånger två åt en verkstadschef är precis det § 7.1 kallar att
+            handleda någon som förstår sitt eget yrke.
+
+            Siffran räknas ur samma Stripe-priser som står i tabellen, så den
+            kan inte bli gammal. */}
+        <p className="mt-8 text-[14px] text-neutral-600">
+          Två skärmar och löneunderlag:{" "}
+          <span className="font-medium tabular-nums text-neutral-900">
+            {kr(pricing.month * 2 + payroll.month)} kr per månad
+          </span>
+          .
+        </p>
+
+        <div className="mt-8 flex flex-wrap items-center gap-5">
           <Cta href="/registrera">Prova i 30 dagar</Cta>
           <p className="text-[13px] text-neutral-500">
             Inget betalkort. Provperioden övergår inte i betalning av sig själv.
           </p>
         </div>
+
+        <ContactLine className="mt-5" />
       </div>
     </section>
   );
@@ -836,52 +866,7 @@ export function Pricing({
 /* -------------------------------------------------------------------------- */
 
 export function Faq({ modules }: { modules: ModulePricing }) {
-  const questions = [
-    {
-      q: "Vilken utrustning krävs i verkstaden?",
-      a: "En pekskärm eller surfplatta med webbläsare. Ingen installation krävs. Skärmen kopplas en gång med en sexsiffrig kod och kräver därefter ingen inloggning.",
-    },
-    {
-      q: "Hur lång tid tar uppsättningen?",
-      a: "Cirka femton minuter. Anställda, arbetsmoment och ordrar läggs upp i en guide, och skärmen kopplas genom att koden anges på den enhet som ska användas.",
-    },
-    {
-      q: "Kan en anställd arbeta med två maskiner samtidigt?",
-      a: "Ja. En anställd kan ha ett pågående jobb per arbetsmoment, men inte två på samma. Pågår två maskiner en timme registreras två maskintimmar, fördelade på respektive order.",
-    },
-    {
-      q: "Vad händer om någon glömmer att stämpla ut?",
-      a: "Posten stängs vid ett klockslag ni anger, exempelvis 18:00, och hamnar i granskningen. Den beräknade sluttiden är märkt som beräknad och rättas före fakturering.",
-    },
-    {
-      q: "Vad händer vid avbrott i internetanslutningen?",
-      a: "Skärmen tar emot registreringar som vanligt. De sparas lokalt och skickas när anslutningen återupprättats. Arbetstid som inte registrerats går inte att rekonstruera i efterhand.",
-    },
-    {
-      q: "Kan Tikkr användas för löneunderlag?",
-      a: `Ja, som tillval för ${kr(modules.PAYROLL.month)} kr per månad: arbetstidsschema, stämplade raster, flex, komp, frånvaro och tidrapport per anställd. Tikkr redovisar timmar. Lönearter, OB och övertidsersättning regleras i kollektivavtal och hanteras i lönesystemet.`,
-    },
-    {
-      q: "Hur hanteras tid som inte ska faktureras?",
-      a: "Städning, möten och underhåll registreras som improduktiv tid i ett eget register, skilt från ordrarna.",
-    },
-    {
-      q: "Kan underlaget skickas vidare till vår kund?",
-      a: "Ja. Underlaget innehåller er logotyp, ordernummer och kund som rubrik, samtliga stämplingar och en summa sist. Självkostnad och marginal redovisas enbart i efterkalkylen, som är märkt som internt underlag.",
-    },
-    {
-      q: "Var lagras uppgifterna?",
-      a: "På servrar i Sverige. Personuppgiftsbiträdesavtal ingår och kan läsas innan ni börjar. Uppgifterna om en anställd omfattar namn, valfritt anställningsnummer och registrerad tid, och kan exporteras eller raderas i panelen.",
-    },
-    {
-      q: "Vad händer vid utebliven betalning?",
-      a: "Stämplingsskärmarna fortsätter att fungera. Panelen och exporten låses, eftersom arbetstid som inte registrerats inte går att återskapa. Registrerad tid finns kvar och blir åtkomlig igen när fakturan är betald.",
-    },
-    {
-      q: "Finns det någon bindningstid?",
-      a: "Nej. Varken bindningstid eller uppsägningstid. Årsbetalning är ett frivilligt alternativ som ger rabatt.",
-    },
-  ];
+  const questions = faqQuestions(modules);
 
   return (
     <section id="fragor" className="scroll-mt-16 bg-neutral-50">
@@ -971,6 +956,8 @@ export function FinalCta({ pricing }: { pricing: ScreenPricing }) {
               30 dagar utan betalkort, därefter {kr(pricing.month)} kr per skärm
               och månad.
             </p>
+
+            <ContactLine tone="tick" className="mt-2" />
           </div>
         </div>
       </div>

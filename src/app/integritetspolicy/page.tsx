@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { pageMetadata } from "@/lib/seo";
 import LegalPage, {
   Definitions,
   List,
@@ -15,11 +16,12 @@ import { HOSTING_LOCATION, LEGAL_UPDATED } from "@/lib/legal";
  */
 export const revalidate = 60;
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
+  path: "/integritetspolicy",
   title: "Integritetspolicy · Tikkr",
   description:
     "Hur TERAFALK AB behandlar personuppgifter i tidregistreringstjänsten Tikkr.",
-};
+});
 
 /**
  * Integritetspolicyn.

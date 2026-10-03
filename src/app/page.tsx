@@ -1,8 +1,9 @@
 import type { Metadata } from "next";
-import { siteUrl } from "@/lib/site-url";
+import { pageMetadata } from "@/lib/seo";
 import { getModulePricing, getScreenPricing } from "@/lib/stripe";
 import Reveal from "@/components/marketing/Reveal";
 import { SiteFooter, SiteHeader } from "@/components/marketing/SiteChrome";
+import StructuredData from "@/components/marketing/StructuredData";
 import {
   AdminSection,
   Capabilities,
@@ -15,8 +16,6 @@ import {
   Pricing,
   Problem,
 } from "@/components/marketing/Sections";
-
-const base = siteUrl();
 
 /**
  * Sidan byggs om varje minut istället för en gång vid deploy.
@@ -31,32 +30,17 @@ export const revalidate = 60;
 // INGET PRIS I BESKRIVNINGEN. Den är det första en besökare ser, i
 // sökresultatet, och priset hör hemma längre ned på sidan när det står klart
 // vad man får. Siffran stod här tidigare och gjorde texten till en prislapp.
-export async function generateMetadata(): Promise<Metadata> {
-  return {
-    title: "Tikkr · Tidregistrering per order för verkstad",
-    description:
-      "Stämplingssystem för pekskärm. Personalen registrerar tid på rätt " +
-      "order och arbetsmoment med ett tryck. Underlag per order, efterkalkyl " +
-      "och tidrapport, med drift och support i Sverige.",
-
-    // Talar om vilken adress som är den riktiga. Utan den kan tikkr.se och
-    // www.tikkr.se räknas som två sidor med samma innehåll, och deras värde
-    // delas upp på båda istället för att samlas på en.
-    ...(base && {
-      metadataBase: new URL(base),
-      alternates: { canonical: "/" },
-      openGraph: {
-        type: "website",
-        locale: "sv_SE",
-        url: base,
-        siteName: "Tikkr",
-        title: "Tikkr · Tidregistrering per order för verkstad",
-        description:
-          "Tidregistrering per order och arbetsmoment, direkt i verkstaden.",
-      },
-    }),
-  };
-}
+export const metadata: Metadata = pageMetadata({
+  path: "/",
+  title: "Tikkr · Tidregistrering per order för verkstad",
+  description:
+    "Stämplingssystem för pekskärm. Personalen registrerar tid på rätt " +
+    "order och arbetsmoment med ett tryck. Underlag per order, efterkalkyl " +
+    "och tidrapport, med drift och support i Sverige.",
+  // Kortare i ett delningskort, där raden klipps efter ett par rader ändå.
+  shareDescription:
+    "Tidregistrering per order och arbetsmoment, direkt i verkstaden.",
+});
 
 export default async function Home() {
   // Hämtas parallellt. Båda ligger bakom samma korta minne i stripe.ts, så
@@ -68,6 +52,7 @@ export default async function Home() {
 
   return (
     <div className="marketing-page bg-white">
+      <StructuredData pricing={pricing} modules={modules} />
       <SiteHeader />
 
       {/* Hero och sifferraden animeras vid inladdning — de syns direkt och

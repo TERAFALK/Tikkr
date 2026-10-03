@@ -2,6 +2,17 @@ import Link from "next/link";
 import { Wordmark } from "@/components/ui/Logo";
 import Motif from "./Motif";
 import { activeNotices } from "@/lib/notices";
+import ContactLine from "./ContactLine";
+import SiteNav from "./SiteNav";
+import { CONTACT } from "@/lib/contact";
+import { LEGAL, NAV } from "./links";
+
+/*
+  LEGAL exporteras vidare härifrån. Länklistorna bor i `links.ts` sedan menyn
+  blev en klientkomponent, men adresserna refereras på flera håll som
+  `SiteChrome`-export, och ett byte där ger inget tillbaka.
+*/
+export { LEGAL };
 
 /**
  * Toppmeny och sidfot för säljsidan.
@@ -21,33 +32,6 @@ import { activeNotices } from "@/lib/notices";
  * Enda färgen är knappen som leder vidare: Tick på mörkt, enligt guiden.
  */
 
-/**
- * De rättsliga sidorna.
- *
- * Länkas i foten på varje sida. Adresserna anges också i betaltjänstens
- * kundportal, som kräver att villkor och integritetspolicy går att nå.
- */
-export const LEGAL = [
-  { href: "/villkor", label: "Användarvillkor" },
-  { href: "/integritetspolicy", label: "Integritetspolicy" },
-  { href: "/personuppgiftsbitradesavtal", label: "Biträdesavtal" },
-];
-
-/**
- * Adresserna inleds med snedstreck.
- *
- * Ett ensamt "#pris" betyder "avsnittet pris på DEN HÄR sidan". Står man på
- * villkorssidan finns inget sådant avsnitt, och länken leder till
- * /villkor#pris där ingenting händer. Med "/#pris" går den alltid till
- * startsidan först.
- */
-const NAV = [
-  { href: "/#sa-funkar-det", label: "Så fungerar det" },
-  { href: "/#underlag", label: "Dokument" },
-  { href: "/#funktioner", label: "Innehåll" },
-  { href: "/#pris", label: "Pris" },
-  { href: "/#fragor", label: "Frågor" },
-];
 
 /**
  * Hämtar meddelandena, eller inga alls.
@@ -131,17 +115,7 @@ function SiteHeaderBar() {
           <Wordmark size={26} tone="reversed" />
         </Link>
 
-        <nav className="hidden gap-6 md:flex">
-          {NAV.map((item) => (
-            <a
-              key={item.href}
-              href={item.href}
-              className="text-[13px] text-neutral-400 transition-colors hover:text-white"
-            >
-              {item.label}
-            </a>
-          ))}
-        </nav>
+        <SiteNav />
 
         <div className="ml-auto flex items-center gap-4">
           <Link
@@ -231,12 +205,15 @@ export function SiteFooter() {
           <p className="text-xs text-neutral-400">
             © {new Date().getFullYear()} TERAFALK AB. Priser exklusive moms.
           </p>
-          <a
-            href="mailto:support@tikkr.se"
-            className="text-xs text-neutral-400 transition-colors hover:text-white"
-          >
-            support@tikkr.se
-          </a>
+          <div className="flex flex-wrap items-center gap-4">
+            <ContactLine tone="dark" size="xs" />
+            <a
+              href={`mailto:${CONTACT.email}`}
+              className="text-xs text-neutral-400 transition-colors hover:text-white"
+            >
+              {CONTACT.email}
+            </a>
+          </div>
         </div>
       </div>
     </footer>

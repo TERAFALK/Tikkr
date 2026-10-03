@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { pageMetadata } from "@/lib/seo";
 import Link from "next/link";
 import LegalPage, {
   Definitions,
@@ -20,11 +21,12 @@ import {
  */
 export const revalidate = 60;
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
+  path: "/personuppgiftsbitradesavtal",
   title: "Personuppgiftsbiträdesavtal · Tikkr",
   description:
     "Biträdesavtal enligt artikel 28 i dataskyddsförordningen mellan kundföretaget och TERAFALK AB.",
-};
+});
 
 /**
  * Biträdesavtalet.

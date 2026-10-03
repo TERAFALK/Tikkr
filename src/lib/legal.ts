@@ -11,6 +11,18 @@
 export const LEGAL_UPDATED = "12 augusti 2026";
 
 /**
+ * Samma dag som raden ovan, i maskinläsbar form. Används av sitemap.
+ *
+ * TVÅ UPPGIFTER OM SAMMA SAK, vilket den här filen annars finns för att
+ * undvika. Skälet: månadens namn på svenska kräver språkdata som en avskalad
+ * container inte garanterat har, och ett datum som renderas som "August" i ett
+ * juridiskt dokument är sämre än en rad till här.
+ *
+ * `tests/seo.test.ts` kontrollerar att dag och år stämmer mellan de två.
+ */
+export const LEGAL_UPDATED_AT = new Date("2026-08-12T00:00:00Z");
+
+/**
  * Var tjänsten driftas.
  *
  * Står i klartext i både integritetspolicyn och biträdesavtalet, och MÅSTE
