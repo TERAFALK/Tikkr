@@ -825,8 +825,7 @@ export function Pricing({
               <p className="mt-2.5 max-w-xl text-[13px] leading-relaxed text-neutral-600">
                 Arbetstidsschema, stämplade raster, flex, komp, frånvaro och
                 tidrapport per anställd. Priset gäller hela företaget oavsett
-                antal skärmar och anställda. Kan slås på och av, och
-                registrerade uppgifter ligger kvar när tillvalet är avstängt.
+                antal skärmar och anställda.
               </p>
             </div>
           </div>
