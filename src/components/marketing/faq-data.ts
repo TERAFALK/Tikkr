@@ -43,7 +43,7 @@ export function faqQuestions(modules: ModulePricing): FaqItem[] {
     },
     {
       q: "Vad händer vid avbrott i internetanslutningen?",
-      a: "Skärmen tar emot registreringar som vanligt. De sparas lokalt och skickas när anslutningen återupprättats. Arbetstid som inte registrerats går inte att rekonstruera i efterhand.",
+      a: "Skärmen tar emot registreringar som vanligt. De sparas lokalt och skickas när anslutningen återupprättats.",
     },
     {
       q: "Kan Tikkr användas för löneunderlag?",
@@ -63,7 +63,7 @@ export function faqQuestions(modules: ModulePricing): FaqItem[] {
     },
     {
       q: "Vad händer vid utebliven betalning?",
-      a: "Stämplingsskärmarna fortsätter att fungera. Panelen och exporten låses, eftersom arbetstid som inte registrerats inte går att återskapa. Registrerad tid finns kvar och blir åtkomlig igen när fakturan är betald.",
+      a: "Stämplingsskärmarna fortsätter att fungera. Panelen och exporten låses. Registrerad tid finns kvar och blir åtkomlig igen när fakturan är betald.",
     },
     {
       q: "Finns det någon bindningstid?",

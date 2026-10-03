@@ -109,10 +109,7 @@ const sections: Section[] = [
             Stämplingsskärmarna påverkas inte.
           </strong>{" "}
           Tidregistreringen fortsätter att fungera, och all tid som registreras
-          under låsningen finns tillgänglig när abonnemanget återupptas. Skälet
-          är att arbetstid som inte registreras när arbetet utförs inte går att
-          rekonstruera i efterhand, och den tiden är kundens underlag mot sin
-          egen kund.
+          under låsningen finns tillgänglig när abonnemanget återupptas.
         </p>
       </>
     ),

@@ -346,7 +346,7 @@ export function Problem() {
         <SectionHead
           index="01"
           eyebrow="Problemet"
-          title="Tid som inte registreras när arbetet utförs går inte att rekonstruera"
+          title="Tid som inte registreras när arbetet utförs blir en uppskattning"
         />
 
         <div className="mt-16 grid border-t border-neutral-200 sm:grid-cols-3">
