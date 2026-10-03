@@ -18,11 +18,12 @@
 
 export const CONTACT = {
   /**
-   * Telefonnummer i det format det ska LÄSAS, t.ex. "0340-12 34 56".
+   * Telefonnummer i det format det ska LÄSAS.
    *
-   * Tomt tills det är bestämt.
+   * Grupperat med mellanslag. Ett nummer man ska kunna skriva ner medan någon
+   * läser upp det går inte att trycka ihop till en sträng.
    */
-  phone: "",
+  phone: "+46 70 868 15 61",
 
   /**
    * Samma nummer i det format det ska RINGAS, t.ex. "+46340123456".
@@ -31,7 +32,7 @@ export const CONTACT = {
    * och det numret är obegripligt att läsa. Skrevs bara det ena fick antingen
    * ögat eller telefonen fel version.
    */
-  phoneHref: "",
+  phoneHref: "+46708681561",
 
   /** Länk till en bokad genomgång. Tom när ingen sådan finns. */
   bookingUrl: "",

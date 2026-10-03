@@ -13,6 +13,7 @@ import {
 import LiveKiosk from "./LiveKiosk";
 import ContactLine from "./ContactLine";
 import Motif from "./Motif";
+import PriceCalculator from "./PriceCalculator";
 import { faqQuestions } from "./faq-data";
 import type { ModulePricing, ScreenPricing } from "@/lib/stripe";
 import { MODULES } from "@/lib/modules";
@@ -829,26 +830,13 @@ export function Pricing({
               </p>
             </div>
           </div>
+
+          {/* Sista raden i priskortet: kundens egen summa. Styckpriserna står
+              kvar ovanför — det är dem man ska kunna upprepa. */}
+          <PriceCalculator pricing={pricing} payroll={payroll} />
         </div>
 
-        {/* RÄKNAT EXEMPEL, INTE EN KALKYLATOR.
-
-            Frågan "vad kostar det för oss" är den enda som står kvar efter
-            tabellen ovan, och den besvaras av en rad. Ett reglage som utför
-            399 gånger två åt en verkstadschef är precis det § 7.1 kallar att
-            handleda någon som förstår sitt eget yrke.
-
-            Siffran räknas ur samma Stripe-priser som står i tabellen, så den
-            kan inte bli gammal. */}
-        <p className="mt-8 text-[14px] text-neutral-600">
-          Två skärmar och löneunderlag:{" "}
-          <span className="font-medium tabular-nums text-neutral-900">
-            {kr(pricing.month * 2 + payroll.month)} kr per månad
-          </span>
-          .
-        </p>
-
-        <div className="mt-8 flex flex-wrap items-center gap-5">
+        <div className="mt-10 flex flex-wrap items-center gap-5">
           <Cta href="/registrera">Prova i 30 dagar</Cta>
           <p className="text-[13px] text-neutral-500">
             Inget betalkort. Provperioden övergår inte i betalning av sig själv.
