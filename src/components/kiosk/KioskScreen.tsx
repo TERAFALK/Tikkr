@@ -423,6 +423,42 @@ export default function KioskScreen({
   }, [recentByEmployee]);
 
   /**
+   * Jobbet någon just lämnade blir "Senast" — men BARA om momentet finns kvar.
+   *
+   * Avaktiveras ett arbetsmoment medan någon står instämplad på det skulle
+   * utstämplingen annars lämna ett förslag som servern vägrar, och ett nedlagt
+   * moment vore åter synligt på skärmen trots att det försvunnit ur rutnätet.
+   * Servern gör samma kontroll vid omladdningen (se src/app/kiosk/page.tsx) —
+   * den här finns för minuterna skärmen räknar själv.
+   *
+   * Bara momentet prövas, inte ordern: en order som skapats på plats hinner
+   * inte alltid in i listan innan utstämplingen, och ett bortfiltrerat förslag
+   * på ett jobb som faktiskt går att fortsätta vore ett sämre fel.
+   */
+  const rememberRecent = useCallback(
+    (employeeId: string, job: { label: string; choice: KioskJobChoice }) => {
+      const choice = job.choice;
+
+      const stillThere =
+        choice.kind === "ORDER"
+          ? moments.some((moment) => moment.id === choice.moment.id)
+          : indirectMoments.some(
+              (moment) => moment.id === choice.indirectMoment.id
+            );
+
+      setRecent((current) => {
+        const next = { ...current };
+
+        if (stillThere) next[employeeId] = { label: job.label, choice };
+        else delete next[employeeId];
+
+        return next;
+      });
+    },
+    [indirectMoments, moments]
+  );
+
+  /**
    * Jobbet man håller på att byta FRÅN, medan man väljer det nya.
    *
    * Utstämplingen sker först när det nya jobbet startats — se punchIn. Skedde
@@ -845,10 +881,7 @@ export default function KioskScreen({
       });
       if (left) {
         // Jobbet man lämnade blir förslaget nästa gång hen kommer fram.
-        setRecent((current) => ({
-          ...current,
-          [employee.id]: { label: left.label, choice: left.choice },
-        }));
+        rememberRecent(employee.id, left);
       }
 
       // Att börja jobba avslutar rasten, både här och på servern.
@@ -878,7 +911,7 @@ export default function KioskScreen({
         label: `${employee.name}, ${label}`,
       });
     },
-    [backToGrid, replacing, send]
+    [backToGrid, rememberRecent, replacing, send]
   );
 
   /**
@@ -891,10 +924,7 @@ export default function KioskScreen({
   const punchOut = useCallback(
     (employee: Employee, job: ActiveJob) => {
       // Jobbet hen lämnar blir förslaget nästa gång hen kommer fram.
-      setRecent((current) => ({
-        ...current,
-        [employee.id]: { label: job.label, choice: job.choice },
-      }));
+      rememberRecent(employee.id, job);
 
       // Bara det här jobbet tas bort. Att radera personens nyckel hade fått
       // skärmen att visa någon som utstämplad medan maskin två räknar vidare.
@@ -921,7 +951,7 @@ export default function KioskScreen({
         label: `${employee.name}, utstämpling`,
       });
     },
-    [backToGrid, send]
+    [backToGrid, rememberRecent, send]
   );
 
   /**
@@ -935,10 +965,7 @@ export default function KioskScreen({
       const last = jobs[0];
 
       if (last) {
-        setRecent((current) => ({
-          ...current,
-          [employee.id]: { label: last.label, choice: last.choice },
-        }));
+        rememberRecent(employee.id, last);
       }
 
       setActive((current) => {
@@ -961,7 +988,7 @@ export default function KioskScreen({
         label: `${employee.name}, utstämpling från allt`,
       });
     },
-    [backToGrid, send]
+    [backToGrid, rememberRecent, send]
   );
 
   /**
@@ -979,10 +1006,7 @@ export default function KioskScreen({
 
       if (last) {
         // Jobbet blir förslaget när personen kommer tillbaka från rasten.
-        setRecent((current) => ({
-          ...current,
-          [employee.id]: { label: last.label, choice: last.choice },
-        }));
+        rememberRecent(employee.id, last);
       }
 
       setActive((current) => {
@@ -1007,7 +1031,7 @@ export default function KioskScreen({
         label: `${employee.name}, ${breakType.name}`,
       });
     },
-    [active, backToGrid, send]
+    [active, backToGrid, rememberRecent, send]
   );
 
   /**

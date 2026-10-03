@@ -98,12 +98,12 @@ export default async function EntriesPage({
         },
       }),
       db.workMoment.findMany({
-        orderBy: { name: "asc" },
-        select: { id: true, name: true },
+        orderBy: [{ active: "desc" }, { name: "asc" }],
+        select: { id: true, name: true, active: true },
       }),
       db.indirectMoment.findMany({
-        orderBy: { name: "asc" },
-        select: { id: true, name: true },
+        orderBy: [{ active: "desc" }, { name: "asc" }],
+        select: { id: true, name: true, active: true },
       }),
       db.timeEntry.findMany({
         where: {
@@ -155,14 +155,35 @@ export default async function EntriesPage({
     label: order.orderNumber,
     hint: order.customer?.name,
   }));
-  const momentOptions = moments.map((moment) => ({
-    id: moment.id,
-    label: moment.name,
-  }));
-  const indirectOptions = indirectMoments.map((moment) => ({
-    id: moment.id,
-    label: moment.name,
-  }));
+  // ETT AVAKTIVERAT MOMENT GÅR INTE ATT BOKA NY TID PÅ.
+  //
+  // Samma regel som på stämplingsskärmen, som bara visar de aktiva: ett moment
+  // verkstaden lagt ner ska bort ur varje val som SKAPAR tid, också när tiden
+  // skrivs in för hand. Behövs ett nedlagt moment för en efterregistrering
+  // återaktiveras det först — annars hade en avaktivering inte betytt något.
+  const pickableMoments = moments
+    .filter((moment) => moment.active)
+    .map((moment) => ({ id: moment.id, label: moment.name }));
+
+  // En BEFINTLIG post behåller däremot sitt eget moment i listan, avaktiverat
+  // eller inte. Föll det bort skulle rutan visa ett annat moment som valt, och
+  // ett sparat formulär flytta tiden dit — tyst, på ett underlag som kanske
+  // redan fakturerats.
+  const momentOptionsFor = (currentId: string | null) =>
+    moments
+      .filter((moment) => moment.active || moment.id === currentId)
+      .map((moment) => ({
+        id: moment.id,
+        label: moment.active ? moment.name : `${moment.name} (avaktiverat)`,
+      }));
+
+  const indirectOptionsFor = (currentId: string | null) =>
+    indirectMoments
+      .filter((moment) => moment.active || moment.id === currentId)
+      .map((moment) => ({
+        id: moment.id,
+        label: moment.active ? moment.name : `${moment.name} (avaktiverat)`,
+      }));
 
   return (
     <>
@@ -172,7 +193,7 @@ export default async function EntriesPage({
           <NewEntryDialog
             employees={employeeOptions}
             orders={orderOptions}
-            moments={momentOptions}
+            moments={pickableMoments}
           />
         }
       />
@@ -364,7 +385,9 @@ export default async function EntriesPage({
                                   name="indirectMomentId"
                                   defaultValue={entry.indirectMomentId ?? ""}
                                 >
-                                  {indirectOptions.map((option) => (
+                                  {indirectOptionsFor(
+                                    entry.indirectMomentId
+                                  ).map((option) => (
                                     <option key={option.id} value={option.id}>
                                       {option.label}
                                     </option>
@@ -390,11 +413,16 @@ export default async function EntriesPage({
                                     name="momentId"
                                     defaultValue={entry.momentId ?? ""}
                                   >
-                                    {momentOptions.map((option) => (
-                                      <option key={option.id} value={option.id}>
-                                        {option.label}
-                                      </option>
-                                    ))}
+                                    {momentOptionsFor(entry.momentId).map(
+                                      (option) => (
+                                        <option
+                                          key={option.id}
+                                          value={option.id}
+                                        >
+                                          {option.label}
+                                        </option>
+                                      )
+                                    )}
                                   </Select>
                                 </Field>
                               </>
