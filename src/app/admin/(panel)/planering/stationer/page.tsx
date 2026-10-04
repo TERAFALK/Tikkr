@@ -1,4 +1,3 @@
-import { Fragment } from "react";
 import { requireAdmin } from "@/lib/admin-session";
 import { requireModule } from "@/lib/company-modules";
 import { companyTimeZone } from "@/lib/company";
@@ -36,9 +35,12 @@ import {
  * därför kan samma moment ligga på flera stationer, och en station bara ha ett
  * moment.
  *
- * LISTAN ÄR GRUPPERAD PÅ ARBETSMOMENT, som tavlan. Momentet står som en rubrik
- * över sin grupp i stället för i en kolumn på varje rad: det upprepades annars
- * en gång per station och sa ingenting nytt efter den första.
+ * ARBETSMOMENTET STÅR UNDER STATIONSNAMNET, precis som på tavlan. Det låg en
+ * kort tid som en rubrikrad över varje grupp, och blev då en tom rad mellan
+ * varje station: en verkstad med fyra maskiner på fyra moment fick fyra rader
+ * som bara upprepade ett ord. Listan är fortfarande sorterad på moment, så
+ * stationer som kan ersätta varandra står ihop — det syns på att namnet under
+ * dem är detsamma, utan att något behöver ritas.
  *
  * Öppettiderna skrivs ihop — "mån–fre 07:00–16:00" och inte fem rader med
  * samma klockslag. Se describeWeek.
@@ -75,16 +77,19 @@ export default async function StationsPage() {
     />
   );
 
-  // Stationerna kommer redan grupperade på moment från stationsFor. Grupperna
-  // byggs här bara för att rubrikerna och pilarna ska veta var en grupp
-  // börjar och slutar: en pil får inte kunna flytta en station förbi kanten.
-  const groups: { momentName: string; rows: typeof stations }[] = [];
+  // Stationerna kommer redan grupperade på moment från stationsFor. Var och en
+  // behöver veta var i SIN grupp den står: pilarna flyttar inom gruppen, och en
+  // pil som pekade förbi kanten hade inte gjort någonting.
+  const place = new Map<string, { first: boolean; last: boolean; alone: boolean }>();
 
-  for (const station of stations) {
-    const last = groups[groups.length - 1];
+  for (let index = 0; index < stations.length; index++) {
+    const moment = stations[index].momentId;
+    const first = index === 0 || stations[index - 1].momentId !== moment;
+    const last =
+      index === stations.length - 1 ||
+      stations[index + 1].momentId !== moment;
 
-    if (last && last.momentName === station.momentName) last.rows.push(station);
-    else groups.push({ momentName: station.momentName, rows: [station] });
+    place.set(stations[index].id, { first, last, alone: first && last });
   }
 
   return (
@@ -121,7 +126,7 @@ export default async function StationsPage() {
           <Table>
             <thead>
               <tr>
-                <Th>Namn</Th>
+                <Th>Station</Th>
                 <Th>Öppettider</Th>
                 <Th numeric>Per vecka (tim:min)</Th>
                 <Th>Status</Th>
@@ -132,73 +137,64 @@ export default async function StationsPage() {
             </thead>
 
             <tbody>
-              {groups.map((group) => (
-                <Fragment key={group.momentName}>
-                  {/* Momentet som rubrik över sin grupp. Stationerna under den
-                      är utbytbara mot varandra och inget annat, och det är
-                      själva skälet att de ligger ihop. */}
-                  <tr>
-                    <Td colSpan={5}>
-                      <span className="text-[11px] font-semibold uppercase tracking-wider text-neutral-400">
-                        {group.momentName}
+              {stations.map((station) => {
+                const weekMinutes = station.hours.reduce(
+                  (total, day) => total + capacityOf(day),
+                  0
+                );
+
+                const spot = place.get(station.id)!;
+
+                return (
+                  <Tr key={station.id} dimmed={!station.active}>
+                    <Td>
+                      <span className="font-medium">{station.name}</span>
+                      <span className="mt-0.5 block text-[12px] text-neutral-500">
+                        {station.momentName}
                       </span>
                     </Td>
-                  </tr>
 
-                  {group.rows.map((station, index) => {
-                    const weekMinutes = station.hours.reduce(
-                      (total, day) => total + capacityOf(day),
-                      0
-                    );
+                    <Td muted={station.hours.length === 0}>
+                      {station.hours.length === 0
+                        ? "Stängd hela veckan"
+                        : describeWeek(station.hours)}
+                    </Td>
 
-                    return (
-                      <Tr key={station.id} dimmed={!station.active}>
-                        <Td>
-                          <span className="font-medium">{station.name}</span>
-                        </Td>
+                    <Td numeric muted={weekMinutes === 0}>
+                      {formatDuration(weekMinutes)}
+                    </Td>
 
-                        <Td muted={station.hours.length === 0}>
-                          {station.hours.length === 0
-                            ? "Stängd hela veckan"
-                            : describeWeek(station.hours)}
-                        </Td>
+                    <Td>
+                      {station.active ? (
+                        <Badge tone="active">Öppen</Badge>
+                      ) : (
+                        <Badge tone="muted">Stängd</Badge>
+                      )}
+                    </Td>
 
-                        <Td numeric muted={weekMinutes === 0}>
-                          {formatDuration(weekMinutes)}
-                        </Td>
-
-                        <Td>
-                          {station.active ? (
-                            <Badge tone="active">Öppen</Badge>
-                          ) : (
-                            <Badge tone="muted">Stängd</Badge>
-                          )}
-                        </Td>
-
-                        <Td>
-                          <StationRowActions
-                            station={{
-                              id: station.id,
-                              name: station.name,
-                              momentId: station.momentId,
-                              active: station.active,
-                              upcomingBlocks: station.upcomingBlocks,
-                              days: toDayValues(station.hours),
-                            }}
-                            moments={moments}
-                            first={index === 0}
-                            last={index === group.rows.length - 1}
-                            saveAction={saveStationAction}
-                            toggleAction={toggleStationAction}
-                            deleteAction={deleteStationAction}
-                            moveAction={moveStationAction}
-                          />
-                        </Td>
-                      </Tr>
-                    );
-                  })}
-                </Fragment>
-              ))}
+                    <Td>
+                      <StationRowActions
+                        station={{
+                          id: station.id,
+                          name: station.name,
+                          momentId: station.momentId,
+                          active: station.active,
+                          upcomingBlocks: station.upcomingBlocks,
+                          days: toDayValues(station.hours),
+                        }}
+                        moments={moments}
+                        first={spot.first}
+                        last={spot.last}
+                        alone={spot.alone}
+                        saveAction={saveStationAction}
+                        toggleAction={toggleStationAction}
+                        deleteAction={deleteStationAction}
+                        moveAction={moveStationAction}
+                      />
+                    </Td>
+                  </Tr>
+                );
+              })}
             </tbody>
           </Table>
         </Card>

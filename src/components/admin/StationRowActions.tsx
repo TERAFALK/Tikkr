@@ -25,7 +25,9 @@ import type { StationState } from "@/app/admin/(panel)/planering/actions";
  *
  * Nu äger den här komponenten hela raden:
  *
- *   Pilarna är små ikoner, inte knappar med ord.
+ *   Pilarna är små ikoner, inte knappar med ord, och VISAS BARA när momentet
+ *   har mer än en station. En ensam fräs går inte att ordna mot något, och två
+ *   grå pilar som aldrig kan tryckas såg mest ut som ett fel i tabellen.
  *   Ändra öppnar rutan med namn, moment och tider.
  *   TA BORT LIGGER I ÄNDRA-RUTAN, längst ned till vänster, där en farlig
  *   åtgärd hör hemma. Samma plats som i rutan för ett planerat jobb.
@@ -54,6 +56,7 @@ export default function StationRowActions({
   moments,
   first,
   last,
+  alone,
   saveAction,
   toggleAction,
   deleteAction,
@@ -64,6 +67,8 @@ export default function StationRowActions({
   /** Först respektive sist INOM sitt arbetsmoment. Styr pilarna. */
   first: boolean;
   last: boolean;
+  /** Ensam på sitt arbetsmoment. Då finns ingen ordning att ändra. */
+  alone: boolean;
   saveAction: (
     previous: StationState,
     formData: FormData
@@ -128,11 +133,13 @@ export default function StationRowActions({
       {/* Pilarna flyttar stationen inom sitt arbetsmoment. Grupperna står i
           bokstavsordning, så en station som flyttades förbi gruppens kant hade
           hamnat tillbaka där den stod. */}
-      <form action={move} className="flex flex-col">
-        <input type="hidden" name="stationId" value={station.id} />
-        <Arrow name="up" disabled={first} label="Flytta upp" />
-        <Arrow name="down" disabled={last} label="Flytta ner" />
-      </form>
+      {!alone && (
+        <form action={move} className="mr-1 flex flex-col">
+          <input type="hidden" name="stationId" value={station.id} />
+          <Arrow name="up" disabled={first} label="Flytta upp" />
+          <Arrow name="down" disabled={last} label="Flytta ner" />
+        </form>
+      )}
 
       <Button type="button" tone="ghost" onClick={() => edit.current?.showModal()}>
         Ändra
@@ -293,7 +300,7 @@ function Arrow({
       disabled={disabled}
       aria-label={label}
       title={label}
-      className="px-1.5 text-[9px] leading-tight text-neutral-400 hover:text-neutral-900 disabled:text-neutral-200 disabled:hover:text-neutral-200"
+      className="rounded px-1.5 text-[11px] leading-none text-neutral-400 hover:bg-neutral-100 hover:text-neutral-900 disabled:text-neutral-200 disabled:hover:bg-transparent disabled:hover:text-neutral-200"
     >
       {name === "up" ? "▲" : "▼"}
     </button>

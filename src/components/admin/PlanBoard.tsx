@@ -1178,10 +1178,17 @@ export default function PlanBoard({
             <div ref={bodyRef} onPointerUp={onBodyPointerUp} className="relative">
               {/* PILARNA MELLAN EN ORDERS MOMENT, över rutorna men utan att ta
                   emot tryck. Ligger i ett eget lager och inte i cellerna,
-                  eftersom en pil går mellan två rader och två dagar. */}
+                  eftersom en pil går mellan två rader och två dagar.
+
+                  LAGRET LIGGER UNDER STATIONSKOLUMNEN (z-15 mot kolumnens
+                  z-20), och det är inte en smaksak. Kolumnen är fruset fönster:
+                  den står still medan dagarna rullar under den. En pil till en
+                  ruta som rullat ut åt vänster ritades annars OVANPÅ kolumnen,
+                  och såg ut som ett streck som kom ut ur stationsnamnet. Rutorna
+                  ligger på z-10, så pilarna syns fortfarande över dem. */}
               {arrows.length > 0 && (
                 <svg
-                  className="pointer-events-none absolute left-0 top-0 z-30"
+                  className="pointer-events-none absolute left-0 top-0 z-[15]"
                   width={contentWidth}
                   height={stations.length * ROW_HEIGHT}
                   aria-hidden="true"
