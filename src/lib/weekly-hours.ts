@@ -244,3 +244,67 @@ export function netMinutes(day: DayWithBreaks): number {
 
   return Math.max(0, span - breakMinutes);
 }
+
+/* --- Veckan som en mening ------------------------------------------------- */
+
+/** Veckodagarnas korta namn, i ISO-ordning. */
+const SHORT = ["mån", "tis", "ons", "tors", "fre", "lör", "sön"];
+
+/**
+ * Arbetsveckan i löpande text: "mån–fre 07:00–16:00".
+ *
+ * DAGAR I FÖLJD MED SAMMA TIDER SLÅS IHOP. En station öppen 07:00–16:00 varje
+ * vardag skrevs annars ut fem gånger i rad, och en lista med sju stationer blev
+ * en vägg av samma klockslag om och om igen. Det som är värt att läsa är när
+ * något SKILJER sig, och det syns inte i en upprepning.
+ *
+ * Skiljer sig en dag bryts gruppen: "mån–tors 07:00–16:00, fre 07:00–13:00".
+ * Dagar som saknas är stängda och nämns inte — en station som går måndag och
+ * onsdag blir "mån 07:00–16:00, ons 07:00–16:00" och inte "mån–ons", eftersom
+ * tisdagen inte ingår.
+ */
+export function describeWeek(
+  days: { weekday: number; startMinute: number; endMinute: number }[]
+): string {
+  if (days.length === 0) return "";
+
+  const sorted = [...days].sort((a, b) => a.weekday - b.weekday);
+
+  const groups: { from: number; to: number; start: number; end: number }[] = [];
+
+  for (const day of sorted) {
+    const last = groups[groups.length - 1];
+
+    // Samma tider OCH dagen direkt efter. Ett glapp bryter gruppen, annars
+    // hade "mån, ons" skrivits som "mån–ons" och påstått att tisdagen ingår.
+    if (
+      last &&
+      last.to === day.weekday - 1 &&
+      last.start === day.startMinute &&
+      last.end === day.endMinute
+    ) {
+      last.to = day.weekday;
+      continue;
+    }
+
+    groups.push({
+      from: day.weekday,
+      to: day.weekday,
+      start: day.startMinute,
+      end: day.endMinute,
+    });
+  }
+
+  return groups
+    .map((group) => {
+      const label =
+        group.from === group.to
+          ? SHORT[group.from - 1]
+          : `${SHORT[group.from - 1]}–${SHORT[group.to - 1]}`;
+
+      return `${label} ${formatMinuteOfDay(group.start)}–${formatMinuteOfDay(
+        group.end
+      )}`;
+    })
+    .join(", ");
+}

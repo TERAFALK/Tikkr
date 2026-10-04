@@ -1,12 +1,13 @@
+import { Fragment } from "react";
 import { requireAdmin } from "@/lib/admin-session";
 import { requireModule } from "@/lib/company-modules";
 import { companyTimeZone } from "@/lib/company";
 import { DEFAULT_STATION_HOURS, stationsFor } from "@/lib/planning";
 import { capacityOf } from "@/lib/plan-calendar";
-import { formatMinuteOfDay } from "@/lib/weekly-hours";
+import { describeWeek, formatMinuteOfDay } from "@/lib/weekly-hours";
 import { formatDuration } from "@/lib/format";
 import StationDialog from "@/components/admin/StationDialog";
-import ActionDialog from "@/components/ui/ActionDialog";
+import StationRowActions from "@/components/admin/StationRowActions";
 import type { ScheduleDayValue } from "@/components/admin/ScheduleDays";
 import {
   Badge,
@@ -22,9 +23,9 @@ import {
 } from "@/components/ui";
 import {
   deleteStationAction,
+  moveStationAction,
   saveStationAction,
   toggleStationAction,
-  moveStationAction,
 } from "../actions";
 
 /**
@@ -35,14 +36,15 @@ import {
  * därför kan samma moment ligga på flera stationer, och en station bara ha ett
  * moment.
  *
- * Öppettiderna är stationens, inte personalens. En maskin kan gå när ingen
- * står vid den, och den kan stå still fastän skiftet pågår. Det är hela skälet
- * att de ligger i egna tabeller och inte i lönemodulens scheman.
+ * LISTAN ÄR GRUPPERAD PÅ ARBETSMOMENT, som tavlan. Momentet står som en rubrik
+ * över sin grupp i stället för i en kolumn på varje rad: det upprepades annars
+ * en gång per station och sa ingenting nytt efter den första.
+ *
+ * Öppettiderna skrivs ihop — "mån–fre 07:00–16:00" och inte fem rader med
+ * samma klockslag. Se describeWeek.
  */
 
 export const dynamic = "force-dynamic";
-
-const WEEKDAYS = ["mån", "tis", "ons", "tors", "fre", "lör", "sön"];
 
 export default async function StationsPage() {
   const session = await requireAdmin();
@@ -73,6 +75,18 @@ export default async function StationsPage() {
     />
   );
 
+  // Stationerna kommer redan grupperade på moment från stationsFor. Grupperna
+  // byggs här bara för att rubrikerna och pilarna ska veta var en grupp
+  // börjar och slutar: en pil får inte kunna flytta en station förbi kanten.
+  const groups: { momentName: string; rows: typeof stations }[] = [];
+
+  for (const station of stations) {
+    const last = groups[groups.length - 1];
+
+    if (last && last.momentName === station.momentName) last.rows.push(station);
+    else groups.push({ momentName: station.momentName, rows: [station] });
+  }
+
   return (
     <>
       <PageHeader
@@ -99,12 +113,15 @@ export default async function StationsPage() {
         <EmptyState title="Inga stationer upplagda" action={newStation} />
       ) : (
         <Card>
-          <CardHeader title={`${stations.length} stationer`} />
+          <CardHeader
+            title={`${stations.length} ${
+              stations.length === 1 ? "station" : "stationer"
+            }`}
+          />
           <Table>
             <thead>
               <tr>
                 <Th>Namn</Th>
-                <Th>Arbetsmoment</Th>
                 <Th>Öppettider</Th>
                 <Th numeric>Per vecka (tim:min)</Th>
                 <Th>Status</Th>
@@ -113,183 +130,80 @@ export default async function StationsPage() {
                 </Th>
               </tr>
             </thead>
+
             <tbody>
-              {stations.map((station, index) => {
-                const weekMinutes = station.hours.reduce(
-                  (total, day) => total + capacityOf(day),
-                  0
-                );
+              {groups.map((group) => (
+                <Fragment key={group.momentName}>
+                  {/* Momentet som rubrik över sin grupp. Stationerna under den
+                      är utbytbara mot varandra och inget annat, och det är
+                      själva skälet att de ligger ihop. */}
+                  <tr>
+                    <Td colSpan={5}>
+                      <span className="text-[11px] font-semibold uppercase tracking-wider text-neutral-400">
+                        {group.momentName}
+                      </span>
+                    </Td>
+                  </tr>
 
-                return (
-                  <Tr key={station.id} dimmed={!station.active}>
-                    <Td>
-                      <span className="font-medium">{station.name}</span>
-                    </Td>
-                    <Td>{station.momentName}</Td>
-                    <Td muted={station.hours.length === 0}>
-                      {station.hours.length === 0
-                        ? "Inga dagar"
-                        : station.hours
-                            .map(
-                              (day) =>
-                                `${WEEKDAYS[day.weekday - 1]} ${formatMinuteOfDay(
-                                  day.startMinute
-                                )}–${formatMinuteOfDay(day.endMinute)}`
-                            )
-                            .join(", ")}
-                    </Td>
-                    <Td numeric muted={weekMinutes === 0}>
-                      {formatDuration(weekMinutes)}
-                    </Td>
-                    <Td>
-                      {station.active ? (
-                        <Badge tone="active">Öppen</Badge>
-                      ) : (
-                        <Badge tone="muted">Stängd</Badge>
-                      )}
-                    </Td>
-                    <Td>
-                      <div className="flex justify-end gap-2">
-                        <OrderButtons
-                          stationId={station.id}
-                          first={index === 0}
-                          last={index === stations.length - 1}
-                        />
+                  {group.rows.map((station, index) => {
+                    const weekMinutes = station.hours.reduce(
+                      (total, day) => total + capacityOf(day),
+                      0
+                    );
 
-                        <StationDialog
-                          trigger="Ändra"
-                          triggerTone="ghost"
-                          title="Ändra station"
-                          submitLabel="Spara"
-                          action={saveStationAction}
-                          stationId={station.id}
-                          name={station.name}
-                          momentId={station.momentId}
-                          moments={moments}
-                          days={toDayValues(station.hours)}
-                          lockedMoment={station.upcomingBlocks > 0}
-                        />
+                    return (
+                      <Tr key={station.id} dimmed={!station.active}>
+                        <Td>
+                          <span className="font-medium">{station.name}</span>
+                        </Td>
 
-                        <ActionDialog
-                          trigger={station.active ? "Stäng" : "Öppna"}
-                          title={
-                            station.active ? "Stäng station" : "Öppna station"
-                          }
-                          description={
-                            station.active
-                              ? "Stationen försvinner från tavlan. Planerad tid som ligger kvar måste flyttas först."
-                              : "Stationen visas på tavlan igen."
-                          }
-                          action={toggleStationAction}
-                          initial={{}}
-                          submitLabel={station.active ? "Stäng" : "Öppna"}
-                        >
-                          <input
-                            type="hidden"
-                            name="stationId"
-                            value={station.id}
-                          />
-                          <input
-                            type="hidden"
-                            name="active"
-                            value={String(station.active)}
-                          />
-                          {station.active && station.upcomingBlocks > 0 && (
-                            <p className="text-[13px] text-neutral-600">
-                              {station.upcomingBlocks} planerade jobb ligger
-                              kvar.
-                            </p>
+                        <Td muted={station.hours.length === 0}>
+                          {station.hours.length === 0
+                            ? "Stängd hela veckan"
+                            : describeWeek(station.hours)}
+                        </Td>
+
+                        <Td numeric muted={weekMinutes === 0}>
+                          {formatDuration(weekMinutes)}
+                        </Td>
+
+                        <Td>
+                          {station.active ? (
+                            <Badge tone="active">Öppen</Badge>
+                          ) : (
+                            <Badge tone="muted">Stängd</Badge>
                           )}
-                        </ActionDialog>
+                        </Td>
 
-                        {/* ATT TA BORT ÄR INTE ATT STÄNGA. Stänga är "inte
-                            just nu"; ta bort är "den här skulle aldrig ha
-                            funnits". Därför två knappar och inte ett läge. */}
-                        <ActionDialog
-                          trigger="Ta bort"
-                          triggerTone="danger"
-                          title={`Ta bort ${station.name}`}
-                          action={deleteStationAction}
-                          initial={{}}
-                          submitLabel="Ta bort"
-                          submitTone="danger"
-                        >
-                          <input
-                            type="hidden"
-                            name="stationId"
-                            value={station.id}
+                        <Td>
+                          <StationRowActions
+                            station={{
+                              id: station.id,
+                              name: station.name,
+                              momentId: station.momentId,
+                              active: station.active,
+                              upcomingBlocks: station.upcomingBlocks,
+                              days: toDayValues(station.hours),
+                            }}
+                            moments={moments}
+                            first={index === 0}
+                            last={index === group.rows.length - 1}
+                            saveAction={saveStationAction}
+                            toggleAction={toggleStationAction}
+                            deleteAction={deleteStationAction}
+                            moveAction={moveStationAction}
                           />
-
-                          <p className="text-[13px] leading-relaxed text-neutral-600">
-                            {station.upcomingBlocks > 0
-                              ? `Stationen och ${station.upcomingBlocks} planerade jobb tas bort. Jobbens tid går tillbaka till Oplacerat och kan placeras om.`
-                              : "Stationen tas bort. Vill du bara pausa den, stäng den i stället."}
-                          </p>
-                        </ActionDialog>
-                      </div>
-                    </Td>
-                  </Tr>
-                );
-              })}
+                        </Td>
+                      </Tr>
+                    );
+                  })}
+                </Fragment>
+              ))}
             </tbody>
           </Table>
         </Card>
       )}
     </>
-  );
-}
-
-/**
- * Pilarna som flyttar en station i listan.
- *
- * Ordningen på tavlan följer flödet genom lokalen, inte bokstäverna. Den som
- * planerar läser raderna i den ordning arbetet går, och en alfabetisk lista
- * tvingar ögat att hoppa.
- */
-function OrderButtons({
-  stationId,
-  first,
-  last,
-}: {
-  stationId: string;
-  first: boolean;
-  last: boolean;
-}) {
-  return (
-    <div className="flex items-center">
-      {!first && (
-        <ActionDialog
-          trigger="Upp"
-          triggerTone="ghost"
-          title="Flytta upp"
-          action={moveStationAction}
-          initial={{}}
-          submitLabel="Flytta"
-        >
-          <input type="hidden" name="stationId" value={stationId} />
-          <input type="hidden" name="direction" value="up" />
-          <p className="text-[13px] text-neutral-600">
-            Stationen byter plats med den ovanför.
-          </p>
-        </ActionDialog>
-      )}
-      {!last && (
-        <ActionDialog
-          trigger="Ner"
-          triggerTone="ghost"
-          title="Flytta ner"
-          action={moveStationAction}
-          initial={{}}
-          submitLabel="Flytta"
-        >
-          <input type="hidden" name="stationId" value={stationId} />
-          <input type="hidden" name="direction" value="down" />
-          <p className="text-[13px] text-neutral-600">
-            Stationen byter plats med den under.
-          </p>
-        </ActionDialog>
-      )}
-    </div>
   );
 }
 
