@@ -35,3 +35,11 @@ backups/
 # SKA checkas in, och därefter krävs en migration vid varje schemaändring för
 # att inte tappa data.
 prisma/migrations/
+
+# Launchvideon. Kallan (manus, komposition) ar vard att spara, men
+# renderingar och nedladdade typsnitt/GSAP hor inte hemma i repot.
+brag-output/*.mp4
+brag-output/**/snapshots*/
+brag-output/**/renders/
+brag-output/**/assets/js/
+brag-output/**/assets/fonts/

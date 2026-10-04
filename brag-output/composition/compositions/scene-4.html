@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="sv">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=1920, height=1080" />
+    <link rel="stylesheet" href="assets/fonts/geist.css" />
+    <link rel="stylesheet" href="assets/css/brand.css" />
+    <script src="assets/js/gsap.min.js"></script>
+    <style>
+      /* Scenens egen Fjord-yta tonar upp over scen 3, som ligger kvar under.
+         Darfor ar stage genomskinlig och #inner bar bakgrunden. */
+      html,
+      body,
+      #root {
+        background: transparent;
+      }
+      /* Motivet ur ovre hogra hornet, som i heron. Avslutet och oppningen
+         ar bokstod: samma yta, samma form, samma horn. */
+      #motif {
+        right: -640px;
+        top: -380px;
+        width: 1360px;
+        height: 1360px;
+      }
+      #inner {
+        position: absolute;
+        inset: 0;
+        overflow: hidden;
+        background: var(--fjord);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        opacity: 0;
+        visibility: hidden;
+      }
+      /* ORDMARKET SATTS ALDRIG SOM TEXT. Det har ar varumarkesfilens egna
+         konturer, samma SVG som ligger i public/brand/. Vanlig text blir just
+         det guiden forbjuder sa fort Geist inte hunnit laddas. */
+      #logo {
+        width: 560px;
+        opacity: 0;
+        visibility: hidden;
+      }
+      #logo svg {
+        width: 100%;
+        height: auto;
+        display: block;
+      }
+      #slogan {
+        margin-top: 62px;
+        color: var(--white);
+        font-size: 56px;
+        font-weight: 500;
+        letter-spacing: -0.01em;
+        opacity: 0;
+        visibility: hidden;
+      }
+      #url {
+        margin-top: 34px;
+        color: var(--tick);
+        font-size: 30px;
+        font-weight: 500;
+        letter-spacing: var(--tracking-wider);
+        opacity: 0;
+        visibility: hidden;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="scene-4" data-width="1920" data-height="1080">
+      <div id="inner">
+        <svg id="motif" class="motif motif-dark" viewBox="0 0 60 60" aria-hidden="true">
+          <path class="motif-a" d="M26 0A26 26 0 0 0 26 52Z" />
+          <path class="motif-b" d="M34 8A26 26 0 0 1 34 60Z" />
+        </svg>
+        <div id="logo">
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="441.55"
+            height="120"
+            viewBox="0 0 441.55 120"
+            role="img"
+            aria-label="Tikkr"
+          >
+            <g transform="translate(-40.000 -40.000) scale(2.00000)">
+              <path d="M46 20A26 26 0 0 0 46 72Z" fill="#F5F6F2" />
+              <path d="M54 28A26 26 0 0 1 54 80Z" fill="#2ED196" />
+            </g>
+            <g transform="translate(154.341 111.600) scale(0.143533)">
+              <path
+                d="M284 0Q204 0 166.5 -36.5Q129 -73 129 -153V-435H45V-534H129V-659H257V-534H398V-435H257V-165Q257 -127 273.5 -113.0Q290 -99 323 -99H398V0ZM434.0 0V-534H562.0V0ZM432.0 -605V-719H565.0V-605ZM637.0 0V-710H765.0V-293L984.0 -534H1142.0L933.0 -312L1149.0 0H1005.0L849.0 -236L765.0 -147V0ZM1165.0 0V-710H1293.0V-293L1512.0 -534H1670.0L1461.0 -312L1677.0 0H1533.0L1377.0 -236L1293.0 -147V0ZM1701.0 0V-534H1821.0L1824.0 -430Q1840.0 -484 1871.0 -509.0Q1902.0 -534 1952.0 -534H2001.0V-424H1951.0Q1890.0 -424 1859.5 -396.5Q1829.0 -369 1829.0 -308V0Z"
+                fill="#F5F6F2"
+              />
+            </g>
+          </svg>
+        </div>
+        <div id="slogan">Tiden tickar. Tikkr räknar.</div>
+        <div id="url">tikkr.se</div>
+      </div>
+    </div>
+    <script>
+      /* SCEN 4 — Avslut. Lokal tid 0 till 3.82 (globalt 16.93-20.75).
+       *
+       * Ankomst och stopp. Ordmarket star stilla pa den starka traffen 18.56
+       * globalt, alltsa 1.63 lokalt, och den sista halvsekunden ar tyst.
+       */
+      const tl = gsap.timeline({ paused: true });
+
+      gsap.set("#inner", { autoAlpha: 0 });
+      gsap.set("#logo", { autoAlpha: 0, y: 20 });
+      gsap.set("#slogan", { autoAlpha: 0, y: 14 });
+      gsap.set("#url", { autoAlpha: 0 });
+
+      // Mjuk korsning fran scen 3
+      tl.to("#inner", { autoAlpha: 1, duration: 0.3, ease: "power1.inOut" }, 0);
+      // beat-locked: 18.56s globalt — tweenen SLUTAR dar, sa market star
+      // stilla pa traffen i stallet for att borja rora sig pa den
+      tl.to("#logo", { autoAlpha: 1, y: 0, duration: 0.4, ease: "power2.out" }, 1.23);
+      tl.to("#slogan", { autoAlpha: 1, y: 0, duration: 0.42, ease: "power2.out" }, 2.17);
+      tl.to("#url", { autoAlpha: 1, duration: 0.36, ease: "power1.out" }, 2.73);
+
+      window.__timelines = window.__timelines || {};
+      window.__timelines["scene-4"] = tl;
+      tl.seek(0);
+    </script>
+  </body>
+</html>

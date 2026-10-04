@@ -1,0 +1,211 @@
+/* TIKKR BRAND GUIDELINES v1.0
+ *
+ * Sex farger och inga fler. Hexkoderna ar hamtade ur src/lib/brand.ts, som ar
+ * projektets egen kalla for dem. Gult och rott finns inte i paletten och
+ * behovs inte har: videon varnar inte om nagot.
+ *
+ * Filen ligger pa ETT stalle av samma skal som paletten gor det i projektet.
+ * Fyra scenfiler med var sin kopia hinner alltid sluta saga samma sak.
+ */
+:root {
+  --fjord: #0e1a2b;
+  --tick: #2ed196;
+  --tick-deep: #0f9e68;
+  --snow: #f5f6f2;
+  --slate: #5b6573;
+  --lichen: #d9ddd6;
+  --white: #ffffff;
+  --tracking-tight: -0.03em;
+  --tracking-wider: 0.08em;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html,
+body {
+  width: 1080px;
+  height: 1920px;
+  overflow: hidden;
+}
+
+#root {
+  position: relative;
+  width: 1080px;
+  height: 1920px;
+  font-family: "Geist", sans-serif;
+  font-feature-settings: "tnum" 1;
+}
+
+.layer {
+  position: absolute;
+  inset: 0;
+}
+
+/* ---------- Kortformen ----------
+ * Samma kort som i panelen och pa stamplingsskarmen: vit yta, Lav-ram,
+ * portratt till vanster, namnet intill, statusraden nederst. Instamplad
+ * fylls helt med Tick Deep, och det ar det enda som skiljer.
+ */
+.card {
+  position: relative;
+  border-radius: 18px;
+}
+
+.face {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 34px;
+  border: 1px solid var(--lichen);
+  border-radius: 18px;
+  background: var(--white);
+}
+
+.face-green {
+  background: var(--tick-deep);
+  border-color: var(--tick-deep);
+}
+
+.who {
+  display: flex;
+  align-items: center;
+  gap: 22px;
+}
+
+.avatar {
+  flex: 0 0 auto;
+  width: 76px;
+  height: 76px;
+  border-radius: 999px;
+  background: var(--lichen);
+  /* Initialerna ar Fjord och inte Skiffer. I panelen blir portrattet mindre
+     an 24 px, och da provas texten mot 4.5:1 i stallet for 3:1 — Skiffer mot
+     Lav ger 4.3 och faller. Fjord mot Lav ligger kring 12:1. */
+  color: var(--fjord);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 28px;
+  font-weight: 600;
+}
+
+/* Portrattet pa ett fyllt kort. Ytan ar Fjord med genomskinlighet och inte
+ * vitt: vita initialer mot en ljus overlay pa gront gav 2.75:1, under WCAG:s
+ * 3:1 for stor text. Fjord under samma vita initialer ligger kring 4.8:1, och
+ * bada fargerna ar paletten. */
+.face-green .avatar {
+  background: rgba(14, 26, 43, 0.38);
+  color: var(--white);
+}
+
+.name {
+  color: var(--fjord);
+  font-size: 40px;
+  font-weight: 600;
+  line-height: 1.1;
+  letter-spacing: -0.01em;
+}
+
+.face-green .name {
+  color: var(--white);
+}
+
+.status {
+  color: var(--slate);
+  font-size: 22px;
+  font-weight: 400;
+}
+
+.job {
+  color: var(--white);
+  font-size: 32px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+/* Rubriken pa stamplingsskarmens delsteg */
+.screen-h {
+  color: var(--fjord);
+  font-size: 60px;
+  font-weight: 600;
+  letter-spacing: var(--tracking-tight);
+}
+
+/* Markoren. Ett tryck ska synas som ett tryck. */
+.cursor {
+  position: absolute;
+  width: 46px;
+  height: 46px;
+  z-index: 40;
+  filter: drop-shadow(0 4px 10px rgba(14, 26, 43, 0.35));
+}
+
+/* ======================================================================
+   SÄLJSIDANS FORMSPRÅK
+   Hämtat ur src/components/marketing/Motif.tsx och Sections.tsx, så att
+   videon och sidan ser ut att komma från samma ställe.
+   ====================================================================== */
+
+/* MOTIVET. Varumarkets tva halvcirklar uppforstorade till bakgrundsgeometri,
+ * blodande utanfor minst en kant, i en ton knappt skild fran ytan. Halvorna
+ * skiljer sig at — 5 % och 10 % — precis som i bannerna, annars laser ogat dem
+ * som en enda cirkel med ett hack i, och hela poangen med market ar att det ar
+ * tva: instamplingen och utstamplingen.
+ *
+ * Samma form i varje scen och inte en ny dekoration per scen. En video med fyra
+ * olika utsmyckningar ser hopplockad ut. */
+.motif {
+  position: absolute;
+  pointer-events: none;
+}
+.motif-dark .motif-a { fill: rgba(245, 246, 242, 0.05); }
+.motif-dark .motif-b { fill: rgba(245, 246, 242, 0.10); }
+.motif-light .motif-a { fill: rgba(14, 26, 43, 0.05); }
+.motif-light .motif-b { fill: rgba(14, 26, 43, 0.10); }
+
+/* DEN NUMRERADE AVSNITTSETIKETTEN. "01 —— Problemet".
+ * Siffran i gront, en kort linjal, och etiketten i versaler med vid knipning. */
+.eyebrow {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  /* 28 px och inte 22. Tick Deep mot Sno ger 3.17:1, vilket racker for STOR
+     text (3:1) men inte for normal (4.5:1), och gransen gar vid 24 px. Att
+     gora gront morkare vore att lagga till en sjunde farg. I en video pa
+     1920 px ar 28 px dessutom narmare sidans egna proportioner an 22. */
+  font-size: 28px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-wider);
+}
+.eyebrow .num { color: var(--tick-deep); }
+.eyebrow .rule { width: 56px; height: 1px; background: var(--lichen); }
+.eyebrow .what { color: var(--slate); }
+.on-dark .num { color: var(--tick); }
+.on-dark .rule { background: #35404f; }
+.on-dark .what { color: #858d94; }
+
+/* PRODUKTPANELEN. Sa visar heron stamplingsskarmen: inte utfallande, utan som
+ * en ljus panel med etikett ovanfor, svavande over Fjord med en djup skugga. */
+.panel-label {
+  position: absolute;
+  font-size: 28px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-wider);
+  color: #858d94;
+}
+.panel {
+  position: absolute;
+  background: var(--snow);
+  border-radius: 20px;
+  box-shadow: 0 60px 120px -50px rgba(0, 0, 0, 0.75);
+  overflow: hidden;
+}
