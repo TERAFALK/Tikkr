@@ -538,7 +538,7 @@ export async function autoCloseForgottenEntries(
         source: "AUTO_CLOSE",
         needsReview: true,
         reviewNote:
-          `Automatiskt utstämplad ${company.autoCloseAt} — ingen utstämpling ` +
+          `Automatiskt utstämplad ${company.autoCloseAt}. Ingen utstämpling ` +
           `registrerades. Kontrollera tiden innan fakturering.`,
       },
     });
@@ -650,7 +650,7 @@ export async function closeOrder(
           reviewNote:
             `Utstämplad när order ${order.orderNumber} avslutades av ` +
             `${options.byEmail}. Systemet vet inte när arbetet faktiskt ` +
-            `slutade — kontrollera tiden innan fakturering.`,
+            `slutade. Kontrollera tiden innan fakturering.`,
         },
       });
     }

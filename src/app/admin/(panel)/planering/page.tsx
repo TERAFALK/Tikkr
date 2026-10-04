@@ -126,7 +126,7 @@ export default async function PlanningPage({
       {open.length === 0 ? (
         <EmptyState
           title="Inga stationer upplagda"
-          description="En station är en maskin eller arbetsplats som kör ett arbetsmoment. Tavlan har en rad per station."
+          description="En station är en maskin eller arbetsplats som kör ett arbetsmoment."
           action={
             <ButtonLink href="/admin/planering/stationer">
               Lägg upp stationer

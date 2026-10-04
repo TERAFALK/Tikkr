@@ -453,7 +453,7 @@ export function AdminSection() {
           index="03"
           eyebrow="På kontoret"
           title="Överblick i realtid"
-          intro="Registrerad tid finns i panelen i samma stund som den registreras."
+          intro="Ett tryck på skärmen i verkstaden syns i panelen i samma stund."
         />
 
         <div className="mt-16 grid items-start gap-12 lg:grid-cols-2 lg:gap-16">

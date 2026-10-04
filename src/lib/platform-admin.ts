@@ -549,8 +549,8 @@ export async function setSubscriptionStatus(params: {
   // Ändringar för sådana företag görs i Stripe.
   if (before.stripeSubscriptionId) {
     throw new PlatformActionError(
-      "Företaget har en aktiv prenumeration hos Stripe. Ändra den i Stripe — " +
-        "en ändring här skulle skrivas över vid nästa uppdatering."
+      "Företaget har en aktiv prenumeration hos Stripe. Ändra den i Stripe. " +
+        "En ändring här skrivs över vid nästa uppdatering."
     );
   }
 
@@ -727,8 +727,8 @@ export async function deleteCompany(params: {
 
   if (company.stripeSubscriptionId) {
     throw new PlatformActionError(
-      "Företaget har en aktiv prenumeration hos Stripe. Avsluta den där först " +
-        "— annars fortsätter faktureringen mot en kund som inte längre finns."
+      "Företaget har en aktiv prenumeration hos Stripe. Avsluta den där " +
+        "först. Annars fortsätter faktureringen mot en kund som inte finns."
     );
   }
 

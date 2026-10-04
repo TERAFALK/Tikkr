@@ -883,6 +883,14 @@ Gäller ALL text kunden och kundens kund ser: sidor, knappar, rutor, tabeller,
 felmeddelanden, PDF och Excel. Inte kodkommentarer — de är för utvecklaren och
 får gärna vara utförliga.
 
+**`TONE-OF-VOICE.md` LÄSES INNAN NY TEXT SKRIVS** (infört 2026-10-04). Reglerna
+nedan är beslutet; den filen är den praktiska versionen av det — ordlistan som
+avgör att en sak heter samma sak överallt, mönstren för knappar, kvittenser,
+tomma tillstånd och fel, och orden som aldrig skrivs. Den lades till eftersom
+reglerna nedan är principer, och en princip utan ordlista räcker inte: samma
+sak hade redan börjat heta två saker på två sidor. Ändras ett beslut ändras det
+HÄR först, och filen följer efter.
+
 **Kort och sakligt. Tikkr är ett verktyg, inte en handledare.**
 
 1. **Skriv ingen beskrivning som inte behöver finnas.** Standardläget är

@@ -57,10 +57,9 @@ export default async function DataProtectionPage() {
             <strong className="block">
               Personen tas bort som namn. Den registrerade tiden finns kvar.
             </strong>
-            Tiden är underlag för fakturor, och fakturaunderlag måste enligt
-            bokföringslagen sparas i sju år. De två kraven krockar, och
-            anonymisering är det som uppfyller båda: tiden går att fakturera men
-            går inte längre att koppla till en namngiven person.
+            Tiden är fakturaunderlag och måste sparas i sju år enligt
+            bokföringslagen. Efteråt går den att fakturera men inte att koppla
+            till en namngiven person.
             <span className="mt-1.5 block">Detta går inte att ångra.</span>
           </Alert>
 

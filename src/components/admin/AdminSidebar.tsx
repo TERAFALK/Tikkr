@@ -103,7 +103,11 @@ const sections: { label: string; links: NavLink[] }[] = [
         icon: IconStation,
         module: "PLANNING",
       },
-      { href: "/admin/skarmar", label: "Skärmar", icon: IconDevice },
+      {
+        href: "/admin/skarmar",
+        label: "Stämplingsskärmar",
+        icon: IconDevice,
+      },
     ],
   },
 ];

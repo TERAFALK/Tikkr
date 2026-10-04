@@ -84,7 +84,7 @@ export async function GET(request: NextRequest) {
 
   for (const row of report.rows) {
     const notes: string[] = [];
-    if (row.ongoing) notes.push("Pågår — ej avslutad");
+    if (row.ongoing) notes.push("Pågår");
     if (row.needsReview) notes.push("Beräknad sluttid, ej granskad");
     if (row.manual) notes.push("Tid inskriven av administratör");
 
@@ -317,10 +317,7 @@ async function reportAsPdf(
     console.error("Rapport-PDF kunde inte skapas", error);
 
     return NextResponse.json(
-      {
-        error:
-          "PDF:en kunde inte skapas. Felet står i serverloggen. Excel-exporten fungerar under tiden.",
-      },
+      { error: "PDF:en kunde inte skapas. Försök igen, eller ta ut som Excel." },
       { status: 500 }
     );
   }

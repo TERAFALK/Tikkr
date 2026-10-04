@@ -50,8 +50,7 @@ export default function AdminError({
         </p>
 
         <p className="mt-3 text-sm leading-relaxed text-neutral-600">
-          Försök igen. Står det kvar beror det oftast på att servern startar om,
-          och då räcker det att vänta en minut.
+          Står felet kvar, vänta en minut och försök igen.
         </p>
 
         <div className="mt-5 flex flex-wrap gap-2">

@@ -59,9 +59,8 @@ export default async function IndirectMomentsPage() {
 
       <div className="mb-4">
         <Alert tone="info">
-          Tid som stämplas här hör inte till någon kund och kommer aldrig med i
-          ett orderunderlag eller en efterkalkyl. Den syns i rapporterna, så att
-          ni ser vart timmarna tar vägen.
+          Tid som stämplas här kommer aldrig med i ett orderunderlag eller en
+          efterkalkyl. Den syns i rapporterna.
         </Alert>
       </div>
 

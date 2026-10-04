@@ -115,9 +115,8 @@ export default async function PricesPage() {
               prenumerationen fungerar som förut.
             </p>
             <p>
-              Artikeln måste vara återkommande och ligga i rätt intervall.
-              Fälten byter inte plats på egen hand, men ett årspris i
-              månadsfältet vägras.
+              Artikeln måste vara återkommande och ligga i rätt intervall. Ett
+              årspris i månadsfältet vägras.
             </p>
           </div>
         </Card>

@@ -65,8 +65,7 @@ export default function NewEntryDialog({
             Lägg till stämpling
           </h2>
           <p className="mt-0.5 text-[13px] leading-relaxed text-neutral-500">
-            För tid som aldrig blev stämplad, oftast när någon glömt stämpla
-            in. Posten märks som manuell.
+            För tid som aldrig blev stämplad. Posten märks som manuell.
           </p>
         </div>
 

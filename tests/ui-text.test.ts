@@ -108,7 +108,11 @@ const PLACEHOLDER = /"—"|>—</g;
 function prosaDashesIn(file: string): string[] {
   const source = readFileSync(file, "utf8")
     .replace(/\/\*[\s\S]*?\*\//g, "")
-    .replace(/^\s*\/\/.*$/gm, "");
+    .replace(/^\s*\/\/.*$/gm, "")
+    // Även HTML-kommentarer. Mejlen i emails.ts är skrivna som markup, och
+    // förklaringarna där står i <!-- --> i stället för i /* */. De är lika
+    // mycket kommentarer och renderas lika lite.
+    .replace(/<!--[\s\S]*?-->/g, "");
 
   return source
     .split("\n")
@@ -195,4 +199,51 @@ describe("inga tankstreck i texten användaren ser", () => {
       );
     }
   });
+});
+
+/**
+ * TEXTERNA SOM INTE LIGGER I EN SIDA.
+ *
+ * Kontrollen ovan tittar på panelen, kiosken och de fyra PDF-filerna. Det är
+ * inte hela ytan, och gapet kostade: Excel-arket skrev
+ *
+ *   "Pågår — ej avslutad"
+ *
+ * i anmärkningskolumnen, och arket är ett av de dokument som går vidare till
+ * kundens faktura. Felet låg i en exportrutt, alltså utanför varje mapp listan
+ * nämner, och stod kvar tills någon läste filen för hand.
+ *
+ * Här står resten av de filer som skriver text en människa läser utan att den
+ * texten bor i en komponent: exportrutterna, granskningsnoterna som `clock.ts`
+ * och `breaks.ts` skriver till databasen, felmeddelandena i
+ * plattformspanelens åtgärder, och mejlen.
+ *
+ * SAMMA REGEL, SAMMA SKÄL. Ett tankstreck som lägger till en eftertanke är
+ * lika fel i en Excel-cell som i en knapp, och värre i ett mejl — det går
+ * inte att rätta efter att det skickats.
+ */
+const PROSE_FILES = [
+  "src/app/api/admin/export/route.ts",
+  "src/app/api/admin/export/orders/route.ts",
+  "src/app/api/admin/export/timesheet/route.ts",
+  "src/lib/clock.ts",
+  "src/lib/breaks.ts",
+  "src/lib/break-close.ts",
+  "src/lib/notices.ts",
+  "src/lib/platform-admin.ts",
+  "src/lib/emails.ts",
+];
+
+describe("texterna utanför sidorna", () => {
+  for (const file of PROSE_FILES) {
+    it(`${path.basename(file)} är fri från tankstreck`, () => {
+      const found = prosaDashesIn(path.join(ROOT, file));
+
+      expect(
+        found,
+        `${file} skriver text som en människa läser. Samma regel som i ` +
+          "panelen: skriv om till en egen mening, eller stryk eftertanken."
+      ).toEqual([]);
+    });
+  }
 });

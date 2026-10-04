@@ -77,7 +77,7 @@ export function buildReportPdf(
   const doc = new PDFDocument({
     size: "A4",
     margin: MARGIN,
-    info: { Title: "Tidrapport", Author: company.name },
+    info: { Title: "Rapport", Author: company.name },
   });
 
   const chunks: Buffer[] = [];
@@ -118,7 +118,12 @@ function render(
   y = doc.y + 14;
 
   doc.font("Helvetica-Bold").fontSize(20).fillColor(DOC.heading);
-  doc.text("Tidrapport", MARGIN, y);
+  // HETER "RAPPORT" OCH INTE "TIDRAPPORT". Tidrapporten är löneunderlaget,
+  // det dokument timesheet-pdf.ts ritar. Två papper på samma bord med samma
+  // rubrik är precis den sammanblandning CLAUDE.md § 1 förbjuder: det ena
+  // svarar på vad kunden ska faktureras, det andra på hur mycket en person
+  // arbetat. Panelen kallar den här "Rapporter", och så heter den här också.
+  doc.text("Rapport", MARGIN, y);
   y = doc.y + 6;
 
   // Filtren i klartext. En rapport utan sina villkor är en siffra utan fråga,
@@ -211,7 +216,7 @@ function render(
 
   /* --- Sidfot -------------------------------------------------------------- */
 
-  drawFooter(doc, "Tidrapport skapad med Tikkr", {
+  drawFooter(doc, "Rapport från Tikkr", {
     marginLeft: MARGIN,
     contentWidth: CONTENT_WIDTH,
     y: FOOTER_Y,

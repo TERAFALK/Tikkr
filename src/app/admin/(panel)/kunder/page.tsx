@@ -56,8 +56,8 @@ export default async function CustomersPage({
         title="Kunder"
         action={
           <CustomerDialog
-            trigger="Lägg till kund"
-            title="Ny kund"
+            trigger="Ny kund"
+            title="Lägg till kund"
             action={createCustomer}
             submitLabel="Lägg till"
           />

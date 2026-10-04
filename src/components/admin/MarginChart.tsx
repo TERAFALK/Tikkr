@@ -29,8 +29,8 @@ export default function MarginChart({ months }: { months: CustomerMonth[] }) {
   if (!hasAny) {
     return (
       <p className="px-5 py-6 text-[13px] text-neutral-500">
-        Ingen marginal att visa. Antingen saknas timkostnader, eller så har
-        ingen tid registrerats på kundens ordrar de senaste tolv månaderna.
+        Ingen marginal att visa. Timkostnader saknas, eller ingen tid är
+        registrerad de senaste tolv månaderna.
       </p>
     );
   }

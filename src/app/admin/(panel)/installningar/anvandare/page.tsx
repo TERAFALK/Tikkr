@@ -30,8 +30,14 @@ export default async function AdminUsersPage() {
 
   return (
     <div className="space-y-6">
+      {/* SKÄLET ÄR INTE LÄNGRE GLÖMDA LÖSENORD. Texten påstod att
+          återställning via e-post inte fanns, vilket slutade vara sant när
+          /admin/glomt-losenord togs i bruk. Kvar står det som faktiskt gäller:
+          med ett enda konto finns ingen annan som kommer in när personen är
+          borta eller slutar. */}
       <Alert tone="info">
-        Lägg upp minst två konton. Med endast ett konto blir arbetsytan otillgänglig om lösenordet tappas bort, eftersom återställning via e-post ännu inte är tillgänglig.
+        Lägg upp minst två konton. Med ett enda konto kommer ingen annan in i
+        arbetsytan.
       </Alert>
 
       {isOwner && (

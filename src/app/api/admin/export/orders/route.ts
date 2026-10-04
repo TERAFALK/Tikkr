@@ -157,10 +157,7 @@ export async function GET(request: NextRequest) {
       console.error("Efterkalkylen kunde inte skapas", error);
 
       return NextResponse.json(
-        {
-          error:
-            "Efterkalkylen kunde inte skapas. Felet står i serverloggen.",
-        },
+        { error: "Efterkalkylen kunde inte skapas. Försök igen." },
         { status: 500 }
       );
     }
@@ -228,10 +225,7 @@ export async function GET(request: NextRequest) {
     console.error("PDF kunde inte skapas", error);
 
     return NextResponse.json(
-      {
-        error:
-          "PDF:en kunde inte skapas. Felet står i serverloggen.",
-      },
+      { error: "PDF:en kunde inte skapas. Försök igen." },
       { status: 500 }
     );
   }

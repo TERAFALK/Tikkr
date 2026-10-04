@@ -126,10 +126,7 @@ export async function createNotice(params: {
   }
 
   if (!params.showInAdmin && !params.showOnKiosk && !params.showOnSite) {
-    throw new NoticeError(
-      "Välj minst en plats där meddelandet ska visas. Ett meddelande som inte " +
-        "syns någonstans fyller ingen funktion."
-    );
+    throw new NoticeError("Välj minst en plats där meddelandet ska visas.");
   }
 
   if (Number.isNaN(params.startsAt.getTime())) {
