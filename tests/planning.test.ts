@@ -4,6 +4,7 @@ import { forCompany, type CompanyDb } from "@/lib/tenant";
 import {
   blocksInWeek,
   moveBlock,
+  deleteStation,
   moveStation,
   placeBlock,
   removeBlock,
@@ -580,7 +581,8 @@ describe("stationsregistret", () => {
     expect((await place()).error).toMatch(/avstängd/);
   });
 
-  it("stationen raderas inte, den stängs", async () => {
+  it("att stänga raderar inte stationen", async () => {
+    // Stänga ar "inte just nu". Att ta bort ar nagot annat, se nedan.
     await setStationActive(db, SE, fras1, false);
 
     const station = await db.station.findFirst({ where: { id: fras1 } });
@@ -605,5 +607,80 @@ describe("stationsregistret", () => {
 
     const names = (await stationsFor(db, SE)).map((item) => item.name);
     expect(names).toEqual(["Fräs 1", "Fräs 2", "Svetsbås"]);
+  });
+});
+
+/* -------------------------------------------------------------------------- */
+
+describe("ta bort en station", () => {
+  /**
+   * ATT TA BORT OCH ATT STÄNGA ÄR OLIKA SAKER.
+   *
+   * Stänga är "maskinen finns men ska inte planeras på just nu". Ta bort är
+   * "den här stationen skulle aldrig ha funnits": ett felstavat namn, ett
+   * moment man ångrat, en maskin som aldrig köptes.
+   *
+   * Att radering tillåts alls är en skillnad mot ordrar och arbetsmoment, som
+   * bara stängs. De bär registrerad tid, alltså underlag för en faktura och en
+   * lön. En station bär PLANER, och en plan som visade sig vara fel ska gå att
+   * ta bort.
+   */
+  it("tar bort stationen", async () => {
+    const result = await deleteStation(db, fras1);
+
+    expect(result.error).toBeUndefined();
+    expect(await db.station.findFirst({ where: { id: fras1 } })).toBeNull();
+  });
+
+  it("tar med sig rutorna och säger hur många", async () => {
+    await place({ startsAt: at(8), minutes: 120 });
+    await place({ startsAt: at(13), minutes: 60 });
+
+    const result = await deleteStation(db, fras1);
+
+    expect(result.removedBlocks).toBe(2);
+    expect(await db.plannedBlock.count({ where: { stationId: fras1 } })).toBe(0);
+  });
+
+  it("TIDEN GÅR TILLBAKA TILL OPLACERAT", async () => {
+    // Det avgörande. Rutorna försvinner, men minuterna gör det inte: den
+    // oplacerade tiden härleds ur beräkningen minus det som ligger ute, så
+    // de dyker upp igen av sig själva. Samma egenskap som gör att en krympt
+    // ruta lämnar tillbaka sin tid.
+    await place({ minutes: 240 });
+
+    const during = (await unplacedWork(db)).find(
+      (row) => row.momentId === frasning
+    )!;
+    expect(during.remainingMinutes).toBe(120);
+
+    await deleteStation(db, fras1);
+
+    const after = (await unplacedWork(db)).find(
+      (row) => row.momentId === frasning
+    )!;
+
+    expect(after.placedMinutes).toBe(0);
+    expect(after.remainingMinutes).toBe(360);
+  });
+
+  it("rör inte rutor på ANDRA stationer", async () => {
+    await place({ stationId: fras1, minutes: 60 });
+    await place({ stationId: fras2, minutes: 60 });
+
+    await deleteStation(db, fras1);
+
+    expect(await db.plannedBlock.count({ where: { stationId: fras2 } })).toBe(1);
+  });
+
+  it("en annan kunds station går inte att ta bort", async () => {
+    const result = await deleteStation(db, theirStationId);
+
+    expect(result.error).toMatch(/finns inte/);
+
+    const still = await unsafeGlobalPrisma.station.findUnique({
+      where: { id: theirStationId },
+    });
+    expect(still).not.toBeNull();
   });
 });

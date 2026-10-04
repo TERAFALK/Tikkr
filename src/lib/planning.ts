@@ -873,6 +873,53 @@ export async function setStationActive(
 }
 
 /**
+ * Raderar en station.
+ *
+ * TA BORT OCH STÄNGA ÄR OLIKA SAKER, och båda behövs.
+ *
+ * Stänga är "maskinen finns men ska inte planeras på just nu" — den kommer
+ * tillbaka. Radera är "den här stationen skulle aldrig ha funnits": ett
+ * felstavat namn, ett moment man ångrat, en maskin som aldrig köptes.
+ *
+ * Rutorna på stationen försvinner med den (onDelete: Cascade), och det är
+ * avsiktligt. Deras tid går inte förlorad: den oplacerade tiden härleds ur
+ * beräkningen minus det som ligger ute, så minuterna dyker upp i Oplacerat
+ * igen av sig själva. Samma egenskap som gör att en krympt ruta lämnar
+ * tillbaka sin tid.
+ *
+ * Att radering tillåts alls är en skillnad mot ordrar och arbetsmoment, som
+ * bara stängs. De bär registrerad tid, alltså underlag för en faktura och en
+ * lön. En station bär planer, och en plan som visade sig vara fel ska gå att
+ * ta bort.
+ *
+ * Svarar med hur många rutor som följde med, så att gränssnittet kan säga det
+ * i efterhand. Att fråga INNAN är anroparens sak — se stationssidan.
+ */
+export async function deleteStation(
+  db: CompanyDb,
+  stationId: string
+): Promise<PlanResult & { removedBlocks?: number }> {
+  const station = await db.station.findFirst({
+    where: { id: stationId },
+    select: { id: true },
+  });
+
+  if (!station) return { error: "Stationen finns inte." };
+
+  const removedBlocks = await db.plannedBlock.count({ where: { stationId } });
+
+  // Rutorna tas bort uttryckligen och inte bara genom databasens regel. Koden
+  // ska säga vad den gör: en regel i schemat går att ändra av någon som inte
+  // läser den här funktionen, och då skulle raderingen plötsligt vägras.
+  await db.$transaction(async (tx) => {
+    await tx.plannedBlock.deleteMany({ where: { stationId } });
+    await tx.station.deleteMany({ where: { id: stationId } });
+  });
+
+  return { removedBlocks };
+}
+
+/**
  * Flyttar en station ett steg.
  *
  * INOM SITT ARBETSMOMENT, inte i hela listan. Stationer med samma moment

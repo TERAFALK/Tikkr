@@ -1345,10 +1345,22 @@ model CompAdjustment {
 /// fräsar. Därför: en station gör ett moment, ett moment kan finnas på flera
 /// stationer. Alltså moment_id här och ingen kopplingstabell.
 ///
-/// Stationen RADERAS ALDRIG, den avaktiveras — och bara när den saknar rutor
-/// från idag och framåt. Samma regel som ordrar och moment med registrerad tid
-/// (§ 3 regel 1): hade vi tillåtit radering skulle planerat arbete försvinna
-/// ur tavlan utan att försvinna ur databasen.
+/// Stationen går att STÄNGA och att RADERA, och de två betyder olika saker.
+///
+/// Stänga: maskinen finns men ska inte planeras på. Den försvinner från tavlan
+/// och går att öppna igen. Kräver att den saknar rutor från idag och framåt,
+/// annars hade planerat arbete försvunnit ur vyn utan att försvinna ur
+/// databasen.
+///
+/// Radera: stationen skulle aldrig ha funnits. Rutorna på den försvinner med
+/// den, och deras tid dyker upp i Oplacerat igen — ingenting går förlorat.
+///
+/// Att radering tilläts ALLS är en skillnad mot ordrar och arbetsmoment, som
+/// bara stängs. Skälet är att de bär något stationen inte bär: registrerad
+/// tid, alltså underlag för en faktura och en lön. En station bär PLANER, och
+/// en plan som visade sig vara fel ska gå att ta bort. Att tvinga fram en rad
+/// som står kvar för alltid för att någon stavade fel vore att behandla en
+/// avsikt som ett kvitto.
 ///
 /// Arbetsmomentet går inte att byta så länge rutor finns. Varje ruta skulle
 /// annars tyst börja peka på en annan beräkningsrad. Vaktas i planning.ts.
@@ -1484,8 +1496,13 @@ model PlannedBlock {
   // Cascade från ordern: raderas ordern är planen för den meningslös.
   order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
 
-  // Restrict från station och moment, som överallt annars.
-  station Station    @relation(fields: [stationId], references: [id], onDelete: Restrict)
+  // Cascade från stationen: raderas maskinen är planen för den meningslös, och
+  // tiden går inte förlorad — den dyker upp i Oplacerat igen eftersom den
+  // härleds ur beräkningen minus det som ligger ute. Se Station.
+  //
+  // Restrict från momentet, som överallt annars: ett arbetsmoment avslutas
+  // genom att avaktiveras, aldrig genom att raderas.
+  station Station    @relation(fields: [stationId], references: [id], onDelete: Cascade)
   moment  WorkMoment @relation(fields: [momentId], references: [id], onDelete: Restrict)
 
   @@index([companyId, stationId, startsAt])

@@ -6,6 +6,7 @@ import { requireModule } from "@/lib/company-modules";
 import { companyTimeZone } from "@/lib/company";
 import { readWeeklyHours } from "@/lib/weekly-hours";
 import {
+  deleteStation,
   moveBlock,
   moveStation,
   noteBlock,
@@ -268,6 +269,46 @@ export async function toggleStationAction(
 
   revalidatePlanning();
   return { ok: active ? "Stationen är öppen." : "Stationen är stängd." };
+}
+
+/**
+ * Raderar en station.
+ *
+ * Egen åtgärd och inte ett läge på toggleStationAction, eftersom de två
+ * betyder olika saker: stänga är "inte just nu", radera är "den här skulle
+ * aldrig ha funnits". En knapp som gör det ena eller det andra beroende på ett
+ * dolt fält är en knapp man trycker fel på.
+ *
+ * Rutorna följer med, och deras tid dyker upp i Oplacerat igen. Svaret säger
+ * hur många det blev, så att den som tryckte får veta vad som hände i stället
+ * för att upptäcka det på tavlan.
+ */
+export async function deleteStationAction(
+  _previous: StationState,
+  formData: FormData
+): Promise<StationState> {
+  const session = await requireAdmin();
+  await assertWritable(session);
+  await requireModule(session, "PLANNING");
+
+  const stationId = String(formData.get("stationId") ?? "");
+  if (!stationId) return { error: "Stationen kunde inte hittas." };
+
+  const result = await deleteStation(session.db, stationId);
+  if (result.error) return { error: result.error };
+
+  revalidatePlanning();
+
+  const removed = result.removedBlocks ?? 0;
+
+  return {
+    ok:
+      removed === 0
+        ? "Stationen är borttagen."
+        : removed === 1
+          ? "Stationen är borttagen. Ett planerat jobb gick tillbaka till Oplacerat."
+          : `Stationen är borttagen. ${removed} planerade jobb gick tillbaka till Oplacerat.`,
+  };
 }
 
 export async function moveStationAction(

@@ -922,15 +922,36 @@ export default function PlanBoard({
   );
 
   /**
-   * Pilarna mellan en orders moment.
+   * PILARNA SOM VISAR FÖLJDEN I ETT JOBB.
    *
-   * Svetsningen pekar på lackeringen. Dras från den SENAST avslutade rutan i
-   * ett moment till den TIDIGAST påbörjade i nästa: det är den punkt där nästa
-   * steg tidigast kan börja, och alltså den enda som säger något.
+   * Två sorter, och båda betyder "det här kommer efter det där":
    *
-   * En pil som går baklänges betyder att stegen är planerade i otakt. Den
-   * ritas i gult och hindras inte — ibland är det precis vad som måste hända,
-   * och att se det är mer värt än att spärras från det.
+   *   MELLAN MOMENT. Svetsningen pekar på fräsningen, enligt orderns egen
+   *   ordning (OrderBudget.sortOrder). Dras från den SENAST avslutade rutan i
+   *   ett moment till den TIDIGAST påbörjade i nästa: det är den punkt där
+   *   nästa steg tidigast kan börja, och alltså den enda som säger något.
+   *
+   *   INOM ETT MOMENT. Sex timmars fräsning som delats på fyra timmar måndag
+   *   och två på tisdag är fortfarande ett arbete. Utan pil mellan delarna såg
+   *   det ut som två orelaterade jobb som råkade ha samma ordernummer, och
+   *   man fick själv hålla reda på att den ena var en fortsättning.
+   *
+   * Delarna kedjas i STARTTIDSORDNING, oavsett vilken station de ligger på.
+   * Ett moment som delats mellan två fräsar hör ihop lika mycket som ett som
+   * delats över två dagar.
+   *
+   * ── NÄR PILEN BLIR GUL ───────────────────────────────────────────────────
+   *
+   * Bara mellan moment, och bara när nästa steg börjar innan det förra är
+   * klart. Då är stegen planerade i otakt, och det ska synas. Den hindras inte
+   * — ibland är det precis vad som måste hända.
+   *
+   * INOM ett moment flaggas ingenting. Två fräsar som kör samma fräsning
+   * samtidigt är inte otakt, det är två maskiner på samma jobb, och en gul
+   * pil där hade varit ett falsklarm på något helt normalt.
+   *
+   * Ordrar UTAN beräkning får också sina delar kedjade. Följden mellan moment
+   * är okänd då, men att en fräsning delats på två dagar vet vi ändå.
    */
   const arrows = useMemo(() => {
     const rows = new Map(stations.map((station, index) => [station.id, index]));
@@ -944,24 +965,59 @@ export default function PlanBoard({
       backwards: boolean;
     }[] = [];
 
-    for (const [orderId, sequence] of Object.entries(sequences)) {
-      // Rutorna för just den här ordern, grupperade på moment.
-      const byMoment = new Map<string, BoardBlock[]>();
+    // Rutorna grupperade per order och moment, varje grupp i starttidsordning.
+    const byOrder = new Map<string, Map<string, BoardBlock[]>>();
 
-      for (const block of shown) {
-        if (block.orderId !== orderId) continue;
+    for (const block of shown) {
+      const moments = byOrder.get(block.orderId) ?? new Map();
+      const list = moments.get(block.momentId) ?? [];
 
-        const list = byMoment.get(block.momentId) ?? [];
-        list.push(block);
-        byMoment.set(block.momentId, list);
+      list.push(block);
+      moments.set(block.momentId, list);
+      byOrder.set(block.orderId, moments);
+    }
+
+    for (const moments of byOrder.values()) {
+      for (const list of moments.values()) {
+        list.sort(
+          (a, b) =>
+            new Date(a.startsAt).getTime() - new Date(b.startsAt).getTime()
+        );
+      }
+    }
+
+    for (const [orderId, moments] of byOrder) {
+      /* --- Delarna av samma moment, kedjade ------------------------------ */
+      for (const [momentId, parts] of moments) {
+        for (let index = 0; index < parts.length - 1; index++) {
+          const a = pointOf(parts[index], "end");
+          const b = pointOf(parts[index + 1], "start");
+
+          if (!a || !b) continue;
+
+          found.push({
+            key: `${orderId}:${momentId}:${index}`,
+            fromX: a.x,
+            fromY: a.y,
+            toX: b.x,
+            toY: b.y,
+            backwards: false,
+          });
+        }
       }
 
+      /* --- Mellan momenten, i orderns egen ordning ----------------------- */
+      const sequence = sequences[orderId] ?? [];
+
       for (let step = 0; step < sequence.length - 1; step++) {
-        const from = byMoment.get(sequence[step]);
-        const to = byMoment.get(sequence[step + 1]);
+        const from = moments.get(sequence[step]);
+        const to = moments.get(sequence[step + 1]);
 
         if (!from?.length || !to?.length) continue;
 
+        // Listorna är sorterade på starttid. Den sista är inte nödvändigtvis
+        // den som slutar sist, eftersom rutor kan vara olika långa — därför
+        // letas slutet upp och antas inte.
         const last = from.reduce((best, block) =>
           endMs(block, hoursFor, days, timeZone) >
           endMs(best, hoursFor, days, timeZone)
@@ -969,17 +1025,13 @@ export default function PlanBoard({
             : best
         );
 
-        const first = to.reduce((best, block) =>
-          new Date(block.startsAt) < new Date(best.startsAt) ? block : best
-        );
-
         const a = pointOf(last, "end");
-        const b = pointOf(first, "start");
+        const b = pointOf(to[0], "start");
 
         if (!a || !b) continue;
 
         found.push({
-          key: `${orderId}:${step}`,
+          key: `${orderId}:steg:${step}`,
           fromX: a.x,
           fromY: a.y,
           toX: b.x,

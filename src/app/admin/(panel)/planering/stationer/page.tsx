@@ -21,6 +21,7 @@ import {
   Tr,
 } from "@/components/ui";
 import {
+  deleteStationAction,
   saveStationAction,
   toggleStationAction,
   moveStationAction,
@@ -199,6 +200,31 @@ export default async function StationsPage() {
                               kvar.
                             </p>
                           )}
+                        </ActionDialog>
+
+                        {/* ATT TA BORT ÄR INTE ATT STÄNGA. Stänga är "inte
+                            just nu"; ta bort är "den här skulle aldrig ha
+                            funnits". Därför två knappar och inte ett läge. */}
+                        <ActionDialog
+                          trigger="Ta bort"
+                          triggerTone="danger"
+                          title={`Ta bort ${station.name}`}
+                          action={deleteStationAction}
+                          initial={{}}
+                          submitLabel="Ta bort"
+                          submitTone="danger"
+                        >
+                          <input
+                            type="hidden"
+                            name="stationId"
+                            value={station.id}
+                          />
+
+                          <p className="text-[13px] leading-relaxed text-neutral-600">
+                            {station.upcomingBlocks > 0
+                              ? `Stationen och ${station.upcomingBlocks} planerade jobb tas bort. Jobbens tid går tillbaka till Oplacerat och kan placeras om.`
+                              : "Stationen tas bort. Vill du bara pausa den, stäng den i stället."}
+                          </p>
                         </ActionDialog>
                       </div>
                     </Td>

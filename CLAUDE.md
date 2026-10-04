@@ -461,8 +461,19 @@ stripe_prices    — item, month_price_id, year_price_id, updated_by_email
    vägen in — samma konstruktion som `clock.ts` har för `kind`.
 
    Stationens arbetsmoment går inte att byta när rutor finns: varje ruta skulle
-   annars tyst börja peka på en annan beräkningsrad. En station **raderas
-   aldrig, den stängs**, och bara när den saknar rutor från idag och framåt.
+   annars tyst börja peka på en annan beräkningsrad.
+
+   **Att STÄNGA och att TA BORT en station är olika saker** (ändrat
+   2026-10-04). Stänga är "maskinen finns men ska inte planeras på just nu":
+   den försvinner från tavlan, går att öppna igen, och kräver att den saknar
+   rutor från idag och framåt. Ta bort är "den här stationen skulle aldrig ha
+   funnits" — rutorna följer med, och deras tid dyker upp i Oplacerat igen
+   eftersom den oplacerade tiden härleds.
+
+   Att radering tillåts alls är ett avsteg från regel 1, där ordrar och moment
+   bara stängs. Skälet är att de bär något stationen inte bär: registrerad tid,
+   alltså underlag för en faktura och en lön. En station bär PLANER, och en
+   plan som visade sig vara fel ska gå att ta bort.
 
    **En rutas minuter är ARBETSMINUTER, inte väggklockans.** En ruta på fyra
    timmar som börjar 10:00 på en station med lunch 12:00–12:40 slutar 14:40 men
@@ -522,7 +533,17 @@ stripe_prices    — item, month_price_id, year_price_id, updated_by_email
    uppgift på varje order.
 
    Styr tre saker: raderna i orderrutan, ordningen i Oplacerat, och pilarna
-   mellan rutorna på tavlan. Den **spärrar ingenting** — att planera
+   mellan rutorna på tavlan.
+
+   **Pilarna finns i två sorter.** Mellan moment, enligt ordningen ovan. Och
+   mellan DELARNA av samma moment: sex timmars fräsning delad på fyra timmar
+   måndag och två på tisdag är ett arbete, och utan pil såg det ut som två
+   orelaterade jobb med samma ordernummer. Delarna kedjas i starttidsordning
+   oavsett station, eftersom ett moment delat mellan två fräsar hör ihop lika
+   mycket som ett delat över två dagar.
+
+   Bara pilar mellan MOMENT kan bli gula. Två fräsar som kör samma fräsning
+   samtidigt är inte otakt utan två maskiner på samma jobb. Den **spärrar ingenting** — att planera
    lackeringen före svetsningen går utmärkt, och tavlan ritar då pilen gul och
    streckad. Att se att något är i otakt är mer värt än att hindras.
 
