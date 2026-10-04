@@ -36,9 +36,12 @@ export default function OrderActions({
   toggleAction,
   customers,
   moments,
+  planning = false,
 }: {
   /** Kunderna som går att välja. Skickas ner så att väljaren kan söka lokalt. */
   customers: SearchSelectOption[];
+  /** Visar leveransdatumet i ändra-rutan. Sätts när Planering är på. */
+  planning?: boolean;
   /** Arbetsmomenten som går att beräkna tid på. */
   moments: BudgetMomentOption[];
   order: {
@@ -53,6 +56,7 @@ export default function OrderActions({
     budgets: OrderBudgetRow[];
     markupPercent: number | null;
     fixedPriceOre: number | null;
+    plannedDueDate: Date | null;
   };
   updateAction: (
     state: OrderFormState,
@@ -363,7 +367,9 @@ export default function OrderActions({
                 })),
                 markupPercent: order.markupPercent,
                 fixedPriceOre: order.fixedPriceOre,
+                plannedDueDate: toDateField(order.plannedDueDate),
               }}
+              planning={planning}
             />
           </div>
 
@@ -508,4 +514,22 @@ function MenuLink({
       </span>
     </a>
   );
+}
+
+/**
+ * Datumet som ett datumfält vill ha det: "2026-10-08".
+ *
+ * Läses i UTC och inte i företagets tidszon. Datumet SKREVS vid middagstid
+ * UTC just för att det ska peka ut samma dag överallt — se
+ * readPlannedDueDate i ordrar/actions.ts — och att tolka det i en lokal
+ * tidszon här vore att flytta tillbaka det.
+ */
+function toDateField(value: Date | null): string | null {
+  if (!value) return null;
+
+  const pad = (n: number) => String(n).padStart(2, "0");
+
+  return `${value.getUTCFullYear()}-${pad(value.getUTCMonth() + 1)}-${pad(
+    value.getUTCDate()
+  )}`;
 }

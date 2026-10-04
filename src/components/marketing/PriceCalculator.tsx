@@ -1,8 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { MODULES } from "@/lib/modules";
-import type { ModulePrice, ScreenPricing } from "@/lib/stripe";
+import { MODULES, MODULE_KEYS, type ModuleKey } from "@/lib/modules";
+import type { ModulePricing, ScreenPricing } from "@/lib/stripe";
 
 /**
  * VAD DET KOSTAR FÖR OSS.
@@ -41,26 +41,48 @@ const MAX_SCREENS = 25;
 
 export default function PriceCalculator({
   pricing,
-  payroll,
+  modules,
 }: {
   pricing: ScreenPricing;
-  payroll: ModulePrice;
+  modules: ModulePricing;
 }) {
   const [screens, setScreens] = useState(1);
-  const [withPayroll, setWithPayroll] = useState(false);
+
+  // EN KRYSSRUTA PER TILLVAL, ur registret. Var en enda `withPayroll` tills
+  // planeringen kom, och nästa modul hade då krävt en till boolean plus en
+  // till rad i summan — två ställen att glömma. Mängden rymmer varje modul
+  // utan att räkningen nedan ändras.
+  const [picked, setPicked] = useState<Set<ModuleKey>>(new Set());
+
+  const toggle = (key: ModuleKey, on: boolean) =>
+    setPicked((current) => {
+      const next = new Set(current);
+      if (on) next.add(key);
+      else next.delete(key);
+      return next;
+    });
 
   /*
-    Årsbetalning erbjuds bara när båda priserna finns hos betaltjänsten.
-    Saknas ett av dem skulle växeln kunna visa en summa där den ena posten
-    räknas per år och den andra per månad.
+    Årsbetalning erbjuds bara när ALLA priser finns hos betaltjänsten. Saknas
+    ett av dem skulle växeln kunna visa en summa där den ena posten räknas per
+    år och den andra per månad.
   */
-  const yearlyOffered = pricing.year !== null && payroll.year !== null;
+  const yearlyOffered =
+    pricing.year !== null &&
+    MODULE_KEYS.every((key) => modules[key].year !== null);
+
   const [yearly, setYearly] = useState(false);
   const perYear = yearly && yearlyOffered;
 
-  const total = perYear
-    ? screens * (pricing.year ?? 0) + (withPayroll ? (payroll.year ?? 0) : 0)
-    : screens * pricing.month + (withPayroll ? payroll.month : 0);
+  const moduleTotal = [...picked].reduce(
+    (sum, key) =>
+      sum + (perYear ? (modules[key].year ?? 0) : modules[key].month),
+    0
+  );
+
+  const total =
+    (perYear ? screens * (pricing.year ?? 0) : screens * pricing.month) +
+    moduleTotal;
 
   const step = (delta: number) =>
     setScreens((current) => Math.min(MAX_SCREENS, Math.max(1, current + delta)));
@@ -101,22 +123,29 @@ export default function PriceCalculator({
 
           {/* Tillval */}
           <div>
-            <Label htmlFor="kalkyl-lon">Tillval</Label>
-            <label
-              htmlFor="kalkyl-lon"
-              className="mt-3 flex cursor-pointer items-center gap-2.5 py-1.5"
-            >
-              <input
-                id="kalkyl-lon"
-                type="checkbox"
-                checked={withPayroll}
-                onChange={(event) => setWithPayroll(event.target.checked)}
-                className="h-4 w-4 rounded border-neutral-300 text-blue-600 focus:ring-blue-600"
-              />
-              <span className="text-[14px] text-neutral-900">
-                {MODULES.PAYROLL.name}
-              </span>
-            </label>
+            <p className="text-[11px] font-medium uppercase tracking-wider text-neutral-500">
+              Tillval
+            </p>
+            <div className="mt-3 space-y-1">
+              {MODULE_KEYS.map((key) => (
+                <label
+                  key={key}
+                  htmlFor={`kalkyl-${key.toLowerCase()}`}
+                  className="flex cursor-pointer items-center gap-2.5"
+                >
+                  <input
+                    id={`kalkyl-${key.toLowerCase()}`}
+                    type="checkbox"
+                    checked={picked.has(key)}
+                    onChange={(event) => toggle(key, event.target.checked)}
+                    className="h-4 w-4 rounded border-neutral-300 text-blue-600 focus:ring-blue-600"
+                  />
+                  <span className="text-[14px] text-neutral-900">
+                    {MODULES[key].name}
+                  </span>
+                </label>
+              ))}
+            </div>
           </div>
 
           {/* Betalning */}

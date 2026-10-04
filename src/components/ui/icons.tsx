@@ -41,6 +41,24 @@ export const IconOverview = (props: IconProps) => (
   </Icon>
 );
 
+/** Tidslinjen. Tre staplar på rad, som rutorna på planeringstavlan. */
+export const IconTimeline = (props: IconProps) => (
+  <Icon {...props}>
+    <rect x="3" y="5" width="11" height="4" rx="1" />
+    <rect x="7" y="15" width="9" height="4" rx="1" />
+    <rect x="10" y="10" width="11" height="4" rx="1" />
+  </Icon>
+);
+
+/** Stationen. En maskin på golvet, sedd framifrån. */
+export const IconStation = (props: IconProps) => (
+  <Icon {...props}>
+    <rect x="3" y="9" width="18" height="11" rx="2" />
+    <path d="M8 9V6a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v3" />
+    <path d="M8 14h3" />
+  </Icon>
+);
+
 export const IconReport = (props: IconProps) => (
   <Icon {...props}>
     <path d="M4 20V10M10 20V4M16 20v-7M22 20H2" />

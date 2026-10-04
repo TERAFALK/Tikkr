@@ -63,6 +63,24 @@ export const MODULES = {
     fallbackMonthly: 499,
     fallbackYearly: 4990,
   },
+
+  PLANNING: {
+    key: "PLANNING",
+    name: "Planering",
+    summary: "Stationer, veckovis tidslinje och planerade jobb mot stämpling.",
+
+    // Dyrare än löneunderlaget, och fast per företag av samma skäl.
+    //
+    // Planeringen är en egen arbetsyta: ett stationsregister, en tidslinje att
+    // arbeta i varje morgon, och det levande utfallet mot planen. Löneunderlaget
+    // är en beräkning och ett par sidor; det här är ett verktyg man står i.
+    //
+    // Per skärm valdes bort av samma skäl som löneunderlaget valde bort det:
+    // planeringen har ingenting med antalet skärmar att göra, och det är första
+    // frågan kunden ställer när de ser fakturan.
+    fallbackMonthly: 699,
+    fallbackYearly: 6990,
+  },
 } as const satisfies Record<string, ModuleDefinition>;
 
 export type ModuleKey = keyof typeof MODULES;

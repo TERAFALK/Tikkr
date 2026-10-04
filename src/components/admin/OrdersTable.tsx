@@ -51,6 +51,7 @@ export default function OrdersTable({
   hideCustomer = false,
   selectable = true,
   closeAction,
+  planning = false,
 }: {
   orders: OrderRow[];
   /** Kunderna som går att välja i ändra-rutan. */
@@ -69,6 +70,8 @@ export default function OrdersTable({
   selectable?: boolean;
   /** Arbetsmomenten som går att beräkna tid på. */
   moments: BudgetMomentOption[];
+  /** Visar leveransdatumet i ändra-rutan. Sätts när Planering är på. */
+  planning?: boolean;
   /**
    * Avslutar flera markerade ordrar. Utelämnad döljer frågan helt, vilket
    * gäller listan på granskningssidan där inget markeringsläge finns.
@@ -271,6 +274,7 @@ export default function OrdersTable({
                       moments={moments}
                       updateAction={updateAction}
                       toggleAction={toggleAction}
+                      planning={planning}
                     />
                   )}
                   {/* Brickan sitter på ordern och inte på kunden: ett

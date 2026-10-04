@@ -24,10 +24,15 @@ const SCREEN_MONTH = "price_screen_month";
 const SCREEN_YEAR = "price_screen_year";
 const PAYROLL_MONTH = "price_payroll_month";
 const PAYROLL_YEAR = "price_payroll_year";
+const PLANNING_MONTH = "price_planning_month";
+const PLANNING_YEAR = "price_planning_year";
 
 const BOOK: PriceBook = {
   screen: { month: SCREEN_MONTH, year: SCREEN_YEAR },
-  modules: { PAYROLL: { month: PAYROLL_MONTH, year: PAYROLL_YEAR } },
+  modules: {
+    PAYROLL: { month: PAYROLL_MONTH, year: PAYROLL_YEAR },
+    PLANNING: { month: PLANNING_MONTH, year: PLANNING_YEAR },
+  },
 };
 
 /** Minsta möjliga prenumeration med de rader testet bryr sig om. */
@@ -81,7 +86,10 @@ describe("priceRole", () => {
     // ingenting ska råka matcha på undefined.
     const utan: PriceBook = {
       screen: { month: SCREEN_MONTH },
-      modules: { PAYROLL: { month: PAYROLL_MONTH } },
+      modules: {
+        PAYROLL: { month: PAYROLL_MONTH },
+        PLANNING: { month: PLANNING_MONTH },
+      },
     };
 
     expect(priceRole(utan, PAYROLL_MONTH)).toEqual({
@@ -109,6 +117,20 @@ describe("screenItemOf", () => {
     // ordning, och den gamla koden hade svarat med löneunderlaget: kvantitet
     // 1, alltså en licens för en kund som betalar för tre.
     const subscription = subscriptionWith([
+      { id: "si_payroll", price: PAYROLL_MONTH },
+      { id: "si_screen", price: SCREEN_MONTH, quantity: 3 },
+    ]);
+
+    expect(screenItemOf(BOOK, subscription)?.id).toBe("si_screen");
+    expect(screenItemOf(BOOK, subscription)?.quantity).toBe(3);
+  });
+
+  it("hittar skärmraden med BÅDA modulerna framför sig", () => {
+    // Med två tillval går det inte längre att hoppas på att skärmraden ligger
+    // bland de första. Uppslaget sker på pris-id, och antalet rader före den
+    // ska inte spela någon roll alls.
+    const subscription = subscriptionWith([
+      { id: "si_planning", price: PLANNING_MONTH },
       { id: "si_payroll", price: PAYROLL_MONTH },
       { id: "si_screen", price: SCREEN_MONTH, quantity: 3 },
     ]);
@@ -160,6 +182,22 @@ describe("moduleItemsOf", () => {
     ]);
 
     expect(moduleItemsOf(BOOK, subscription)).toEqual([
+      { key: "PAYROLL", itemId: "si_payroll" },
+    ]);
+  });
+
+  it("skiljer de två modulerna från varandra", () => {
+    // Två moduler med fyra artiklar mellan sig. Blandas de ihop får kunden en
+    // modul de inte köpt och förlorar en de betalar för, och ingenting i
+    // gränssnittet skulle säga vilket.
+    const subscription = subscriptionWith([
+      { id: "si_planning", price: PLANNING_MONTH },
+      { id: "si_screen", price: SCREEN_MONTH, quantity: 2 },
+      { id: "si_payroll", price: PAYROLL_YEAR },
+    ]);
+
+    expect(moduleItemsOf(BOOK, subscription)).toEqual([
+      { key: "PLANNING", itemId: "si_planning" },
       { key: "PAYROLL", itemId: "si_payroll" },
     ]);
   });

@@ -57,6 +57,11 @@ export const TENANT_SCOPED_MODELS = [
   "AbsenceReason",
   "Absence",
   "CompAdjustment",
+  // Planeringen.
+  "Station",
+  "StationDay",
+  "StationBreak",
+  "PlannedBlock",
   // Tillvalen. Se company-modules.ts — skrivningarna sker via
   // unsafeGlobalPrisma, men raderna hör till kunden och filtreras därför här.
   "CompanyModule",

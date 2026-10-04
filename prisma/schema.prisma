@@ -31,6 +31,9 @@ enum SubscriptionStatus {
 enum CompanyModuleKey {
   /// Löneunderlaget: schema, raster, flex, komp och frånvaro.
   PAYROLL
+
+  /// Planeringen: stationer, veckovis tidslinje och planerade jobb.
+  PLANNING
 }
 
 /// Hur en modul slogs på. Avgör vem som får stänga av den igen.
@@ -169,6 +172,11 @@ model Company {
   compAdjustments CompAdjustment[]
 
   /// Tillvalen. Se CompanyModule längst ner i filen.
+  stations      Station[]
+  stationDays   StationDay[]
+  stationBreaks StationBreak[]
+  plannedBlocks PlannedBlock[]
+
   modules CompanyModule[]
 
   @@map("companies")
@@ -382,6 +390,19 @@ model Order {
   /// företagets påslag fram och tillbaka och råkat fakturera fel på allt
   /// annat under tiden.
   markupPercent Int?     @map("markup_percent")
+
+  /// När jobbet ska vara klart. Frivilligt, och ett DATUM och inte en
+  /// tidpunkt — det är en dag, inte ett klockslag.
+  ///
+  /// Hör till planeringen (CLAUDE.md § 3.1) och visas i orderrutan bara när
+  /// modulen är på. Fältet ligger ändå på Order och inte i en egen tabell:
+  /// det är en egenskap hos ordern, och en sidotabell med en rad per order
+  /// vore samma sak uttryckt sämre.
+  ///
+  /// Utan det vet planeraren inte vad som brådskar, och den oplacerade listan
+  /// har ingen annan ordning än ordernummer.
+  plannedDueDate DateTime? @map("planned_due_date")
+
   createdAt     DateTime @default(now()) @map("created_at")
   updatedAt     DateTime @updatedAt @map("updated_at")
 
@@ -390,6 +411,9 @@ model Order {
 
   /// Den beräknade tiden, uppdelad per arbetsmoment. Se OrderBudget.
   budgets OrderBudget[]
+
+  /// Planerade rutor på tavlan. Se PlannedBlock.
+  plannedBlocks PlannedBlock[]
 
   // Restrict och inte Cascade: en kund med ordrar ska inte gå att radera, bara
   // avaktiveras. Samma regel som redan gäller ordrar och arbetsmoment med
@@ -430,6 +454,10 @@ model WorkMoment {
   company     Company       @relation(fields: [companyId], references: [id], onDelete: Cascade)
   timeEntries TimeEntry[]
   budgets     OrderBudget[]
+
+  /// Stationerna som kör det här momentet. Se Station.
+  stations      Station[]
+  plannedBlocks PlannedBlock[]
 
   @@unique([companyId, name])
   @@index([companyId, active])
@@ -1266,14 +1294,200 @@ model CompAdjustment {
 }
 
 // ---------------------------------------------------------------------------
+// PLANERINGEN
+//
+// Tillval. Se src/lib/modules.ts och CLAUDE.md § 3.1.
+//
+// En veckovis tidslinje: en rad per station, och planerade rutor som hämtar
+// sin tid ur orderns beräkning (OrderBudget). Modulen svarar på NÄR ett jobb
+// ska köras och PÅ VILKEN MASKIN — frågan som ligger mellan beräkningen och
+// stämplingen, och som idag bara finns på en whiteboard.
+//
+// TRE SAKER SOM INTE FÅR GLIDA:
+//
+//  1. PLANERAD TID ÄR VARKEN ARBETAD ELLER FAKTURERBAR TID. Den är en avsikt.
+//     Den når aldrig ett fakturaunderlag, en efterkalkyl, en rapport eller en
+//     tidrapport. Började fakturasidan läsa planen vore det en tidsfråga innan
+//     någon fakturerade en order på vad den var TÄNKT att ta.
+//
+//  2. PLANERINGEN LÄSER STÄMPLINGEN, ALDRIG TVÄRTOM. Ingen fil i modulen
+//     skriver till time_entries. En plan som skriver om sig själv när
+//     verkligheten avviker går inte att lita på, och en plan som kan flytta en
+//     stämplad timme vore ett fakturafel.
+//
+//  3. INGA TABELLER DELAS MED LÖNEUNDERLAGET. Stationernas arbetstider ser ut
+//     precis som schedule_days men ligger i egna tabeller, eftersom modulerna
+//     säljs var för sig och en kund kan ha den ena utan den andra. Priset är
+//     att den som har båda matar in arbetstider två gånger, och det är rätt
+//     pris — samma avvägning som clock.ts gör med sin egen isWeekend().
+//
+// Bevisas av tests/planning-boundary.test.ts och tests/module-coverage.test.ts.
+// ---------------------------------------------------------------------------
+
+/// En station — en maskin eller arbetsplats som kör ETT arbetsmoment.
+///
+/// MOMENTET ÄR MASKINEN (CLAUDE.md § 3 regel 2), men en verkstad har ofta två
+/// fräsar. Därför: en station gör ett moment, ett moment kan finnas på flera
+/// stationer. Alltså moment_id här och ingen kopplingstabell.
+///
+/// Stationen RADERAS ALDRIG, den avaktiveras — och bara när den saknar rutor
+/// från idag och framåt. Samma regel som ordrar och moment med registrerad tid
+/// (§ 3 regel 1): hade vi tillåtit radering skulle planerat arbete försvinna
+/// ur tavlan utan att försvinna ur databasen.
+///
+/// Arbetsmomentet går inte att byta så länge rutor finns. Varje ruta skulle
+/// annars tyst börja peka på en annan beräkningsrad. Vaktas i planning.ts.
+model Station {
+  id        String  @id @default(cuid())
+  companyId String  @map("company_id")
+  name      String
+  momentId  String  @map("moment_id")
+  active    Boolean @default(true)
+
+  /// Ordningen stationerna står i på tavlan. Verkstaden har en ordning som
+  /// följer flödet genom lokalen, och den är inte alfabetisk.
+  sortOrder Int @default(0) @map("sort_order")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  // Restrict: ett moment som en station är byggd kring ska inte kunna
+  // försvinna under en pågående vecka. Moment avslutas genom att avaktiveras.
+  moment WorkMoment @relation(fields: [momentId], references: [id], onDelete: Restrict)
+
+  days   StationDay[]
+  blocks PlannedBlock[]
+
+  @@unique([companyId, name])
+  @@index([companyId, active])
+  @@map("stations")
+}
+
+/// En arbetsdag för en station.
+///
+/// MINUTER FRÅN MIDNATT, och ISO-veckodag 1 = måndag … 7 = söndag. Samma form
+/// som ScheduleDay, med flit: formuläret och räknekoden ska se ut som de redan
+/// gör. Egen tabell av skälet i avsnittets toppkommentar.
+///
+/// En veckodag som saknas är stängd och ger noll kapacitet. Det är rätt svar
+/// för en lördag.
+model StationDay {
+  id        String @id @default(cuid())
+  companyId String @map("company_id")
+  stationId String @map("station_id")
+
+  weekday Int
+
+  startMinute Int @map("start_minute")
+  endMinute   Int @map("end_minute")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  station Station @relation(fields: [stationId], references: [id], onDelete: Cascade)
+
+  breaks StationBreak[]
+
+  @@unique([stationId, weekday])
+  @@index([companyId, stationId])
+  @@map("station_days")
+}
+
+/// En rast eller lunch då stationen står still.
+///
+/// Ingen breakTypeId och ingen koppling till break_entries. Det här är inte
+/// någons lunch utan maskinens stillestånd, och lönemodulens rasttyper hör
+/// inte hit — se avsnittets toppkommentar punkt 3.
+model StationBreak {
+  id           String @id @default(cuid())
+  companyId    String @map("company_id")
+  stationDayId String @map("station_day_id")
+
+  startMinute Int @map("start_minute")
+  endMinute   Int @map("end_minute")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  company    Company    @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  stationDay StationDay @relation(fields: [stationDayId], references: [id], onDelete: Cascade)
+
+  @@index([companyId, stationDayId])
+  @@map("station_breaks")
+}
+
+/// En planerad ruta på tavlan: det här jobbet, på den här stationen, då.
+///
+/// MINUTES ÄR ARBETSMINUTER, inte väggklockans. En ruta på fyra timmar som
+/// börjar 10:00 på en station med lunch 12:00-12:40 slutar 14:40 på väggen men
+/// är 4:00 arbete. Annars skulle "fyll stationens arbetstid" betyda olika
+/// saker beroende på var på dagen man råkade börja, och den oplacerade
+/// återstoden bli fel. Översättningen ligger i src/lib/plan-calendar.ts.
+///
+/// SLUTET LAGRAS INTE. Det är start plus minuter enligt stationens kalender,
+/// och två fält som säger samma sak hinner alltid sluta göra det — samma skäl
+/// som att orderns totala beräkning aldrig lagras (§ 3 regel 6).
+///
+/// MOMENT_ID LAGRAS ändå, fastän det går att läsa ur stationen. Skulle en
+/// station någon gång byta moment får inte varje historisk ruta tyst byta
+/// beräkningsrad. Villkoret block.momentId === station.momentId kan inte
+/// uttryckas i databasen (db push saknar CHECK) och vaktas i planning.ts, som
+/// är enda vägen in — samma konstruktion som clock.ts har för kind.
+///
+/// Ingen order_budget_id: saveOrderBudgets raderar och skapar om raderna vid
+/// varje sparning, så id:na byts ut. (order_id, moment_id) är det som består.
+///
+/// INGEN RUTA KORSAR MIDNATT. Den får ligga utanför stationens arbetstid —
+/// överbokning är tillåten och varnas för i gult — men dras den mot midnatt
+/// kapas den där och återstoden ligger kvar som oplacerad. En ruta som spänner
+/// över två dagar går varken att rita eller att läsa.
+model PlannedBlock {
+  id        String @id @default(cuid())
+  companyId String @map("company_id")
+  stationId String @map("station_id")
+  orderId   String @map("order_id")
+  momentId  String @map("moment_id")
+
+  startsAt DateTime @map("starts_at")
+
+  /// Planerad tid i ARBETSMINUTER. Alltid större än noll.
+  minutes Int
+
+  note String?
+
+  /// Vem som la rutan. Samma spår som frånvaro och manuella stämplingar bär.
+  createdByEmail String @map("created_by_email")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  // Cascade från ordern: raderas ordern är planen för den meningslös.
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  // Restrict från station och moment, som överallt annars.
+  station Station    @relation(fields: [stationId], references: [id], onDelete: Restrict)
+  moment  WorkMoment @relation(fields: [momentId], references: [id], onDelete: Restrict)
+
+  @@index([companyId, stationId, startsAt])
+  @@index([companyId, orderId])
+  @@index([companyId, startsAt])
+  @@map("planned_blocks")
+}
+
+// ---------------------------------------------------------------------------
 // TILLVALEN
 //
 // Basen i Tikkr är stämpling mot order: kioskskärmen, rapporterna och
 // fakturaunderlaget. Den är alltid på och finns inte i det här registret.
 //
-// Allt därutöver är moduler kunden köper till, en rad var. Löneunderlaget är
-// den första; planeringsdelen blir nästa. Se src/lib/modules.ts för registret
-// koden läser, och CLAUDE.md § 3.1 för reglerna.
+// Allt därutöver är moduler kunden köper till, en rad var: löneunderlaget och
+// planeringen. Se src/lib/modules.ts för registret koden läser, och
+// CLAUDE.md § 3.1 för reglerna.
 // ---------------------------------------------------------------------------
 
 /// En modul ett företag har påslagen.

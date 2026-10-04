@@ -1,4 +1,5 @@
 import { requireAdmin } from "@/lib/admin-session";
+import { hasModule } from "@/lib/company-modules";
 import NewOrderDialog from "@/components/admin/NewOrderDialog";
 import OrdersTable from "@/components/admin/OrdersTable";
 import { Alert, EmptyState, PageHeader } from "@/components/ui";
@@ -9,7 +10,12 @@ import { closeOrders, createOrder, toggleOrder, updateOrder } from "./actions";
 export const dynamic = "force-dynamic";
 
 export default async function OrdersPage() {
-  const { db } = await requireAdmin();
+  const { db, companyId } = await requireAdmin();
+
+  // Leveransdatumet i orderrutan hör till tillvalet Planering. Att det döljs
+  // här är kosmetik — serveråtgärden frågar om modulen själv, se actions.ts.
+  // Resten av sidan är basen och visas för varje kund.
+  const planning = await hasModule(companyId, "PLANNING");
 
   // Hämtas parallellt: kundväljaren behöver hela registret, och en fråga till
   // kostar mindre än att sidan väntar på två i följd.
@@ -27,6 +33,7 @@ export default async function OrdersPage() {
       customers={customerList}
       moments={moments}
       action={createOrder}
+      planning={planning}
     />
   );
 
@@ -67,6 +74,7 @@ export default async function OrdersPage() {
           updateAction={updateOrder}
           toggleAction={toggleOrder}
           closeAction={closeOrders}
+          planning={planning}
         />
       )}
     </>

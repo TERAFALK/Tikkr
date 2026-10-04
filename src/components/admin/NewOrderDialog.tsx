@@ -29,6 +29,7 @@ export default function NewOrderDialog({
   moments,
   action,
   trigger = "Ny order",
+  planning = false,
 }: {
   customers: SearchSelectOption[];
   moments: BudgetMomentOption[];
@@ -37,6 +38,8 @@ export default function NewOrderDialog({
     formData: FormData
   ) => Promise<OrderFormState>;
   trigger?: string;
+  /** Visar leveransdatumet. Sätts när tillvalet Planering är på. */
+  planning?: boolean;
 }) {
   const dialog = useRef<HTMLDialogElement>(null);
 
@@ -84,6 +87,7 @@ export default function NewOrderDialog({
               customers={customers}
               moments={moments}
               autoFocus
+              planning={planning}
             />
           </div>
 

@@ -3,19 +3,24 @@
 import { useState } from "react";
 import { TimeField } from "@/components/ui";
 import { IconClose, IconPlus } from "@/components/ui/icons";
-import { parseMinuteOfDay } from "@/lib/schedule";
+import { netMinutes, parseMinuteOfDay } from "@/lib/weekly-hours";
 import { formatDuration } from "@/lib/format";
 
 /**
  * VECKANS DAGAR SOM FÄLT.
  *
  * Bara rutnätet, ingen ram och ingen sparaknapp. Det gör att samma fält kan
- * stå på två ställen: i inställningarnas schemasida, där de sätter företagets
- * standard, och i rutan under Anställda, där de ger en person egna tider.
+ * stå på tre ställen: i inställningarnas schemasida, där de sätter företagets
+ * standard, i rutan under Anställda, där de ger en person egna tider, och i
+ * planeringens stationsruta, där de är en maskins öppettider.
+ *
+ * De två första hör till löneunderlaget och den tredje till planeringen, som
+ * säljs var för sig. Därför läses fälten av lib/weekly-hours.ts och inte av
+ * lib/schedule.ts: en stationssida får inte kräva lönemodulen.
  *
  * Fältnamnen är formulärets avtal med servern (`active-1`, `start-1`,
  * `break-start-1` och så vidare) och läses på ett enda ställe, av
- * `readScheduleDays` i lib/schedule.ts.
+ * `readWeeklyHours` i lib/weekly-hours.ts.
  *
  * Planerad tid är NETTO efter rast. Kundens mån–tors 06:30–16:00 med tjugo
  * minuters frukost och fyrtio minuters lunch är 8,5 timmar, inte 9,5. Summan
@@ -49,10 +54,20 @@ interface DayState extends ScheduleDayValue {
 export default function ScheduleDays({
   initial,
   compact = false,
+  totalLabel = "Planerad vecka",
 }: {
   initial: ScheduleDayValue[];
   /** Tätare rader. Används i rutan under Anställda, där ytan är mindre. */
   compact?: boolean;
+  /**
+   * Vad summan överst kallas.
+   *
+   * Finns för att samma rutnät numera står på en tredje plats: en STATIONS
+   * öppettider i planeringen. "Planerad vecka" är rätt ord för ett schema som
+   * flex mäts mot och fel ord för en maskin, som inte planerar någonting —
+   * den är öppen eller stängd.
+   */
+  totalLabel?: string;
 }) {
   const [days, setDays] = useState<DayState[]>(() =>
     DAYS.map(({ weekday }) => {
@@ -124,22 +139,32 @@ export default function ScheduleDays({
     );
   }
 
-  /** Planerad tid netto för en dag, i minuter. Samma räkning som servern. */
+  /**
+   * Planerad tid netto för en dag, i minuter.
+   *
+   * Räknar inte själv. `netMinutes` i weekly-hours.ts äger aritmetiken, och
+   * servern kallar samma funktion — en egen kopia här hann annars börja visa
+   * ett annat tal än det som sparades.
+   */
   function plannedMinutes(day: DayState): number {
     if (!day.active) return 0;
 
-    const start = parseMinuteOfDay(day.start);
-    const end = parseMinuteOfDay(day.end);
-    if (start === null || end === null || end <= start) return 0;
+    const startMinute = parseMinuteOfDay(day.start);
+    const endMinute = parseMinuteOfDay(day.end);
+    if (startMinute === null || endMinute === null || endMinute <= startMinute) {
+      return 0;
+    }
 
-    const breaks = day.breaks.reduce((total, rest) => {
+    // Halvskrivna rastrader hoppas över, som servern gör med dem.
+    const breaks = day.breaks.flatMap((rest) => {
       const from = parseMinuteOfDay(rest.start);
       const to = parseMinuteOfDay(rest.end);
-      if (from === null || to === null) return total;
-      return total + Math.max(0, Math.min(to, end) - Math.max(from, start));
-    }, 0);
+      return from === null || to === null
+        ? []
+        : [{ startMinute: from, endMinute: to }];
+    });
 
-    return Math.max(0, end - start - breaks);
+    return netMinutes({ startMinute, endMinute, breaks });
   }
 
   const weekMinutes = days.reduce((total, day) => total + plannedMinutes(day), 0);
@@ -147,7 +172,7 @@ export default function ScheduleDays({
   return (
     <div className={compact ? "space-y-2" : "space-y-3"}>
       <p className="text-right text-[13px] tabular-nums text-neutral-500">
-        Planerad vecka{" "}
+        {totalLabel}{" "}
         <span className="font-medium text-neutral-900">
           {hours(weekMinutes)} tim
         </span>

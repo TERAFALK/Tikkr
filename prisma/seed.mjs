@@ -102,22 +102,92 @@ async function main() {
   // TILLVALEN SÄTTS EFTER FÖRETAGEN, av samma skäl som kunderna nedan: ett
   // nästlat create hade hoppats över på en databas som redan kört seed.
   //
-  // Demoföretaget får löneunderlaget, grannen får det inte. Skillnaden är med
-  // flit — då går det att se vad modulen faktiskt döljer genom att logga in
+  // Demoföretaget får BÅDA tillvalen, grannen får inget. Skillnaden är med
+  // flit — då går det att se vad modulerna faktiskt döljer genom att logga in
   // på det ena företaget och sedan på det andra, i stället för att behöva slå
-  // av och på den i plattformspanelen.
-  await prisma.companyModule.upsert({
-    where: {
-      companyId_module: { companyId: demo.id, module: "PAYROLL" },
-    },
-    update: {},
-    create: {
-      companyId: demo.id,
-      module: "PAYROLL",
-      source: "MANUAL",
-      enabledBy: "seed",
-    },
+  // av och på dem i plattformspanelen.
+  for (const module of ["PAYROLL", "PLANNING"]) {
+    await prisma.companyModule.upsert({
+      where: { companyId_module: { companyId: demo.id, module } },
+      update: {},
+      create: {
+        companyId: demo.id,
+        module,
+        source: "MANUAL",
+        enabledBy: "seed",
+      },
+    });
+  }
+
+  // STATIONERNA, som planeringstavlan har en rad var för.
+  //
+  // TVÅ FRÄSAR MED FLIT. En station kör ett arbetsmoment, men samma moment kan
+  // ligga på flera stationer — och den regeln är lätt att missförstå tills man
+  // ser den. Med två fräsar går det också att pröva att en ruta FLYTTAR mellan
+  // dem, men vägras mot svetsen.
+  //
+  // Öppettiderna skiljer sig åt, likaså med flit: tidsaxeln på tavlan är den
+  // vidaste av stationernas tider, och med identiska rader hade man aldrig
+  // sett att den räknas fram.
+  const STATIONER = [
+    // namn, moment, öppnar, stänger, lunch
+    ["Fräs 1", "Fräsning", 7 * 60, 16 * 60, [[12 * 60, 12 * 60 + 40]]],
+    ["Fräs 2", "Fräsning", 6 * 60, 14 * 60 + 30, [[11 * 60, 11 * 60 + 30]]],
+    ["Svetsbås", "Svetsning", 7 * 60, 16 * 60, [[12 * 60, 12 * 60 + 40]]],
+    ["Monteringsbord", "Montering", 7 * 60, 16 * 60, [[12 * 60, 12 * 60 + 40]]],
+    // Lackeringen går kvällsskift. Visar att en station kan ha helt andra
+    // tider än resten, och att tavlans axel sträcker sig efter den.
+    ["Lackbox", "Lackering", 14 * 60, 22 * 60, [[18 * 60, 18 * 60 + 30]]],
+  ];
+
+  const demoMoments = await prisma.workMoment.findMany({
+    where: { companyId: demo.id },
+    select: { id: true, name: true },
   });
+
+  for (const [index, [name, moment, start, end, breaks]] of STATIONER.entries()) {
+    const momentId = demoMoments.find((row) => row.name === moment)?.id;
+    if (!momentId) continue;
+
+    // Namnet är unikt per företag, så det går att slå upp på. Stationen
+    // skapas bara en gång; körs seed igen lämnas den och sina dagar i fred.
+    const existing = await prisma.station.findFirst({
+      where: { companyId: demo.id, name },
+      select: { id: true },
+    });
+
+    if (existing) continue;
+
+    const station = await prisma.station.create({
+      data: {
+        companyId: demo.id,
+        name,
+        momentId,
+        sortOrder: index,
+      },
+    });
+
+    // Mån–fre. Helgen lämnas stängd, vilket är det normala — och tavlan döljer
+    // då lördag och söndag helt, tills någon lägger en ruta där.
+    for (let weekday = 1; weekday <= 5; weekday++) {
+      await prisma.stationDay.create({
+        data: {
+          companyId: demo.id,
+          stationId: station.id,
+          weekday,
+          startMinute: start,
+          endMinute: end,
+          breaks: {
+            create: breaks.map(([from, to]) => ({
+              companyId: demo.id,
+              startMinute: from,
+              endMinute: to,
+            })),
+          },
+        },
+      });
+    }
+  }
 
   // FRÅNVAROORSAKERNA ÄR KUNDENS EGNA RADER sedan 2026-10-01, inte en enum.
   // En arbetsyta som skapas via registreringen får dem automatiskt; seedens
@@ -284,6 +354,7 @@ async function main() {
     kunder: await prisma.customer.count({ where: { companyId: { in: ids } } }),
     ordrar: await prisma.order.count({ where: { companyId: { in: ids } } }),
     moment: await prisma.workMoment.count({ where: { companyId: { in: ids } } }),
+    stationer: await prisma.station.count({ where: { companyId: { in: ids } } }),
   };
 
   console.log("Seed klar:");
@@ -291,7 +362,8 @@ async function main() {
   console.log(`  ${other.name} (id: ${other.id})`);
   console.log(
     `  Totalt: ${counts.anstallda} anställda, ${counts.kunder} kunder, ` +
-      `${counts.ordrar} ordrar, ${counts.moment} moment`
+      `${counts.ordrar} ordrar, ${counts.moment} moment, ` +
+      `${counts.stationer} stationer`
   );
   console.log("");
   console.log("Koppla testskärmen: öppna /kiosk och knappa in koden");

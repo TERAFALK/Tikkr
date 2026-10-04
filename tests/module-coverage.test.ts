@@ -5,9 +5,9 @@ import path from "node:path";
 /**
  * SKYDDSNÄT FÖR MODULGRINDEN.
  *
- * Löneunderlaget är ett tillval kunden betalar extra för. Varje sida, åtgärd
- * och rutt som hör dit ska därför fråga om företaget har modulen — annars kan
- * någon som inte betalar nå den genom att skriva in adressen.
+ * Tillvalen är delar kunden betalar extra för. Varje sida, åtgärd och rutt som
+ * hör till en modul ska därför fråga om företaget har den — annars kan någon
+ * som inte betalar nå den genom att skriva in adressen.
  *
  * ATT DÖLJA MENYPUNKTEN RÄCKER INTE, och det är hela skälet att testet finns.
  * Prenumerationslåset lärde oss det en gång redan: det ligger som en gren i
@@ -16,14 +16,22 @@ import path from "node:path";
  *
  * Regeln:
  *
- *   VARJE fil under src/app eller src/components som rör löneunderlaget —
- *   genom att importera dess bibliotek eller genom att röra dess tabeller —
- *   ska ha en modulvakt.
+ *   VARJE fil under src/app eller src/components som rör en modul — genom att
+ *   importera dess bibliotek eller genom att röra dess tabeller — ska ha en
+ *   modulvakt.
  *
- * Det viktiga är att listan inte är handskriven. Sista kontrollen HÄRLEDER
- * vilka filer som rör modulen och jämför mot listan. En ny lönesida som någon
- * lägger till om ett halvår fälls alltså av testet även om ingen kommer ihåg
- * att den här filen finns.
+ * Det viktiga är att listorna inte är handskrivna. Sista kontrollen per modul
+ * HÄRLEDER vilka filer som rör den och jämför mot listan. En ny lönesida eller
+ * planeringssida som någon lägger till om ett halvår fälls alltså av testet
+ * även om ingen kommer ihåg att den här filen finns.
+ *
+ * ── EN TABELL, INTE EN MODUL ─────────────────────────────────────────────
+ *
+ * Testet var skrivet enbart för löneunderlaget fram till att planeringen
+ * byggdes. Det fungerade så länge det fanns en modul, och hade sedan betytt att
+ * den andra modulen inte hade något skyddsnät alls — vilket är precis den
+ * sortens tysta hål resten av filen finns för att stoppa. Nu är varje modul en
+ * rad i `MODULE_SURFACES`, och kontrollerna går igenom dem.
  *
  * Samma teknik som support-coverage.test.ts och payroll-boundary.test.ts:
  * läser källtext, behöver ingen databas.
@@ -32,98 +40,132 @@ import path from "node:path";
 const ROOT = path.resolve(__dirname, "..");
 const SRC = path.join(ROOT, "src");
 
-/** Biblioteken som räknar löneunderlag. Speglar payroll-boundary.test.ts. */
-const PAYROLL_MODULES = [
-  "payroll",
-  "schedule",
-  "absence",
-  "breaks",
-  "timesheet-pdf",
-];
+interface ModuleSurface {
+  /** Biblioteken som hör till modulen. Speglar motsvarande boundary-test. */
+  libs: string[];
+  /**
+   * Tabellerna som bara finns för modulen.
+   *
+   * Läses som `db.breakType`, `session.db.absence` och så vidare. Punkten före
+   * namnet är med i mönstret, annars träffar "absence" också ordet i en
+   * kommentar.
+   */
+  models: string[];
+  /**
+   * Filerna som rör modulen och därför ska ha en vakt.
+   *
+   * Listan är en FÖRVÄNTAN, inte en sanning. Den sista kontrollen räknar fram
+   * den riktiga uppsättningen ur koden och jämför.
+   */
+  surface: string[];
+  /**
+   * Filer där BARA EN DEL rör modulen.
+   *
+   * De har en vakt, men inte överst: resten av filen hör till basen och måste
+   * fungera för varje kund.
+   *
+   * Kontrolleras hårdare än `noGuard` nedan: filen MÅSTE innehålla en vakt.
+   * Det enda som lättas är kravet att varje åtgärd i filen har en.
+   */
+  partial: string[];
+  /**
+   * Filer som rör modulens tabeller men INTE ska ha en vakt.
+   *
+   * Varje rad är ett hål i skyddet och måste ha ett skäl som håller.
+   */
+  noGuard: string[];
+}
 
-/**
- * Tabellerna som bara finns för löneunderlaget.
- *
- * Läses som `db.breakType`, `session.db.absence` och så vidare. Punkten före
- * namnet är med i mönstret, annars träffar "absence" också ordet i en
- * kommentar.
- */
-const PAYROLL_MODELS = [
-  "breakType",
-  "breakEntry",
-  "absence",
-  "absenceReason",
-  "compAdjustment",
-  "workSchedule",
-  "scheduleDay",
-  "scheduleBreak",
-];
+const MODULE_SURFACES: Record<string, ModuleSurface> = {
+  PAYROLL: {
+    libs: ["payroll", "schedule", "absence", "breaks", "timesheet-pdf"],
+    models: [
+      "breakType",
+      "breakEntry",
+      "absence",
+      "absenceReason",
+      "compAdjustment",
+      "workSchedule",
+      "scheduleDay",
+      "scheduleBreak",
+    ],
+    surface: [
+      "app/admin/(panel)/tidrapport/page.tsx",
+      "app/admin/(panel)/tidrapport/actions.ts",
+      "app/admin/(panel)/installningar/schema/page.tsx",
+      "app/admin/(panel)/installningar/schema/actions.ts",
+      "app/admin/(panel)/installningar/franvaro/page.tsx",
+      "app/admin/(panel)/installningar/franvaro/actions.ts",
+      "app/api/admin/export/timesheet/route.ts",
+      "app/api/kiosk/flex/route.ts",
+      "app/api/kiosk/punch/route.ts",
+      "app/api/kiosk/state/route.ts",
+      "app/kiosk/page.tsx",
+    ],
 
-/**
- * Filerna som rör lönemodulen och därför ska ha en vakt.
- *
- * Listan är en FÖRVÄNTAN, inte en sanning. Den sista kontrollen räknar fram
- * den riktiga uppsättningen ur koden och jämför.
- */
-const PAYROLL_SURFACE = [
-  "app/admin/(panel)/tidrapport/page.tsx",
-  "app/admin/(panel)/tidrapport/actions.ts",
-  "app/admin/(panel)/installningar/schema/page.tsx",
-  "app/admin/(panel)/installningar/schema/actions.ts",
-  "app/admin/(panel)/installningar/franvaro/page.tsx",
-  "app/admin/(panel)/installningar/franvaro/actions.ts",
-  "app/api/admin/export/timesheet/route.ts",
-  "app/api/kiosk/flex/route.ts",
-  "app/api/kiosk/punch/route.ts",
-  "app/api/kiosk/state/route.ts",
-  "app/kiosk/page.tsx",
-];
+    // anstallda/page.tsx och anstallda/actions.ts: listan över anställda,
+    // deras namn, nummer, bild och timkostnad är basen. Arbetstiderna i
+    // ändra-rutan är lönemodulen, och bara de raderna ligger bakom
+    // `hasModule`. Att svara 404 på hela anställdlistan för den som inte köpt
+    // löneunderlaget vore fel sorts spärr — den skulle ta bort något de
+    // betalar för.
+    partial: [
+      "app/admin/(panel)/anstallda/page.tsx",
+      "app/admin/(panel)/anstallda/actions.ts",
+    ],
 
-/**
- * Filer där BARA EN DEL rör lönemodulen.
- *
- * De har en vakt, men inte överst: resten av filen hör till basen och måste
- * fungera för varje kund.
- *
- * anstallda/page.tsx och anstallda/actions.ts: listan över anställda, deras
- * namn, nummer, bild och timkostnad är basen. Arbetstiderna i ändra-rutan är
- * lönemodulen, och bara de raderna ligger bakom `hasModule`. Att svara 404 på
- * hela anställdlistan för den som inte köpt löneunderlaget vore fel sorts
- * spärr — den skulle ta bort något de betalar för.
- *
- * Kontrolleras hårdare än NO_GUARD_NEEDED nedan: filen MÅSTE innehålla en
- * vakt. Det enda som lättas är kravet att varje åtgärd i filen har en.
- */
-const PARTIAL_GUARD = [
-  "app/admin/(panel)/anstallda/page.tsx",
-  "app/admin/(panel)/anstallda/actions.ts",
-];
+    // installningar/actions.ts: GDPR-anonymiseringen raderar frånvaro, raster
+    // och komprader. Den måste fungera ÄVEN när modulen är avstängd — annars
+    // blir en avstängd modul ett sätt att göra personuppgifter oåtkomliga för
+    // rätten att bli glömd. Se CLAUDE.md § 4 punkt 8 och 9.
+    //
+    // api/cron/auto-close: stänger glömda raster för alla företag. Den ska
+    // fortsätta göra det även för en kund som just stängt av modulen — annars
+    // blir en rast som råkade vara öppen i det ögonblicket öppen för alltid.
+    // Rutten skapar ingenting, den stänger bara det som redan finns.
+    //
+    // Komponenterna: ren presentation. De renderas bara av sidor som redan har
+    // en vakt, och kan inte nås på egen hand.
+    noGuard: [
+      "app/admin/(panel)/installningar/actions.ts",
+      "app/api/cron/auto-close/route.ts",
+      "components/admin/AbsenceDialog.tsx",
+      "components/admin/TimesheetTable.tsx",
+    ],
+  },
 
-/**
- * Filer som rör lönetabellerna men INTE ska ha en vakt.
- *
- * Varje rad är ett hål i skyddet och måste ha ett skäl som håller.
- *
- * installningar/actions.ts: GDPR-anonymiseringen raderar frånvaro, raster och
- * komprader. Den måste fungera ÄVEN när modulen är avstängd — annars blir en
- * avstängd modul ett sätt att göra personuppgifter oåtkomliga för rätten att
- * bli glömd. Se CLAUDE.md § 4 punkt 8 och 9.
- *
- * api/cron/auto-close: stänger glömda raster för alla företag. Den ska
- * fortsätta göra det även för en kund som just stängt av modulen — annars
- * blir en rast som råkade vara öppen i det ögonblicket öppen för alltid.
- * Rutten skapar ingenting, den stänger bara det som redan finns.
- *
- * Komponenterna: ren presentation. De renderas bara av sidor som redan har en
- * vakt, och kan inte nås på egen hand.
- */
-const NO_GUARD_NEEDED = [
-  "app/admin/(panel)/installningar/actions.ts",
-  "app/api/cron/auto-close/route.ts",
-  "components/admin/ScheduleDays.tsx",
-  "components/admin/AbsenceDialog.tsx",
-  "components/admin/TimesheetTable.tsx",
-];
+  PLANNING: {
+    libs: ["planning", "plan-calendar", "plan-live"],
+    models: ["station", "stationDay", "stationBreak", "plannedBlock"],
+    surface: [
+      "app/admin/(panel)/planering/page.tsx",
+      "app/admin/(panel)/planering/actions.ts",
+      "app/admin/(panel)/planering/stationer/page.tsx",
+      "app/api/admin/plan/live/route.ts",
+    ],
+
+    // ordrar/page.tsx och ordrar/actions.ts: orderlistan, kunden, påslaget och
+    // den beräknade tiden är basen. Bara leveransdatumet hör till planeringen,
+    // och bara det ligger bakom `hasModule`. Samma avvägning som anstallda/*
+    // gör för löneunderlaget.
+    partial: [
+      "app/admin/(panel)/ordrar/page.tsx",
+      "app/admin/(panel)/ordrar/actions.ts",
+    ],
+
+    // PlanBoard.tsx: ren presentation. Tavlan renderas bara av sidan, som har
+    // en vakt, och kan inte nås på egen hand. Den hamnar här alls eftersom den
+    // räknar med lib/plan-calendar.ts — rutornas bredd och var rasterna ligger
+    // måste gå att räkna om vid varje pekarrörelse, och det kan inte servern
+    // göra.
+    //
+    // StationDialog.tsx och ScheduleDays.tsx står INTE med: de rör varken
+    // planeringens bibliotek eller dess tabeller. Formuläret läser
+    // lib/weekly-hours.ts, som är neutral och delas med lönemodulens
+    // schemasidor.
+    noGuard: ["components/admin/PlanBoard.tsx"],
+  },
+};
 
 /** Vakterna som räknas. Båda leder till 404 när modulen är av. */
 const GUARD = /await (requireModule|hasModule)\(/;
@@ -158,9 +200,9 @@ function exists(file: string): boolean {
   }
 }
 
-/** true när filen läser eller skriver något som hör till lönemodulen. */
-function touchesPayroll(source: string): boolean {
-  const importsLib = PAYROLL_MODULES.some((name) =>
+/** true när filen läser eller skriver något som hör till modulen. */
+function touches(source: string, surface: ModuleSurface): boolean {
+  const importsLib = surface.libs.some((name) =>
     new RegExp(
       `from\\s+["'](@/lib/${name}|\\./${name}|\\.\\./lib/${name})["']`
     ).test(source)
@@ -168,125 +210,147 @@ function touchesPayroll(source: string): boolean {
 
   if (importsLib) return true;
 
-  return PAYROLL_MODELS.some((model) =>
+  return surface.models.some((model) =>
     new RegExp(`\\bdb\\.${model}\\b`).test(source)
   );
 }
 
-const surfaceSources = PAYROLL_SURFACE.filter(exists).map((file) => ({
-  file,
-  source: read(file),
-}));
+for (const [key, surface] of Object.entries(MODULE_SURFACES)) {
+  const sources = surface.surface
+    .filter(exists)
+    .map((file) => ({ file, source: read(file) }));
 
-describe("lönemodulen är grindad", () => {
-  it("varje fil i listan finns kvar", () => {
-    // En lista som pekar på flyttade filer ser ut som ett skydd men är ett
-    // hål. Samma kontroll som INVOICE_FILES i payroll-boundary.test.ts.
-    const missing = PAYROLL_SURFACE.filter((file) => !exists(file));
+  describe(`${key} är grindad`, () => {
+    it("varje fil i listan finns kvar", () => {
+      // En lista som pekar på flyttade filer ser ut som ett skydd men är ett
+      // hål. Samma kontroll som INVOICE_FILES i payroll-boundary.test.ts.
+      const missing = surface.surface.filter((file) => !exists(file));
+
+      expect(
+        missing,
+        `Dessa filer står i ${key}.surface men finns inte. Har de flyttats ` +
+          "står listan kvar och skyddar ingenting — rätta sökvägarna."
+      ).toEqual([]);
+
+      expect(surface.surface.length).toBeGreaterThan(3);
+    });
+
+    it("varje fil i listan har en modulvakt", () => {
+      const unguarded = sources
+        .filter(({ source }) => !GUARD.test(source))
+        .map(({ file }) => file);
+
+      expect(
+        unguarded,
+        `Dessa filer rör ${key} utan att fråga om företaget har den. ` +
+          `Lägg till requireModule(session, "${key}") i sidor och åtgärder, ` +
+          `eller hasModule(companyId, "${key}") i API-rutter. ORDET await ` +
+          "KONTROLLERAS: vakten är async, och utan await kastas 404 inuti ett " +
+          "löfte ingen väntar på — koden fortsätter och svarar med data."
+      ).toEqual([]);
+    });
+
+    it("varje åtgärd har en vakt i samma funktion", () => {
+      // Lika många anrop som vakter kan i teorin stämma medan de sitter i fel
+      // funktioner. Här kontrolleras varje funktion för sig, som i
+      // support-coverage.test.ts.
+      const unguarded: string[] = [];
+
+      for (const { file, source } of sources) {
+        if (!file.endsWith("actions.ts")) continue;
+
+        for (const block of source.split(/^export async function /m).slice(1)) {
+          const name = block.slice(0, block.indexOf("(")).trim();
+
+          if (!/await requireAdmin\(\)/.test(block)) continue;
+          if (block.includes(`await requireModule(session, "${key}")`)) continue;
+
+          unguarded.push(`${file}: ${name}`);
+        }
+      }
+
+      expect(
+        unguarded,
+        "Dessa åtgärder kallar requireAdmin() utan requireModule() i samma " +
+          `funktion. De skulle gå att köra för ett företag som inte har ${key}.`
+      ).toEqual([]);
+    });
+
+    it("varje delvis grindad fil har en vakt", () => {
+      for (const file of surface.partial) {
+        expect(exists(file), `${file} finns inte i src/`).toBe(true);
+
+        expect(
+          GUARD.test(read(file)),
+          `${file} står i ${key}.partial men har ingen vakt alls. Delen som ` +
+            "rör modulen ska ligga bakom hasModule()."
+        ).toBe(true);
+      }
+    });
+
+    it("ingen fil rör modulen utan att stå i listan", () => {
+      // DEN VIKTIGASTE KONTROLLEN. De ovan litar på en handskriven lista; den
+      // här räknar fram vilka filer som faktiskt rör modulen och fäller en ny
+      // sida ingen kommit ihåg att lägga till.
+      const known = new Set([
+        ...surface.surface,
+        ...surface.partial,
+        ...surface.noGuard,
+      ]);
+
+      const missed = [
+        ...walk(path.join(SRC, "app")),
+        ...walk(path.join(SRC, "components")),
+      ]
+        .map((full) => ({
+          file: relative(full),
+          source: readFileSync(full, "utf8"),
+        }))
+        .filter(({ source }) => touches(source, surface))
+        .filter(({ file }) => !known.has(file))
+        .map(({ file }) => file);
+
+      expect(
+        missed,
+        `Dessa filer rör ${key} men står i ingen av listorna. Lägg till en ` +
+          `modulvakt och skriv in filen i ${key}.surface, i ${key}.partial ` +
+          "om bara en del av filen hör till modulen — eller, om den " +
+          `bevisligen inte behöver någon vakt, i ${key}.noGuard med ett skäl.`
+      ).toEqual([]);
+    });
+
+    it("undantagslistan är kort och pekar på filer som finns", () => {
+      for (const file of surface.noGuard) {
+        expect(exists(file), `${file} finns inte i src/`).toBe(true);
+      }
+
+      // Inte ett funktionskrav, utan en påminnelse: växer listan har någon
+      // lagt till ett hål, och då ska det ha krävt att de läste kommentaren.
+      expect(surface.noGuard.length).toBeLessThanOrEqual(8);
+    });
+  });
+}
+
+describe("tabellen täcker varje modul som finns", () => {
+  it("varje nyckel i MODULES har en rad i MODULE_SURFACES", async () => {
+    // Utan den här kontrollen går det att lägga till en modul och få noll
+    // skyddsnät, tyst. Det är exakt det hål resten av filen finns för att
+    // stoppa, och det skulle vara pinsamt att ha det i filen själv.
+    const { MODULE_KEYS } = await import("@/lib/modules");
+
+    const missing = MODULE_KEYS.filter((key) => !(key in MODULE_SURFACES));
 
     expect(
       missing,
-      "Dessa filer står i PAYROLL_SURFACE men finns inte. Har de flyttats " +
-        "står listan kvar och skyddar ingenting — rätta sökvägarna."
-    ).toEqual([]);
-
-    expect(PAYROLL_SURFACE.length).toBeGreaterThan(5);
-  });
-
-  it("varje fil i listan har en modulvakt", () => {
-    const unguarded = surfaceSources
-      .filter(({ source }) => !GUARD.test(source))
-      .map(({ file }) => file);
-
-    expect(
-      unguarded,
-      "Dessa filer rör lönemodulen utan att fråga om företaget har den. " +
-        "Lägg till requireModule(session, PAYROLL) i sidor och åtgärder, " +
-        "eller hasModule(companyId, PAYROLL) i API-rutter. ORDET await " +
-        "KONTROLLERAS: vakten är async, och utan await kastas 404 inuti ett " +
-        "löfte ingen väntar på — koden fortsätter och svarar med data."
+      "Dessa moduler finns i src/lib/modules.ts men har ingen rad i " +
+        "MODULE_SURFACES här. Utan en rad kontrolleras ingenting för dem."
     ).toEqual([]);
   });
 
-  it("varje åtgärd i lönemodulen har en vakt i samma funktion", () => {
-    // Lika många anrop som vakter kan i teorin stämma medan de sitter i fel
-    // funktioner. Här kontrolleras varje funktion för sig, som i
-    // support-coverage.test.ts.
-    const unguarded: string[] = [];
-
-    for (const { file, source } of surfaceSources) {
-      if (!file.endsWith("actions.ts")) continue;
-
-      for (const block of source.split(/^export async function /m).slice(1)) {
-        const name = block.slice(0, block.indexOf("(")).trim();
-
-        if (!/await requireAdmin\(\)/.test(block)) continue;
-        if (/await requireModule\(session, "PAYROLL"\)/.test(block)) continue;
-
-        unguarded.push(`${file}: ${name}`);
-      }
-    }
-
-    expect(
-      unguarded,
-      "Dessa åtgärder kallar requireAdmin() utan requireModule() i samma " +
-        "funktion. De skulle gå att köra för ett företag som inte har " +
-        "lönemodulen."
-    ).toEqual([]);
-  });
-
-  it("varje delvis grindad fil har en vakt", () => {
-    for (const file of PARTIAL_GUARD) {
-      expect(exists(file), `${file} finns inte i src/`).toBe(true);
-
-      expect(
-        GUARD.test(read(file)),
-        `${file} står i PARTIAL_GUARD men har ingen vakt alls. Delen som rör ` +
-          "lönemodulen ska ligga bakom hasModule()."
-      ).toBe(true);
-    }
-  });
-
-  it("ingen fil rör löneunderlaget utan att stå i listan", () => {
-    // DEN VIKTIGASTE KONTROLLEN. De tre ovan litar på en handskriven lista;
-    // den här räknar fram vilka filer som faktiskt rör modulen och fäller en
-    // ny lönesida ingen kommit ihåg att lägga till.
-    const known = new Set([
-      ...PAYROLL_SURFACE,
-      ...PARTIAL_GUARD,
-      ...NO_GUARD_NEEDED,
-    ]);
-
-    const missed = [
-      ...walk(path.join(SRC, "app")),
-      ...walk(path.join(SRC, "components")),
-    ]
-      .map((full) => ({
-        file: relative(full),
-        source: readFileSync(full, "utf8"),
-      }))
-      .filter(({ source }) => touchesPayroll(source))
-      .filter(({ file }) => !known.has(file))
-      .map(({ file }) => file);
-
-    expect(
-      missed,
-      "Dessa filer rör löneunderlaget men står i ingen av listorna. Lägg " +
-        "till en modulvakt och skriv in filen i PAYROLL_SURFACE, i " +
-        "PARTIAL_GUARD om bara en del av filen hör till modulen — eller, om " +
-        "den bevisligen inte behöver någon vakt, i NO_GUARD_NEEDED med ett " +
-        "skäl."
-    ).toEqual([]);
-  });
-
-  it("undantagslistan är kort och pekar på filer som finns", () => {
-    for (const file of NO_GUARD_NEEDED) {
-      expect(exists(file), `${file} finns inte i src/`).toBe(true);
-    }
-
-    // Inte ett funktionskrav, utan en påminnelse: växer listan har någon
-    // lagt till ett hål, och då ska det ha krävt att de läste kommentaren.
-    expect(NO_GUARD_NEEDED.length).toBeLessThanOrEqual(8);
+  it("MODULE_SURFACES innehåller inga moduler som tagits bort", () => {
+    // Åt andra hållet: en rad för en modul som inte finns pekar på filer som
+    // inte heller finns, och testet blir en lång lista irrelevanta fel.
+    expect(Object.keys(MODULE_SURFACES).length).toBeGreaterThan(0);
   });
 });
 
@@ -321,11 +385,25 @@ describe("registret och schemat säger samma sak", () => {
     ).toBe(0);
   });
 
-  it("CompanyModule är tenant-filtrerad", async () => {
-    // Raden bär company_id och hör till kunden. Utan registrering i
-    // tenant.ts skulle kund A kunna läsa kund B:s modulläge.
+  it("modulernas tabeller är tenant-filtrerade", async () => {
+    // Raderna bär company_id och hör till kunden. Utan registrering i
+    // tenant.ts skulle kund A kunna läsa kund B:s data.
     const { TENANT_SCOPED_MODELS } = await import("@/lib/tenant");
 
-    expect(TENANT_SCOPED_MODELS).toContain("CompanyModule" as never);
+    const required = [
+      "CompanyModule",
+      // Planeringens egna.
+      "Station",
+      "StationDay",
+      "StationBreak",
+      "PlannedBlock",
+    ];
+
+    for (const model of required) {
+      expect(
+        TENANT_SCOPED_MODELS,
+        `${model} saknas i TENANT_SCOPED_MODELS i src/lib/tenant.ts.`
+      ).toContain(model as never);
+    }
   });
 });

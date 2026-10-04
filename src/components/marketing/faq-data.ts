@@ -50,6 +50,10 @@ export function faqQuestions(modules: ModulePricing): FaqItem[] {
       a: `Ja, som tillval för ${kr(modules.PAYROLL.month)} kr per månad: arbetstidsschema, stämplade raster, flex, komp, frånvaro och tidrapport per anställd. Tikkr redovisar timmar. Lönearter, OB och övertidsersättning regleras i kollektivavtal och hanteras i lönesystemet.`,
     },
     {
+      q: "Går det att planera jobben i Tikkr?",
+      a: `Ja, som tillval för ${kr(modules.PLANNING.month)} kr per månad: en veckovis tidslinje med en rad per station. Orderns arbetsmoment placeras ut med sin beräknade tid, och en stämpling på ett planerat jobb syns direkt i tavlan. Planerad tid når aldrig ett fakturaunderlag.`,
+    },
+    {
       q: "Hur hanteras tid som inte ska faktureras?",
       a: "Städning, möten och underhåll registreras som improduktiv tid i ett eget register, skilt från ordrarna.",
     },

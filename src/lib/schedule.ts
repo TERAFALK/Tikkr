@@ -1,6 +1,10 @@
 import type { CompanyDb } from "./tenant";
-import { normalizeTimeOfDay } from "./time-input";
-import { addDaysInZone, wallTimeIn } from "./time-zone";
+import {
+  netMinutes,
+  readWeeklyHours,
+  type WeekdayHours,
+} from "./weekly-hours";
+import { addDaysInZone } from "./time-zone";
 
 /**
  * ARBETSTIDSSCHEMAT — PLANERAD TID.
@@ -25,6 +29,36 @@ import { addDaysInZone, wallTimeIn } from "./time-zone";
  * VECKODAGAR ÄR ISO: 1 = måndag … 7 = söndag. Samma räkning som veckovyn.
  */
 
+/* --- Formulärdelen ligger i weekly-hours.ts -------------------------------
+ *
+ * Sju dagar med tider och raster matas in på tre ställen numera: företagets
+ * schema, en anställds egna tider och en STATIONS öppettider. Den tredje hör
+ * till planeringen, som säljs skilt från löneunderlaget — och varje fil som
+ * importerar DEN HÄR filen räknas som en lönesida av
+ * tests/module-coverage.test.ts.
+ *
+ * Läsningen flyttade därför till en neutral fil. Namnen exporteras om här, så
+ * att varje befintlig import fortsätter fungera och lönekoden kan läsa sitt
+ * schema där den alltid gjort det. */
+
+export {
+  parseMinuteOfDay,
+  formatMinuteOfDay,
+  dayName,
+  isoWeekdayIn,
+} from "./weekly-hours";
+
+/** En dag på väg in i databasen. Samma form som `WeekdayHours`. */
+export type ScheduleDayInput = WeekdayHours;
+
+/**
+ * Hela veckan ur ett formulär. Se `readWeeklyHours` i weekly-hours.ts.
+ *
+ * Noll dagar betyder "inget eget schema": för företaget att ingen dag är
+ * arbetsdag, för en anställd att standardschemat gäller.
+ */
+export const readScheduleDays = readWeeklyHours;
+
 /** En schemalagd rast, i minuter från midnatt. */
 export interface ScheduleBreakSpan {
   startMinute: number;
@@ -48,23 +82,6 @@ export interface Schedule {
 }
 
 /**
- * Veckodagen ett datum har, som ISO-nummer i företagets tidszon.
- *
- * Går via kalenderdatumet och inte via `getDay()` på instansen, eftersom
- * servern kör UTC: ett kvällspass i Stockholm hör till dagen på väggen, inte
- * till den UTC råkar visa.
- */
-export function isoWeekdayIn(instant: Date, timeZone: string): number {
-  const wall = wallTimeIn(instant, timeZone);
-  const day = new Date(
-    Date.UTC(wall.year, wall.month - 1, wall.day)
-  ).getUTCDay();
-
-  // getUTCDay() ger 0 för söndag. ISO vill ha 7.
-  return day === 0 ? 7 : day;
-}
-
-/**
  * Planerad tid för en veckodag, i minuter netto.
  *
  * Saknas dagen i schemat är den arbetsfri och ger noll — vilket är rätt svar
@@ -81,15 +98,7 @@ export function plannedMinutesForDay(
   const day = schedule?.days.find((d) => d.weekday === weekday);
   if (!day) return 0;
 
-  const span = Math.max(0, day.endMinute - day.startMinute);
-
-  const breakMinutes = day.breaks.reduce((total, rest) => {
-    const from = Math.max(rest.startMinute, day.startMinute);
-    const to = Math.min(rest.endMinute, day.endMinute);
-    return total + Math.max(0, to - from);
-  }, 0);
-
-  return Math.max(0, span - breakMinutes);
+  return netMinutes(day);
 }
 
 /** Planerad tid för en hel vecka, i minuter. Mest för att kontrollera schemat. */
@@ -201,134 +210,6 @@ export function daysInPeriod(
   }
 
   return days;
-}
-
-/* --- Klockslag som text ---------------------------------------------------
- *
- * Schemat visas och matas in som "06:30" men lagras som 390. Omvandlingen
- * ligger här, så att gränssnittet och beräkningen aldrig kan tolka samma
- * sträng olika. */
-
-/**
- * "06:30" → 390. Ger null på något som inte är ett klockslag.
- *
- * Tar även emot "0630" och "630". Fältet i adminpanelen sätter kolonet medan
- * man skriver, men ett formulär kan skickas innan det skriptet hunnit köra,
- * och då ska siffrorna ändå betyda det de ser ut att betyda.
- */
-export function parseMinuteOfDay(value: string): number | null {
-  const normalized = normalizeTimeOfDay(value);
-  if (normalized === null) return null;
-
-  const [hour, minute] = normalized.split(":").map(Number);
-  return hour * 60 + minute;
-}
-
-/** 390 → "06:30". */
-export function formatMinuteOfDay(minutes: number): string {
-  const hour = Math.floor(minutes / 60);
-  const minute = minutes % 60;
-  return `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
-}
-
-/* --- Schemat som formulär -------------------------------------------------
- *
- * Två ställen skickar in ett veckoschema: inställningarnas schemasida, som
- * sätter företagets standard, och rutan under Anställda, som ger en person
- * egna tider. Fälten heter likadant och tolkas därför av samma kod. Två
- * läsare av samma formulär hade glidit isär vid första ändringen, och den
- * sortens glidning syns först som ett felaktigt flexsaldo. */
-
-/** En dag på väg in i databasen. */
-export interface ScheduleDayInput {
-  weekday: number;
-  startMinute: number;
-  endMinute: number;
-  breaks: { startMinute: number; endMinute: number }[];
-}
-
-/** Rasterna på en dag, som de kommer från formuläret. */
-function readBreaks(
-  formData: FormData,
-  weekday: number
-): { startMinute: number; endMinute: number }[] {
-  const starts = formData.getAll(`break-start-${weekday}`);
-  const ends = formData.getAll(`break-end-${weekday}`);
-
-  const breaks: { startMinute: number; endMinute: number }[] = [];
-
-  for (const [index, rawStart] of starts.entries()) {
-    const start = parseMinuteOfDay(String(rawStart ?? ""));
-    const end = parseMinuteOfDay(String(ends[index] ?? ""));
-
-    // Halvfyllda rader hoppas över. Den som tryckt på plus och ångrat sig har
-    // lämnat en tom rad, inte begått ett fel.
-    if (start === null || end === null) continue;
-    if (end <= start) continue;
-
-    breaks.push({ startMinute: start, endMinute: end });
-  }
-
-  return breaks;
-}
-
-/**
- * Hela veckan ur ett formulär.
- *
- * Ger antingen ett fel att visa eller färdiga dagar, aldrig både och. Noll
- * dagar är ett giltigt svar och betyder "inget eget schema": för företaget att
- * ingen dag är arbetsdag, för en anställd att standardschemat gäller.
- */
-export function readScheduleDays(
-  formData: FormData
-): { error: string } | { days: ScheduleDayInput[] } {
-  const days: ScheduleDayInput[] = [];
-
-  for (let weekday = 1; weekday <= 7; weekday++) {
-    // Dagen är arbetsfri när rutan inte är i. Raden skrivs då inte alls, och
-    // planerad tid blir noll.
-    if (formData.get(`active-${weekday}`) !== "on") continue;
-
-    const start = parseMinuteOfDay(String(formData.get(`start-${weekday}`) ?? ""));
-    const end = parseMinuteOfDay(String(formData.get(`end-${weekday}`) ?? ""));
-
-    if (start === null || end === null) {
-      return { error: "Skriv tiderna som klockslag, till exempel 06:30." };
-    }
-
-    if (end <= start) {
-      return { error: "Sluttiden måste ligga efter starttiden." };
-    }
-
-    const breaks = readBreaks(formData, weekday);
-
-    const breakMinutes = breaks.reduce(
-      (total, rest) => total + (rest.endMinute - rest.startMinute),
-      0
-    );
-
-    if (breakMinutes >= end - start) {
-      return {
-        error: `Rasterna är längre än arbetsdagen på ${dayName(weekday)}.`,
-      };
-    }
-
-    days.push({ weekday, startMinute: start, endMinute: end, breaks });
-  }
-
-  return { days };
-}
-
-export function dayName(weekday: number): string {
-  return [
-    "måndag",
-    "tisdag",
-    "onsdag",
-    "torsdag",
-    "fredag",
-    "lördag",
-    "söndag",
-  ][weekday - 1];
 }
 
 /* --- Egna arbetstider per anställd ----------------------------------------

@@ -1,4 +1,5 @@
 import { requireAdmin } from "@/lib/admin-session";
+import { hasModule } from "@/lib/company-modules";
 import { unsafeGlobalPrisma } from "@/lib/db";
 import OrdersTable from "@/components/admin/OrdersTable";
 import ReviewForm from "@/components/admin/ReviewForm";
@@ -45,6 +46,12 @@ export const dynamic = "force-dynamic";
  */
 export default async function ReviewPage() {
   const { db, companyId } = await requireAdmin();
+  // Leveransdatumet i orderrutan hör till tillvalet Planering. Samma flagga
+  // som under Ordrar: att dölja fältet är kosmetik, serveråtgärden frågar
+  // själv. Den skickas ändå med hit, så att samma order går att ändra likadant
+  // oavsett vilken sida man står på.
+  const planning = await hasModule(companyId, "PLANNING");
+
 
   const company = await unsafeGlobalPrisma.company.findUnique({
     where: { id: companyId },
@@ -93,6 +100,7 @@ export default async function ReviewPage() {
             moments={moments}
             updateAction={updateOrder}
             toggleAction={toggleOrder}
+            planning={planning}
             selectable={false}
             title={`${quickJobs.length} snabbjobb att komplettera`}
           />

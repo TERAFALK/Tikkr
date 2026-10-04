@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { assertWritable, requireAdmin } from "@/lib/admin-session";
+import { hasModule } from "@/lib/company-modules";
 import { resolveCustomerId } from "@/lib/customers";
 import { ClockError, closeOrder, openEntriesOnOrder } from "@/lib/clock";
 import { parseMarkupPercent, parseOre } from "@/lib/money";
@@ -32,6 +33,45 @@ interface OrderFields {
   orderNumber: string;
   markupPercent: number | null;
   fixedPriceOre: number | null;
+}
+
+/**
+ * LEVERANSDATUMET LÄSES BARA MED TILLVALET PLANERING.
+ *
+ * Fältet hör till planeringen och visas bara när den är på. Att dölja det i
+ * formuläret räcker inte: ett formulär kan skickas av annat än rutan, och ett
+ * datum som smugit in skulle styra en sortering kunden inte betalar för.
+ * Därför frågas modulen här, i åtgärden — grinden ligger i koden och inte i
+ * gränssnittet, se CLAUDE.md § 3.1.
+ *
+ * Resten av orderrutan är basen och rörs inte. Hela sidan svarar alltså 200
+ * för varje kund; det är bara det här fältet som är grindat. Samma avvägning
+ * som arbetstiderna under Anställda gör för löneunderlaget.
+ *
+ * Tomt fält betyder inget datum, vilket är det normala. Ett obegripligt datum
+ * behandlas också som inget: fältet är ett datumfält i webbläsaren, och den
+ * som skickat något annat har inte skrivit det för hand.
+ */
+async function readPlannedDueDate(
+  companyId: string,
+  formData: FormData
+): Promise<{ plannedDueDate?: Date | null }> {
+  if (!(await hasModule(companyId, "PLANNING"))) return {};
+
+  const raw = String(formData.get("plannedDueDate") ?? "").trim();
+  if (!raw) return { plannedDueDate: null };
+
+  // Mitt på dagen i UTC och inte vid midnatt. Datumet pekar ut en DAG, och
+  // middagstid ligger tryggt inom dygnet i varje tidszon kunden kan ha —
+  // till skillnad från midnatt, som kan hamna på dagen före.
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(raw);
+  if (!match) return { plannedDueDate: null };
+
+  return {
+    plannedDueDate: new Date(
+      Date.UTC(Number(match[1]), Number(match[2]) - 1, Number(match[3]), 12)
+    ),
+  };
 }
 
 /**
@@ -104,6 +144,7 @@ export async function createOrder(
       customerId: await resolveCustomerId(db, formData.get("customerId")),
       markupPercent: fields.values.markupPercent,
       fixedPriceOre: fields.values.fixedPriceOre,
+      ...(await readPlannedDueDate(companyId, formData)),
     },
   });
 
@@ -143,6 +184,7 @@ export async function updateOrder(
       customerId: await resolveCustomerId(db, formData.get("customerId")),
       markupPercent: fields.values.markupPercent,
       fixedPriceOre: fields.values.fixedPriceOre,
+      ...(await readPlannedDueDate(companyId, formData)),
       // Att spara uppgifterna ÄR kvittot på att någon tittat. Ett snabbjobb
       // skapat i verkstaden slutar därmed vara en uppgift att göra, utan att
       // det behövs en egen knapp för "jag har sett den".

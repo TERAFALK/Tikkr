@@ -45,6 +45,14 @@ export interface OrderRow {
   fixedPriceOre: number | null;
   /** Skapad från en stämplingsskärm och ännu inte kompletterad av admin. */
   isQuickJob: boolean;
+  /**
+   * När jobbet ska vara klart, eller null när inget datum satts.
+   *
+   * Hör till tillvalet Planering och styr ordningen i Oplacerat. Fältet läses
+   * alltid — raden är billig och basen visar den inte — men FÄLTET i
+   * orderrutan visas bara när modulen är på. Se CLAUDE.md § 3.1.
+   */
+  plannedDueDate: Date | null;
 }
 
 /**
@@ -73,6 +81,7 @@ export async function orderRows(
       markupPercent: true,
       fixedPriceOre: true,
       isQuickJob: true,
+      plannedDueDate: true,
       // Beräknad tid är egna rader, en per arbetsmoment. Orderns totala
       // beräkning är summan av dem — se src/lib/order-budget.ts.
       budgets: {
@@ -119,6 +128,7 @@ export async function orderRows(
       markupPercent: order.markupPercent,
       fixedPriceOre: order.fixedPriceOre,
       isQuickJob: order.isQuickJob,
+      plannedDueDate: order.plannedDueDate,
       entries: order.timeEntries.length,
       minutes: order.timeEntries.reduce(
         (total, entry) =>

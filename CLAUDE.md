@@ -138,7 +138,8 @@ customers      — id, company_id, name, customer_number, org_number,
                  contact_name, email, phone,
                  address_line, postal_code, city,
                  markup_percent, discount_percent, notes, active
-orders         — id, company_id, order_number, customer_id?, status
+orders         — id, company_id, order_number, customer_id?, status,
+                 planned_due_date?
 order_budgets  — id, company_id, order_id, moment_id, minutes
 work_moments   — id, company_id, name, cost_rate_ore
 indirect_moments — id, company_id, name, active
@@ -163,6 +164,14 @@ absences         — id, company_id, employee_id, date, reason_id, minutes,
                    note, created_by_email
 comp_adjustments — id, company_id, employee_id, date, minutes,
                    note, created_by_email, absence_id
+
+  — planeringen, se regel 8 —
+stations         — id, company_id, name, moment_id, active, sort_order
+station_days     — id, company_id, station_id, weekday, start_minute,
+                   end_minute
+station_breaks   — id, company_id, station_day_id, start_minute, end_minute
+planned_blocks   — id, company_id, station_id, order_id, moment_id,
+                   starts_at, minutes, note, created_by_email
 
   — tillvalen, se § 3.1 —
 company_modules  — id, company_id, module, source, stripe_item_id,
@@ -420,6 +429,99 @@ stripe_prices    — item, month_price_id, year_price_id, updated_by_email
    som fixtur i `tests/payroll.test.ts`: 33,75 närvaro mot 34,00 planerat ger
    −0,25 i flex, varav 0,17 produktivt och 33,58 improduktivt.
 
+8. **Planeringen: stationer, tidslinje och planerade rutor**
+   (tillagt 2026-10-04).
+
+   Ett tillval, se § 3.1. Svarar på frågan som ligger mellan beräkningen och
+   stämplingen: **när** ska jobbet köras, och **på vilken maskin**. Verkstaden
+   vet vad ordern är beräknad att ta per arbetsmoment (regel 6) och i efterhand
+   vad den tog (stämplingarna). Steget däremellan låg på en whiteboard.
+
+   **PLANERAD TID ÄR VARKEN ARBETAD ELLER FAKTURERBAR TID.** Den är en avsikt,
+   och når ALDRIG ett fakturaunderlag, en efterkalkyl, en rapport eller en
+   tidrapport. Började fakturasidan läsa planen vore det en tidsfråga innan
+   någon fakturerade en order på vad den var *tänkt* att ta, och kunden skulle
+   betala för arbete som inte utförts. Det är samma fel som motiverar gränsen
+   mot löneunderlaget, bara åt andra hållet.
+
+   `planning.ts`, `plan-calendar.ts` och `plan-live.ts` importeras därför aldrig
+   av `order-export.ts`, `order-calc.ts`, `order-price.ts`, `pdf.ts`,
+   `calc-pdf.ts`, `report.ts`, `report-pdf.ts` eller exportrutterna. Bevisas av
+   `tests/planning-boundary.test.ts`.
+
+   **Planeringen läser stämplingen, aldrig tvärtom.** Ingen fil i modulen
+   skriver till `time_entries`, och kiosken rörs inte alls. En plan som skriver
+   om sig själv när verkligheten avviker går inte att lita på, och en plan som
+   kan flytta en stämplad timme vore ett fakturafel.
+
+   **En station gör ETT arbetsmoment; ett arbetsmoment kan finnas på flera
+   stationer.** Momentet är maskinen (regel 2), men en verkstad har ofta två
+   fräsar. Villkoret `block.momentId === station.momentId` kan inte uttryckas i
+   databasen (`db push` saknar CHECK) och vaktas i `planning.ts`, som är enda
+   vägen in — samma konstruktion som `clock.ts` har för `kind`.
+
+   Stationens arbetsmoment går inte att byta när rutor finns: varje ruta skulle
+   annars tyst börja peka på en annan beräkningsrad. En station **raderas
+   aldrig, den stängs**, och bara när den saknar rutor från idag och framåt.
+
+   **En rutas minuter är ARBETSMINUTER, inte väggklockans.** En ruta på fyra
+   timmar som börjar 10:00 på en station med lunch 12:00–12:40 slutar 14:40 men
+   är 4:00 arbete. Regeln i en mening: **bara stationens egna raster hoppas
+   över.** Tid utanför öppettiderna räknas som arbete — det är själva
+   innebörden av överbokning. `plan-calendar.ts` äger hela den räkningen, och
+   `tests/plan-calendar.test.ts` fäller den.
+
+   Slutet lagras aldrig; det är start plus minuter enligt stationens kalender.
+   Ingen ruta korsar midnatt: dras den dit kapas den, och återstoden ligger kvar
+   som oplacerad.
+
+   **INGEN TID FÅR FALLA BORT.** Modulens enda hårda krav mot användaren: summan
+   av en orders planerade rutor plus dess oplacerade tid är ALLTID den beräknade
+   tiden. Därför lagras den oplacerade tiden ingenstans — den härleds vid varje
+   läsning, av samma skäl som orderns totala beräkning aldrig lagras (regel 6).
+   Krymper man en ruta kommer minuterna tillbaka av sig själva.
+
+   **Överbokning tillåts och varnas för i gult.** Två rutor i varandra, eller
+   mer planerat än dagen rymmer, markeras men avvisas inte. Administratören vet
+   ibland att maskinen ska gå över kvällen, och en plan som vägrar är en plan
+   man slutar använda. Systemet stoppar aldrig planering för att en beräkning
+   överskrids, lika lite som det stoppar stämpling.
+
+   **Tavlan visar utfallet, aldrig tvärtom.** `plan-live.ts` läser `time_entries`
+   och märker en ruta som pågående när någon står instämplad på dess order och
+   moment. Tillskrivningen är medvetet förenklad: **en stämpling bär ingen
+   station**, eftersom kiosken inte känner några — ligger två rutor för samma
+   order och moment samtidigt på olika stationer räknas samma minuter på båda.
+   Siffran svarar på om jobbet körs, inte på vad som ska faktureras. Den sanna
+   summan finns i rapporterna, och `tests/plan-live.test.ts` spikar fast regeln
+   så att en ändring av den kräver ett beslut.
+
+   Summeringen är rå (`minutesBetween`), aldrig `mainMinutes`: tavlan frågar om
+   maskinen gick, inte om personen var på jobbet.
+
+   **Stationernas arbetstider ligger i EGNA tabeller**, inte i
+   `work_schedules`. Modulerna säljs var för sig, och en kund kan ha
+   planeringen utan löneunderlaget — en stationssida som krävde lönemodulen
+   vore ett riktigt fel. Priset är att den som har båda matar in arbetstider två
+   gånger, och det är rätt pris. Formuläret de ändå delar bor i
+   `src/lib/weekly-hours.ts`, som är **neutral och ska förbli det**: den läses
+   från båda hållen, precis som `modules.ts` och `brand.ts`.
+
+   `src/lib/schedule.ts` exporterar om den delen, så att lönekoden läser sitt
+   schema där den alltid gjort det.
+
+   **Leveransdatumet på ordern** (`orders.planned_due_date`) hör till modulen
+   och visas i orderrutan bara när den är på. Utan det vet planeraren inte vad
+   som brådskar, och Oplacerat har ingen annan ordning än ordernummer.
+
+   **Planerade rutor är inte personuppgifter.** En ruta bär station, order,
+   arbetsmoment och tid — ingen person. Vem som körde jobbet framgår bara av
+   stämplingarna, som redan har sin GDPR-väg. Anonymiseringen i § 4 punkt 8
+   behöver därför inte röras, till skillnad från löneunderlagets poster.
+
+   Kiosken är **orörd**. Ett tryck ska räcka.
+
+
 Multi-tenant-isolering byggs i appens kod: **varje databasfråga går via ett
 gemensamt lager** i Prisma som alltid filtrerar på inloggad användares
 `company_id`. Ett enda ställe i koden, inte utspritt — och testat automatiskt.
@@ -432,9 +534,20 @@ fakturaunderlaget. Den är alltid på.
 **Löneunderlaget är ett tillval.** Det byggdes för att en pilotkund behövde
 det och ingick från början gratis, men det är ungefär en tredjedel av
 systemet — och kunden som bara vill fakturera rätt fick en panel full av
-menypunkter hen aldrig öppnar. Planeringsdelen som ska komma blir nästa
-modul. Läggs allt i basen blir Tikkr ett affärssystem till priset av en
-stämpelklocka, och prislappen går inte längre att förklara.
+menypunkter hen aldrig öppnar. Läggs allt i basen blir Tikkr ett affärssystem
+till priset av en stämpelklocka, och prislappen går inte längre att förklara.
+
+**Planeringen är det andra tillvalet** (tillagt 2026-10-04), se § 3 regel 8.
+Den är en egen arbetsyta med stationsregister och tidslinje, och den kund som
+bara vill fakturera rätt har ingen nytta av någon av dess sidor.
+
+Att den gick att lägga till utan att röra arkitekturen är kvittot på att
+grinden sitter rätt: en nyckel i registret, ett värde i enumen, fyra tabeller
+i `tenant.ts`, en artikel hos Stripe. `price-book.ts`, Stripe-uppslagen,
+prenumerationssidan, plattformspanelen och menyfiltreringen var redan
+generiska över `MODULE_KEYS` och behövde inte en rad. **Säljsidan var det enda
+som inte var det**, och är nu en slinga över modulerna i stället för en
+handskriven rad om löneunderlaget.
 
 `src/lib/modules.ts` är registret. **Filen har inga importer och ska inte få
 några**: både fakturasidan och lönesidan läser den, och drog den in något
@@ -459,8 +572,14 @@ bara — sidan bakom svarar 404 oavsett vad menyn visar.
 
 Bevisas av `tests/module-coverage.test.ts`. Den viktiga kontrollen där är
 inte listan över filer utan den som **härleder** vilka filer som rör modulen,
-ur deras importer och tabellnamn, och fäller en ny lönesida ingen kommit ihåg
-att grinda.
+ur deras importer och tabellnamn, och fäller en ny sida ingen kommit ihåg att
+grinda.
+
+Testet är **en tabell med en rad per modul** sedan 2026-10-04, inte en fil
+skriven för löneunderlaget. Det fungerade så länge det fanns en modul, och
+hade därefter betytt att den andra inte hade något skyddsnät alls — precis den
+sortens tysta hål resten av filen finns för att stoppa. En egen kontroll fäller
+dessutom en modul som lagts till i registret utan att få en rad i tabellen.
 
 Undantag, uttryckligen: GDPR-anonymiseringen i
 `installningar/actions.ts` raderar frånvaro, raster och komprader **även när
@@ -885,6 +1004,11 @@ två skärmar) läggs den till när den kunden dyker upp.
 **Löneunderlaget: 499 kr per månad och FÖRETAG, exkl. moms.** Årsbetalning
 4 990 kr, samma tio-för-tolv som basen. En kund med tre skärmar betalar tre
 skärmpriser plus en modulavgift.
+
+**Planeringen: 699 kr per månad och FÖRETAG, exkl. moms.** Årsbetalning
+6 990 kr. Dyrare än löneunderlaget, eftersom den är en egen arbetsyta man står
+i varje morgon och inte en beräkning med ett par sidor. En kund med tre skärmar
+och båda tillvalen betalar 3 × 399 + 499 + 699 = 2 395 kr i månaden.
 
 Per skärm valdes bort: löneunderlaget har ingenting med skärmar att göra, och
 det är första frågan kunden ställer när de ser fakturan. Per anställd valdes

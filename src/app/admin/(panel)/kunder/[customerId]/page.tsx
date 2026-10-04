@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireAdmin } from "@/lib/admin-session";
+import { hasModule } from "@/lib/company-modules";
 import {
   customerMoney,
   customerOptions,
@@ -50,6 +51,12 @@ export default async function CustomerPage({
   params: Promise<{ customerId: string }>;
 }) {
   const { db, companyId } = await requireAdmin();
+  // Leveransdatumet i orderrutan hör till tillvalet Planering. Samma flagga
+  // som under Ordrar: att dölja fältet är kosmetik, serveråtgärden frågar
+  // själv. Den skickas ändå med hit, så att samma order går att ändra likadant
+  // oavsett vilken sida man står på.
+  const planning = await hasModule(companyId, "PLANNING");
+
   const { customerId } = await params;
 
   const customer = await getCustomer(db, customerId);
@@ -297,6 +304,7 @@ export default async function CustomerPage({
               updateAction={updateOrder}
               toggleAction={toggleOrder}
               closeAction={closeOrders}
+              planning={planning}
               title="Ordrar"
               hideCustomer
             />

@@ -17,7 +17,7 @@ import Motif from "./Motif";
 import PriceCalculator from "./PriceCalculator";
 import { faqQuestions } from "./faq-data";
 import type { ModulePricing, ScreenPricing } from "@/lib/stripe";
-import { MODULES } from "@/lib/modules";
+import { MODULES, MODULE_KEYS, type ModuleKey } from "@/lib/modules";
 import Reveal from "./Reveal";
 
 /**
@@ -625,6 +625,11 @@ export function Capabilities() {
           body: "Arbetstidsschema, stämplade raster, flex, komp och frånvaro.",
           tillval: true,
         },
+        {
+          term: "Planering",
+          body: "Veckovis tidslinje per station, med orderns arbetsmoment utplacerade och stämplingen synlig i tavlan.",
+          tillval: true,
+        },
       ],
     },
     {
@@ -720,6 +725,24 @@ export function Capabilities() {
  * Siffrorna kommer från prislistan hos betaltjänsten och inte från koden. En
  * prisändring syns här utan att något behöver byggas om.
  */
+/**
+ * Säljtexten för varje tillval.
+ *
+ * Står här och inte i src/lib/modules.ts. Registret läses av både fakturasidan
+ * och lönesidan och är beroendefritt med flit; dess `summary` är en rad på
+ * prenumerationssidan, inte en säljtext. Två olika behov, två olika texter.
+ */
+const MODULE_COPY: Record<ModuleKey, string> = {
+  PAYROLL:
+    "Arbetstidsschema, stämplade raster, flex, komp, frånvaro och tidrapport " +
+    "per anställd. Priset gäller hela företaget oavsett antal skärmar och " +
+    "anställda.",
+  PLANNING:
+    "Veckovis tidslinje med en rad per station. Dra ut orderns arbetsmoment " +
+    "med sin beräknade tid, och se direkt i tavlan när någon stämplar in på " +
+    "jobbet.",
+};
+
 export function Pricing({
   pricing,
   modules,
@@ -727,7 +750,17 @@ export function Pricing({
   pricing: ScreenPricing;
   modules: ModulePricing;
 }) {
-  const payroll = modules.PAYROLL;
+  // EN RAD PER TILLVAL, hämtad ur registret. Stod som en handskriven rad för
+  // löneunderlaget fram till att planeringen kom, och då hade nästa modul
+  // behövt en kopia av hela rutan. Beskrivningarna hör hemma här och inte i
+  // modules.ts: registret läses av både fakturasidan och lönesidan och måste
+  // förbli beroendefritt, och en säljtext är inte ett systemvillkor.
+  const offers = MODULE_KEYS.map((key) => ({
+    key,
+    name: MODULES[key].name,
+    price: modules[key],
+    body: MODULE_COPY[key],
+  }));
 
   return (
     <section id="pris" className="scroll-mt-16 bg-white">
@@ -797,43 +830,46 @@ export function Pricing({
             </div>
           </div>
 
-          {/* Tillvalet. Egen rad med tonad botten, så att det syns att det är
-              något annat än basen och inte ett paket till. */}
-          <div className="grid gap-6 bg-neutral-50 p-7 sm:p-10 lg:grid-cols-[20rem_1fr] lg:gap-12">
-            <div>
-              <p className="text-[11px] font-medium uppercase tracking-wider text-neutral-500">
-                Tillval
-              </p>
-              <p className="mt-5 flex items-baseline gap-2">
-                <span className="text-[32px] font-semibold leading-none tracking-tight tabular-nums text-neutral-900">
-                  {kr(payroll.month)}
-                </span>
-                <span className="text-[14px] text-neutral-500">
-                  kr per månad och företag
-                </span>
-              </p>
-              {payroll.year !== null && (
-                <p className="mt-3 text-[13px] text-neutral-500">
-                  eller {kr(payroll.year)} kr per år
+          {/* Tillvalen. En rad var med tonad botten, så att det syns att de
+              är något annat än basen och inte paket till. */}
+          {offers.map((offer) => (
+            <div
+              key={offer.key}
+              className="grid gap-6 border-b border-neutral-200 bg-neutral-50 p-7 last:border-b-0 sm:p-10 lg:grid-cols-[20rem_1fr] lg:gap-12"
+            >
+              <div>
+                <p className="text-[11px] font-medium uppercase tracking-wider text-neutral-500">
+                  Tillval
                 </p>
-              )}
-            </div>
+                <p className="mt-5 flex items-baseline gap-2">
+                  <span className="text-[32px] font-semibold leading-none tracking-tight tabular-nums text-neutral-900">
+                    {kr(offer.price.month)}
+                  </span>
+                  <span className="text-[14px] text-neutral-500">
+                    kr per månad och företag
+                  </span>
+                </p>
+                {offer.price.year !== null && (
+                  <p className="mt-3 text-[13px] text-neutral-500">
+                    eller {kr(offer.price.year)} kr per år
+                  </p>
+                )}
+              </div>
 
-            <div>
-              <p className="text-[14px] font-medium text-neutral-900">
-                {MODULES.PAYROLL.name}
-              </p>
-              <p className="mt-2.5 max-w-xl text-[13px] leading-relaxed text-neutral-600">
-                Arbetstidsschema, stämplade raster, flex, komp, frånvaro och
-                tidrapport per anställd. Priset gäller hela företaget oavsett
-                antal skärmar och anställda.
-              </p>
+              <div>
+                <p className="text-[14px] font-medium text-neutral-900">
+                  {offer.name}
+                </p>
+                <p className="mt-2.5 max-w-xl text-[13px] leading-relaxed text-neutral-600">
+                  {offer.body}
+                </p>
+              </div>
             </div>
-          </div>
+          ))}
 
           {/* Sista raden i priskortet: kundens egen summa. Styckpriserna står
               kvar ovanför — det är dem man ska kunna upprepa. */}
-          <PriceCalculator pricing={pricing} payroll={payroll} />
+          <PriceCalculator pricing={pricing} modules={modules} />
         </div>
 
         <div className="mt-10 flex flex-wrap items-center gap-5">

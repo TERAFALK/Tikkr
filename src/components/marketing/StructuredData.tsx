@@ -1,4 +1,5 @@
 import { siteUrl } from "@/lib/site-url";
+import { MODULES, MODULE_KEYS } from "@/lib/modules";
 import type { ModulePricing, ScreenPricing } from "@/lib/stripe";
 import { faqQuestions } from "./faq-data";
 
@@ -74,7 +75,16 @@ export default function StructuredData({
       priceCurrency: "SEK",
       category: "subscription",
       availability: "https://schema.org/InStock",
-      description: `${pricing.month} kr per stämplingsskärm och månad, exklusive moms. Tillvalet Löneunderlag ${modules.PAYROLL.month} kr per månad och företag.`,
+      // Tillvalen räknas upp ur registret och skrivs inte av. Stod som en
+      // handskriven mening om löneunderlaget, och planeringen hade då saknats
+      // här utan att något gick sönder — vilket är det tysta felet.
+      description:
+        `${pricing.month} kr per stämplingsskärm och månad, exklusive moms. ` +
+        MODULE_KEYS.map(
+          (key) =>
+            `Tillvalet ${MODULES[key].name} ${modules[key].month} kr per ` +
+            "månad och företag."
+        ).join(" "),
     },
   };
 

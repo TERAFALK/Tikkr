@@ -22,6 +22,8 @@ export interface OrderFieldsDefaults {
   budgets: { momentId: string; minutes: number }[];
   markupPercent: number | null;
   fixedPriceOre: number | null;
+  /** "2026-10-08". Tomt när inget datum satts. */
+  plannedDueDate: string | null;
 }
 
 export default function OrderFields({
@@ -29,12 +31,22 @@ export default function OrderFields({
   moments,
   defaults,
   autoFocus = false,
+  planning = false,
 }: {
   customers: SearchSelectOption[];
   moments: BudgetMomentOption[];
   /** Utelämnat betyder en ny order: tomma fält. */
   defaults?: OrderFieldsDefaults;
   autoFocus?: boolean;
+  /**
+   * Visar leveransdatumet. Hör till tillvalet Planering.
+   *
+   * Fältet står inte här för alla: utan tavlan finns ingenting som läser det,
+   * och ett datum som inte används är en ruta till att fylla i. Sidan avgör,
+   * genom `hasModule` — menyn och fältet döljer bara, spärren ligger i
+   * serveråtgärden.
+   */
+  planning?: boolean;
 }) {
   return (
     <>
@@ -69,6 +81,16 @@ export default function OrderFields({
       >
         <BudgetMoments moments={moments} defaultRows={defaults?.budgets} />
       </Field>
+
+      {planning && (
+        <Field label="Leveransdatum" hint="Valfritt. Styr ordningen i Oplacerat">
+          <Input
+            type="date"
+            name="plannedDueDate"
+            defaultValue={defaults?.plannedDueDate ?? ""}
+          />
+        </Field>
+      )}
 
       <Field
         label="Påslag"

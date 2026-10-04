@@ -17,6 +17,8 @@ import {
   IconReport,
   IconReview,
   IconSettings,
+  IconStation,
+  IconTimeline,
 } from "@/components/ui/icons";
 import type { ModuleKey } from "@/lib/modules";
 import CompanyBadge from "@/components/ui/CompanyBadge";
@@ -66,6 +68,19 @@ const sections: { label: string; links: NavLink[] }[] = [
         icon: IconPeople,
         module: "PAYROLL",
       },
+      {
+        href: "/admin/planering",
+        label: "Planering",
+        icon: IconTimeline,
+        // Tavlan ligger under Dagligen och inte under Register: den öppnas
+        // varje morgon, inte någon gång i månaden. Stationerna, som är ett
+        // register, ligger längre ner.
+        //
+        // `exact` eftersom stationssidan ligger under samma adress och har en
+        // egen menypunkt. Utan den skulle båda markeras som aktiva samtidigt.
+        exact: true,
+        module: "PLANNING",
+      },
       { href: "/admin/granskning", label: "Granskning", icon: IconReview, badge: true },
       { href: "/admin/stamplingar", label: "Stämplingar", icon: IconClock },
     ],
@@ -81,6 +96,12 @@ const sections: { label: string; links: NavLink[] }[] = [
         href: "/admin/improduktivt",
         label: "Improduktiv tid",
         icon: IconBroom,
+      },
+      {
+        href: "/admin/planering/stationer",
+        label: "Stationer",
+        icon: IconStation,
+        module: "PLANNING",
       },
       { href: "/admin/skarmar", label: "Skärmar", icon: IconDevice },
     ],
