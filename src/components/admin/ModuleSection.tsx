@@ -16,15 +16,26 @@ import { Alert, Badge, Button } from "@/components/ui";
  * ingenting. Med prenumeration är det två, och mellansteget visar vad Stripe
  * kommer att fakturera. En kryssruta som tyst ändrar en faktura är inte ett
  * val kunden gjort medvetet.
+ *
+ * För ett företag som SKÖTS AV OSS finns inget reglage alls. Tillvalen står
+ * där som en upplysning, och ändras i plattformspanelen — se `managed`.
  */
 export default function ModuleSection({
   modules,
   hasSubscription,
   interval,
+  managed = false,
 }: {
   modules: ModuleOffer[];
   hasSubscription: boolean;
   interval: "month" | "year";
+  /**
+   * Företaget sköts av oss: tillvalen visas men går inte att ändra här.
+   *
+   * Att knappen försvinner är kosmetik. Åtgärden frågar själv — se
+   * changeModule i prenumeration/actions.ts.
+   */
+  managed?: boolean;
 }) {
   const [state, action] = useActionState<ModuleFormState, FormData>(
     changeModule,
@@ -65,7 +76,11 @@ export default function ModuleSection({
               {kr(module.amount)} kr/{per}
             </span>
 
-            {module.enabled || module.forSale || !hasSubscription ? (
+            {managed ? (
+              <span className="text-xs text-neutral-400">
+                {module.enabled ? "Ingår" : "Ingår inte"}
+              </span>
+            ) : module.enabled || module.forSale || !hasSubscription ? (
               <form action={action}>
                 <input type="hidden" name="module" value={module.key} />
                 <input

@@ -5,6 +5,7 @@ import {
   TRIAL_DAYS,
   type SubscriptionFacts,
 } from "@/lib/subscription";
+import { isPlatformManaged } from "@/lib/billing";
 
 /**
  * Reglerna för utebliven betalning.
@@ -154,5 +155,56 @@ describe("stämplingen spärras aldrig", () => {
         expect(state.detail).toContain("Stämplingsskärmarna är opåverkade");
       }
     }
+  });
+});
+
+/* -------------------------------------------------------------------------- */
+
+describe("vem som sköter prenumerationen", () => {
+  /**
+   * SKILLNADEN ÄR VEM SOM FÅR ÄNDRA, OCH DEN KOSTAR PENGAR ÅT BÅDA HÅLL.
+   *
+   * Ett företag utan prenumeration hos Stripe kan stå i två helt olika lägen.
+   * Under provperioden är det kundens egen arbetsyta: de slår på och av
+   * tillval fritt och köper när de vill. Är företaget däremot satt till ACTIVE
+   * för hand i plattformspanelen är det en uppgörelse vi gjort — en
+   * fakturakund, eller en vi bjuder på systemet.
+   *
+   * Utan den skillnaden händer två saker, och ingen av dem syns:
+   *
+   *   En fakturakund slår på planeringen i reglaget. Det skriver bara en rad i
+   *   company_modules och kostar ingenting — 699 kr i månaden som aldrig
+   *   faktureras.
+   *
+   *   En fakturakund går till kassan och tecknar en kortprenumeration ovanpå
+   *   den faktura vi redan skickar, och betalar två gånger.
+   */
+  it("ett företag med prenumeration hos Stripe sköts av kunden", () => {
+    expect(isPlatformManaged("sub_123", "ACTIVE")).toBe(false);
+    expect(isPlatformManaged("sub_123", "PAST_DUE")).toBe(false);
+  });
+
+  it("ACTIVE utan prenumeration är satt för hand och sköts av oss", () => {
+    // Stripe lämnar aldrig ett företag ACTIVE utan prenumerations-id. Det
+    // läget uppstår bara genom setSubscriptionStatus i plattformspanelen.
+    expect(isPlatformManaged(null, "ACTIVE")).toBe(true);
+  });
+
+  it("PAST_DUE utan prenumeration sköts också av oss", () => {
+    // En fakturakund som inte betalat. Att låta dem lösa det med ett kort
+    // skulle lämna fakturan hängande vid sidan av.
+    expect(isPlatformManaged(null, "PAST_DUE")).toBe(true);
+  });
+
+  it("provperioden är kundens egen", () => {
+    // Hela poängen med den, se CLAUDE.md § 8: kunden ska kunna pröva
+    // tillvalen fritt och köpa när de bestämt sig.
+    expect(isPlatformManaged(null, "TRIALING")).toBe(false);
+  });
+
+  it("en avslutad prenumeration går att köpa om", () => {
+    // Webhooken nollställer prenumerations-id vid uppsägning. Den som vill
+    // komma tillbaka ska kunna göra det utan att höra av sig.
+    expect(isPlatformManaged(null, "CANCELED")).toBe(false);
   });
 });

@@ -15,7 +15,7 @@ export const dynamic = "force-dynamic";
 export default async function SubscriptionPage({
   searchParams,
 }: {
-  searchParams: Promise<{ klart?: string }>;
+  searchParams: Promise<{ klart?: string; skots?: string }>;
 }) {
   const { companyId } = await requireAdmin();
   const params = await searchParams;
@@ -55,6 +55,16 @@ export default async function SubscriptionPage({
 
   return (
     <div className="space-y-6">
+      {/* Någon har skickat kassaformuläret trots att knappen är dold. Det
+          händer bara med ett sparat formulär eller en gammal flik, men svaret
+          ska vara en förklaring och inte en tyst omdirigering. */}
+      {params.skots === "1" && (
+        <Alert tone="info">
+          Prenumerationen sköts av Tikkr för det här företaget. Kontakta
+          support@tikkr.se för att ändra den.
+        </Alert>
+      )}
+
       {params.klart === "1" && (
         <Alert tone="info">
           Betalningen behandlas. Statusen uppdateras inom kort. Ladda om sidan
@@ -139,6 +149,14 @@ export default async function SubscriptionPage({
             <Alert tone="info">
               Kortbetalning är inte aktiverad för den här installationen.
               Kontakta support@tikkr.se för att aktivera prenumerationen.
+            </Alert>
+          ) : overview.platformManaged ? (
+            /* FAKTURAKUND ELLER ANNAN UPPGÖRELSE. Kassan visas inte: en
+               kortprenumeration ovanpå en faktura vi redan skickar betyder
+               att kunden betalar två gånger. */
+            <Alert tone="info">
+              Prenumerationen sköts av Tikkr för det här företaget. Kontakta
+              support@tikkr.se för att ändra antalet licenser eller tillvalen.
             </Alert>
           ) : overview.hasSubscription ? (
             <div className="space-y-6">
@@ -233,6 +251,7 @@ export default async function SubscriptionPage({
               modules={overview.modules}
               hasSubscription={overview.hasSubscription}
               interval={overview.interval ?? "month"}
+              managed={overview.platformManaged}
             />
           </div>
         </Card>

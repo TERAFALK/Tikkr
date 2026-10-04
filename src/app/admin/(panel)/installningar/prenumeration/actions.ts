@@ -10,6 +10,8 @@ import {
   BillingChangeError,
   createCheckoutSession,
   createPortalSession,
+  isPlatformManaged,
+  platformManagedCompany,
   previewLicenseChange,
   previewModuleChange,
 } from "@/lib/billing";
@@ -30,9 +32,27 @@ async function baseUrl(): Promise<string> {
   return `${proto}://${host}`;
 }
 
+/**
+ * Beskedet en fakturakund får i stället för att komma vidare.
+ *
+ * Samma text på båda ställena den behövs, så att svaret inte beror på vilken
+ * knapp som trycktes.
+ */
+const MANAGED_NOTICE =
+  "Prenumerationen sköts av Tikkr för det här företaget. Kontakta " +
+  "support@tikkr.se för att ändra licenser eller tillval.";
+
 export async function startCheckout(formData: FormData) {
   const session = await requireAdmin();
   await assertWritable(session);
+
+  // SKÖTS FÖRETAGET AV OSS FINNS INGET ATT KÖPA HÄR. En kortprenumeration
+  // ovanpå en faktura vi redan skickar betyder att kunden betalar två gånger,
+  // och ingenting i systemet skulle säga ifrån. Grinden ligger i åtgärden och
+  // inte bara i sidan: knappen är dold, men ett formulär kan skickas ändå.
+  if (await platformManagedCompany(session.companyId)) {
+    redirect("/admin/installningar/prenumeration?skots=1");
+  }
 
   const url = await createCheckoutSession({
     companyId: session.companyId,
@@ -204,8 +224,24 @@ export async function changeModule(
 
   const company = await unsafeGlobalPrisma.company.findUnique({
     where: { id: session.companyId },
-    select: { stripeSubscriptionId: true },
+    select: { stripeSubscriptionId: true, subscriptionStatus: true },
   });
+
+  // SKÖTS FÖRETAGET AV OSS BESTÄMMER VI, inte kunden.
+  //
+  // Reglaget nedan skriver bara en rad i company_modules och kostar därmed
+  // ingenting. Det är rätt under provperioden och fel för en fakturakund: de
+  // hade kunnat slå på planeringen för 699 kr i månaden utan att någonsin bli
+  // debiterade. Tillvalen för dem sätts i plattformspanelen, där de hamnar i
+  // händelseloggen med vem som gjorde det och varför.
+  if (
+    isPlatformManaged(
+      company?.stripeSubscriptionId ?? null,
+      company?.subscriptionStatus ?? "TRIALING"
+    )
+  ) {
+    return { error: MANAGED_NOTICE };
+  }
 
   // Utan prenumeration kostar reglaget ingenting, och då finns inget att
   // bekräfta. Kunden trycker en gång och är klar.

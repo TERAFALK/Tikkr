@@ -272,6 +272,30 @@ export interface BillingOverview {
   /** Vad kunden sparar på att betala ett år i förskott. */
   yearlySaving: number | null;
   hasSubscription: boolean;
+  /**
+   * SKÖTS AV OSS, INTE AV KUNDEN.
+   *
+   * Sant för ett företag som är ACTIVE eller PAST_DUE utan prenumeration hos
+   * Stripe. Det läget uppstår bara på ett sätt: någon har satt det för hand i
+   * plattformspanelen — en kund som betalar mot faktura, en vi bjuder på
+   * systemet, eller en som väntar på att kortbetalningen ska kopplas på.
+   *
+   * För dem ska panelen VISA vad som gäller men inte kunna ändra det. Två
+   * saker skulle annars gå fel, och båda kostar pengar:
+   *
+   *   Ett köp i kassan skulle lägga en kortprenumeration OVANPÅ den faktura
+   *   vi redan skickar, och kunden betalar dubbelt utan att något i systemet
+   *   säger ifrån.
+   *
+   *   Ett tillval som slås på utan prenumeration är gratis — reglaget skriver
+   *   bara en rad i company_modules. En fakturakund hade därmed kunnat ta
+   *   planeringen för 699 kr i månaden utan att någonstans bli debiterad.
+   *
+   * TRIALING räknas INTE hit. Provperioden ska vara fri att pröva i, och det
+   * är hela poängen med den (CLAUDE.md § 8). CANCELED räknas inte heller:
+   * den som vill komma tillbaka ska kunna köpa igen utan att höra av sig.
+   */
+  platformManaged: boolean;
   currentPeriodEnd: Date | null;
   cancelAtPeriodEnd: boolean;
   interval: BillingInterval | null;
@@ -323,6 +347,39 @@ function moduleOffers(
 }
 
 /** Vad kunden ser på prenumerationssidan. */
+/**
+ * Sköts företaget av oss i stället för av kunden?
+ *
+ * Ligger som en egen funktion så att både översikten och serveråtgärderna
+ * svarar på frågan likadant. Åtgärderna måste fråga själva — att dölja en
+ * knapp är kosmetik, och ett formulär kan skickas av annat än sidan. Samma
+ * hållning som modulgrinden i company-modules.ts.
+ */
+export function isPlatformManaged(
+  stripeSubscriptionId: string | null,
+  status: string
+): boolean {
+  if (stripeSubscriptionId) return false;
+  return status === "ACTIVE" || status === "PAST_DUE";
+}
+
+/** Läser läget ur databasen. För serveråtgärderna, som bara har ett id. */
+export async function platformManagedCompany(
+  companyId: string
+): Promise<boolean> {
+  const company = await unsafeGlobalPrisma.company.findUnique({
+    where: { id: companyId },
+    select: { stripeSubscriptionId: true, subscriptionStatus: true },
+  });
+
+  if (!company) return false;
+
+  return isPlatformManaged(
+    company.stripeSubscriptionId,
+    company.subscriptionStatus
+  );
+}
+
 export async function getBillingOverview(
   companyId: string
 ): Promise<BillingOverview> {
@@ -337,7 +394,7 @@ export async function getBillingOverview(
 
   const company = await unsafeGlobalPrisma.company.findUnique({
     where: { id: companyId },
-    select: { stripeSubscriptionId: true },
+    select: { stripeSubscriptionId: true, subscriptionStatus: true },
   });
 
   const amounts = (count: number) => ({
@@ -352,6 +409,10 @@ export async function getBillingOverview(
     used: licenses.used,
     ...amounts(screens),
     hasSubscription: Boolean(company?.stripeSubscriptionId),
+    platformManaged: isPlatformManaged(
+      company?.stripeSubscriptionId ?? null,
+      company?.subscriptionStatus ?? "TRIALING"
+    ),
     currentPeriodEnd: null,
     cancelAtPeriodEnd: false,
     interval: null,

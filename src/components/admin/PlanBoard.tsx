@@ -120,8 +120,31 @@ export interface BoardUnplaced {
 /** Hur ofta utfallet hämtas. Tio sekunder känns samtidigt utan att märkas. */
 const LIVE_MS = 10_000;
 
-/** Zoomstegen, i pixlar per minut. Mitten är utgångsläget. */
-const ZOOM = [0.3, 0.55, 1.0];
+/**
+ * ZOOMSTEGEN ÄR MULTIPLIKATORER, INTE PIXLAR PER MINUT.
+ *
+ * Steg ett betyder "hela veckan får plats i rutan". Skalan räknas alltså fram
+ * ur den bredd tavlan faktiskt har, inte ur ett tal valt i förväg.
+ *
+ * Det var fel förut, och det syntes direkt: ett fast tal gav en vecka som var
+ * dubbelt så bred som fönstret, och tavlan öppnade på måndag förmiddag med
+ * resten utanför kanten. En planeringsvy vars första intryck är att man måste
+ * leta rätt på onsdagen är ingen planeringsvy.
+ */
+const ZOOM = [1, 1.75, 3];
+
+/** Stationskolumnens bredd i pixlar. Behövs för att räkna ut skalan. */
+const STATION_COLUMN = 150;
+
+/**
+ * Minsta skala som är läsbar.
+ *
+ * Under det här blir en timme så smal att inte ens ett ordernummer får plats,
+ * och tavlan är bättre med en rullningslist än med rutor som inte går att
+ * skilja åt. Slår taket till rullar veckan i sidled, med stationskolumnen
+ * kvar på plats.
+ */
+const MIN_PX_PER_MINUTE = 0.22;
 
 /** Hur långt pekaren får röra sig och ändå räknas som ett tryck. */
 const CLICK_SLOP = 4;
@@ -205,7 +228,18 @@ export default function PlanBoard({
   const [blocks, setBlocks] = useState(initialBlocks);
   const [drag, setDrag] = useState<Drag | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [zoom, setZoom] = useState(1);
+  const [zoom, setZoom] = useState(0);
+  const [showUnplaced, setShowUnplaced] = useState(true);
+
+  /**
+   * Tavlans egen bredd i pixlar, mätt och inte gissad.
+   *
+   * Noll tills den mätts. Första renderingen sker på servern, där ingen bredd
+   * finns — och en gissad bredd hade ritat en vecka som hoppar till så fort
+   * mätningen kommer.
+   */
+  const [boardWidth, setBoardWidth] = useState(0);
+  const boardRef = useRef<HTMLDivElement>(null);
   const [progress, setProgress] = useState<Record<string, BlockProgress>>({});
   const [now, setNow] = useState<number | null>(null);
   const [editing, setEditing] = useState<BoardBlock | null>(null);
@@ -216,7 +250,22 @@ export default function PlanBoard({
   useEffect(() => setBlocks(initialBlocks), [initialBlocks]);
 
   const mondayStart = useMemo(() => new Date(monday), [monday]);
-  const pxPerMinute = ZOOM[zoom];
+
+  // Mäts om när fönstret ändras, när menyn fälls ut och när Oplacerat
+  // stängs. Alla tre ändrar hur mycket plats veckan har.
+  useEffect(() => {
+    const node = boardRef.current;
+    if (!node) return;
+
+    const measure = () => setBoardWidth(node.clientWidth);
+
+    measure();
+
+    const observer = new ResizeObserver(measure);
+    observer.observe(node);
+
+    return () => observer.disconnect();
+  }, []);
 
   /** Dygnsbörjan för veckans sju dagar, som tidpunkter. */
   const days = useMemo(
@@ -343,6 +392,34 @@ export default function PlanBoard({
 
     return result;
   }, [blocks, days, hoursFor, stations, timeZone, visibleDays]);
+
+  /**
+   * Skalan: pixlar per minut.
+   *
+   * Steg ett lägger hela veckan i den bredd som finns. Måtten är kända först
+   * när dagfönstren räknats, eftersom en fredag som slutar 13:00 är smalare
+   * än en måndag som slutar 16:00 — veckan är inte sju lika breda kolumner.
+   *
+   * Innan bredden mätts används en skala som duger till en första rendering.
+   * Den syns bara ett ögonblick, och ett nollvärde hade gett kolumner utan
+   * bredd.
+   */
+  const pxPerMinute = useMemo(() => {
+    const minutes = visibleDays.reduce((total, index) => {
+      const axis = windows.get(index);
+      return total + (axis ? axis.endMinute - axis.startMinute : 0);
+    }, 0);
+
+    if (boardWidth === 0 || minutes === 0) return 0.5 * ZOOM[zoom];
+
+    // Två pixlar per dag för kolumnlinjerna, så att sista dagen inte hamnar
+    // en hårsmån utanför och tvingar fram en rullningslist som inte behövs.
+    const usable = boardWidth - STATION_COLUMN - visibleDays.length * 2;
+
+    const fit = usable / minutes;
+
+    return Math.max(MIN_PX_PER_MINUTE, fit) * ZOOM[zoom];
+  }, [boardWidth, visibleDays, windows, zoom]);
 
   const widthOf = useCallback(
     (dayIndex: number) => {
@@ -773,16 +850,37 @@ export default function PlanBoard({
         startedAt.current = null;
       }}
     >
-      {/* --- Oplacerat ---------------------------------------------------- */}
-      <aside className="w-full shrink-0 lg:w-64">
+      {/* --- Oplacerat ----------------------------------------------------
+          Går att fälla ihop. Panelen tog 256 pixlar av veckans bredd även när
+          den stod tom, och de pixlarna är veckans. */}
+      <aside
+        className={`w-full shrink-0 ${showUnplaced ? "lg:w-60" : "lg:w-auto"}`}
+      >
         <div className="rounded-lg border border-neutral-200 bg-white">
-          <div className="border-b border-neutral-200 px-4 py-3">
-            <h2 className="text-sm font-semibold text-neutral-900">
+          <button
+            type="button"
+            onClick={() => setShowUnplaced((value) => !value)}
+            className="flex w-full items-center gap-2 border-b border-neutral-200 px-4 py-3 text-left hover:bg-neutral-50"
+            aria-expanded={showUnplaced}
+          >
+            <span className="text-sm font-semibold text-neutral-900">
               Oplacerat
-            </h2>
-          </div>
+            </span>
+            {unplaced.length > 0 && (
+              <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[11px] font-semibold tabular-nums text-amber-800">
+                {unplaced.length}
+              </span>
+            )}
+            <span className="ml-auto text-neutral-400">
+              {showUnplaced ? "−" : "+"}
+            </span>
+          </button>
 
-          <div className="max-h-[32rem] overflow-y-auto p-2">
+          <div
+            className={`max-h-[32rem] overflow-y-auto p-2 ${
+              showUnplaced ? "" : "hidden"
+            }`}
+          >
             {plannable.length === 0 && unplannable.length === 0 ? (
               <p className="px-2 py-6 text-center text-[13px] text-neutral-500">
                 Allt beräknat arbete ligger på tavlan.
@@ -871,20 +969,30 @@ export default function PlanBoard({
             </p>
           </div>
         ) : (
-          <div className="overflow-x-auto rounded-lg border border-neutral-200 bg-white">
+          <div
+            ref={boardRef}
+            className="overflow-x-auto rounded-lg border border-neutral-200 bg-white"
+          >
             <div className="inline-block min-w-full">
               {/* Dagrubrikerna */}
               <div className="flex border-b border-neutral-200 bg-neutral-50">
-                <div className="w-40 shrink-0 border-r border-neutral-200 px-3 py-2 text-[11px] font-semibold uppercase tracking-wider text-neutral-400">
+                {/* STATIONSKOLUMNEN STÅR STILL. Rullar man in i veckan ska man
+                    fortfarande kunna se vilken maskin raden gäller — utan det
+                    är en tavla med tolv stationer oläslig så fort man zoomat
+                    in. */}
+                <div
+                  style={{ width: STATION_COLUMN }}
+                  className="sticky left-0 z-20 shrink-0 border-r border-neutral-200 bg-neutral-50 px-3 py-2 text-[11px] font-semibold uppercase tracking-wider text-neutral-400"
+                >
                   Station
                 </div>
                 {visibleDays.map((index) => (
                   <div
                     key={index}
                     style={{ width: widthOf(index) }}
-                    className="shrink-0 border-r border-neutral-200 px-2 py-2 last:border-r-0"
+                    className="shrink-0 border-l-2 border-neutral-200 px-2 py-2 first:border-l-0"
                   >
-                    <p className="text-[13px] font-medium text-neutral-900">
+                    <p className="truncate text-[13px] font-medium text-neutral-900">
                       {DAY_LABELS[index]}{" "}
                       <span className="font-normal text-neutral-400">
                         {dayLabel(days[index], timeZone)}
@@ -904,7 +1012,10 @@ export default function PlanBoard({
                   key={station.id}
                   className="flex border-b border-neutral-100 last:border-b-0"
                 >
-                  <div className="w-40 shrink-0 border-r border-neutral-200 px-3 py-2">
+                  <div
+                    style={{ width: STATION_COLUMN }}
+                    className="sticky left-0 z-20 flex shrink-0 flex-col justify-center border-r border-neutral-200 bg-white px-3 py-2"
+                  >
                     <p className="truncate text-[13px] font-medium text-neutral-900">
                       {station.name}
                     </p>
@@ -944,7 +1055,7 @@ export default function PlanBoard({
                           registerCell(`${station.id}|${dayIndex}`, node)
                         }
                         style={{ width: widthOf(dayIndex) }}
-                        className={`relative shrink-0 border-r border-neutral-200 last:border-r-0 ${
+                        className={`relative shrink-0 border-l-2 border-neutral-200 first:border-l-0 ${
                           draggingMoment && draggingMoment !== station.momentId
                             ? "opacity-30"
                             : ""
@@ -956,7 +1067,7 @@ export default function PlanBoard({
                             : ""
                         }`}
                       >
-                        <div className="relative h-14">
+                        <div className="relative h-20">
                           {/* Stängd tid och raster, i grått. Det öppna är vitt. */}
                           <div className="absolute inset-0 bg-neutral-100/70" />
                           {axis &&
@@ -1198,14 +1309,22 @@ function BlockBox({
         />
       )}
 
-      {width > 58 && (
-        <div className="relative px-1.5 py-1">
-          <p className="truncate text-[11px] font-semibold leading-tight">
+      {width > 34 && (
+        <div className="relative px-1.5 py-1.5">
+          <p className="truncate text-[12px] font-semibold leading-tight">
             {block.orderNumber}
           </p>
-          <p className="truncate text-[10px] leading-tight opacity-80">
-            {width > 110 ? block.momentName : formatDuration(block.minutes)}
-          </p>
+          {width > 80 && (
+            <p className="truncate text-[11px] leading-tight opacity-80">
+              {block.momentName}
+            </p>
+          )}
+          {width > 80 && (
+            <p className="truncate text-[11px] leading-tight tabular-nums opacity-70">
+              {formatDuration(block.minutes)}
+              {progress ? ` · ${formatDuration(progress.clockedMinutes)}` : ""}
+            </p>
+          )}
         </div>
       )}
 
