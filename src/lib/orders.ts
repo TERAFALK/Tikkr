@@ -85,7 +85,10 @@ export async function orderRows(
       // Beräknad tid är egna rader, en per arbetsmoment. Orderns totala
       // beräkning är summan av dem — se src/lib/order-budget.ts.
       budgets: {
-        orderBy: { moment: { name: "asc" } },
+        // Orderns egen ordning, inte alfabetisk. Raderna säger i vilken följd
+        // momenten ska göras, och den uppgiften går förlorad om listan
+        // sorteras om på vägen ut.
+        orderBy: { sortOrder: "asc" },
         select: {
           momentId: true,
           minutes: true,

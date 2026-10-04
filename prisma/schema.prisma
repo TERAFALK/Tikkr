@@ -493,6 +493,21 @@ model OrderBudget {
   /// är två olika svar.
   minutes Int
 
+  /// I VILKEN ORDNING MOMENTEN SKA GÖRAS. Noll först.
+  ///
+  /// Svetsningen före lackeringen, fräsningen före monteringen. Ordningen är
+  /// orderns egen och inte global: samma två moment kan komma i olika följd på
+  /// två olika jobb, och ett företagsgemensamt flöde hade därför varit fel.
+  ///
+  /// Styr tre saker: raderna i orderrutan, i vilken ordning jobben står i
+  /// Oplacerat, och pilarna mellan rutorna på planeringstavlan.
+  ///
+  /// Den SPÄRRAR ingenting. Att planera lackeringen före svetsningen går
+  /// alldeles utmärkt — ibland är det precis vad som måste hända — och tavlan
+  /// ritar då en pil som går baklänges. Att se att något är i otakt är mer
+  /// värt än att hindras från att planera det.
+  sortOrder Int @default(0) @map("sort_order")
+
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 

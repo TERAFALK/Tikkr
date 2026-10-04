@@ -2,7 +2,12 @@ import Link from "next/link";
 import { requireAdmin } from "@/lib/admin-session";
 import { requireModule } from "@/lib/company-modules";
 import { companyTimeZone } from "@/lib/company";
-import { blocksInWeek, stationsFor, unplacedWork } from "@/lib/planning";
+import {
+  blocksInWeek,
+  orderSequences,
+  stationsFor,
+  unplacedWork,
+} from "@/lib/planning";
 import { isoWeekNumber } from "@/lib/week";
 import {
   addDaysInZone,
@@ -64,6 +69,14 @@ export default async function PlanningPage({
   ]);
 
   const open = stations.filter((station) => station.active);
+
+  // I vilken ordning varje orders moment ska göras. Bara för de ordrar som
+  // faktiskt har en ruta i veckan — tavlan ritar pilar mellan dem, och en
+  // order utan rutor har inget att peka på.
+  const sequences = await orderSequences(
+    db,
+    blocks.map((block) => block.orderId)
+  );
 
   const shift = (days: number) =>
     toDateInput(addDaysInZone(monday, days, timeZone), timeZone);
@@ -128,6 +141,7 @@ export default async function PlanningPage({
           monday={monday.toISOString()}
           weekNumber={isoWeekNumber(monday, timeZone)}
           timeZone={timeZone}
+          sequences={sequences}
           isCurrentWeek={isCurrentWeek}
           readOnly={Boolean(session.support)}
         />
@@ -190,6 +204,7 @@ function toBoardUnplaced(row: {
   placedMinutes: number;
   remainingMinutes: number;
   plannable: boolean;
+  sequence: number;
 }): BoardUnplaced {
   return { ...row, dueDate: row.dueDate?.toISOString() ?? null };
 }

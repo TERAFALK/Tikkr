@@ -22,9 +22,14 @@ import {
  * totalen räknas fram medan man skriver. Det är totalen som visas i
  * orderlistan, precis som förut.
  *
+ * RADERNAS ORDNING ÄR EN UPPGIFT när planeringen är påslagen: den säger i
+ * vilken följd momenten ska göras, och tavlan ritar pilar efter den. Pilarna
+ * som flyttar en rad visas därför bara då, se `ordered`.
+ *
  * Skriver vanliga formulärfält med samma namn på varje rad. Serveråtgärden
  * läser dem med getAll() i samma ordning som de står här, så ingen av rutorna
- * behöver veta hur den här listan fungerar. Se src/lib/order-budget.ts, som
+ * behöver veta hur den här listan fungerar. Ordningen behöver alltså inget
+ * eget fält — den ÄR fältens ordning. Se src/lib/order-budget.ts, som
  * också äger tolkningen av timfältet — samma funktion i webbläsaren som på
  * servern, annars visar totalen en sak och sparar en annan.
  */
@@ -52,9 +57,23 @@ interface DraftRow {
 export default function BudgetMoments({
   moments,
   defaultRows = [],
+  ordered = false,
 }: {
   moments: BudgetMomentOption[];
   defaultRows?: BudgetMomentRow[];
+  /**
+   * Visar pilarna som flyttar en rad, och numret framför den.
+   *
+   * Hör till tillvalet Planering: utan tavlan finns ingenting som läser
+   * ordningen, och två pilar per rad vore då bara brus i en ruta som redan är
+   * full. Sidan avgör genom `hasModule`.
+   *
+   * ORDNINGEN SPARAS ÄNDÅ, för varje kund. Den kommer ur radernas ordning i
+   * formuläret, och den finns oavsett om någon kan ändra den eller inte. Den
+   * som köper planeringen ett halvår senare har alltså en ordning redan, i
+   * stället för en tom uppgift att fylla i på varje order.
+   */
+  ordered?: boolean;
 }) {
   const [rows, setRows] = useState<DraftRow[]>(() =>
     defaultRows.map((row, index) => ({
@@ -98,6 +117,26 @@ export default function BudgetMoments({
     setRows((current) => current.filter((row) => row.key !== key));
   }
 
+  /**
+   * Flyttar en rad ett steg.
+   *
+   * Byter plats på två rader i listan, och det är hela lagringen: fälten
+   * skickas i den ordning de står, och servern numrerar om dem. Inget dolt
+   * fält, ingen andra sanning.
+   */
+  function move(key: number, direction: -1 | 1) {
+    setRows((current) => {
+      const index = current.findIndex((row) => row.key === key);
+      const target = index + direction;
+
+      if (index < 0 || target < 0 || target >= current.length) return current;
+
+      const next = [...current];
+      [next[index], next[target]] = [next[target], next[index]];
+      return next;
+    });
+  }
+
   const total = rows.reduce(
     (sum, row) => sum + (parseHours(row.hours) ?? 0),
     0
@@ -117,7 +156,7 @@ export default function BudgetMoments({
 
   return (
     <div className="space-y-2">
-      {rows.map((row) => {
+      {rows.map((row, index) => {
         // Radens eget moment måste finnas kvar i listan, annars skulle
         // webbläsaren visa ett annat namn än det som sparats.
         const options = moments.filter(
@@ -128,6 +167,37 @@ export default function BudgetMoments({
 
         return (
           <div key={row.key} className="flex items-center gap-2">
+            {ordered && (
+              <>
+                {/* Numret står framför raden. Utan det är två pilar bara två
+                    pilar; med det syns att raderna har en följd. */}
+                <span className="w-5 shrink-0 text-right text-[13px] tabular-nums text-neutral-400">
+                  {index + 1}
+                </span>
+
+                <div className="flex shrink-0 flex-col">
+                  <button
+                    type="button"
+                    onClick={() => move(row.key, -1)}
+                    disabled={index === 0}
+                    aria-label="Flytta upp"
+                    className="px-1 text-[10px] leading-none text-neutral-400 hover:text-neutral-900 disabled:text-neutral-200"
+                  >
+                    ▲
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => move(row.key, 1)}
+                    disabled={index === rows.length - 1}
+                    aria-label="Flytta ner"
+                    className="px-1 text-[10px] leading-none text-neutral-400 hover:text-neutral-900 disabled:text-neutral-200"
+                  >
+                    ▼
+                  </button>
+                </div>
+              </>
+            )}
+
             <Select
               name={BUDGET_MOMENT_FIELD}
               value={row.momentId}

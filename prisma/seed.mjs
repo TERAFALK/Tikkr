@@ -306,6 +306,53 @@ async function main() {
   // Samma ordernummer som demoföretaget — helt tillåtet, de ska inte krocka.
   await order(other.id, "2601", "Egen kund");
 
+  // BERÄKNAD TID PER ARBETSMOMENT, I DEN ORDNING DE SKA GÖRAS.
+  //
+  // Utan den här biten står Oplacerat tomt på planeringstavlan, och modulen
+  // går inte att pröva utan att först fylla i tre ordrar för hand. Ordningen
+  // är den som ritas som pilar: svetsning före fräsning före montering.
+  //
+  // 2602 delar två moment med 2601 med flit. Då går det att se att pilarna
+  // hör till VARJE ORDER för sig och inte till momenten i allmänhet.
+  const BERAKNINGAR = [
+    ["2601", [["Svetsning", 240], ["Fräsning", 360], ["Montering", 120]]],
+    ["2602", [["Fräsning", 180], ["Lackering", 240]]],
+    ["2603", [["Montering", 300], ["Kvalitetskontroll", 60]]],
+  ];
+
+  for (const [orderNumber, rader] of BERAKNINGAR) {
+    const found = await prisma.order.findFirst({
+      where: { companyId: demo.id, orderNumber },
+      select: { id: true },
+    });
+
+    if (!found) continue;
+
+    // Körs seed igen lämnas en befintlig beräkning i fred. Den kan ha ändrats
+    // på skärmen, och seed ska inte skriva tillbaka sina egna siffror över
+    // något någon arbetat med.
+    const already = await prisma.orderBudget.count({
+      where: { orderId: found.id },
+    });
+
+    if (already > 0) continue;
+
+    for (const [index, [momentName, minutes]] of rader.entries()) {
+      const moment = demoMoments.find((row) => row.name === momentName);
+      if (!moment) continue;
+
+      await prisma.orderBudget.create({
+        data: {
+          companyId: demo.id,
+          orderId: found.id,
+          momentId: moment.id,
+          minutes,
+          sortOrder: index,
+        },
+      });
+    }
+  }
+
   // Testskärm för demoföretaget, i väntande läge med en fast kod. Koden
   // sparas som fingeravtryck, precis som en riktig — bara att den här är
   // förutsägbar så att du kan koppla om testskärmen hur många gånger som helst.

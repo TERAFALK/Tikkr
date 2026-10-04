@@ -77,9 +77,17 @@ export default function OrderFields({
 
       <Field
         label="Beräknad tid"
-        hint="Valfritt. Timmar per arbetsmoment"
+        hint={
+          planning
+            ? "Valfritt. Timmar per arbetsmoment, i den ordning de ska göras"
+            : "Valfritt. Timmar per arbetsmoment"
+        }
       >
-        <BudgetMoments moments={moments} defaultRows={defaults?.budgets} />
+        <BudgetMoments
+          moments={moments}
+          defaultRows={defaults?.budgets}
+          ordered={planning}
+        />
       </Field>
 
       {planning && (

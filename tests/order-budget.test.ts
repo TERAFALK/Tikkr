@@ -146,8 +146,8 @@ describe("läsa raderna ur formuläret", () => {
     );
 
     expect(rows).toEqual([
-      { momentId: svets, minutes: 25 * 60 },
-      { momentId: montering, minutes: 15 * 60 },
+      { momentId: svets, minutes: 25 * 60, sortOrder: 0 },
+      { momentId: montering, minutes: 15 * 60, sortOrder: 1 },
     ]);
   });
 
@@ -160,7 +160,7 @@ describe("läsa raderna ur formuläret", () => {
       ])
     );
 
-    expect(rows).toEqual([{ momentId: svets, minutes: 25 * 60 }]);
+    expect(rows).toEqual([{ momentId: svets, minutes: 25 * 60, sortOrder: 0 }]);
   });
 
   it("lägger ihop samma moment till en rad", () => {
@@ -171,7 +171,7 @@ describe("läsa raderna ur formuläret", () => {
       ])
     );
 
-    expect(rows).toEqual([{ momentId: svets, minutes: 15 * 60 }]);
+    expect(rows).toEqual([{ momentId: svets, minutes: 15 * 60, sortOrder: 0 }]);
   });
 
   it("inga rader alls ger ingen beräkning", () => {
@@ -206,13 +206,13 @@ describe("spara beräkningen", () => {
     const db = forCompany(companyId);
 
     await saveOrderBudgets(db, companyId, orderId, [
-      { momentId: svets, minutes: 25 * 60 },
-      { momentId: montering, minutes: 15 * 60 },
+      { momentId: svets, minutes: 25 * 60, sortOrder: 0 },
+      { momentId: montering, minutes: 15 * 60, sortOrder: 1 },
     ]);
 
     // Momenteringen togs bort på skärmen och svetsningen räknades om.
     await saveOrderBudgets(db, companyId, orderId, [
-      { momentId: svets, minutes: 30 * 60 },
+      { momentId: svets, minutes: 30 * 60, sortOrder: 0 },
     ]);
 
     const saved = await db.orderBudget.findMany({ where: { orderId } });
@@ -226,7 +226,7 @@ describe("spara beräkningen", () => {
     const db = forCompany(companyId);
 
     await saveOrderBudgets(db, companyId, orderId, [
-      { momentId: svets, minutes: 25 * 60 },
+      { momentId: svets, minutes: 25 * 60, sortOrder: 0 },
     ]);
     await saveOrderBudgets(db, companyId, orderId, []);
 
@@ -239,8 +239,8 @@ describe("multi-tenant: id:n från formuläret", () => {
     const db = forCompany(companyId);
 
     await saveOrderBudgets(db, companyId, orderId, [
-      { momentId: svets, minutes: 10 * 60 },
-      { momentId: theirMoment, minutes: 10 * 60 },
+      { momentId: svets, minutes: 10 * 60, sortOrder: 0 },
+      { momentId: theirMoment, minutes: 10 * 60, sortOrder: 0 },
     ]);
 
     const saved = await db.orderBudget.findMany({ where: { orderId } });
@@ -251,7 +251,7 @@ describe("multi-tenant: id:n från formuläret", () => {
 
   it("en annan kunds order går inte att beräkna tid på", async () => {
     await saveOrderBudgets(forCompany(companyId), companyId, theirOrder, [
-      { momentId: svets, minutes: 10 * 60 },
+      { momentId: svets, minutes: 10 * 60, sortOrder: 0 },
     ]);
 
     const leaked = await unsafeGlobalPrisma.orderBudget.findMany({
@@ -274,5 +274,68 @@ describe("multi-tenant: id:n från formuläret", () => {
     const visible = await forCompany(companyId).orderBudget.findMany({});
 
     expect(visible).toEqual([]);
+  });
+});
+
+/* -------------------------------------------------------------------------- */
+
+describe("ordningen momenten ska göras i", () => {
+  /**
+   * ORDNINGEN ÄR EN UPPGIFT, INTE EN SLUMP.
+   *
+   * Svetsningen före lackeringen. Den följden styr tre saker: raderna i
+   * orderrutan, i vilken ordning jobben står i Oplacerat, och pilarna mellan
+   * rutorna på planeringstavlan. Tappas den bort någonstans på vägen blir
+   * pilarna fel, och en pil som pekar åt fel håll är värre än ingen pil.
+   */
+  it("kommer ur radernas ordning i formuläret", () => {
+    const rows = readBudgetRows(
+      form([
+        [montering, "5"],
+        [svets, "10"],
+      ])
+    );
+
+    // Monteringen stod först på skärmen, alltså är den först.
+    expect(rows.map((row) => row.momentId)).toEqual([montering, svets]);
+    expect(rows.map((row) => row.sortOrder)).toEqual([0, 1]);
+  });
+
+  it("sparas och läses tillbaka i samma ordning", async () => {
+    const db = forCompany(companyId);
+
+    await saveOrderBudgets(db, companyId, orderId, [
+      { momentId: montering, minutes: 5 * 60, sortOrder: 0 },
+      { momentId: svets, minutes: 10 * 60, sortOrder: 1 },
+    ]);
+
+    const saved = await db.orderBudget.findMany({
+      where: { orderId },
+      orderBy: { sortOrder: "asc" },
+    });
+
+    expect(saved.map((row) => row.momentId)).toEqual([montering, svets]);
+  });
+
+  it("numreras om när en rad fallit bort", async () => {
+    // Ett moment från ett annat företag filtreras bort innan skrivningen. Utan
+    // omnumrering hade ordningen fått ett hål, och nästa sparning hade flyttat
+    // raderna utan att någon bett om det.
+    const db = forCompany(companyId);
+
+    await saveOrderBudgets(db, companyId, orderId, [
+      { momentId: theirMoment, minutes: 2 * 60, sortOrder: 0 },
+      { momentId: svets, minutes: 10 * 60, sortOrder: 1 },
+      { momentId: montering, minutes: 5 * 60, sortOrder: 2 },
+    ]);
+
+    const saved = await db.orderBudget.findMany({
+      where: { orderId },
+      orderBy: { sortOrder: "asc" },
+    });
+
+    expect(saved).toHaveLength(2);
+    expect(saved.map((row) => row.sortOrder)).toEqual([0, 1]);
+    expect(saved.map((row) => row.momentId)).toEqual([svets, montering]);
   });
 });

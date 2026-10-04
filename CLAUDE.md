@@ -140,7 +140,7 @@ customers      — id, company_id, name, customer_number, org_number,
                  markup_percent, discount_percent, notes, active
 orders         — id, company_id, order_number, customer_id?, status,
                  planned_due_date?
-order_budgets  — id, company_id, order_id, moment_id, minutes
+order_budgets  — id, company_id, order_id, moment_id, minutes, sort_order
 work_moments   — id, company_id, name, cost_rate_ore
 indirect_moments — id, company_id, name, active
 time_entries   — id, company_id, employee_id, kind,
@@ -509,6 +509,35 @@ stripe_prices    — item, month_price_id, year_price_id, updated_by_email
 
    `src/lib/schedule.ts` exporterar om den delen, så att lönekoden läser sitt
    schema där den alltid gjort det.
+
+   **Momenten har en ORDNING på ordern** (`order_budgets.sort_order`, tillagt
+   2026-10-04). Svetsningen före lackeringen. Ordningen är orderns egen och
+   inte global: samma två moment kan komma i olika följd på två jobb, och ett
+   företagsgemensamt flöde hade därför varit fel.
+
+   Den kommer ur radernas ordning i formuläret och inte ur ett eget fält —
+   webbläsaren skickar fälten som de står. Pilarna som flyttar en rad visas
+   bara med modulen, men ordningen SPARAS för varje kund: den som köper
+   planeringen ett halvår senare har då en ordning redan i stället för en tom
+   uppgift på varje order.
+
+   Styr tre saker: raderna i orderrutan, ordningen i Oplacerat, och pilarna
+   mellan rutorna på tavlan. Den **spärrar ingenting** — att planera
+   lackeringen före svetsningen går utmärkt, och tavlan ritar då pilen gul och
+   streckad. Att se att något är i otakt är mer värt än att hindras.
+
+   **Stationer med samma arbetsmoment ligger bredvid varandra** på tavlan.
+   Två fräsar är utbytbara mot varandra och inget annat, och den som letar en
+   ledig lucka tittar på dem i samma ögonkast. Grupperna kommer i
+   bokstavsordning på momentets namn, och pilarna i stationsregistret flyttar
+   en station inom sin grupp. Momentnamnet är den enda stabila nyckeln:
+   ordningen momenten görs i är ORDERNS, inte företagets.
+
+   **Överplanering tillåts men syns.** Sju timmar på ett moment beräknat till
+   sex går igenom, av samma skäl som systemet aldrig stoppar stämpling för att
+   en beräkning överskrids (regel 6). Raden står då kvar i Oplacerat med "Över
+   beräknat" i gult. Till 2026-10-04 filtrerades den bort i stället, och
+   överplanering var därmed helt osynlig.
 
    **Leveransdatumet på ordern** (`orders.planned_due_date`) hör till modulen
    och visas i orderrutan bara när den är på. Utan det vet planeraren inte vad

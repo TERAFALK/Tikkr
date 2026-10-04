@@ -111,6 +111,8 @@ export interface BoardUnplaced {
   placedMinutes: number;
   remainingMinutes: number;
   plannable: boolean;
+  /** Momentets plats i orderns egen ordning. Noll först. */
+  sequence: number;
 }
 
 /* -------------------------------------------------------------------------- */
@@ -209,6 +211,7 @@ export default function PlanBoard({
   weekNumber,
   timeZone,
   isCurrentWeek,
+  sequences,
   readOnly,
 }: {
   stations: BoardStation[];
@@ -219,6 +222,13 @@ export default function PlanBoard({
   weekNumber: number;
   timeZone: string;
   isCurrentWeek: boolean;
+  /**
+   * I vilken ordning varje orders moment ska göras, som moment-id per order.
+   *
+   * Tavlan ritar pilar efter den: svetsningen pekar på lackeringen. En order
+   * som saknas här har ingen känd följd, och då ritas inga pilar.
+   */
+  sequences: Record<string, string[]>;
   /** Supportläge. Tavlan går att läsa, inte att ändra. */
   readOnly: boolean;
 }) {
@@ -344,12 +354,20 @@ export default function PlanBoard({
     return shown;
   }, [blocks, days, stations]);
 
-  /** Tidsaxeln per dag. */
+  /**
+   * Tidsaxeln per dag.
+   *
+   * RÄKNAS UR SERVERNS RUTOR, inte ur de optimistiska. Axeln sträcks ut av en
+   * ruta som ligger utanför öppettiderna, och med den lokala listan som
+   * underlag ändrades därmed varje kolumns bredd mitt under en dragning — allt
+   * på tavlan bytte storlek medan man höll i det. Nu rör sig bredderna en gång,
+   * när servern svarat, i stället för två gånger varav en under handen.
+   */
   const windows = useMemo(() => {
     const result = new Map<number, { startMinute: number; endMinute: number }>();
 
     for (const index of visibleDays) {
-      const spans = blocks
+      const spans = initialBlocks
         .filter((block) => dayIndexOf(new Date(block.startsAt), days) === index)
         .map((block) => ({
           startsAt: new Date(block.startsAt),
@@ -363,7 +381,7 @@ export default function PlanBoard({
     }
 
     return result;
-  }, [blocks, days, hoursFor, stations, timeZone, visibleDays]);
+  }, [days, hoursFor, initialBlocks, stations, timeZone, visibleDays]);
 
   /**
    * Skalan: pixlar per minut.
@@ -386,11 +404,23 @@ export default function PlanBoard({
     return Math.max(MIN_PX_PER_MINUTE, usable / minutes) * ZOOM[zoom];
   }, [boardWidth, visibleDays, windows, zoom]);
 
+  /**
+   * En dags bredd i HELA pixlar.
+   *
+   * Avrundningen är inte kosmetik. Med bruten bredd hamnar kolumnlinjen,
+   * timlinjerna och rutornas kanter på var sin sida om samma halva pixel, och
+   * webbläsaren väljer olika håll beroende på var i kolumnen de ligger. Det
+   * syns som att saker byter storlek med en pixel när något annat ändras, och
+   * det är precis den sortens vaghet som får en vy att kännas opålitlig.
+   *
+   * Träffytan använder samma funktion, så det pekaren pekar på är det som
+   * ritats.
+   */
   const widthOf = useCallback(
     (dayIndex: number) => {
       const axis = windows.get(dayIndex);
       if (!axis) return 0;
-      return (axis.endMinute - axis.startMinute) * pxPerMinute;
+      return Math.round((axis.endMinute - axis.startMinute) * pxPerMinute);
     },
     [pxPerMinute, windows]
   );
@@ -448,6 +478,21 @@ export default function PlanBoard({
       return null;
     },
     [days, pxPerMinute, stations, visibleDays, widthOf, windows]
+  );
+
+  /** Pixlar från tavlans vänsterkant till en dags början. */
+  const dayOffset = useCallback(
+    (dayIndex: number) => {
+      let x = STATION_COLUMN;
+
+      for (const index of visibleDays) {
+        if (index === dayIndex) return x;
+        x += widthOf(index) + DAY_BORDER;
+      }
+
+      return null;
+    },
+    [visibleDays, widthOf]
   );
 
   /* --- Skrivningarna ----------------------------------------------------- */
@@ -829,10 +874,23 @@ export default function PlanBoard({
     return blocks;
   }, [blocks, drag]);
 
+  /**
+   * Raderna som visas i Oplacerat.
+   *
+   * Allt utom det som gått jämnt ut. En rad med noll kvar ligger ute på tavlan
+   * och är färdigplanerad; en rad med MINUS kvar är planerad över sin
+   * beräkning, och den ska synas.
+   *
+   * Filtret var `remainingMinutes > 0` till 2026-10-04, vilket tog bort just
+   * de raderna. Att planera sju timmar på ett moment beräknat till sex gick
+   * alltså igenom helt osynligt: brickan försvann ur Oplacerat som om allt
+   * stämde. Systemet HINDRAR inte överplanering, av samma skäl som det inte
+   * hindrar stämpling över beräkningen — men det ska säga ifrån.
+   */
   const unplaced = useMemo(
     () =>
       initialUnplaced.filter(
-        (row) => row.remainingMinutes > 0 || row.budgetMinutes === null
+        (row) => row.remainingMinutes !== 0 || row.budgetMinutes === null
       ),
     [initialUnplaced]
   );
@@ -852,6 +910,122 @@ export default function PlanBoard({
 
   const draggedBlockId = drag && drag.kind !== "new" ? drag.block.id : null;
   const dropSlot = drag && drag.kind !== "resize" ? drag.slot : null;
+
+  /** Tavlans hela bredd. Pilarnas lager spänner över den. */
+  const contentWidth = useMemo(
+    () =>
+      visibleDays.reduce(
+        (total, index) => total + widthOf(index) + DAY_BORDER,
+        STATION_COLUMN
+      ),
+    [visibleDays, widthOf]
+  );
+
+  /**
+   * Pilarna mellan en orders moment.
+   *
+   * Svetsningen pekar på lackeringen. Dras från den SENAST avslutade rutan i
+   * ett moment till den TIDIGAST påbörjade i nästa: det är den punkt där nästa
+   * steg tidigast kan börja, och alltså den enda som säger något.
+   *
+   * En pil som går baklänges betyder att stegen är planerade i otakt. Den
+   * ritas i gult och hindras inte — ibland är det precis vad som måste hända,
+   * och att se det är mer värt än att spärras från det.
+   */
+  const arrows = useMemo(() => {
+    const rows = new Map(stations.map((station, index) => [station.id, index]));
+
+    const found: {
+      key: string;
+      fromX: number;
+      fromY: number;
+      toX: number;
+      toY: number;
+      backwards: boolean;
+    }[] = [];
+
+    for (const [orderId, sequence] of Object.entries(sequences)) {
+      // Rutorna för just den här ordern, grupperade på moment.
+      const byMoment = new Map<string, BoardBlock[]>();
+
+      for (const block of shown) {
+        if (block.orderId !== orderId) continue;
+
+        const list = byMoment.get(block.momentId) ?? [];
+        list.push(block);
+        byMoment.set(block.momentId, list);
+      }
+
+      for (let step = 0; step < sequence.length - 1; step++) {
+        const from = byMoment.get(sequence[step]);
+        const to = byMoment.get(sequence[step + 1]);
+
+        if (!from?.length || !to?.length) continue;
+
+        const last = from.reduce((best, block) =>
+          endMs(block, hoursFor, days, timeZone) >
+          endMs(best, hoursFor, days, timeZone)
+            ? block
+            : best
+        );
+
+        const first = to.reduce((best, block) =>
+          new Date(block.startsAt) < new Date(best.startsAt) ? block : best
+        );
+
+        const a = pointOf(last, "end");
+        const b = pointOf(first, "start");
+
+        if (!a || !b) continue;
+
+        found.push({
+          key: `${orderId}:${step}`,
+          fromX: a.x,
+          fromY: a.y,
+          toX: b.x,
+          toY: b.y,
+          backwards: b.time < a.time,
+        });
+      }
+    }
+
+    return found;
+
+    /** Rutans kant som en punkt på tavlan, eller null utanför veckan. */
+    function pointOf(block: BoardBlock, edge: "start" | "end") {
+      const startsAt = new Date(block.startsAt);
+      const dayIndex = dayIndexOf(startsAt, days);
+      if (dayIndex === null) return null;
+
+      const axis = windows.get(dayIndex);
+      const base = dayOffset(dayIndex);
+      const row = rows.get(block.stationId);
+
+      if (!axis || base === null || row === undefined) return null;
+
+      const time =
+        edge === "start"
+          ? startsAt.getTime()
+          : endMs(block, hoursFor, days, timeZone);
+
+      return {
+        x: base + offsetPx(time, days[dayIndex], axis, pxPerMinute),
+        y: row * ROW_HEIGHT + ROW_HEIGHT / 2,
+        time,
+      };
+    }
+  }, [
+    dayOffset,
+    days,
+    hoursFor,
+    pxPerMinute,
+    sequences,
+    shown,
+    stations,
+    timeZone,
+    windows,
+  ]);
+
 
   return (
     <div
@@ -949,7 +1123,48 @@ export default function PlanBoard({
             </div>
 
             {/* Raderna. Enda måttet träffytan räknas ur. */}
-            <div ref={bodyRef} onPointerUp={onBodyPointerUp}>
+            <div ref={bodyRef} onPointerUp={onBodyPointerUp} className="relative">
+              {/* PILARNA MELLAN EN ORDERS MOMENT, över rutorna men utan att ta
+                  emot tryck. Ligger i ett eget lager och inte i cellerna,
+                  eftersom en pil går mellan två rader och två dagar. */}
+              {arrows.length > 0 && (
+                <svg
+                  className="pointer-events-none absolute left-0 top-0 z-30"
+                  width={contentWidth}
+                  height={stations.length * ROW_HEIGHT}
+                  aria-hidden="true"
+                >
+                  <defs>
+                    <marker
+                      id="plan-arrow"
+                      viewBox="0 0 8 8"
+                      refX="7"
+                      refY="4"
+                      markerWidth="5"
+                      markerHeight="5"
+                      orient="auto-start-reverse"
+                    >
+                      <path d="M0 0 L8 4 L0 8 z" fill="currentColor" />
+                    </marker>
+                  </defs>
+
+                  {arrows.map((arrow) => (
+                    <path
+                      key={arrow.key}
+                      d={arrowPath(arrow)}
+                      fill="none"
+                      strokeWidth={1.5}
+                      markerEnd="url(#plan-arrow)"
+                      className={
+                        arrow.backwards ? "text-amber-600" : "text-skiffer"
+                      }
+                      stroke="currentColor"
+                      strokeDasharray={arrow.backwards ? "4 3" : undefined}
+                    />
+                  ))}
+                </svg>
+              )}
+
               {stations.map((station) => {
                 const dim = seeking !== null && seeking !== station.momentId;
                 const target = seeking !== null && seeking === station.momentId;
@@ -1108,12 +1323,16 @@ function UnplacedStrip({
         )}
       </div>
 
+      {/* HÖJDEN ÄR DEN SAMMA TOM SOM FULL. Raden krympte när sista brickan
+          placerats, och hela tavlan under hoppade uppåt i samma ögonblick som
+          man släppte. Att ytan man just arbetat i flyttar sig är det som får en
+          vy att kännas opålitlig, även när allt den gjorde var rätt. */}
       {rows.length === 0 ? (
-        <p className="px-4 py-4 text-[13px] text-neutral-500">
+        <p className="flex h-[88px] items-center px-4 text-[13px] text-neutral-500">
           Allt beräknat arbete ligger på tavlan.
         </p>
       ) : (
-        <div className="flex gap-2 overflow-x-auto px-3 py-3">
+        <div className="flex h-[88px] items-stretch gap-2 overflow-x-auto px-3 py-2">
           {plannable.map((row) => (
             <Chip
               key={`${row.orderId}:${row.momentId}`}
@@ -1653,6 +1872,42 @@ function BlockDialog({
 /* -------------------------------------------------------------------------- */
 /* Räknehjälp                                                                  */
 /* -------------------------------------------------------------------------- */
+
+/**
+ * Pilens form: ut ur rutan, över, och in i nästa.
+ *
+ * En kubisk kurva och inte en rak linje. Två rutor på olika rader och olika
+ * dagar ger en diagonal som skär genom allt den passerar; en kurva som går ut
+ * vågrätt och kommer in vågrätt läses som ett flöde i stället.
+ *
+ * Kontrollpunkterna ligger halvvägs i x-led, med ett golv så att en pil mellan
+ * två rutor som nästan möts ändå böjer av synligt.
+ */
+function arrowPath(arrow: {
+  fromX: number;
+  fromY: number;
+  toX: number;
+  toY: number;
+}): string {
+  const reach = Math.max(24, Math.abs(arrow.toX - arrow.fromX) / 2);
+
+  return [
+    `M ${arrow.fromX} ${arrow.fromY}`,
+    `C ${arrow.fromX + reach} ${arrow.fromY}`,
+    `${arrow.toX - reach} ${arrow.toY}`,
+    `${arrow.toX} ${arrow.toY}`,
+  ].join(" ");
+}
+
+/** Rutans slut som millisekunder. Används av pilarna. */
+function endMs(
+  block: BoardBlock,
+  hoursFor: (stationId: string, dayIndex: number) => StationHours | null,
+  days: Date[],
+  timeZone: string
+): number {
+  return endOf(block, hoursFor, days, timeZone).getTime();
+}
 
 /** Rutans slut på väggen, givet stationernas tider. */
 function endOf(

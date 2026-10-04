@@ -9,12 +9,25 @@ import type { CompanyDb } from "./tenant";
  *
  * Hela läsningen av formuläret och hela skrivningen ligger här, så att
  * skapa-rutan och ändra-rutan inte kan komma att tolka samma fält på två sätt.
+ *
+ * RADERNAS ORDNING ÄR EN UPPGIFT, inte en slump. Den säger i vilken följd
+ * momenten ska göras, och planeringen ritar pilar efter den. Ordningen kommer
+ * ur formuläret och inte ur ett eget fält: webbläsaren skickar fälten i den
+ * ordning de står på skärmen.
  */
 
-/** En rad: ett arbetsmoment och dess beräknade tid i minuter. */
+/** En rad: ett arbetsmoment, dess beräknade tid, och dess plats i ordningen. */
 export interface BudgetRow {
   momentId: string;
   minutes: number;
+  /**
+   * I vilken ordning momentet ska göras. Noll först.
+   *
+   * Kommer ur radernas ordning i formuläret och inte ur ett eget fält.
+   * Webbläsaren skickar fälten i den ordning de står på skärmen, så den som
+   * flyttat en rad uppåt har redan sagt vad hen menar.
+   */
+  sortOrder: number;
 }
 
 /** Namnen på fälten i formuläret. En rad skriver ett värde i vardera. */
@@ -86,7 +99,14 @@ export function readBudgetRows(formData: FormData): BudgetRow[] {
     byMoment.set(momentId, (byMoment.get(momentId) ?? 0) + minutes);
   }
 
-  return [...byMoment].map(([momentId, minutes]) => ({ momentId, minutes }));
+  // Ordningen är kartans, alltså den ordning raderna stod i på skärmen. En Map
+  // behåller insättningsordningen, och det är hela skälet att den används här
+  // i stället för ett vanligt objekt.
+  return [...byMoment].map(([momentId, minutes], sortOrder) => ({
+    momentId,
+    minutes,
+    sortOrder,
+  }));
 }
 
 /** Summan av raderna. Orderns beräknade tid, i minuter. */
@@ -142,11 +162,15 @@ export async function saveOrderBudgets(
     if (valid.length === 0) return;
 
     await tx.orderBudget.createMany({
-      data: valid.map((row) => ({
+      data: valid.map((row, index) => ({
         companyId,
         orderId,
         momentId: row.momentId,
         minutes: row.minutes,
+        // Numreras om efter filtreringen. Föll en rad bort för att momentet
+        // hörde till ett annat företag skulle ordningen annars ha ett hål,
+        // och nästa sparning hade flyttat raderna utan att någon bett om det.
+        sortOrder: index,
       })),
     });
   });

@@ -107,6 +107,14 @@ export interface UnplacedRow {
   remainingMinutes: number;
   /** false när ingen aktiv station kan göra momentet. */
   plannable: boolean;
+  /**
+   * Momentets plats i orderns egen ordning. Noll först.
+   *
+   * Svetsningen före lackeringen. Styr i vilken ordning jobben står i
+   * Oplacerat, så att den som betar av en order möter momenten i den följd de
+   * ska göras i stället för i bokstavsordning.
+   */
+  sequence: number;
 }
 
 /* -------------------------------------------------------------------------- */
@@ -115,6 +123,17 @@ export interface UnplacedRow {
 
 /**
  * Stationerna med sina öppettider.
+ *
+ * STATIONER MED SAMMA ARBETSMOMENT LIGGER BREDVID VARANDRA. Två fräsar är
+ * utbytbara mot varandra och inget annat, och den som letar en ledig lucka
+ * tittar på dem i samma ögonkast. Låg de isär fick man leta uppifrån och ner
+ * varje gång.
+ *
+ * Grupperna kommer i bokstavsordning på momentets namn, och inom en grupp
+ * gäller den ordning pilarna i registret satt. Momentnamnet är den enda
+ * stabila nyckel som finns: ordningen momenten ska göras i är ORDERNS egen
+ * (se OrderBudget.sortOrder) och kan skilja sig mellan två jobb, så den duger
+ * inte till att sortera stationer efter.
  *
  * Avaktiverade tas med: de ska gå att se och slå på igen i registret. Tavlan
  * filtrerar bort dem själv.
@@ -166,16 +185,28 @@ export async function stationsFor(
     upcoming.map((row) => [row.stationId, row._count._all])
   );
 
-  return rows.map((row) => ({
-    id: row.id,
-    name: row.name,
-    momentId: row.momentId,
-    momentName: row.moment.name,
-    active: row.active,
-    sortOrder: row.sortOrder,
-    hours: row.days,
-    upcomingBlocks: counted.get(row.id) ?? 0,
-  }));
+  return rows
+    .map((row) => ({
+      id: row.id,
+      name: row.name,
+      momentId: row.momentId,
+      momentName: row.moment.name,
+      active: row.active,
+      sortOrder: row.sortOrder,
+      hours: row.days,
+      upcomingBlocks: counted.get(row.id) ?? 0,
+    }))
+    .sort(byMomentThenOrder);
+}
+
+/** Moment i bokstavsordning, och inom momentet den ordning registret satt. */
+function byMomentThenOrder(a: Station, b: Station): number {
+  const moment = a.momentName.localeCompare(b.momentName, "sv");
+  if (moment !== 0) return moment;
+
+  if (a.sortOrder !== b.sortOrder) return a.sortOrder - b.sortOrder;
+
+  return a.name.localeCompare(b.name, "sv");
 }
 
 /**
@@ -288,9 +319,11 @@ export async function unplacedWork(db: CompanyDb): Promise<UnplacedRow[]> {
         plannedDueDate: true,
         customer: { select: { name: true } },
         budgets: {
+          orderBy: { sortOrder: "asc" },
           select: {
             momentId: true,
             minutes: true,
+            sortOrder: true,
             moment: { select: { name: true } },
           },
         },
@@ -348,6 +381,7 @@ export async function unplacedWork(db: CompanyDb): Promise<UnplacedRow[]> {
         placedMinutes,
         remainingMinutes: budget.minutes - placedMinutes,
         plannable: canDo.has(budget.momentId),
+        sequence: budget.sortOrder,
       });
     }
 
@@ -368,6 +402,10 @@ export async function unplacedWork(db: CompanyDb): Promise<UnplacedRow[]> {
         placedMinutes: placed.get(`${order.id}:${momentId}`) ?? 0,
         remainingMinutes: 0,
         plannable: canDo.has(momentId),
+        // Sist. Momentet står inte i beräkningen och har därför ingen plats i
+        // ordningen; att ge det noll hade lagt det först, före det som faktiskt
+        // är planerat att göras först.
+        sequence: Number.MAX_SAFE_INTEGER,
       });
     }
   }
@@ -376,10 +414,14 @@ export async function unplacedWork(db: CompanyDb): Promise<UnplacedRow[]> {
 }
 
 /**
- * Ordningen i Oplacerat: leveransdatum först, sedan ordernummer.
+ * Ordningen i Oplacerat: leveransdatum, ordernummer, och orderns egen följd.
  *
  * Ordrar utan datum hamnar sist. Att de skulle hamna först vore fel håll —
  * tomt betyder "ingen har sagt när", inte "genast".
+ *
+ * INOM EN ORDER GÄLLER DESS EGEN ORDNING och inte bokstäverna. Den som betar
+ * av ett jobb möter då momenten i den följd de ska göras: fräsningen före
+ * monteringen, inte "Fräsning" efter "Borrning".
  */
 function byUrgency(a: UnplacedRow, b: UnplacedRow): number {
   const left = a.dueDate?.getTime() ?? Number.POSITIVE_INFINITY;
@@ -392,7 +434,40 @@ function byUrgency(a: UnplacedRow, b: UnplacedRow): number {
   });
   if (order !== 0) return order;
 
+  if (a.sequence !== b.sequence) return a.sequence - b.sequence;
+
   return a.momentName.localeCompare(b.momentName, "sv");
+}
+
+/**
+ * I VILKEN ORDNING VARJE ORDERS MOMENT SKA GÖRAS.
+ *
+ * En lista moment-id per order, i orderns egen följd. Tavlan ritar pilar
+ * mellan rutorna efter den: svetsningen pekar på lackeringen.
+ *
+ * Bara ordrarna som efterfrågas, och bara de som har en beräkning. En order
+ * utan beräknade rader har ingen känd följd, och då ritas inga pilar — vilket
+ * är rätt svar och inte ett fel.
+ */
+export async function orderSequences(
+  db: CompanyDb,
+  orderIds: string[]
+): Promise<Record<string, string[]>> {
+  if (orderIds.length === 0) return {};
+
+  const rows = await db.orderBudget.findMany({
+    where: { orderId: { in: [...new Set(orderIds)] } },
+    orderBy: { sortOrder: "asc" },
+    select: { orderId: true, momentId: true },
+  });
+
+  const result: Record<string, string[]> = {};
+
+  for (const row of rows) {
+    (result[row.orderId] ??= []).push(row.momentId);
+  }
+
+  return result;
 }
 
 /* -------------------------------------------------------------------------- */
@@ -797,32 +872,50 @@ export async function setStationActive(
   return { id: stationId };
 }
 
-/** Flyttar en station ett steg i listan. Ordningen följer flödet i lokalen. */
+/**
+ * Flyttar en station ett steg.
+ *
+ * INOM SITT ARBETSMOMENT, inte i hela listan. Stationer med samma moment
+ * ligger bredvid varandra på tavlan, och grupperna kommer i bokstavsordning —
+ * en station som flyttades förbi gruppens kant hade hamnat tillbaka där den
+ * stod, och pilen hade sett trasig ut.
+ *
+ * Det som går att bestämma är alltså i vilken ordning de två fräsarna står,
+ * inte om fräsarna kommer före svetsarna. Det är också det enda som betyder
+ * något: grupperna är utbytbara mot sig själva och ingenting annat.
+ */
 export async function moveStation(
   db: CompanyDb,
   stationId: string,
   direction: "up" | "down"
 ): Promise<PlanResult> {
-  const stations = await db.station.findMany({
+  const station = await db.station.findFirst({
+    where: { id: stationId },
+    select: { id: true, momentId: true },
+  });
+
+  if (!station) return { error: "Stationen finns inte." };
+
+  const group = await db.station.findMany({
+    where: { momentId: station.momentId },
     orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
     select: { id: true },
   });
 
-  const index = stations.findIndex((station) => station.id === stationId);
-  if (index < 0) return { error: "Stationen finns inte." };
-
+  const index = group.findIndex((item) => item.id === stationId);
   const target = direction === "up" ? index - 1 : index + 1;
-  if (target < 0 || target >= stations.length) return {};
 
-  const reordered = [...stations];
+  if (index < 0 || target < 0 || target >= group.length) return {};
+
+  const reordered = [...group];
   [reordered[index], reordered[target]] = [reordered[target], reordered[index]];
 
-  // Hela listan skrivs om. Att byta två tal räcker när de är olika, men en
+  // Hela gruppen skrivs om. Att byta två tal räcker när de är olika, men en
   // lista där flera rader råkar ha samma sortOrder — vilket händer när rader
   // lagts upp samtidigt — hade då bytt plats på fel par.
-  for (const [order, station] of reordered.entries()) {
+  for (const [order, item] of reordered.entries()) {
     await db.station.updateMany({
-      where: { id: station.id },
+      where: { id: item.id },
       data: { sortOrder: order },
     });
   }
