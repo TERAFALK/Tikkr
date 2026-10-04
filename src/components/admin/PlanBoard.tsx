@@ -40,39 +40,39 @@ import {
 /**
  * TAVLAN.
  *
- * En rad per station, sju kolumner, och rutor som dras ut ur orderns beräknade
- * tid. Förebilden är SkyPlanner; skillnaden är att utfallet ligger i samma vy,
- * så att planen och verkligheten går att jämföra utan att byta sida.
+ * En rad per station, dagarna åt höger, och rutor som hämtar sin tid ur
+ * orderns beräkning.
  *
- * ── TYPERNA ÄR TAVLANS EGNA ──────────────────────────────────────────────
+ * ── ATT PLACERA ETT JOBB SKA VARA TVÅ TRYCK ──────────────────────────────
  *
- * Komponenten definierar sina egna props i stället för att importera
- * `PlannedBlock` ur lib/planning.ts. Två skäl, och det första räcker: formen
- * ÄR en annan. Datum blir strängar på vägen hit, eftersom tavlan tar emot dem
- * både ur sidan och ur ett JSON-svar. Det andra är att lib/planning.ts drar in
- * Prisma. Samma hållning som KioskScreen har med `KioskActiveJob`: skärmen
- * äger formen, servern fyller den.
+ * Första versionen hade bara dragning, och den var opålitlig på ett sätt som
+ * inte gick att se. Träffytorna låg i en Map av DOM-noder som byggdes om vid
+ * varje omrendering, och en dragning renderar om vid varje pekarrörelse:
+ * släppte man i fel ögonblick fanns ingen cell under pekaren och ingenting
+ * hände. Det syntes som att tavlan tappade bort jobb på måfå.
  *
- * `BlockProgress` är undantaget och importeras som TYP ur lib/plan-live.ts.
- * Den korsar gränsen oförändrad — tre tal och en lista namn, inget datum — och
- * en egen kopia av den hade varit två ställen som säger samma sak. En
- * typimport finns inte kvar efter bygget, så ingenting av Prisma följer med.
+ * Nu finns två vägar, och DEN ENKLA ÄR FÖRSTAVALET:
  *
- * ── DRAGNINGARNA ─────────────────────────────────────────────────────────
+ *   TRYCK på ett jobb i Oplacerat. Det blir valt, och stationerna som kan
+ *   köra momentet lyser upp medan resten tonas ned. TRYCK sedan i en sådan
+ *   rad. Klart.
  *
- * Pointer events, inte HTML5 drag-and-drop. Det senare fungerar inte med
- * fingrar, och adminpanelen används på pekskärm. Inget bibliotek: repot skriver
- * hellre sin egen zip-fil än drar in ett beroende.
+ *   DRA jobbet dit i stället, om man hellre siktar direkt.
  *
- * Varje dragning är OPTIMISTISK. Rutan flyttar sig direkt, åtgärden skickas,
- * och ett fel lägger rutan tillbaka med ett meddelande. Samma hållning som
- * kiosken har, och av samma skäl: en tavla som fryser vid varje tryck blir en
- * tavla man inte orkar använda.
+ * Två tryck fungerar med fingrar, på en sladdrig mus, och för den som inte
+ * gissar att en ruta går att dra. Dragningen finns kvar för att den är
+ * snabbare när man redan vet var jobbet ska.
  *
- * ── SKALAN ───────────────────────────────────────────────────────────────
+ * ── TRÄFFYTAN RÄKNAS, DEN SLÅS INTE UPP ──────────────────────────────────
  *
- * En hel vecka i verkliga proportioner är bredare än vilken skärm som helst.
- * Därför tre zoomsteg, och helgdagar som bara visas när något ligger där.
+ * Vilken station och vilket klockslag pekaren står på räknas fram ur ETT mått
+ * på radernas behållare. Raderna är lika höga och dagarnas bredder är kända,
+ * så svaret är ren aritmetik. Det går inte sönder av en omrendering.
+ *
+ * ── OPLACERAT LIGGER ÖVER, INTE BREDVID ──────────────────────────────────
+ *
+ * Som en rad över tavlan. Panelen vid sidan tog tvåhundrafemtio pixlar av
+ * veckans bredd även när den stod tom, och veckan är det man är här för.
  */
 
 /* -------------------------------------------------------------------------- */
@@ -114,42 +114,51 @@ export interface BoardUnplaced {
 }
 
 /* -------------------------------------------------------------------------- */
-/* Konstanter                                                                  */
+/* Mått och konstanter                                                         */
 /* -------------------------------------------------------------------------- */
 
 /** Hur ofta utfallet hämtas. Tio sekunder känns samtidigt utan att märkas. */
 const LIVE_MS = 10_000;
 
 /**
- * ZOOMSTEGEN ÄR MULTIPLIKATORER, INTE PIXLAR PER MINUT.
+ * Zoomstegen är MULTIPLIKATORER av "hela veckan syns", inte pixlar per minut.
  *
- * Steg ett betyder "hela veckan får plats i rutan". Skalan räknas alltså fram
- * ur den bredd tavlan faktiskt har, inte ur ett tal valt i förväg.
- *
- * Det var fel förut, och det syntes direkt: ett fast tal gav en vecka som var
- * dubbelt så bred som fönstret, och tavlan öppnade på måndag förmiddag med
- * resten utanför kanten. En planeringsvy vars första intryck är att man måste
- * leta rätt på onsdagen är ingen planeringsvy.
+ * Ett fast tal gav en vecka dubbelt så bred som fönstret, och tavlan öppnade
+ * på måndag förmiddag med resten utanför kanten.
  */
 const ZOOM = [1, 1.75, 3];
 
-/** Stationskolumnens bredd i pixlar. Behövs för att räkna ut skalan. */
-const STATION_COLUMN = 150;
+/** Stationskolumnens bredd. Används både för att rita och för att räkna. */
+const STATION_COLUMN = 160;
+
+/** Radhöjden. MÅSTE stämma med klassen nedan — träffytan räknar med den. */
+const ROW_HEIGHT = 72;
+const ROW_CLASS = "h-[72px]";
+
+/** Linjen mellan två dagar. Räknas med i träffytan. */
+const DAY_BORDER = 2;
 
 /**
- * Minsta skala som är läsbar.
+ * Minsta läsbara skala.
  *
- * Under det här blir en timme så smal att inte ens ett ordernummer får plats,
- * och tavlan är bättre med en rullningslist än med rutor som inte går att
- * skilja åt. Slår taket till rullar veckan i sidled, med stationskolumnen
- * kvar på plats.
+ * Under det blir en timme smalare än ett ordernummer, och då är en
+ * rullningslist bättre än rutor som inte går att skilja åt.
  */
-const MIN_PX_PER_MINUTE = 0.22;
+const MIN_PX_PER_MINUTE = 0.25;
 
 /** Hur långt pekaren får röra sig och ändå räknas som ett tryck. */
-const CLICK_SLOP = 4;
+const CLICK_SLOP = 5;
 
-const DAY_LABELS = ["Mån", "Tis", "Ons", "Tors", "Fre", "Lör", "Sön"];
+const DAY_LONG = [
+  "Måndag",
+  "Tisdag",
+  "Onsdag",
+  "Torsdag",
+  "Fredag",
+  "Lördag",
+  "Söndag",
+];
+const DAY_SHORT = ["Mån", "Tis", "Ons", "Tors", "Fre", "Lör", "Sön"];
 
 const MS_PER_MINUTE = 60_000;
 
@@ -157,14 +166,19 @@ const MS_PER_MINUTE = 60_000;
 /* Dragningens tillstånd                                                       */
 /* -------------------------------------------------------------------------- */
 
+interface Slot {
+  stationId: string;
+  dayIndex: number;
+  /** Starttiden pekaren svarar mot, redan snäppt. */
+  startsAt: Date;
+}
+
 type Drag =
   | {
       kind: "new";
       row: BoardUnplaced;
-      /** Minuter rutan får när den släpps. */
-      minutes: number;
       at: { x: number; y: number };
-      target: Target | null;
+      slot: Slot | null;
     }
   | {
       kind: "move";
@@ -172,31 +186,16 @@ type Drag =
       /** Var i rutan man tog tag, i minuter från rutans början. */
       grabMinutes: number;
       at: { x: number; y: number };
-      target: Target | null;
+      slot: Slot | null;
     }
   | {
       kind: "resize";
       block: BoardBlock;
-      /**
-       * Rutans längd när draget började, och pekarens x-läge då.
-       *
-       * Längden räknas som utgångsläget PLUS pekarens förflyttning, inte ur
-       * någon rutas kant. Händelserna fångas av rutan med
-       * `setPointerCapture` men hanteras på tavlans rot, så
-       * `event.currentTarget` är tavlan och inte rutan — ett rect därifrån
-       * hade mätt från tavlans vänsterkant och gett rutor på många timmar.
-       */
+      /** Rutans längd när draget började, och pekarens x-läge då. */
       fromMinutes: number;
       originX: number;
       minutes: number;
     };
-
-interface Target {
-  stationId: string;
-  dayIndex: number;
-  /** Starttiden pekaren svarar mot, redan snäppt. */
-  startsAt: Date;
-}
 
 /* -------------------------------------------------------------------------- */
 /* Komponenten                                                                 */
@@ -227,22 +226,17 @@ export default function PlanBoard({
 
   const [blocks, setBlocks] = useState(initialBlocks);
   const [drag, setDrag] = useState<Drag | null>(null);
+  const [armed, setArmed] = useState<BoardUnplaced | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [zoom, setZoom] = useState(0);
-  const [showUnplaced, setShowUnplaced] = useState(true);
-
-  /**
-   * Tavlans egen bredd i pixlar, mätt och inte gissad.
-   *
-   * Noll tills den mätts. Första renderingen sker på servern, där ingen bredd
-   * finns — och en gissad bredd hade ritat en vecka som hoppar till så fort
-   * mätningen kommer.
-   */
-  const [boardWidth, setBoardWidth] = useState(0);
-  const boardRef = useRef<HTMLDivElement>(null);
   const [progress, setProgress] = useState<Record<string, BlockProgress>>({});
   const [now, setNow] = useState<number | null>(null);
   const [editing, setEditing] = useState<BoardBlock | null>(null);
+  const [boardWidth, setBoardWidth] = useState(0);
+
+  const scrollRef = useRef<HTMLDivElement>(null);
+  /** Radernas behållare. Enda måttet träffytan räknas ur. */
+  const bodyRef = useRef<HTMLDivElement>(null);
 
   // Serverns bild vinner när sidan ritats om. Utan detta skulle en
   // omrendering efter revalidatePath lämna de optimistiska rutorna kvar, och
@@ -251,14 +245,11 @@ export default function PlanBoard({
 
   const mondayStart = useMemo(() => new Date(monday), [monday]);
 
-  // Mäts om när fönstret ändras, när menyn fälls ut och när Oplacerat
-  // stängs. Alla tre ändrar hur mycket plats veckan har.
   useEffect(() => {
-    const node = boardRef.current;
+    const node = scrollRef.current;
     if (!node) return;
 
     const measure = () => setBoardWidth(node.clientWidth);
-
     measure();
 
     const observer = new ResizeObserver(measure);
@@ -267,7 +258,7 @@ export default function PlanBoard({
     return () => observer.disconnect();
   }, []);
 
-  /** Dygnsbörjan för veckans sju dagar, som tidpunkter. */
+  /** Veckans sju dygnsbörjan, som tidpunkter. */
   const days = useMemo(
     () => buildDays(mondayStart, timeZone),
     [mondayStart, timeZone]
@@ -298,8 +289,7 @@ export default function PlanBoard({
 
   useEffect(() => {
     // INGEN POLLNING I EN VECKA SOM INTE PÅGÅR. I en vecka som varit eller
-    // inte börjat finns ingenting levande att hämta, och ett anrop var tionde
-    // sekund för en bild som inte kan ändras är ren kostnad.
+    // inte börjat finns ingenting levande att hämta.
     if (!isCurrentWeek) {
       setProgress({});
       setNow(null);
@@ -321,34 +311,16 @@ export default function PlanBoard({
     };
   }, [isCurrentWeek, syncProgress]);
 
-  /* --- Hjälp till uträkningarna ----------------------------------------- */
+  /* --- Måtten ------------------------------------------------------------ */
 
   const hoursFor = useCallback(
     (stationId: string, dayIndex: number): StationHours | null => {
       const station = stations.find((item) => item.id === stationId);
       if (!station) return null;
 
-      // Veckodagen är kolumnens, inte tidpunktens. Kolumnerna står i ISO-ordning
-      // från måndag, så index noll är veckodag ett.
       return station.hours.find((day) => day.weekday === dayIndex + 1) ?? null;
     },
     [stations]
-  );
-
-  /** Rutans spann på väggen, som millisekunder. */
-  const spanOf = useCallback(
-    (block: BoardBlock) => {
-      const startsAt = new Date(block.startsAt);
-      const dayIndex = dayIndexOf(startsAt, days);
-      const hours = dayIndex === null ? null : hoursFor(block.stationId, dayIndex);
-
-      return {
-        dayIndex,
-        from: startsAt,
-        to: blockEnd(hours, startsAt, block.minutes, timeZone),
-      };
-    },
-    [days, hoursFor, timeZone]
   );
 
   /** Vilka dagar som ritas. Helg visas när någon station går eller något ligger där. */
@@ -372,7 +344,7 @@ export default function PlanBoard({
     return shown;
   }, [blocks, days, stations]);
 
-  /** Tidsaxeln per dag. Räknas om när rutorna flyttar, så överbokning syns. */
+  /** Tidsaxeln per dag. */
   const windows = useMemo(() => {
     const result = new Map<number, { startMinute: number; endMinute: number }>();
 
@@ -398,11 +370,7 @@ export default function PlanBoard({
    *
    * Steg ett lägger hela veckan i den bredd som finns. Måtten är kända först
    * när dagfönstren räknats, eftersom en fredag som slutar 13:00 är smalare
-   * än en måndag som slutar 16:00 — veckan är inte sju lika breda kolumner.
-   *
-   * Innan bredden mätts används en skala som duger till en första rendering.
-   * Den syns bara ett ögonblick, och ett nollvärde hade gett kolumner utan
-   * bredd.
+   * än en måndag som slutar 16:00.
    */
   const pxPerMinute = useMemo(() => {
     const minutes = visibleDays.reduce((total, index) => {
@@ -412,13 +380,10 @@ export default function PlanBoard({
 
     if (boardWidth === 0 || minutes === 0) return 0.5 * ZOOM[zoom];
 
-    // Två pixlar per dag för kolumnlinjerna, så att sista dagen inte hamnar
-    // en hårsmån utanför och tvingar fram en rullningslist som inte behövs.
-    const usable = boardWidth - STATION_COLUMN - visibleDays.length * 2;
+    const usable =
+      boardWidth - STATION_COLUMN - visibleDays.length * DAY_BORDER;
 
-    const fit = usable / minutes;
-
-    return Math.max(MIN_PX_PER_MINUTE, fit) * ZOOM[zoom];
+    return Math.max(MIN_PX_PER_MINUTE, usable / minutes) * ZOOM[zoom];
   }, [boardWidth, visibleDays, windows, zoom]);
 
   const widthOf = useCallback(
@@ -430,77 +395,265 @@ export default function PlanBoard({
     [pxPerMinute, windows]
   );
 
-  /* --- Träffytor --------------------------------------------------------- */
-
-  const cells = useRef(new Map<string, HTMLElement>());
-
-  const registerCell = useCallback(
-    (key: string, node: HTMLElement | null) => {
-      if (node) cells.current.set(key, node);
-      else cells.current.delete(key);
-    },
-    []
-  );
+  /* --- Träffytan --------------------------------------------------------- */
 
   /**
-   * Vilken cell pekaren står i, och vilken starttid det svarar mot.
+   * Vilken station och vilket klockslag en punkt på skärmen svarar mot.
    *
-   * Hittas genom att gå igenom cellernas rutor och inte med
-   * `elementFromPoint`: det senare träffar den ruta man drar, som ligger under
-   * pekaren hela tiden.
+   * RÄKNAS, SLÅS INTE UPP. Ett enda `getBoundingClientRect` på radernas
+   * behållare, och resten är aritmetik: raderna är lika höga, dagarnas
+   * bredder är kända. Rektangeln bär redan rullningen i sig, så den behöver
+   * inte läggas till.
+   *
+   * Den tidigare versionen gick igenom en Map av DOM-noder som byggdes om vid
+   * varje omrendering. En dragning renderar om vid varje pekarrörelse, så
+   * uppslaget kunde ske mitt i ombyggnaden och svara tomt. Det var hela skälet
+   * att dragningen kändes trasig.
    */
-  const targetAt = useCallback(
-    (x: number, y: number): Target | null => {
-      for (const [key, node] of cells.current) {
-        const rect = node.getBoundingClientRect();
+  const slotAt = useCallback(
+    (clientX: number, clientY: number): Slot | null => {
+      const body = bodyRef.current;
+      if (!body) return null;
 
-        if (x < rect.left || x > rect.right) continue;
-        if (y < rect.top || y > rect.bottom) continue;
+      const rect = body.getBoundingClientRect();
 
-        const [stationId, rawDay] = key.split("|");
-        const dayIndex = Number(rawDay);
-        const axis = windows.get(dayIndex);
-        if (!axis) continue;
+      const row = Math.floor((clientY - rect.top) / ROW_HEIGHT);
+      if (row < 0 || row >= stations.length) return null;
 
-        const minute =
-          axis.startMinute + (x - rect.left) / Math.max(pxPerMinute, 0.01);
+      let x = clientX - rect.left - STATION_COLUMN;
+      if (x < 0) return null;
 
-        const snapped =
-          Math.round(minute / SNAP_MINUTES) * SNAP_MINUTES;
+      for (const dayIndex of visibleDays) {
+        const width = widthOf(dayIndex);
 
-        return {
-          stationId,
-          dayIndex,
-          startsAt: new Date(
-            days[dayIndex].getTime() + Math.max(0, snapped) * MS_PER_MINUTE
-          ),
-        };
+        if (x <= width) {
+          const axis = windows.get(dayIndex);
+          if (!axis) return null;
+
+          const minute = axis.startMinute + x / Math.max(pxPerMinute, 0.01);
+          const snapped = Math.round(minute / SNAP_MINUTES) * SNAP_MINUTES;
+
+          return {
+            stationId: stations[row].id,
+            dayIndex,
+            startsAt: new Date(
+              days[dayIndex].getTime() + Math.max(0, snapped) * MS_PER_MINUTE
+            ),
+          };
+        }
+
+        x -= width + DAY_BORDER;
       }
 
       return null;
     },
-    [days, pxPerMinute, windows]
+    [days, pxPerMinute, stations, visibleDays, widthOf, windows]
   );
 
-  /* --- Dragningarna ----------------------------------------------------- */
+  /* --- Skrivningarna ----------------------------------------------------- */
 
-  const startedAt = useRef<{ x: number; y: number } | null>(null);
+  /** Kör en åtgärd och lägger tillbaka den optimistiska bilden vid fel. */
+  const run = useCallback(
+    async (
+      before: BoardBlock[],
+      optimistic: () => void,
+      send: () => Promise<{ error?: string }>
+    ) => {
+      optimistic();
 
-  function beginNew(
-    event: ReactPointerEvent<HTMLElement>,
-    row: BoardUnplaced
-  ) {
-    if (readOnly) return;
+      const result = await send();
+
+      if (result.error) {
+        setBlocks(before);
+        setError(result.error);
+        return;
+      }
+
+      setError(null);
+
+      // Serverns svar hämtas in. Den kan ha kapat rutan mot midnatt eller
+      // avrundat annorlunda än vi gissade, och då ska dess siffra gälla.
+      router.refresh();
+    },
+    [router]
+  );
+
+  const place = useCallback(
+    async (row: BoardUnplaced, slot: Slot) => {
+      const station = stations.find((item) => item.id === slot.stationId);
+      if (!station) return;
+
+      if (station.momentId !== row.momentId) {
+        setError(`${station.name} kör inte ${row.momentName}.`);
+        return;
+      }
+
+      const hours = hoursFor(station.id, slot.dayIndex);
+      const room = fitsFrom(hours, slot.startsAt, timeZone);
+
+      if (room < 1) {
+        setError("Starttiden ligger för sent på dygnet.");
+        return;
+      }
+
+      const minutes = Math.min(
+        snap(Math.max(SNAP_MINUTES, row.remainingMinutes)),
+        room
+      );
+
+      // Tillfälligt id. Ersätts av serverns när sidan ritas om.
+      const draft: BoardBlock = {
+        id: `ny-${Date.now()}`,
+        stationId: station.id,
+        orderId: row.orderId,
+        orderNumber: row.orderNumber,
+        customerName: row.customerName,
+        momentId: row.momentId,
+        momentName: row.momentName,
+        startsAt: slot.startsAt.toISOString(),
+        minutes,
+        note: null,
+      };
+
+      setArmed(null);
+
+      await run(
+        blocks,
+        () => setBlocks((current) => [...current, draft]),
+        () => {
+          const data = new FormData();
+          data.set("orderId", row.orderId);
+          data.set("momentId", row.momentId);
+          data.set("stationId", station.id);
+          data.set("startsAt", slot.startsAt.toISOString());
+          data.set("minutes", String(minutes));
+          return placeBlockAction({}, data);
+        }
+      );
+    },
+    [blocks, hoursFor, run, stations, timeZone]
+  );
+
+  const moveTo = useCallback(
+    async (block: BoardBlock, slot: Slot) => {
+      const station = stations.find((item) => item.id === slot.stationId);
+      if (!station) return;
+
+      if (station.momentId !== block.momentId) {
+        setError(`${station.name} kör inte ${block.momentName}.`);
+        return;
+      }
+
+      await run(
+        blocks,
+        () =>
+          setBlocks((current) =>
+            current.map((item) =>
+              item.id === block.id
+                ? {
+                    ...item,
+                    stationId: station.id,
+                    startsAt: slot.startsAt.toISOString(),
+                  }
+                : item
+            )
+          ),
+        () => {
+          const data = new FormData();
+          data.set("blockId", block.id);
+          data.set("stationId", station.id);
+          data.set("startsAt", slot.startsAt.toISOString());
+          return moveBlockAction({}, data);
+        }
+      );
+    },
+    [blocks, run, stations]
+  );
+
+  const resize = useCallback(
+    async (block: BoardBlock, minutes: number) => {
+      if (minutes === block.minutes) return;
+
+      await run(
+        blocks,
+        () =>
+          setBlocks((current) =>
+            current.map((item) =>
+              item.id === block.id ? { ...item, minutes } : item
+            )
+          ),
+        () => {
+          const data = new FormData();
+          data.set("blockId", block.id);
+          data.set("minutes", String(minutes));
+          return resizeBlockAction({}, data);
+        }
+      );
+    },
+    [blocks, run]
+  );
+
+  const saveNote = useCallback(
+    async (block: BoardBlock, note: string) => {
+      if ((block.note ?? "") === note.trim()) return;
+
+      await run(
+        blocks,
+        () =>
+          setBlocks((current) =>
+            current.map((item) =>
+              item.id === block.id
+                ? { ...item, note: note.trim() || null }
+                : item
+            )
+          ),
+        () => {
+          const data = new FormData();
+          data.set("blockId", block.id);
+          data.set("note", note);
+          return noteBlockAction({}, data);
+        }
+      );
+    },
+    [blocks, run]
+  );
+
+  const remove = useCallback(
+    async (block: BoardBlock) => {
+      setEditing(null);
+
+      await run(
+        blocks,
+        () =>
+          setBlocks((current) => current.filter((item) => item.id !== block.id)),
+        () => {
+          const data = new FormData();
+          data.set("blockId", block.id);
+          return removeBlockAction({}, data);
+        }
+      );
+    },
+    [blocks, run]
+  );
+
+  /* --- Pekaren ----------------------------------------------------------- */
+
+  const origin = useRef<{ x: number; y: number } | null>(null);
+  const moved = useRef(false);
+
+  function beginNew(event: ReactPointerEvent<HTMLElement>, row: BoardUnplaced) {
+    if (readOnly || !row.plannable) return;
 
     event.currentTarget.setPointerCapture(event.pointerId);
-    startedAt.current = { x: event.clientX, y: event.clientY };
+    origin.current = { x: event.clientX, y: event.clientY };
+    moved.current = false;
 
+    setError(null);
     setDrag({
       kind: "new",
       row,
-      minutes: snap(Math.max(SNAP_MINUTES, row.remainingMinutes)),
       at: { x: event.clientX, y: event.clientY },
-      target: null,
+      slot: null,
     });
   }
 
@@ -509,14 +662,15 @@ export default function PlanBoard({
 
     const rect = event.currentTarget.getBoundingClientRect();
     event.currentTarget.setPointerCapture(event.pointerId);
-    startedAt.current = { x: event.clientX, y: event.clientY };
+    origin.current = { x: event.clientX, y: event.clientY };
+    moved.current = false;
 
     setDrag({
       kind: "move",
       block,
       grabMinutes: (event.clientX - rect.left) / Math.max(pxPerMinute, 0.01),
       at: { x: event.clientX, y: event.clientY },
-      target: null,
+      slot: null,
     });
   }
 
@@ -528,7 +682,8 @@ export default function PlanBoard({
 
     event.stopPropagation();
     event.currentTarget.setPointerCapture(event.pointerId);
-    startedAt.current = { x: event.clientX, y: event.clientY };
+    origin.current = { x: event.clientX, y: event.clientY };
+    moved.current = false;
 
     setDrag({
       kind: "resize",
@@ -542,232 +697,113 @@ export default function PlanBoard({
   function onPointerMove(event: ReactPointerEvent<HTMLElement>) {
     if (!drag) return;
 
-    if (drag.kind === "resize") {
-      const moved = (event.clientX - drag.originX) / Math.max(pxPerMinute, 0.01);
+    const start = origin.current;
 
-      setDrag({ ...drag, minutes: snap(drag.fromMinutes + moved) });
+    if (
+      start &&
+      (Math.abs(event.clientX - start.x) > CLICK_SLOP ||
+        Math.abs(event.clientY - start.y) > CLICK_SLOP)
+    ) {
+      moved.current = true;
+    }
+
+    if (drag.kind === "resize") {
+      const delta = (event.clientX - drag.originX) / Math.max(pxPerMinute, 0.01);
+      setDrag({ ...drag, minutes: snap(drag.fromMinutes + delta) });
       return;
     }
 
-    const target = targetAt(event.clientX, event.clientY);
+    const slot = slotAt(event.clientX, event.clientY);
 
     if (drag.kind === "new") {
-      setDrag({ ...drag, at: { x: event.clientX, y: event.clientY }, target });
-    } else {
-      // Pekaren pekar på var man HÅLLER, inte på rutans början. Utan
-      // greppavståndet skulle rutan hoppa så att dess vänsterkant hamnar under
-      // fingret, vilket känns som att den rycker till.
-      const shifted = target
-        ? {
-            ...target,
-            startsAt: new Date(
-              target.startsAt.getTime() -
-                Math.round(drag.grabMinutes / SNAP_MINUTES) *
-                  SNAP_MINUTES *
-                  MS_PER_MINUTE
-            ),
-          }
-        : null;
-
-      setDrag({
-        ...drag,
-        at: { x: event.clientX, y: event.clientY },
-        target: shifted,
-      });
+      setDrag({ ...drag, at: { x: event.clientX, y: event.clientY }, slot });
+      return;
     }
+
+    // Pekaren pekar på var man HÅLLER, inte på rutans början. Utan
+    // greppavståndet hoppar rutan så att dess vänsterkant hamnar under
+    // fingret, vilket känns som att den rycker till.
+    const shifted = slot
+      ? {
+          ...slot,
+          startsAt: new Date(
+            slot.startsAt.getTime() -
+              Math.round(drag.grabMinutes / SNAP_MINUTES) *
+                SNAP_MINUTES *
+                MS_PER_MINUTE
+          ),
+        }
+      : null;
+
+    setDrag({
+      ...drag,
+      at: { x: event.clientX, y: event.clientY },
+      slot: shifted,
+    });
   }
 
-  async function onPointerUp(event: ReactPointerEvent<HTMLElement>) {
+  async function onPointerUp() {
     const current = drag;
-    const origin = startedAt.current;
+    const didMove = moved.current;
 
     setDrag(null);
-    startedAt.current = null;
+    origin.current = null;
+    moved.current = false;
 
     if (!current) return;
 
-    const moved =
-      !origin ||
-      Math.abs(event.clientX - origin.x) > CLICK_SLOP ||
-      Math.abs(event.clientY - origin.y) > CLICK_SLOP;
-
-    // Ett tryck utan rörelse på en befintlig ruta öppnar den i stället.
-    if (!moved) {
-      if (current.kind === "move") setEditing(current.block);
-      return;
-    }
-
-    setError(null);
-
     if (current.kind === "resize") {
-      await commitResize(current.block, current.minutes);
+      if (didMove) await resize(current.block, current.minutes);
       return;
     }
 
-    if (!current.target) return;
+    // ETT TRYCK UTAN RÖRELSE ÄR INTE EN DRAGNING.
+    //
+    // På ett jobb i Oplacerat betyder det "välj det här", och nästa tryck på
+    // tavlan placerar det. På en ruta betyder det "öppna den".
+    if (!didMove) {
+      if (current.kind === "new") {
+        setArmed((value) =>
+          value &&
+          value.orderId === current.row.orderId &&
+          value.momentId === current.row.momentId
+            ? null
+            : current.row
+        );
+      } else {
+        setEditing(current.block);
+      }
+      return;
+    }
 
-    if (current.kind === "new") await commitPlace(current.row, current.target);
-    else await commitMove(current.block, current.target);
+    if (!current.slot) return;
+
+    if (current.kind === "new") await place(current.row, current.slot);
+    else await moveTo(current.block, current.slot);
   }
 
-  /* --- Skrivningarna ---------------------------------------------------- */
+  /** Ett tryck på tavlan när ett jobb är valt placerar det där. */
+  function onBodyPointerUp(event: ReactPointerEvent<HTMLElement>) {
+    if (drag || !armed || readOnly) return;
 
-  /** Kör en åtgärd och lägger tillbaka den optimistiska bilden vid fel. */
-  async function run(
-    optimistic: () => void,
-    send: () => Promise<{ error?: string }>
-  ) {
-    const before = blocks;
-    optimistic();
-
-    const result = await send();
-
-    if (result.error) {
-      setBlocks(before);
-      setError(result.error);
-      return;
-    }
-
-    // Serverns svar hämtas in. Den kan ha kapat rutan mot midnatt eller
-    // avrundat annorlunda än vi gissade, och då ska dess siffra gälla.
-    router.refresh();
+    const slot = slotAt(event.clientX, event.clientY);
+    if (slot) void place(armed, slot);
   }
 
-  async function commitPlace(row: BoardUnplaced, target: Target) {
-    const station = stations.find((item) => item.id === target.stationId);
-    if (!station) return;
+  // Escape avbryter ett val. Den som ångrat sig ska inte behöva träffa samma
+  // ruta igen för att komma ur läget.
+  useEffect(() => {
+    if (!armed) return;
 
-    if (station.momentId !== row.momentId) {
-      setError(`${station.name} kör inte ${row.momentName}.`);
-      return;
-    }
-
-    const hours = hoursFor(station.id, target.dayIndex);
-    const room = fitsFrom(hours, target.startsAt, timeZone);
-
-    if (room < 1) {
-      setError("Starttiden ligger för sent på dygnet.");
-      return;
-    }
-
-    const minutes = Math.min(
-      snap(Math.max(SNAP_MINUTES, row.remainingMinutes)),
-      room
-    );
-
-    // Tillfälligt id. Ersätts av serverns när sidan ritas om.
-    const draft: BoardBlock = {
-      id: `ny-${Date.now()}`,
-      stationId: station.id,
-      orderId: row.orderId,
-      orderNumber: row.orderNumber,
-      customerName: row.customerName,
-      momentId: row.momentId,
-      momentName: row.momentName,
-      startsAt: target.startsAt.toISOString(),
-      minutes,
-      note: null,
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setArmed(null);
     };
 
-    await run(
-      () => setBlocks((current) => [...current, draft]),
-      () => {
-        const data = new FormData();
-        data.set("orderId", row.orderId);
-        data.set("momentId", row.momentId);
-        data.set("stationId", station.id);
-        data.set("startsAt", target.startsAt.toISOString());
-        data.set("minutes", String(minutes));
-        return placeBlockAction({}, data);
-      }
-    );
-  }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [armed]);
 
-  async function commitMove(block: BoardBlock, target: Target) {
-    const station = stations.find((item) => item.id === target.stationId);
-    if (!station) return;
-
-    if (station.momentId !== block.momentId) {
-      setError(`${station.name} kör inte ${block.momentName}.`);
-      return;
-    }
-
-    await run(
-      () =>
-        setBlocks((current) =>
-          current.map((item) =>
-            item.id === block.id
-              ? {
-                  ...item,
-                  stationId: station.id,
-                  startsAt: target.startsAt.toISOString(),
-                }
-              : item
-          )
-        ),
-      () => {
-        const data = new FormData();
-        data.set("blockId", block.id);
-        data.set("stationId", station.id);
-        data.set("startsAt", target.startsAt.toISOString());
-        return moveBlockAction({}, data);
-      }
-    );
-  }
-
-  async function commitResize(block: BoardBlock, minutes: number) {
-    if (minutes === block.minutes) return;
-
-    await run(
-      () =>
-        setBlocks((current) =>
-          current.map((item) =>
-            item.id === block.id ? { ...item, minutes } : item
-          )
-        ),
-      () => {
-        const data = new FormData();
-        data.set("blockId", block.id);
-        data.set("minutes", String(minutes));
-        return resizeBlockAction({}, data);
-      }
-    );
-  }
-
-  async function commitNote(block: BoardBlock, note: string) {
-    if ((block.note ?? "") === note.trim()) return;
-
-    await run(
-      () =>
-        setBlocks((current) =>
-          current.map((item) =>
-            item.id === block.id ? { ...item, note: note.trim() || null } : item
-          )
-        ),
-      () => {
-        const data = new FormData();
-        data.set("blockId", block.id);
-        data.set("note", note);
-        return noteBlockAction({}, data);
-      }
-    );
-  }
-
-  async function commitRemove(block: BoardBlock) {
-    setEditing(null);
-
-    await run(
-      () =>
-        setBlocks((current) => current.filter((item) => item.id !== block.id)),
-      () => {
-        const data = new FormData();
-        data.set("blockId", block.id);
-        return removeBlockAction({}, data);
-      }
-    );
-  }
-
-  /* --- Det som ritas ---------------------------------------------------- */
+  /* --- Det som ritas ----------------------------------------------------- */
 
   /** Rutorna som de ser ut just nu, med dragningen inräknad. */
   const shown = useMemo(() => {
@@ -775,17 +811,12 @@ export default function PlanBoard({
 
     if (drag.kind === "resize") {
       return blocks.map((block) =>
-        block.id === drag.block.id
-          ? { ...block, minutes: drag.minutes }
-          : block
+        block.id === drag.block.id ? { ...block, minutes: drag.minutes } : block
       );
     }
 
-    if (drag.kind === "move" && drag.target) {
-      // Plockas ut före map(). Inuti callbacken har TypeScript tappat att
-      // `drag.target` är satt, och alternativet vore två utropstecken som
-      // påstår något kompilatorn inte kan se.
-      const { stationId, startsAt } = drag.target;
+    if (drag.kind === "move" && drag.slot) {
+      const { stationId, startsAt } = drag.slot;
       const moving = drag.block.id;
 
       return blocks.map((block) =>
@@ -798,16 +829,6 @@ export default function PlanBoard({
     return blocks;
   }, [blocks, drag]);
 
-  /**
-   * Raderna som visas i Oplacerat.
-   *
-   * Rader utan återstod faller bort — de ligger redan ute på tavlan. Rader utan
-   * beräkning står kvar, eftersom deras planerade tid annars vore osynlig.
-   *
-   * Listan räknas om av SERVERN efter varje dragning, inte här. Återstoden
-   * härleds ur rutorna (se `unplacedWork` i lib/planning.ts), och att gissa
-   * samma tal lokalt vore ett andra ställe som säger samma sak.
-   */
   const unplaced = useMemo(
     () =>
       initialUnplaced.filter(
@@ -816,368 +837,221 @@ export default function PlanBoard({
     [initialUnplaced]
   );
 
-  const plannable = unplaced.filter((row) => row.plannable);
-  const unplannable = unplaced.filter((row) => !row.plannable);
-
-  const draggingMoment =
+  /**
+   * Momentet som söker en plats just nu, draget eller valt.
+   *
+   * Stationerna som kan köra det lyser upp, resten tonas ned. Att visa VAR
+   * något får ligga är billigare än ett felmeddelande efteråt.
+   */
+  const seeking =
     drag?.kind === "new"
       ? drag.row.momentId
       : drag?.kind === "move"
         ? drag.block.momentId
-        : null;
+        : (armed?.momentId ?? null);
 
-  /** Rutan som dras just nu, om någon. Null under en ny placering. */
-  const draggedBlockId =
-    drag && drag.kind !== "new" ? drag.block.id : null;
-
-  /**
-   * Cellen som är på väg att få släppet, om någon.
-   *
-   * Plockas ut en gång och inte i varje cells klassnamn. `drag?.target` går
-   * inte att skriva rakt: varianten "resize" har inget `target`-fält, och
-   * TypeScript smalnar inte av unionen genom en valfri kedja.
-   */
-  const dropTarget =
-    drag && drag.kind !== "resize" ? drag.target : null;
+  const draggedBlockId = drag && drag.kind !== "new" ? drag.block.id : null;
+  const dropSlot = drag && drag.kind !== "resize" ? drag.slot : null;
 
   return (
     <div
-      className="flex flex-col gap-4 lg:flex-row"
+      className="space-y-3"
       onPointerMove={onPointerMove}
-      onPointerUp={onPointerUp}
+      onPointerUp={() => void onPointerUp()}
       onPointerCancel={() => {
         setDrag(null);
-        startedAt.current = null;
+        origin.current = null;
+        moved.current = false;
       }}
     >
-      {/* --- Oplacerat ----------------------------------------------------
-          Går att fälla ihop. Panelen tog 256 pixlar av veckans bredd även när
-          den stod tom, och de pixlarna är veckans. */}
-      <aside
-        className={`w-full shrink-0 ${showUnplaced ? "lg:w-60" : "lg:w-auto"}`}
-      >
-        <div className="rounded-lg border border-neutral-200 bg-white">
-          <button
+      {error && <Alert>{error}</Alert>}
+
+      <UnplacedStrip
+        rows={unplaced}
+        armed={armed}
+        readOnly={readOnly}
+        onPointerDownRow={beginNew}
+      />
+
+      <div className="flex items-center justify-between gap-3">
+        <p className="text-[13px] text-neutral-500">
+          Vecka {weekNumber}
+          {isCurrentWeek && (
+            <span className="ml-2 rounded bg-emerald-50 px-1.5 py-0.5 text-[11px] font-medium text-emerald-700 ring-1 ring-inset ring-emerald-200">
+              Pågår
+            </span>
+          )}
+        </p>
+
+        <div className="flex items-center gap-1">
+          <Button
             type="button"
-            onClick={() => setShowUnplaced((value) => !value)}
-            className="flex w-full items-center gap-2 border-b border-neutral-200 px-4 py-3 text-left hover:bg-neutral-50"
-            aria-expanded={showUnplaced}
+            tone="ghost"
+            onClick={() => setZoom((value) => Math.max(0, value - 1))}
+            disabled={zoom === 0}
+            aria-label="Zooma ut"
           >
-            <span className="text-sm font-semibold text-neutral-900">
-              Oplacerat
-            </span>
-            {unplaced.length > 0 && (
-              <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[11px] font-semibold tabular-nums text-amber-800">
-                {unplaced.length}
-              </span>
-            )}
-            <span className="ml-auto text-neutral-400">
-              {showUnplaced ? "−" : "+"}
-            </span>
-          </button>
-
-          <div
-            className={`max-h-[32rem] overflow-y-auto p-2 ${
-              showUnplaced ? "" : "hidden"
-            }`}
+            −
+          </Button>
+          <Button
+            type="button"
+            tone="ghost"
+            onClick={() =>
+              setZoom((value) => Math.min(ZOOM.length - 1, value + 1))
+            }
+            disabled={zoom === ZOOM.length - 1}
+            aria-label="Zooma in"
           >
-            {plannable.length === 0 && unplannable.length === 0 ? (
-              <p className="px-2 py-6 text-center text-[13px] text-neutral-500">
-                Allt beräknat arbete ligger på tavlan.
-              </p>
-            ) : (
-              <ul className="space-y-1.5">
-                {plannable.map((row) => (
-                  <li key={`${row.orderId}:${row.momentId}`}>
-                    <UnplacedChip
-                      row={row}
-                      readOnly={readOnly}
-                      onPointerDown={(event) => beginNew(event, row)}
-                    />
-                  </li>
-                ))}
-              </ul>
-            )}
-
-            {unplannable.length > 0 && (
-              <div className="mt-4 border-t border-neutral-200 pt-3">
-                <p className="px-2 pb-1.5 text-[11px] font-semibold uppercase tracking-wider text-neutral-400">
-                  Ingen station
-                </p>
-                <ul className="space-y-1.5">
-                  {unplannable.map((row) => (
-                    <li key={`${row.orderId}:${row.momentId}`}>
-                      <UnplacedChip row={row} readOnly muted />
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
-          </div>
+            +
+          </Button>
         </div>
-      </aside>
+      </div>
 
-      {/* --- Tavlan ------------------------------------------------------- */}
-      <div className="min-w-0 flex-1">
-        <div className="mb-2 flex items-center justify-between gap-3">
-          <p className="text-[13px] text-neutral-500">
-            Vecka {weekNumber}
-            {isCurrentWeek && (
-              <span className="ml-2 rounded bg-emerald-50 px-1.5 py-0.5 text-[11px] font-medium text-emerald-700 ring-1 ring-inset ring-emerald-200">
-                Pågår
-              </span>
-            )}
+      {stations.length === 0 ? (
+        <div className="rounded-lg border border-dashed border-neutral-200 bg-neutral-50/50 px-6 py-14 text-center">
+          <p className="text-sm font-medium text-neutral-900">
+            Inga öppna stationer
           </p>
-
-          <div className="flex items-center gap-1">
-            <Button
-              type="button"
-              tone="ghost"
-              onClick={() => setZoom((value) => Math.max(0, value - 1))}
-              disabled={zoom === 0}
-              aria-label="Zooma ut"
-            >
-              −
-            </Button>
-            <Button
-              type="button"
-              tone="ghost"
-              onClick={() =>
-                setZoom((value) => Math.min(ZOOM.length - 1, value + 1))
-              }
-              disabled={zoom === ZOOM.length - 1}
-              aria-label="Zooma in"
-            >
-              +
-            </Button>
-          </div>
+          <p className="mx-auto mt-1 max-w-md text-[13px] text-neutral-500">
+            Lägg upp stationerna innan du planerar.
+          </p>
         </div>
-
-        {error && (
-          <div className="mb-3">
-            <Alert>{error}</Alert>
-          </div>
-        )}
-
-        {stations.length === 0 ? (
-          <div className="rounded-lg border border-dashed border-neutral-200 bg-neutral-50/50 px-6 py-14 text-center">
-            <p className="text-sm font-medium text-neutral-900">
-              Inga öppna stationer
-            </p>
-            <p className="mx-auto mt-1 max-w-md text-[13px] text-neutral-500">
-              Lägg upp stationerna innan du planerar.
-            </p>
-          </div>
-        ) : (
-          <div
-            ref={boardRef}
-            className="overflow-x-auto rounded-lg border border-neutral-200 bg-white"
-          >
-            <div className="inline-block min-w-full">
-              {/* Dagrubrikerna */}
-              <div className="flex border-b border-neutral-200 bg-neutral-50">
-                {/* STATIONSKOLUMNEN STÅR STILL. Rullar man in i veckan ska man
-                    fortfarande kunna se vilken maskin raden gäller — utan det
-                    är en tavla med tolv stationer oläslig så fort man zoomat
-                    in. */}
-                <div
-                  style={{ width: STATION_COLUMN }}
-                  className="sticky left-0 z-20 shrink-0 border-r border-neutral-200 bg-neutral-50 px-3 py-2 text-[11px] font-semibold uppercase tracking-wider text-neutral-400"
-                >
-                  Station
-                </div>
-                {visibleDays.map((index) => (
-                  <div
-                    key={index}
-                    style={{ width: widthOf(index) }}
-                    className="shrink-0 border-l-2 border-neutral-200 px-2 py-2 first:border-l-0"
-                  >
-                    <p className="truncate text-[13px] font-medium text-neutral-900">
-                      {DAY_LABELS[index]}{" "}
-                      <span className="font-normal text-neutral-400">
-                        {dayLabel(days[index], timeZone)}
-                      </span>
-                    </p>
-                    <Axis
-                      axis={windows.get(index)}
-                      pxPerMinute={pxPerMinute}
-                    />
-                  </div>
-                ))}
+      ) : (
+        <div
+          ref={scrollRef}
+          className="overflow-x-auto rounded-lg border border-neutral-200 bg-white"
+        >
+          <div className="inline-block min-w-full">
+            {/* Dagrubrikerna */}
+            <div className="flex border-b border-neutral-200 bg-neutral-50">
+              <div
+                style={{ width: STATION_COLUMN }}
+                className="sticky left-0 z-20 shrink-0 border-r border-neutral-200 bg-neutral-50 px-3 py-2 text-[11px] font-semibold uppercase tracking-wider text-neutral-400"
+              >
+                Station
               </div>
 
-              {/* En rad per station */}
-              {stations.map((station) => (
+              {visibleDays.map((index) => (
                 <div
-                  key={station.id}
-                  className="flex border-b border-neutral-100 last:border-b-0"
+                  key={index}
+                  style={{ width: widthOf(index) }}
+                  className="shrink-0 border-l-2 border-neutral-200 px-2 py-2 first:border-l-0"
                 >
-                  <div
-                    style={{ width: STATION_COLUMN }}
-                    className="sticky left-0 z-20 flex shrink-0 flex-col justify-center border-r border-neutral-200 bg-white px-3 py-2"
-                  >
-                    <p className="truncate text-[13px] font-medium text-neutral-900">
-                      {station.name}
-                    </p>
-                    <p className="truncate text-[11px] text-neutral-400">
-                      {station.momentName}
-                    </p>
-                  </div>
-
-                  {visibleDays.map((dayIndex) => {
-                    const hours = hoursFor(station.id, dayIndex);
-                    const axis = windows.get(dayIndex);
-
-                    const dayBlocks = shown.filter(
-                      (block) =>
-                        block.stationId === station.id &&
-                        dayIndexOf(new Date(block.startsAt), days) === dayIndex
-                    );
-
-                    const load = stationDayLoad(
-                      hours,
-                      dayBlocks.map((block) => ({
-                        startsAt: new Date(block.startsAt),
-                        minutes: block.minutes,
-                        hours,
-                      })),
-                      timeZone
-                    );
-
-                    const over =
-                      load.overlaps ||
-                      load.plannedMinutes > load.capacityMinutes;
-
-                    return (
-                      <div
-                        key={dayIndex}
-                        ref={(node) =>
-                          registerCell(`${station.id}|${dayIndex}`, node)
-                        }
-                        style={{ width: widthOf(dayIndex) }}
-                        className={`relative shrink-0 border-l-2 border-neutral-200 first:border-l-0 ${
-                          draggingMoment && draggingMoment !== station.momentId
-                            ? "opacity-30"
-                            : ""
-                        } ${
-                          dropTarget !== null &&
-                          dropTarget.stationId === station.id &&
-                          dropTarget.dayIndex === dayIndex
-                            ? "bg-blue-50/60"
-                            : ""
-                        }`}
-                      >
-                        <div className="relative h-20">
-                          {/* Stängd tid och raster, i grått. Det öppna är vitt. */}
-                          <div className="absolute inset-0 bg-neutral-100/70" />
-                          {axis &&
-                            workingWindows(hours, days[dayIndex], timeZone).map(
-                              (span, index) => (
-                                <div
-                                  key={index}
-                                  className="absolute inset-y-0 bg-white"
-                                  style={{
-                                    left: offsetPx(
-                                      span.from,
-                                      days[dayIndex],
-                                      axis,
-                                      pxPerMinute
-                                    ),
-                                    width:
-                                      ((span.to - span.from) / MS_PER_MINUTE) *
-                                      pxPerMinute,
-                                  }}
-                                />
-                              )
-                            )}
-
-                          {/* Nulinjen, bara i dagens kolumn. */}
-                          {now !== null &&
-                            axis &&
-                            dayIndexOf(new Date(now), days) === dayIndex && (
-                              <div
-                                className="absolute inset-y-0 w-0.5 bg-tick-deep"
-                                style={{
-                                  left: offsetPx(
-                                    now,
-                                    days[dayIndex],
-                                    axis,
-                                    pxPerMinute
-                                  ),
-                                }}
-                              />
-                            )}
-
-                          {axis &&
-                            dayBlocks.map((block) => (
-                              <BlockBox
-                                key={block.id}
-                                block={block}
-                                hours={hours}
-                                day={days[dayIndex]}
-                                axis={axis}
-                                pxPerMinute={pxPerMinute}
-                                timeZone={timeZone}
-                                progress={progress[block.id]}
-                                dragging={draggedBlockId === block.id}
-                                readOnly={readOnly}
-                                onPointerDown={(event) =>
-                                  beginMove(event, block)
-                                }
-                                onResizeStart={(event) =>
-                                  beginResize(event, block)
-                                }
-                              />
-                            ))}
-                        </div>
-
-                        {over && (
-                          <span
-                            className="absolute right-1 top-1 rounded bg-amber-100 px-1 text-[10px] font-semibold text-amber-800"
-                            title={
-                              load.overlaps
-                                ? "Två jobb ligger i varandra"
-                                : `${formatDuration(
-                                    load.plannedMinutes - load.capacityMinutes
-                                  )} mer än stationen hinner`
-                            }
-                          >
-                            {load.overlaps ? "krock" : "över"}
-                          </span>
-                        )}
-                      </div>
-                    );
-                  })}
+                  <p className="truncate text-[13px] font-medium text-neutral-900">
+                    {widthOf(index) > 160 ? DAY_LONG[index] : DAY_SHORT[index]}{" "}
+                    <span className="font-normal text-neutral-400">
+                      {dayLabel(days[index], timeZone)}
+                    </span>
+                  </p>
+                  <Axis axis={windows.get(index)} pxPerMinute={pxPerMinute} />
                 </div>
               ))}
             </div>
+
+            {/* Raderna. Enda måttet träffytan räknas ur. */}
+            <div ref={bodyRef} onPointerUp={onBodyPointerUp}>
+              {stations.map((station) => {
+                const dim = seeking !== null && seeking !== station.momentId;
+                const target = seeking !== null && seeking === station.momentId;
+
+                return (
+                  <div
+                    key={station.id}
+                    className={`flex border-b border-neutral-100 last:border-b-0 ${ROW_CLASS} ${
+                      dim ? "opacity-40" : ""
+                    }`}
+                  >
+                    <div
+                      style={{ width: STATION_COLUMN }}
+                      className={`sticky left-0 z-20 flex shrink-0 flex-col justify-center border-r border-neutral-200 px-3 ${
+                        target ? "bg-blue-50" : "bg-white"
+                      }`}
+                    >
+                      <p className="truncate text-[13px] font-medium text-neutral-900">
+                        {station.name}
+                      </p>
+                      <p className="truncate text-[11px] text-neutral-400">
+                        {station.momentName}
+                      </p>
+                    </div>
+
+                    {visibleDays.map((dayIndex) => (
+                      <DayCell
+                        key={dayIndex}
+                        stationName={station.name}
+                        day={days[dayIndex]}
+                        days={days}
+                        dayIndex={dayIndex}
+                        axis={windows.get(dayIndex)}
+                        width={widthOf(dayIndex)}
+                        pxPerMinute={pxPerMinute}
+                        timeZone={timeZone}
+                        hours={hoursFor(station.id, dayIndex)}
+                        blocks={shown.filter(
+                          (block) =>
+                            block.stationId === station.id &&
+                            dayIndexOf(new Date(block.startsAt), days) ===
+                              dayIndex
+                        )}
+                        progress={progress}
+                        now={now}
+                        highlight={
+                          dropSlot?.stationId === station.id &&
+                          dropSlot.dayIndex === dayIndex
+                        }
+                        draggedBlockId={draggedBlockId}
+                        pickable={target && armed !== null}
+                        readOnly={readOnly}
+                        onBlockPointerDown={beginMove}
+                        onResizeStart={beginResize}
+                      />
+                    ))}
+                  </div>
+                );
+              })}
+            </div>
           </div>
-        )}
+        </div>
+      )}
 
-        <Legend />
-      </div>
+      <Legend armed={armed} />
 
-      {/* --- Rutan som öppnas vid ett tryck ------------------------------- */}
+      {/* SPÖKET SOM FÖLJER PEKAREN under en dragning från Oplacerat.
+          Utan det ser en dragning ut som att ingenting händer, vilket var en
+          stor del av varför den kändes trasig.
+
+          Visas från första ögonblicket och inte först när pekaren hittat en
+          giltig plats: ett spöke som blinkar fram och tillbaka är sämre än
+          inget. Att platsen duger syns på färgen i stället. */}
+      {drag?.kind === "new" && (
+        <div
+          className={`pointer-events-none fixed z-50 rounded-md px-2 py-1 text-[12px] font-semibold shadow-lg ${
+            drag.slot
+              ? "bg-tick-deep text-white"
+              : "bg-neutral-700 text-white opacity-70"
+          }`}
+          style={{ left: drag.at.x + 14, top: drag.at.y + 14 }}
+        >
+          {drag.row.orderNumber} · {drag.row.momentName}
+        </div>
+      )}
+
       {editing && (
         <BlockDialog
           block={editing}
-          span={spanOf(editing)}
+          end={endOf(editing, hoursFor, days, timeZone)}
           progress={progress[editing.id]}
           timeZone={timeZone}
           readOnly={readOnly}
           onClose={() => setEditing(null)}
-          onRemove={() => void commitRemove(editing)}
+          onRemove={() => void remove(editing)}
           onSave={(minutes, note) => {
             const block = editing;
             setEditing(null);
 
-            // Två åtgärder och inte en. Tiden ändras vid varje dragning och är
-            // därför en egen, het väg; anteckningen skrivs sällan. En
-            // sammanslagen åtgärd hade betytt att varje drag skickade med en
-            // anteckning den inte rör.
             void (async () => {
-              await commitResize(block, minutes);
-              await commitNote(block, note);
+              await resize(block, minutes);
+              await saveNote(block, note);
             })();
           }}
         />
@@ -1187,18 +1061,98 @@ export default function PlanBoard({
 }
 
 /* -------------------------------------------------------------------------- */
-/* Delarna                                                                     */
+/* Oplacerat                                                                   */
 /* -------------------------------------------------------------------------- */
 
-function UnplacedChip({
-  row,
+/**
+ * Jobben som väntar på en plats, som en rad ÖVER tavlan.
+ *
+ * Låg som en panel till vänster och tog tvåhundrafemtio pixlar av veckans
+ * bredd även när den stod tom. Veckan är det man är här för att se.
+ *
+ * Rullar i sidled när de blir många. Det är rätt håll: en lista som växer
+ * nedåt trycker ned tavlan, och tavlan ska ligga still.
+ */
+function UnplacedStrip({
+  rows,
+  armed,
   readOnly,
-  muted = false,
+  onPointerDownRow,
+}: {
+  rows: BoardUnplaced[];
+  armed: BoardUnplaced | null;
+  readOnly: boolean;
+  onPointerDownRow: (
+    event: ReactPointerEvent<HTMLElement>,
+    row: BoardUnplaced
+  ) => void;
+}) {
+  const plannable = rows.filter((row) => row.plannable);
+  const blocked = rows.filter((row) => !row.plannable);
+
+  return (
+    <div className="rounded-lg border border-neutral-200 bg-white">
+      <div className="flex items-center gap-2 border-b border-neutral-200 px-4 py-2.5">
+        <h2 className="text-sm font-semibold text-neutral-900">Oplacerat</h2>
+
+        {rows.length > 0 && (
+          <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[11px] font-semibold tabular-nums text-amber-800">
+            {rows.length}
+          </span>
+        )}
+
+        {armed && (
+          <span className="ml-auto truncate text-[12px] font-medium text-tick-deep">
+            Tryck på en station för att placera {armed.orderNumber}
+          </span>
+        )}
+      </div>
+
+      {rows.length === 0 ? (
+        <p className="px-4 py-4 text-[13px] text-neutral-500">
+          Allt beräknat arbete ligger på tavlan.
+        </p>
+      ) : (
+        <div className="flex gap-2 overflow-x-auto px-3 py-3">
+          {plannable.map((row) => (
+            <Chip
+              key={`${row.orderId}:${row.momentId}`}
+              row={row}
+              armed={
+                armed?.orderId === row.orderId &&
+                armed?.momentId === row.momentId
+              }
+              readOnly={readOnly}
+              onPointerDown={(event) => onPointerDownRow(event, row)}
+            />
+          ))}
+
+          {blocked.map((row) => (
+            <Chip
+              key={`${row.orderId}:${row.momentId}`}
+              row={row}
+              armed={false}
+              readOnly
+              blocked
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function Chip({
+  row,
+  armed,
+  readOnly,
+  blocked = false,
   onPointerDown,
 }: {
   row: BoardUnplaced;
+  armed: boolean;
   readOnly: boolean;
-  muted?: boolean;
+  blocked?: boolean;
   onPointerDown?: (event: ReactPointerEvent<HTMLElement>) => void;
 }) {
   const over = row.remainingMinutes < 0;
@@ -1206,18 +1160,29 @@ function UnplacedChip({
   return (
     <div
       onPointerDown={onPointerDown}
-      className={`rounded-md border px-2.5 py-2 ${
-        muted
-          ? "border-neutral-200 bg-neutral-50"
-          : "border-neutral-200 bg-white"
-      } ${readOnly || muted ? "" : "cursor-grab touch-none active:cursor-grabbing"}`}
+      title={
+        blocked
+          ? `Ingen station kör ${row.momentName}`
+          : `${row.orderNumber} · ${row.momentName}`
+      }
+      className={`w-44 shrink-0 rounded-md border px-2.5 py-2 ${
+        armed
+          ? "border-tick-deep bg-blue-50 ring-2 ring-tick-deep"
+          : blocked
+            ? "border-neutral-200 bg-neutral-50 opacity-60"
+            : "border-neutral-200 bg-white hover:border-neutral-400"
+      } ${
+        readOnly || blocked
+          ? ""
+          : "cursor-grab touch-none select-none active:cursor-grabbing"
+      }`}
     >
-      <p className="flex items-baseline justify-between gap-2 text-[13px]">
-        <span className="truncate font-medium text-neutral-900">
+      <p className="flex items-baseline justify-between gap-2">
+        <span className="truncate text-[13px] font-semibold text-neutral-900">
           {row.orderNumber}
         </span>
         <span
-          className={`shrink-0 tabular-nums ${
+          className={`shrink-0 text-[13px] tabular-nums ${
             over ? "text-amber-700" : "text-neutral-900"
           }`}
         >
@@ -1226,21 +1191,158 @@ function UnplacedChip({
             : formatDuration(Math.abs(row.remainingMinutes))}
         </span>
       </p>
-      <p className="truncate text-[11px] text-neutral-500">
-        {row.momentName}
-        {row.customerName ? ` · ${row.customerName}` : ""}
-      </p>
-      {(row.dueDate || over || row.budgetMinutes === null) && (
-        <p className="mt-0.5 truncate text-[11px] text-neutral-400">
-          {row.budgetMinutes === null
+
+      <p className="truncate text-[11px] text-neutral-500">{row.momentName}</p>
+
+      <p className="truncate text-[11px] text-neutral-400">
+        {blocked
+          ? "Ingen station"
+          : row.budgetMinutes === null
             ? "Ingen beräkning"
             : over
               ? "Över beräknat"
-              : null}
-          {row.dueDate && row.budgetMinutes !== null && !over
-            ? `Senast ${shortDate(row.dueDate)}`
-            : null}
-        </p>
+              : row.dueDate
+                ? `Senast ${shortDate(row.dueDate)}`
+                : (row.customerName ?? "")}
+      </p>
+    </div>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+/* Tavlans celler                                                              */
+/* -------------------------------------------------------------------------- */
+
+function DayCell({
+  stationName,
+  day,
+  days,
+  dayIndex,
+  axis,
+  width,
+  pxPerMinute,
+  timeZone,
+  hours,
+  blocks,
+  progress,
+  now,
+  highlight,
+  draggedBlockId,
+  pickable,
+  readOnly,
+  onBlockPointerDown,
+  onResizeStart,
+}: {
+  stationName: string;
+  day: Date;
+  days: Date[];
+  dayIndex: number;
+  axis?: { startMinute: number; endMinute: number };
+  width: number;
+  pxPerMinute: number;
+  timeZone: string;
+  hours: StationHours | null;
+  blocks: BoardBlock[];
+  progress: Record<string, BlockProgress>;
+  now: number | null;
+  highlight: boolean;
+  draggedBlockId: string | null;
+  /** Ett valt jobb kan läggas här. Ger pekaren en annan form. */
+  pickable: boolean;
+  readOnly: boolean;
+  onBlockPointerDown: (
+    event: ReactPointerEvent<HTMLElement>,
+    block: BoardBlock
+  ) => void;
+  onResizeStart: (
+    event: ReactPointerEvent<HTMLElement>,
+    block: BoardBlock
+  ) => void;
+}) {
+  const load = stationDayLoad(
+    hours,
+    blocks.map((block) => ({
+      startsAt: new Date(block.startsAt),
+      minutes: block.minutes,
+      hours,
+    })),
+    timeZone
+  );
+
+  const over = load.overlaps || load.plannedMinutes > load.capacityMinutes;
+
+  return (
+    <div
+      style={{ width }}
+      className={`relative shrink-0 border-l-2 border-neutral-200 first:border-l-0 ${
+        highlight ? "bg-blue-100" : ""
+      } ${pickable ? "cursor-copy" : ""}`}
+    >
+      <div className="relative h-full">
+        {/* Stängd tid och raster i grått, det öppna vitt. */}
+        <div className="absolute inset-0 bg-neutral-100/70" />
+
+        {axis &&
+          workingWindows(hours, day, timeZone).map((span, index) => (
+            <div
+              key={index}
+              className="absolute inset-y-0 bg-white"
+              style={{
+                left: offsetPx(span.from, day, axis, pxPerMinute),
+                width: ((span.to - span.from) / MS_PER_MINUTE) * pxPerMinute,
+              }}
+            />
+          ))}
+
+        {/* Timlinjer, så att ytan läses som en tidslinje och inte som en ruta. */}
+        {axis &&
+          hourTicks(axis).map((minute) => (
+            <div
+              key={minute}
+              className="absolute inset-y-0 w-px bg-neutral-200/70"
+              style={{ left: (minute - axis.startMinute) * pxPerMinute }}
+            />
+          ))}
+
+        {now !== null && axis && dayIndexOf(new Date(now), days) === dayIndex && (
+          <div
+            className="absolute inset-y-0 z-10 w-0.5 bg-tick-deep"
+            style={{ left: offsetPx(now, day, axis, pxPerMinute) }}
+          />
+        )}
+
+        {axis &&
+          blocks.map((block) => (
+            <BlockBox
+              key={block.id}
+              block={block}
+              hours={hours}
+              day={day}
+              axis={axis}
+              pxPerMinute={pxPerMinute}
+              timeZone={timeZone}
+              progress={progress[block.id]}
+              dragging={draggedBlockId === block.id}
+              readOnly={readOnly}
+              onPointerDown={(event) => onBlockPointerDown(event, block)}
+              onResizeStart={(event) => onResizeStart(event, block)}
+            />
+          ))}
+      </div>
+
+      {over && (
+        <span
+          className="absolute right-1 top-1 z-20 rounded bg-amber-100 px-1 text-[10px] font-semibold text-amber-800"
+          title={
+            load.overlaps
+              ? "Två jobb ligger i varandra"
+              : `${formatDuration(
+                  load.plannedMinutes - load.capacityMinutes
+                )} mer än ${stationName} hinner`
+          }
+        >
+          {load.overlaps ? "krock" : "över"}
+        </span>
       )}
     </div>
   );
@@ -1276,7 +1378,7 @@ function BlockBox({
 
   const left = offsetPx(startsAt.getTime(), day, axis, pxPerMinute);
   const width = Math.max(
-    6,
+    8,
     ((end.getTime() - startsAt.getTime()) / MS_PER_MINUTE) * pxPerMinute
   );
 
@@ -1284,24 +1386,30 @@ function BlockBox({
     ? Math.min(100, (progress.clockedMinutes / Math.max(block.minutes, 1)) * 100)
     : 0;
 
-  const label = `${block.orderNumber} · ${block.momentName} · ${formatDuration(
-    block.minutes
-  )}${progress ? ` · stämplat ${formatDuration(progress.clockedMinutes)}` : ""}${
-    progress?.running ? ` · ${progress.people.join(", ")}` : ""
-  }`;
+  const label = [
+    `${block.orderNumber} · ${block.momentName}`,
+    block.customerName,
+    `Planerat ${formatDuration(block.minutes)}`,
+    progress ? `Stämplat ${formatDuration(progress.clockedMinutes)}` : null,
+    progress?.running ? `Pågår: ${progress.people.join(", ")}` : null,
+    block.note,
+  ]
+    .filter(Boolean)
+    .join("\n");
 
   return (
     <div
       onPointerDown={onPointerDown}
       title={label}
       style={{ left, width }}
-      className={`absolute inset-y-1 overflow-hidden rounded-md bg-blue-600 text-white ring-1 ring-inset ${
-        progress?.running ? "ring-2 ring-tick" : "ring-blue-700/40"
-      } ${dragging ? "opacity-70" : ""} ${
-        readOnly ? "" : "cursor-grab touch-none active:cursor-grabbing"
+      className={`absolute inset-y-1 z-10 overflow-hidden rounded-md bg-fjord text-white ring-1 ring-inset ${
+        progress?.running ? "ring-2 ring-tick" : "ring-black/10"
+      } ${dragging ? "opacity-60" : ""} ${
+        readOnly
+          ? ""
+          : "cursor-grab touch-none select-none active:cursor-grabbing"
       }`}
     >
-      {/* Stämplad tid som en ifylld del. Ligger bakom texten. */}
       {progress && (
         <div
           className="absolute inset-y-0 left-0 bg-tick-deep"
@@ -1309,8 +1417,8 @@ function BlockBox({
         />
       )}
 
-      {width > 34 && (
-        <div className="relative px-1.5 py-1.5">
+      {width > 30 && (
+        <div className="relative px-1.5 py-1">
           <p className="truncate text-[12px] font-semibold leading-tight">
             {block.orderNumber}
           </p>
@@ -1322,7 +1430,9 @@ function BlockBox({
           {width > 80 && (
             <p className="truncate text-[11px] leading-tight tabular-nums opacity-70">
               {formatDuration(block.minutes)}
-              {progress ? ` · ${formatDuration(progress.clockedMinutes)}` : ""}
+              {progress
+                ? ` · stämplat ${formatDuration(progress.clockedMinutes)}`
+                : ""}
             </p>
           )}
         </div>
@@ -1331,14 +1441,14 @@ function BlockBox({
       {!readOnly && (
         <div
           onPointerDown={onResizeStart}
-          className="absolute inset-y-0 right-0 w-2 cursor-ew-resize touch-none bg-white/20"
+          className="absolute inset-y-0 right-0 z-10 w-2.5 cursor-ew-resize touch-none bg-white/25 hover:bg-white/40"
         />
       )}
     </div>
   );
 }
 
-/** Klockslagen under dagrubriken. En etikett per hel eller annan timme. */
+/** Klockslagen under dagrubriken. */
 function Axis({
   axis,
   pxPerMinute,
@@ -1348,20 +1458,9 @@ function Axis({
 }) {
   if (!axis) return null;
 
-  const step = pxPerMinute < 0.45 ? 180 : pxPerMinute < 0.8 ? 120 : 60;
-
-  const ticks: number[] = [];
-  for (
-    let minute = Math.ceil(axis.startMinute / step) * step;
-    minute < axis.endMinute;
-    minute += step
-  ) {
-    ticks.push(minute);
-  }
-
   return (
     <div className="relative mt-0.5 h-3">
-      {ticks.map((minute) => (
+      {hourTicks(axis, pxPerMinute).map((minute) => (
         <span
           key={minute}
           className="absolute top-0 text-[10px] tabular-nums text-neutral-400"
@@ -1374,11 +1473,44 @@ function Axis({
   );
 }
 
-function Legend() {
+/**
+ * Klockslagen som får plats.
+ *
+ * Utan pixelmåttet ges varje hel timme, vilket är rätt för linjerna i
+ * bakgrunden. Med måttet glesas de ut så att etiketterna inte skriver över
+ * varandra.
+ */
+function hourTicks(
+  axis: { startMinute: number; endMinute: number },
+  pxPerMinute?: number
+): number[] {
+  const step =
+    pxPerMinute === undefined
+      ? 60
+      : pxPerMinute < 0.35
+        ? 180
+        : pxPerMinute < 0.7
+          ? 120
+          : 60;
+
+  const ticks: number[] = [];
+
+  for (
+    let minute = Math.ceil(axis.startMinute / step) * step;
+    minute < axis.endMinute;
+    minute += step
+  ) {
+    ticks.push(minute);
+  }
+
+  return ticks;
+}
+
+function Legend({ armed }: { armed: BoardUnplaced | null }) {
   return (
-    <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-neutral-500">
+    <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-neutral-500">
       <span className="flex items-center gap-1.5">
-        <span className="h-2.5 w-4 rounded-sm bg-blue-600" />
+        <span className="h-2.5 w-4 rounded-sm bg-fjord" />
         Planerat
       </span>
       <span className="flex items-center gap-1.5">
@@ -1389,14 +1521,23 @@ function Legend() {
         <span className="h-2.5 w-4 rounded-sm bg-neutral-200" />
         Stängt eller rast
       </span>
+
+      <span className="ml-auto text-neutral-400">
+        {armed
+          ? "Tryck på en station, eller Esc för att avbryta"
+          : "Tryck på ett jobb i Oplacerat, sedan på en station"}
+      </span>
     </div>
   );
 }
 
-/** Rutan som öppnas när man trycker på ett planerat jobb. */
+/* -------------------------------------------------------------------------- */
+/* Rutan som öppnas vid ett tryck                                              */
+/* -------------------------------------------------------------------------- */
+
 function BlockDialog({
   block,
-  span,
+  end,
   progress,
   timeZone,
   readOnly,
@@ -1405,7 +1546,7 @@ function BlockDialog({
   onSave,
 }: {
   block: BoardBlock;
-  span: { from: Date; to: Date };
+  end: Date;
   progress?: BlockProgress;
   timeZone: string;
   readOnly: boolean;
@@ -1414,7 +1555,7 @@ function BlockDialog({
   onSave: (minutes: number, note: string) => void;
 }) {
   const dialog = useRef<HTMLDialogElement>(null);
-  const [hours, setHours] = useState(() => toHourText(block.minutes));
+  const [hours, setHours] = useState(() => formatDuration(block.minutes));
   const [note, setNote] = useState(block.note ?? "");
 
   useEffect(() => {
@@ -1432,7 +1573,8 @@ function BlockDialog({
           {block.orderNumber} · {block.momentName}
         </h2>
         <p className="mt-0.5 text-[13px] text-neutral-500">
-          {clockText(span.from, timeZone)}–{clockText(span.to, timeZone)}
+          {clockText(new Date(block.startsAt), timeZone)} till{" "}
+          {clockText(end, timeZone)}
           {block.customerName ? ` · ${block.customerName}` : ""}
         </p>
       </div>
@@ -1454,8 +1596,8 @@ function BlockDialog({
           <Input
             value={hours}
             onChange={(event) => setHours(event.target.value)}
-            inputMode="text"
             disabled={readOnly}
+            autoFocus
           />
         </Field>
 
@@ -1512,6 +1654,20 @@ function BlockDialog({
 /* Räknehjälp                                                                  */
 /* -------------------------------------------------------------------------- */
 
+/** Rutans slut på väggen, givet stationernas tider. */
+function endOf(
+  block: BoardBlock,
+  hoursFor: (stationId: string, dayIndex: number) => StationHours | null,
+  days: Date[],
+  timeZone: string
+): Date {
+  const startsAt = new Date(block.startsAt);
+  const index = dayIndexOf(startsAt, days);
+  const hours = index === null ? null : hoursFor(block.stationId, index);
+
+  return blockEnd(hours, startsAt, block.minutes, timeZone);
+}
+
 /** Veckans sju dygnsbörjan, räknade i företagets tidszon. */
 function buildDays(monday: Date, timeZone: string): Date[] {
   const days: Date[] = [];
@@ -1527,13 +1683,7 @@ function buildDays(monday: Date, timeZone: string): Date[] {
   return days;
 }
 
-/**
- * Dygnets början på väggen.
- *
- * Egen rad här och inte `startOfDayIn` ur time-zone.ts, eftersom den bygger på
- * `instantFromWallTime`, som itererar — billigt på servern och onödigt i en
- * omrendering som sker vid varje pekarrörelse. Resultatet är detsamma.
- */
+/** Dygnets början på väggen. */
 function startOfWallDay(instant: Date, timeZone: string): Date {
   const parts = new Intl.DateTimeFormat("sv-SE", {
     timeZone,
@@ -1550,7 +1700,9 @@ function startOfWallDay(instant: Date, timeZone: string): Date {
     Number(parts.find((part) => part.type === type)?.value ?? "0");
 
   const intoDay =
-    value("hour") * 3_600_000 + value("minute") * 60_000 + value("second") * 1000;
+    value("hour") * 3_600_000 +
+    value("minute") * 60_000 +
+    value("second") * 1000;
 
   return new Date(instant.getTime() - intoDay);
 }
@@ -1560,13 +1712,7 @@ function startOfWallDay(instant: Date, timeZone: string): Date {
  *
  * Gränsen är NÄSTA DAGS början och inte ett antal timmar. Dygnet då klockan
  * ställs om är 23 eller 25 timmar långt, och ett fast tal hade lagt söndagen
- * till lördagen två gånger om året — vilket syns som att rutor försvinner ur
- * tavlan just de veckorna.
- *
- * Söndagen har ingen nästa dag i listan, och får därför det längsta dygn som
- * finns. Det kan i teorin svälja första timmen av måndagen efter, men ingen
- * tidpunkt som kommer hit ligger där: rutorna är hämtade inom veckan och
- * kapas mot midnatt, och nulinjen ritas bara i den pågående veckan.
+ * till lördagen två gånger om året.
  */
 function dayIndexOf(instant: Date, days: Date[]): number | null {
   const time = instant.getTime();
@@ -1634,17 +1780,12 @@ function toDateParam(day: Date, timeZone: string): string {
   return `${value("year")}-${value("month")}-${value("day")}`;
 }
 
-/** Minuter som "4:30". Samma form som fältet tar emot. */
-function toHourText(minutes: number): string {
-  return formatDuration(minutes);
-}
-
 /**
  * "4:30" eller "4,5" till minuter.
  *
- * Tar båda formerna, av samma skäl som orderns beräkningsfält gör det: systemet
- * visar tim:min överallt, och det vore oanständigt att kräva att man räknar om
- * det till decimaltimmar för att skriva tillbaka samma tal.
+ * Tar båda formerna, av samma skäl som orderns beräkningsfält gör det:
+ * systemet visar tim:min överallt, och det vore oanständigt att kräva att man
+ * räknar om det till decimaltimmar för att skriva tillbaka samma tal.
  */
 function parseHourText(raw: string): number | null {
   const text = raw.trim();
