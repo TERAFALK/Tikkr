@@ -71,7 +71,9 @@ export async function GET(request: NextRequest) {
         momentId: block.momentId,
         startsAt: block.startsAt,
         minutes: block.minutes,
-        hours: station ? hoursOn(station, block.startsAt, timeZone) : null,
+        hours: station
+          ? hoursOn(station.hours, block.startsAt, timeZone)
+          : null,
       };
     }),
     timeZone

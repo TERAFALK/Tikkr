@@ -156,12 +156,10 @@ export function readWeeklyHours(
 
     const breaks = readBreaks(formData, weekday);
 
-    const breakMinutes = breaks.reduce(
-      (total, rest) => total + (rest.endMinute - rest.startMinute),
-      0
-    );
-
-    if (breakMinutes >= end - start) {
+    // Mäts med `netMinutes` och inte med en egen summa. En råsumma räknar
+    // överlappande raster två gånger och avvisade därmed en dag som i
+    // själva verket hade arbetstid kvar.
+    if (netMinutes({ startMinute: start, endMinute: end, breaks }) <= 0) {
       return {
         error: `Rasterna är längre än arbetsdagen på ${dayName(weekday)}.`,
       };
@@ -173,29 +171,76 @@ export function readWeeklyHours(
   return { days };
 }
 
-/**
- * Arbetstid netto för en dag, i minuter: spannet minus rasterna.
- *
- * En rast som sträcker sig utanför arbetspasset räknas bara till den del som
- * ligger innanför. Annars skulle en lunch som lagts 12:00–13:00 på en dag som
- * slutar 12:30 dra av trettio minuter för mycket.
- *
- * Samma aritmetik som `plannedMinutesForDay` i schedule.ts och `capacityOf` i
- * plan-calendar.ts, och de två kallar hit i stället för att räkna själva —
- * annars hade samma dag kunnat bli olång beroende på vem som frågade.
- */
-export function netMinutes(day: {
+/** En dag med raster, som de tre funktionerna nedan läser den. */
+export interface DayWithBreaks {
   startMinute: number;
   endMinute: number;
   breaks: { startMinute: number; endMinute: number }[];
-}): number {
+}
+
+/**
+ * Rasterna klippta mot passet, sorterade, och ÖVERLAPP SLAGET IHOP.
+ *
+ * ETT ställe äger den här regeln, och det är inte prydnad. Rasterna behöver
+ * läsas på två olika sätt: som ett antal minuter (`netMinutes` nedan, för
+ * dagens längd) och som tidpunkter på väggen (`breakSpans` i
+ * plan-calendar.ts, för att hoppa över dem när en ruta ritas). Räknade de två
+ * självständigt gav de olika svar på samma dag — vilket de gjorde: en station
+ * med rasterna 12:00–12:40 och 12:20–13:00 fick en dag som var åttio minuter
+ * kortare enligt den ena och sextio enligt den andra.
+ *
+ * TVÅ REGLER, OCH BÅDA BEHÖVS:
+ *
+ * Klippning. En rast räknas bara till den del som ligger innanför passet.
+ * Annars skulle en lunch lagd 12:00–13:00 på en dag som slutar 12:30 dra av
+ * trettio minuter för mycket.
+ *
+ * Sammanslagning. Två raster som ligger i varandra täcker tillsammans ett
+ * spann, inte två. Maskinen står still 12:00–13:00, alltså sextio minuter —
+ * att räkna 40 + 40 = 80 i ett fönster som är sextio minuter långt är fel
+ * oavsett vem som frågar. Formuläret hindrar inte överlappande rader, och ska
+ * inte behöva göra det.
+ */
+export function mergedBreaks(
+  day: DayWithBreaks
+): { startMinute: number; endMinute: number }[] {
+  const clipped = day.breaks
+    .map((rest) => ({
+      startMinute: Math.max(rest.startMinute, day.startMinute),
+      endMinute: Math.min(rest.endMinute, day.endMinute),
+    }))
+    .filter((rest) => rest.endMinute > rest.startMinute)
+    .sort((a, b) => a.startMinute - b.startMinute);
+
+  const merged: { startMinute: number; endMinute: number }[] = [];
+
+  for (const rest of clipped) {
+    const last = merged[merged.length - 1];
+
+    if (last && rest.startMinute <= last.endMinute) {
+      last.endMinute = Math.max(last.endMinute, rest.endMinute);
+    } else {
+      merged.push({ ...rest });
+    }
+  }
+
+  return merged;
+}
+
+/**
+ * Arbetstid netto för en dag, i minuter: spannet minus rasterna.
+ *
+ * Samma aritmetik som `plannedMinutesForDay` i schedule.ts och `capacityOf` i
+ * plan-calendar.ts, och de två kallar hit i stället för att räkna själva —
+ * annars blir samma dag olång beroende på vem som frågade.
+ */
+export function netMinutes(day: DayWithBreaks): number {
   const span = Math.max(0, day.endMinute - day.startMinute);
 
-  const breakMinutes = day.breaks.reduce((total, rest) => {
-    const from = Math.max(rest.startMinute, day.startMinute);
-    const to = Math.min(rest.endMinute, day.endMinute);
-    return total + Math.max(0, to - from);
-  }, 0);
+  const breakMinutes = mergedBreaks(day).reduce(
+    (total, rest) => total + (rest.endMinute - rest.startMinute),
+    0
+  );
 
   return Math.max(0, span - breakMinutes);
 }

@@ -1,4 +1,4 @@
-import { netMinutes } from "./weekly-hours";
+import { mergedBreaks, netMinutes } from "./weekly-hours";
 import {
   addDaysInZone,
   instantFromWallTime,
@@ -144,34 +144,21 @@ export function workingWindows(
 
   const dayStart = startOfDayIn(day, timeZone);
 
-  const breaks = hours.breaks
-    .map((rest) => ({
-      from: Math.max(rest.startMinute, hours.startMinute),
-      to: Math.min(rest.endMinute, hours.endMinute),
-    }))
-    .filter((rest) => rest.to > rest.from)
-    .sort((a, b) => a.from - b.from);
-
-  // Överlappande raster slås ihop. Två rader som täcker samma kvart ska inte
-  // dra av den två gånger.
-  const merged: { from: number; to: number }[] = [];
-  for (const rest of breaks) {
-    const last = merged[merged.length - 1];
-    if (last && rest.from <= last.to) last.to = Math.max(last.to, rest.to);
-    else merged.push({ ...rest });
-  }
-
+  // Samma klippta och sammanslagna raster som aritmetiken använder. Att rita
+  // ur en egen uppsättning vore att låta skärmen visa en annan dag än den
+  // som räknas — raster som i tavlan ser ut att ligga bredvid varandra och i
+  // summan överlappar.
   const spans: WallSpan[] = [];
   let cursor = hours.startMinute;
 
-  for (const rest of merged) {
-    if (rest.from > cursor) {
+  for (const rest of mergedBreaks(hours)) {
+    if (rest.startMinute > cursor) {
       spans.push({
         from: atMinute(dayStart, cursor, timeZone).getTime(),
-        to: atMinute(dayStart, rest.from, timeZone).getTime(),
+        to: atMinute(dayStart, rest.startMinute, timeZone).getTime(),
       });
     }
-    cursor = Math.max(cursor, rest.to);
+    cursor = Math.max(cursor, rest.endMinute);
   }
 
   if (hours.endMinute > cursor) {
@@ -192,14 +179,13 @@ function endOfDay(instant: Date, timeZone: string): number {
 /**
  * Stationens raster på väggen en viss dag, sorterade och sammanslagna.
  *
- * Det här är det ENDA aritmetiken hoppar över. Överlappande rastrader slås
- * ihop: två rader som täcker samma kvart ska inte dra av den två gånger, och
- * ett formulär kan skickas med raster som ligger i varandra.
+ * Det här är det ENDA aritmetiken hoppar över.
  *
- * Raster klipps mot passet. En lunch som lagts 12:00–13:00 på en station som
- * stänger 12:30 drar av trettio minuter, inte sextio — och en rast som ligger
- * helt utanför passet drar av ingenting, eftersom tiden utanför öppettiderna
- * ändå är arbete när någon planerat dit en ruta.
+ * Klippningen och sammanslagningen görs av `mergedBreaks` i weekly-hours.ts
+ * och inte här. Funktionen räknade själv till 2026-10-04, och gled då från
+ * `capacityOf`: en station med rasterna 12:00–12:40 och 12:20–13:00 fick en
+ * dag som var sextio minuter kortare enligt den här filen och åttio enligt
+ * den andra. Två räknare för samma regel hinner alltid sluta säga samma sak.
  */
 export function breakSpans(
   hours: StationHours | null | undefined,
@@ -210,24 +196,9 @@ export function breakSpans(
 
   const dayStart = startOfDayIn(day, timeZone);
 
-  const clipped = hours.breaks
-    .map((rest) => ({
-      from: Math.max(rest.startMinute, hours.startMinute),
-      to: Math.min(rest.endMinute, hours.endMinute),
-    }))
-    .filter((rest) => rest.to > rest.from)
-    .sort((a, b) => a.from - b.from);
-
-  const merged: { from: number; to: number }[] = [];
-  for (const rest of clipped) {
-    const last = merged[merged.length - 1];
-    if (last && rest.from <= last.to) last.to = Math.max(last.to, rest.to);
-    else merged.push({ ...rest });
-  }
-
-  return merged.map((rest) => ({
-    from: atMinute(dayStart, rest.from, timeZone).getTime(),
-    to: atMinute(dayStart, rest.to, timeZone).getTime(),
+  return mergedBreaks(hours).map((rest) => ({
+    from: atMinute(dayStart, rest.startMinute, timeZone).getTime(),
+    to: atMinute(dayStart, rest.endMinute, timeZone).getTime(),
   }));
 }
 

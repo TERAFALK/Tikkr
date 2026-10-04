@@ -178,14 +178,23 @@ export async function stationsFor(
   }));
 }
 
-/** Stationens tider den veckodag en tidpunkt faller på, eller null när stängt. */
+/**
+ * Tiderna som gäller den veckodag en tidpunkt faller på, eller null när
+ * stationen är stängd.
+ *
+ * TAR DAGARNA OCH INTE STATIONEN. Uppslaget behövs på två ställen där raden
+ * ser olika ut: `stationsFor` lämnar fältet som `hours` eftersom det är vad
+ * tavlan läser, och `loadStation` som `days` eftersom det är vad Prisma
+ * kallar relationen. En parameter som tog "en station" tog därför emot två
+ * olika former, och den ena hade inget `hours` att leta i.
+ */
 export function hoursOn(
-  station: { hours: StationHours[] },
+  days: StationHours[],
   instant: Date,
   timeZone: string
 ): StationHours | null {
   const weekday = isoWeekdayIn(instant, timeZone);
-  return station.hours.find((day) => day.weekday === weekday) ?? null;
+  return days.find((day) => day.weekday === weekday) ?? null;
 }
 
 /**
@@ -478,7 +487,7 @@ export async function placeBlock(
   }
 
   const startsAt = snapInstant(input.startsAt, timeZone);
-  const hours = hoursOn(station, startsAt, timeZone);
+  const hours = hoursOn(station.days, startsAt, timeZone);
   const room = fitsFrom(hours, startsAt, timeZone);
 
   if (room < 1) {
@@ -539,7 +548,7 @@ export async function moveBlock(
   }
 
   const snapped = snapInstant(startsAt, timeZone);
-  const hours = hoursOn(station, snapped, timeZone);
+  const hours = hoursOn(station.days, snapped, timeZone);
   const room = fitsFrom(hours, snapped, timeZone);
 
   if (room < 1) {
@@ -581,7 +590,7 @@ export async function resizeBlock(
   const station = await loadStation(db, block.stationId);
   if (!station) return { error: "Stationen finns inte." };
 
-  const hours = hoursOn(station, block.startsAt, timeZone);
+  const hours = hoursOn(station.days, block.startsAt, timeZone);
   const room = fitsFrom(hours, block.startsAt, timeZone);
 
   await db.plannedBlock.updateMany({
