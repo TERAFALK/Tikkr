@@ -774,10 +774,26 @@ export async function deleteCompany(params: {
   //
   // Allt i en transaktion. Ett halvraderat företag — administratörer kvar men
   // stämplingarna borta — vore värre än både att radera och att låta bli.
+  //
+  // Samma sak gäller fler relationer än stämplingarna (rättat 2026-10-05).
+  // Varje rad nedan är en tabell vars rader pekar på något med Restrict, och
+  // som därför måste bort före det den pekar på. Ordningen följer pilarna:
+  // ruta och station före moment, beräkning före moment, rast före rasttyp,
+  // frånvaro före orsak, order före kund. Kaskaden från företaget tar sedan
+  // resten. Testet raderade bara ett företag med en stämpling, och ett
+  // företag med frånvaro eller planering hade inte gått att radera alls.
+  const companyId = params.companyId;
+
   await unsafeGlobalPrisma.$transaction([
+    unsafeGlobalPrisma.plannedBlock.deleteMany({ where: { companyId } }),
+    unsafeGlobalPrisma.station.deleteMany({ where: { companyId } }),
+    unsafeGlobalPrisma.orderBudget.deleteMany({ where: { companyId } }),
     unsafeGlobalPrisma.timeEntry.deleteMany({
       where: { companyId: params.companyId },
     }),
+    unsafeGlobalPrisma.breakEntry.deleteMany({ where: { companyId } }),
+    unsafeGlobalPrisma.absence.deleteMany({ where: { companyId } }),
+    unsafeGlobalPrisma.order.deleteMany({ where: { companyId } }),
     // Anteckningen saknar koppling till företaget i databasen, med flit, så att
     // den aldrig kan följa med i en fråga kunden själv gör. Priset är att den
     // inte heller följer med i kaskaden.

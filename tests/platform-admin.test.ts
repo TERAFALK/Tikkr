@@ -341,4 +341,88 @@ describe("radera ett kundföretag", () => {
     expect(log?.detail).toContain(target.name);
     expect(log?.detail).toContain("Avslutat kundförhållande");
   });
+  it("ett företag med data i alla tabeller går att radera", async () => {
+    // Relationer med Restrict prövas direkt i kaskaden, i den ordning
+    // Postgres råkar ta dem. Testet ovan har bara en stämpling. Ett företag
+    // med frånvaro, planering, raster och kundkopplade ordrar gick förr inte
+    // att radera alls, och raderingen efter avslutat avtal hänger på det.
+    const target = await company();
+    const companyId = target.id;
+
+    const employee = await unsafeGlobalPrisma.employee.create({
+      data: { companyId, name: "Anna Andersson" },
+    });
+    const customer = await unsafeGlobalPrisma.customer.create({
+      data: { companyId, name: "Kund AB" },
+    });
+    const order = await unsafeGlobalPrisma.order.create({
+      data: { companyId, orderNumber: "9002", customerId: customer.id },
+    });
+    const moment = await unsafeGlobalPrisma.workMoment.create({
+      data: { companyId, name: "Fräsning" },
+    });
+    await unsafeGlobalPrisma.orderBudget.create({
+      data: { companyId, orderId: order.id, momentId: moment.id, minutes: 60 },
+    });
+    const station = await unsafeGlobalPrisma.station.create({
+      data: { companyId, name: "Fräs 1", momentId: moment.id },
+    });
+    await unsafeGlobalPrisma.plannedBlock.create({
+      data: {
+        companyId,
+        stationId: station.id,
+        orderId: order.id,
+        momentId: moment.id,
+        startsAt: new Date(),
+        minutes: 60,
+        createdByEmail: actor,
+      },
+    });
+    const reason = await unsafeGlobalPrisma.absenceReason.create({
+      data: { companyId, name: "Sjuk" },
+    });
+    await unsafeGlobalPrisma.absence.create({
+      data: {
+        companyId,
+        employeeId: employee.id,
+        date: new Date("2026-09-01T00:00:00Z"),
+        reasonId: reason.id,
+        createdByEmail: actor,
+      },
+    });
+    const breakType = await unsafeGlobalPrisma.breakType.create({
+      data: { companyId, name: "Lunch" },
+    });
+    await unsafeGlobalPrisma.breakEntry.create({
+      data: {
+        companyId,
+        employeeId: employee.id,
+        breakTypeId: breakType.id,
+        startedAt: new Date(),
+      },
+    });
+    await unsafeGlobalPrisma.timeEntry.create({
+      data: {
+        companyId,
+        employeeId: employee.id,
+        orderId: order.id,
+        momentId: moment.id,
+        clockInAt: new Date(),
+      },
+    });
+
+    await deleteCompany({
+      actorEmail: actor,
+      companyId,
+      confirmName: target.name,
+      reason: "Avslutat kundförhållande",
+    });
+
+    expect(
+      await unsafeGlobalPrisma.company.count({ where: { id: companyId } })
+    ).toBe(0);
+    expect(
+      await unsafeGlobalPrisma.absence.count({ where: { companyId } })
+    ).toBe(0);
+  });
 });

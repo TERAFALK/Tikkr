@@ -7,6 +7,7 @@ import {
   isLockedOut,
   noteFailedLogin,
 } from "./login-throttle";
+import { clientIpFrom } from "./client-ip";
 
 /**
  * INLOGGNING FÖR ADMINISTRATÖRER.
@@ -31,6 +32,18 @@ import {
 /** Håller bromsen åtskild från plattformsinloggningens. */
 const THROTTLE_SCOPE = "admin";
 
+/**
+ * EN BROMS TILL, PER AVSÄNDARE.
+ *
+ * Spärren per e-postadress stoppar den som gissar länge på ETT konto. Den
+ * stoppar inte den som prövar ett läckt lösenord mot tusen olika adresser,
+ * eftersom varje adress bara får ett försök. Den här räknar per IP-adress i
+ * stället, med ett högre tak: en verkstad delar ofta en enda utgående adress,
+ * och tre personer som skriver fel några gånger ska inte stänga ute de andra.
+ */
+const IP_SCOPE = "admin-ip";
+const IP_MAX_FAILURES = 30;
+
 export const { handlers, auth, signIn, signOut } = NextAuth({
   session: { strategy: "jwt" },
 
@@ -45,7 +58,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         password: { label: "Lösenord", type: "password" },
       },
 
-      async authorize(credentials) {
+      async authorize(credentials, request) {
         const email = String(credentials?.email ?? "")
           .trim()
           .toLowerCase();
@@ -53,9 +66,12 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
 
         if (!email || !password) return null;
 
+        const ip = request ? clientIpFrom(request.headers) : undefined;
+
         // Kontrolleras före uppslaget. Är adressen låst ska ingen tid läggas
         // på att jämföra lösenord — det är hela poängen med spärren.
         if (isLockedOut(THROTTLE_SCOPE, email)) return null;
+        if (ip && isLockedOut(IP_SCOPE, ip, IP_MAX_FAILURES)) return null;
 
         const user = await unsafeGlobalPrisma.adminUser.findUnique({
           where: { email },
@@ -69,6 +85,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
 
         if (!user || !correct) {
           noteFailedLogin(THROTTLE_SCOPE, email);
+          if (ip) noteFailedLogin(IP_SCOPE, ip);
           return null;
         }
 

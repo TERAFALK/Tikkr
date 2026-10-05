@@ -136,36 +136,47 @@ async function sendViaGraph(message: EmailMessage): Promise<EmailResult> {
     return { delivered: false, provider: "graph", problem };
   }
 
-  const response = await fetch(
-    `https://graph.microsoft.com/v1.0/users/${encodeURIComponent(sender)}/sendMail`,
-    {
-      method: "POST",
-      headers: {
-        authorization: `Bearer ${token}`,
-        "content-type": "application/json",
-      },
-      body: JSON.stringify({
-        message: {
-          subject: message.subject,
-          // Graph tar emot EN kroppstyp per mejl i det här formatet. Finns en
-          // HTML-version är det den som skickas, och textversionen används då
-          // bara i labbläget. Vill man skicka båda samtidigt krävs att hela
-          // mejlet byggs som MIME och skickas base64-kodat — mer maskineri än
-          // det är värt så länge HTML-versionen är läsbar.
-          body: message.html
-            ? { contentType: "HTML", content: message.html }
-            : { contentType: "Text", content: message.text },
-          toRecipients: [{ emailAddress: { address: message.to } }],
-          ...(replyTo && {
-            replyTo: [{ emailAddress: { address: replyTo } }],
-          }),
+  let response: Response;
+  try {
+    response = await fetch(
+      `https://graph.microsoft.com/v1.0/users/${encodeURIComponent(sender)}/sendMail`,
+      {
+        method: "POST",
+        // Ett mejl får aldrig hålla en sida. Svarar inte Microsoft inom tio
+        // sekunder räknas utskicket som misslyckat, och den som begärde en
+        // återställning får sin kvittens ändå.
+        signal: AbortSignal.timeout(GRAPH_TIMEOUT_MS),
+        headers: {
+          authorization: `Bearer ${token}`,
+          "content-type": "application/json",
         },
-        // Kvitton i avsändarens skickat-mapp fyller den med automatmejl som
-        // ingen läser. Innehållet finns i loggen om något behöver redas ut.
-        saveToSentItems: false,
-      }),
-    }
-  );
+        body: JSON.stringify({
+          message: {
+            subject: message.subject,
+            // Graph tar emot EN kroppstyp per mejl i det här formatet. Finns en
+            // HTML-version är det den som skickas, och textversionen används då
+            // bara i labbläget. Vill man skicka båda samtidigt krävs att hela
+            // mejlet byggs som MIME och skickas base64-kodat — mer maskineri än
+            // det är värt så länge HTML-versionen är läsbar.
+            body: message.html
+              ? { contentType: "HTML", content: message.html }
+              : { contentType: "Text", content: message.text },
+            toRecipients: [{ emailAddress: { address: message.to } }],
+            ...(replyTo && {
+              replyTo: [{ emailAddress: { address: replyTo } }],
+            }),
+          },
+          // Kvitton i avsändarens skickat-mapp fyller den med automatmejl som
+          // ingen läser. Innehållet finns i loggen om något behöver redas ut.
+          saveToSentItems: false,
+        }),
+      }
+    );
+  } catch (error) {
+    const problem = `Microsoft Graph svarade inte: ${describe(error)}`;
+    console.error(problem);
+    return { delivered: false, provider: "graph", problem };
+  }
 
   if (!response.ok) {
     const detail = await response.text().catch(() => "");
@@ -176,6 +187,9 @@ async function sendViaGraph(message: EmailMessage): Promise<EmailResult> {
 
   return { delivered: true, provider: "graph" };
 }
+
+/** Längsta väntan på Microsoft, per anrop. */
+const GRAPH_TIMEOUT_MS = 10_000;
 
 /** Åtkomsttoken, återanvänd tills den nästan gått ut. */
 let cachedToken: { value: string; expiresAt: number } | null = null;
@@ -196,6 +210,7 @@ async function graphToken(config: {
     {
       method: "POST",
       headers: { "content-type": "application/x-www-form-urlencoded" },
+      signal: AbortSignal.timeout(GRAPH_TIMEOUT_MS),
       body: new URLSearchParams({
         client_id: config.clientId,
         client_secret: config.clientSecret,
