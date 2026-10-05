@@ -328,14 +328,14 @@ kunder, och det finns inget fast att granska med `npm audit`.
 Skapa den på servern, där Node finns, och hämta hem den till laptopen:
 
 ```bash
-docker compose run --rm --no-deps -v "$PWD:/work" -w /work migrate npm install --package-lock-only
+docker compose run --rm --no-deps --user "$(id -u):$(id -g)" -e npm_config_cache=/tmp/.npm -v "$PWD:/work" -w /work migrate npm install --package-lock-only
 ```
 
 ```bash
-docker compose run --rm --no-deps -v "$PWD:/work" -w /work migrate npm audit --omit=dev
+docker compose run --rm --no-deps --user "$(id -u):$(id -g)" -e npm_config_cache=/tmp/.npm -v "$PWD:/work" -w /work migrate npm audit --omit=dev
 ```
 
-Från laptopen, i projektmappen:
+Från laptopen, i projektmappen. Byt användare och servernamn om de skiljer sig:
 
 ```powershell
 scp administrator@tf-docker01-test:Tikkr/package-lock.json .
