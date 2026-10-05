@@ -148,7 +148,9 @@ time_entries   — id, company_id, employee_id, kind,
                  clock_in_at, clock_out_at, source,
                  moment_cost_rate_ore, employee_cost_rate_ore,
                  needs_review, review_note, kiosk_device_id, source_ip
-admin_users    — id, company_id, email, password_hash, role
+admin_users    — id, company_id, email, name?, phone?, password_hash, role
+audit_events   — id, company_id, actor_email, entity, entity_id, action,
+                 before, after, subject_employee_id
 kiosk_devices  — id, company_id, name, device_token, active, last_seen_at
 support_visits — id, company_id, email, started_at, last_seen_at
 
@@ -211,6 +213,19 @@ stripe_prices    — item, month_price_id, year_price_id, updated_by_email
    flaggas för granskning — aldrig ett felsvar, eftersom offline-kön kastar
    tryck som får 4xx och arbetstid då går förlorad.
 
+   **Ett köat tryck avvisas inte för att världen hunnit ändras** (tillagt
+   2026-10-05). En order som stängts medan trycket låg i kön stoppar det
+   inte; det registreras och flaggas. Ett tryck som kommer fram efter en
+   senare stämpling på samma moment blir ett avslutat pass fram till nästa
+   början, i stället för ett öppet jobb som överlappar. Kön tar bara bort ett
+   tryck när servern själv svarat 400 eller 409 med ett besked — 401 och
+   proxyns felsidor behåller det.
+
+   **Skärmens klocka mäts, den litas inte på** (tillagt 2026-10-05). Skärmen
+   skickar både när trycket gjordes och när det skickades. Servern räknar ut
+   hur fel klockan går och rättar trycket efter det; avviker den mer än två
+   minuter flaggas posten. Se `punch-time.ts`.
+
 3. **Glömd utstämpling stängs vid ett fast klockslag OCH flaggas.**
 
    **Helgstämpling flaggas också** (tillagt 2026-10-01). En stämpling som görs
@@ -226,6 +241,13 @@ stripe_prices    — item, month_price_id, year_price_id, updated_by_email
    klartext. Systemet fyller aldrig i en tid i tysthet — admin får en lista
    att rätta.
    Tidszon per företag, annars glider klockslaget mellan sommar- och vintertid.
+
+   **Övertid efter klockslaget går inte förlorad** (beslutat 2026-10-05).
+   Stängdes ett jobb automatiskt medan personen fortfarande arbetade visar
+   skärmen det i sex timmar med "Stämpla ut nu". Trycket förlänger passet till
+   dess, om det gäller samma jobb och inget startats på maskinen sedan dess.
+   Posten förblir flaggad: systemet vet att personen tryckte, inte att hen
+   arbetade hela tiden. Se `extendAutoClosed` i `clock.ts`.
 
 4. **Självkostnaden är personens sats PLUS momentets** (bestämt 2026-09-25).
    Momentet är maskinen, `employees.cost_rate_ore` är människan, och en
@@ -449,6 +471,9 @@ stripe_prices    — item, month_price_id, year_price_id, updated_by_email
    tryck ska räcka för att registrera tid, annars slutar folk stämpla. Ett
    flexsaldo är något annat — en uppgift om en namngiven person, på en skärm
    i en verkstad där vem som helst går förbi.
+
+   Därför visas saldot inte heller som kvitto efter "Stämpla ut allt"
+   (ändrat 2026-10-05). Det gjorde det en tid, sex sekunder och utan kod.
 
    **Allt i det här stycket är modulens, och ingenting av det finns utan
    modulen** (tillagt 2026-10-01). Koden i rutan under Anställda, knappen på
@@ -815,6 +840,21 @@ inställningarna.
    accepteras ingen stämpling.
 3. **Fullständig audit-logg** — varje stämpling sparar tidsstämpel, kiosk-ID och
    IP, så admin i efterhand kan se och manuellt korrigera en felaktig stämpling.
+
+   **Ändringsloggen** (tillagt 2026-10-05). Varje ändring av något som är
+   underlag för faktura eller lön skrivs i `audit_events` med värdet före och
+   efter och vem som gjorde den: manuella stämplingar, granskning, automatisk
+   utstämpling, frånvaro, komp, saldon, timkostnad, påslag och roller. Bara
+   tillägg, i samma transaktion som ändringen. Loggen bär aldrig namn, nummer
+   eller foto, och anonymiseringen tar bort raderna om personens frånvaro och
+   komp. Historik går inte att skriva i efterhand, och därför fanns den före
+   första kunden. Se `src/lib/audit.ts`.
+
+   **Länkar och IP-adresser kommer aldrig ur anropet** (tillagt 2026-10-05).
+   Mejlade länkar byggs ur `APP_URL`, eftersom `X-Forwarded-Host` skrivs av
+   klienten och en återställningslänk annars kunde peka till en angripare.
+   Klientens IP är SISTA värdet i `X-Forwarded-For`, det vår egen proxy satte.
+   Se `app-url.ts` och `client-ip.ts`.
 4. **Anomali-varningar** (senare fas, ej MVP-kritiskt) — flagga t.ex. ett jobb
    som pågått orimligt länge, eller en person med fler parallella jobb än hen
    rimligen hinner sköta. Däremot INTE "instämplad på två ställen samtidigt" —
@@ -867,12 +907,23 @@ inställningarna.
 
 Alla kunder delar samma server → **en** deploy-pipeline:
 
+**Målbilden** (inte byggd än, se nedan):
+
 1. Kodändring pushas till Git
-2. GitHub Actions bygger Docker-image automatiskt
+2. GitHub Actions kör testerna och bygger Docker-image automatiskt
 3. Deploy till liten **staging-miljö** för snabb kontroll — viktigt, en trasig
    deploy slår annars mot *alla* kunder samtidigt
 4. Efter godkänd staging: SSH till produktion, `docker compose pull && docker compose up -d`
-5. Alla kunder har nya versionen inom sekunder, utan driftstopp (rolling restart)
+
+**Så går det till i dag** (konstaterat 2026-10-05): ingen CI, ingen staging
+utöver labbet. Koden byggs på servern med `git pull && docker compose up -d
+--build`, och appen startar om som en enda container — ett kort avbrott, inte
+en rullande omstart. Labbet är staging tills vidare: en gren provas där innan
+den slås ihop med `main`.
+
+Produktionsservern kör Caddy framför appen (`deploy/Caddyfile`,
+`docker-compose.prod.yml`). Plattformspanelen nås där bara från adresserna i
+`PLATFORM_ALLOWED_IPS`.
 
 Måste finnas stöd för:
 

@@ -274,15 +274,74 @@ SPF, DKIM och DMARC måste vara satta för `tikkr.se`, annars hamnar
 ## 7. Innan riktig kunddata
 
 - [ ] Baslinjemigration skapad och incheckad (punkt 1)
-- [ ] Offsite-backup satt upp (punkt 3)
+- [ ] Lockfilen incheckad och `npm audit` utan allvarliga fynd (punkt 9)
+- [ ] Offsite-backup satt upp, krypterad, och en återläsning övad (punkt 3)
+- [ ] Larm för backup och automatisk utstämpling kopplade (punkt 3)
 - [ ] E-post kopplad och åtkomstpolicyn kontrollerad (punkt 6)
-- [ ] Rättsliga sidorna lästa och godkända av dig eller jurist
+- [ ] `APP_URL` satt till systemets adress (annars går inga återställningsmejl ut)
+- [ ] Organisationsnummer och postadress ifyllda i `src/lib/legal.ts`
+- [ ] Rättsliga sidorna lästa och godkända av jurist
 - [ ] Adresserna till villkor och integritetspolicy inlagda i betaltjänstens
       kundportal
 - [ ] Repot satt till **privat** på GitHub
 - [ ] Adminlösenordet från testdatan (`tikkr123`) borttaget eller bytt
 - [ ] Testskärmen från seed-datan (fast kopplingskod `123456`) raderad under Skärmar
+- [ ] Produktionsservern med Caddy och `PLATFORM_ALLOWED_IPS` (punkt 8)
 - [ ] `./scripts/status.sh` utan röda punkter
+
+---
+
+## 8. Produktionsservern
+
+Produktionen kör Caddy framför appen, på en egen Ubuntu-server. Hela
+konfigurationen ligger i `deploy/Caddyfile` och `docker-compose.prod.yml`.
+
+1. Peka DNS för `www.tikkr.se`, `tikkr.se` och `portal.tikkr.se` mot servern
+2. Installera Docker och klona repot
+3. Skapa nätet appen och Caddy delar:
+
+```bash
+docker network create npm_proxy
+```
+
+4. Fyll i `.env` utifrån `.env.example`. Utöver labbets värden krävs
+   `ACME_EMAIL`, `PLATFORM_ALLOWED_IPS`, `APP_URL=https://portal.tikkr.se`,
+   `MARKETING_HOST=www.tikkr.se,tikkr.se`, `PORTAL_HOST=portal.tikkr.se` och
+   `APP_BIND=127.0.0.1`
+5. Starta:
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+```
+
+Caddy hämtar certifikaten själv första gången. Plattformspanelen svarar 404
+för alla adresser utom de i `PLATFORM_ALLOWED_IPS`.
+
+---
+
+## 9. Lockfilen
+
+Utan `package-lock.json` i repot löser varje bygge versionerna på nytt. En
+trasig eller komprometterad version av ett beroende går då rakt ut till alla
+kunder, och det finns inget fast att granska med `npm audit`.
+
+Skapa den på servern, där Node finns, och hämta hem den till laptopen:
+
+```bash
+docker compose run --rm --no-deps -v "$PWD:/work" -w /work migrate npm install --package-lock-only
+```
+
+```bash
+docker compose run --rm --no-deps -v "$PWD:/work" -w /work migrate npm audit --omit=dev
+```
+
+Från laptopen, i projektmappen:
+
+```powershell
+scp administrator@tf-docker01-test:Tikkr/package-lock.json .
+```
+
+Checka sedan in filen. Dockerfilen använder `npm ci` så fort den finns.
 
 ---
 
