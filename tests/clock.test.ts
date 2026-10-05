@@ -375,6 +375,132 @@ describe("offline-kön skapar inga dubbletter", () => {
     ).rejects.toThrow(ClockError);
   });
 
+  it("ett KÖAT tryck före ett pågående jobb blir ett avslutat pass", async () => {
+    // Anna stämplade in 08:00 på en skärm utan nät och 10:00 på en annan.
+    // Trycket från 08:00 kommer fram sist. Förr avvisades det, kön kastade
+    // det och två timmar försvann. Nu blir det ett pass 08:00–10:00, flaggat.
+    const later = await clockIn(companyId, {
+      kind: "ORDER",
+      employeeId: anna,
+      orderId: orderA,
+      momentId: svetsning,
+      at: new Date("2026-08-05T10:00:00Z"),
+    });
+
+    const { started, autoClosed } = await clockIn(companyId, {
+      kind: "ORDER",
+      employeeId: anna,
+      orderId: orderB,
+      momentId: svetsning,
+      at: new Date("2026-08-05T08:00:00Z"),
+      fromOfflineQueue: true,
+    });
+
+    expect(started.clockInAt.toISOString()).toBe("2026-08-05T08:00:00.000Z");
+    expect(started.clockOutAt?.toISOString()).toBe("2026-08-05T10:00:00.000Z");
+    expect(started.needsReview).toBe(true);
+    expect(started.reviewNote).toContain("kom fram efter");
+    expect(autoClosed).toBeNull();
+
+    // Det pågående jobbet rörs inte.
+    const still = await unsafeGlobalPrisma.timeEntry.findUniqueOrThrow({
+      where: { id: later.started.id },
+    });
+    expect(still.clockOutAt).toBeNull();
+  });
+
+  it("ett köat tryck före ett AVSLUTAT pass överlappar det inte", async () => {
+    // Förr skapades ett öppet jobb från 08:00 som löpte rakt igenom passet
+    // 09:00–12:00 på samma maskin: samma timmar fakturerade två gånger.
+    await clockIn(companyId, {
+      kind: "ORDER",
+      employeeId: anna,
+      orderId: orderA,
+      momentId: svetsning,
+      at: new Date("2026-08-05T09:00:00Z"),
+    });
+    await clockOut(companyId, {
+      employeeId: anna,
+      momentId: svetsning,
+      at: new Date("2026-08-05T12:00:00Z"),
+    });
+
+    const { started } = await clockIn(companyId, {
+      kind: "ORDER",
+      employeeId: anna,
+      orderId: orderB,
+      momentId: svetsning,
+      at: new Date("2026-08-05T08:00:00Z"),
+      fromOfflineQueue: true,
+    });
+
+    expect(started.clockOutAt?.toISOString()).toBe("2026-08-05T09:00:00.000Z");
+
+    const open = await getOpenEntries(forCompany(companyId), anna);
+    expect(open).toHaveLength(0);
+  });
+
+  it("ett köat tryck som hamnar mitt i ett annat pass avvisas", async () => {
+    // Tiden är redan registrerad på maskinen. En post till vore samma timme
+    // två gånger, och servern säger ifrån med sitt eget besked.
+    await clockIn(companyId, {
+      kind: "ORDER",
+      employeeId: anna,
+      orderId: orderA,
+      momentId: svetsning,
+      at: new Date("2026-08-05T07:00:00Z"),
+    });
+    await clockIn(companyId, {
+      kind: "ORDER",
+      employeeId: anna,
+      orderId: orderA,
+      momentId: svetsning,
+      at: new Date("2026-08-05T10:00:00Z"),
+    });
+
+    await expect(
+      clockIn(companyId, {
+        kind: "ORDER",
+        employeeId: anna,
+        orderId: orderB,
+        momentId: svetsning,
+        at: new Date("2026-08-05T08:00:00Z"),
+        fromOfflineQueue: true,
+      })
+    ).rejects.toThrow(ClockError);
+  });
+
+  it("ett köat tryck på en order som hunnit stängas registreras och flaggas", async () => {
+    // Trycket gjordes medan ordern var öppen. Att kontoret stängde den innan
+    // nätet kom tillbaka gör inte arbetet ogjort.
+    const { started } = await clockIn(companyId, {
+      kind: "ORDER",
+      employeeId: anna,
+      orderId: stangdOrder,
+      momentId: svetsning,
+      at: new Date(Date.now() - 30 * 60 * 1000),
+      fromOfflineQueue: true,
+    });
+
+    expect(started.orderId).toBe(stangdOrder);
+    expect(started.needsReview).toBe(true);
+    expect(started.reviewNote).toContain("5003 stängdes");
+  });
+
+  it("en rättad skärmklocka står i noten", async () => {
+    const { started } = await clockIn(companyId, {
+      kind: "ORDER",
+      employeeId: anna,
+      orderId: orderA,
+      momentId: svetsning,
+      at: new Date("2026-08-05T08:00:00Z"),
+      clockNote: "Skärmens klocka visade 2026-08-02 08:00 när trycket gjordes.",
+    });
+
+    expect(started.needsReview).toBe(true);
+    expect(started.reviewNote).toContain("2026-08-02 08:00");
+  });
+
   it("en försenad stämpling på en ANNAN maskin går igenom", async () => {
     // Kontrollen ovan gäller per maskin. Att fräsen startade innan svetsen är
     // inget fel — det är två maskiner, och den som kör båda hann trycka i den

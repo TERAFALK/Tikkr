@@ -4,8 +4,8 @@ import { unsafeGlobalPrisma } from "./db";
 import {
   ClockError,
   clockOutAll,
-  clockSkewNote,
   isUniqueViolation,
+  skewNoteOf,
   type PunchContext,
 } from "./clock";
 import { nextOccurrenceOf } from "./time-zone";
@@ -113,6 +113,7 @@ export async function startBreak(
     // Följer med, annars flaggas rasten men inte jobben som stängdes av samma
     // tryck — och det är jobben som bär den fakturerbara tiden.
     rejectedAt: input.rejectedAt,
+    clockNote: input.clockNote,
     // Egen nyckel: utstämplingen och rasten är två skrivningar av samma tryck,
     // och de får inte dela dubblettnyckel — då skulle en omsändning tro att
     // rasten redan skapats för att jobben hann stängas.
@@ -132,10 +133,10 @@ export async function startBreak(
         clientPunchId: input.clientPunchId ?? null,
         kioskDeviceId: input.kioskDeviceId ?? null,
         sourceIp: input.sourceIp ?? null,
-        ...(input.rejectedAt
+        ...(skewNoteOf(input)
           ? {
               needsReview: true,
-              reviewNote: clockSkewNote(input.rejectedAt),
+              reviewNote: skewNoteOf(input),
             }
           : {}),
       },
@@ -172,7 +173,7 @@ export async function endBreak(
     forCompany(companyId),
     input.employeeId,
     at,
-    input.rejectedAt ? clockSkewNote(input.rejectedAt) : undefined
+    skewNoteOf(input)
   );
 }
 

@@ -571,6 +571,14 @@ export default function KioskScreen({
     const result = await flush();
     setQueueLength(result.waiting);
 
+    // Skärmen är inte längre kopplad. Trycken ligger kvar och skickas när den
+    // kopplats igen, så det enda som behövs är att någon gör det.
+    if (result.unpaired) {
+      setError(
+        "Skärmen är inte kopplad. Stämplingarna sparas och skickas när den kopplats igen."
+      );
+    }
+
     if (result.rejected.length > 0) {
       const first = result.rejected[0];
       setError(

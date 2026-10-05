@@ -99,7 +99,9 @@ describe("när servern svarar", () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
-  it("skickas med markering om att det kommer från kön", async () => {
+  it("ett tryck som skickas direkt räknas inte som köat", async () => {
+    // Varje tryck går genom kön. Markerades alla som köade fick varje post
+    // källan "offline" i audit-loggen, och fältet sa ingenting.
     const fetchMock = vi
       .spyOn(globalThis, "fetch")
       .mockResolvedValue(jsonResponse(200));
@@ -108,8 +110,78 @@ describe("när servern svarar", () => {
     await flush();
 
     const body = JSON.parse(String(fetchMock.mock.calls[0][1]?.body));
-    expect(body.queued).toBe(true);
+    expect(body.queued).toBe(false);
     expect(body.clientPunchId).toBe("abc");
+  });
+
+  it("ett tryck som fått vänta skickas som köat", async () => {
+    const fetchMock = vi
+      .spyOn(globalThis, "fetch")
+      .mockResolvedValue(jsonResponse(200));
+
+    await enqueue(
+      punch({ at: new Date(Date.now() - 5 * 60 * 1000).toISOString() })
+    );
+    await flush();
+
+    const body = JSON.parse(String(fetchMock.mock.calls[0][1]?.body));
+    expect(body.queued).toBe(true);
+  });
+
+  it("avsändningstiden följer med, så att servern kan mäta skärmens klocka", async () => {
+    const fetchMock = vi
+      .spyOn(globalThis, "fetch")
+      .mockResolvedValue(jsonResponse(200));
+
+    await enqueue(punch());
+    await flush();
+
+    const body = JSON.parse(String(fetchMock.mock.calls[0][1]?.body));
+    expect(Number.isNaN(Date.parse(body.sentAt))).toBe(false);
+  });
+});
+
+describe("tryck som servern inte prövat ligger kvar", () => {
+  it("en skärm som inte längre är kopplad behåller hela kön", async () => {
+    // Förr raderade 401 trycket. En skärm som kopplades om medan den hade
+    // tryck i kön tappade därmed arbetstid.
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      jsonResponse(401, { error: "Skärmen är inte kopplad." })
+    );
+
+    await enqueue(punch());
+    await enqueue(punch());
+    const result = await flush();
+
+    expect(result.unpaired).toBe(true);
+    expect(result.rejected).toHaveLength(0);
+    expect(await pending()).toHaveLength(2);
+  });
+
+  it("en felsida från proxyn tar inte bort trycket", async () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response("<html>403 Forbidden</html>", {
+        status: 403,
+        headers: { "content-type": "text/html" },
+      })
+    );
+
+    await enqueue(punch());
+    const result = await flush();
+
+    expect(result.rejected).toHaveLength(0);
+    expect(await pending()).toHaveLength(1);
+  });
+
+  it("ett 409 utan serverns eget besked tar inte bort trycket", async () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response("Conflict", { status: 409 })
+    );
+
+    await enqueue(punch());
+    await flush();
+
+    expect(await pending()).toHaveLength(1);
   });
 });
 

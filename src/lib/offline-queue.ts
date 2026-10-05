@@ -110,6 +110,12 @@ export interface FlushResult {
    * är det ändå det här svaret som kommer.
    */
   flexMinutes?: { employeeId: string; minutes: number } | null;
+  /**
+   * true när servern inte känner igen skärmen (401). Kön ligger kvar och
+   * skickas när skärmen kopplats på nytt — till samma företag hittar trycken
+   * rätt, till ett annat avvisas de som okända anställda.
+   */
+  unpaired?: boolean;
 }
 
 /**
@@ -122,6 +128,28 @@ export interface FlushResult {
  */
 const REQUEST_TIMEOUT_MS = 8000;
 
+/**
+ * Hur gammalt ett tryck ska vara för att räknas som köat.
+ *
+ * Varje tryck går genom kön, även när nätet fungerar — det skickas bara några
+ * millisekunder efter att det sparats. Markerades alla som köade fick varje
+ * stämpling från skärmen källan "offline" i audit-loggen, och fältet sa
+ * ingenting. Tio sekunder skiljer ett tryck som gick direkt från ett som fick
+ * vänta.
+ *
+ * Båda tiderna kommer från skärmens egen klocka, så jämförelsen håller även
+ * när den klockan går fel.
+ */
+const QUEUED_AFTER_MS = 10_000;
+
+/** Servern har prövat trycket och sagt nej. Bara då får det tas bort. */
+function isVerdict(status: number, data: unknown): data is { error: string } {
+  return (
+    (status === 400 || status === 409) &&
+    typeof (data as { error?: unknown } | null)?.error === "string"
+  );
+}
+
 // Bara en tömning åt gången. Två samtidiga skulle kunna skicka samma tryck två
 // gånger och rota till ordningen.
 let flushing: Promise<FlushResult> | null = null;
@@ -131,8 +159,9 @@ let flushing: Promise<FlushResult> | null = null;
  *
  * Går servern inte att nå avbryts tömningen och resten ligger kvar till nästa
  * försök. Avvisar servern ett tryck av ett skäl som inte försvinner av sig
- * självt — t.ex. att ordern hunnit stängas — plockas det bort och rapporteras,
- * annars skulle kön fastna på det för alltid.
+ * självt — t.ex. en anställd som inte finns — plockas det bort och rapporteras,
+ * annars skulle kön fastna på det för alltid. En order som hunnit stängas är
+ * inte ett sådant skäl längre: servern tar emot trycket och flaggar det.
  */
 export function flush(): Promise<FlushResult> {
   if (flushing) return flushing;
@@ -147,10 +176,18 @@ export function flush(): Promise<FlushResult> {
       let response: Response;
 
       try {
+        const now = Date.now();
+
         response = await fetch("/api/kiosk/punch", {
           method: "POST",
           headers: { "content-type": "application/json" },
-          body: JSON.stringify({ ...punch, queued: true }),
+          body: JSON.stringify({
+            ...punch,
+            // Samma klocka som `at`. Servern mäter hur fel den går och rättar
+            // trycket efter det, se punch-time.ts.
+            sentAt: new Date(now).toISOString(),
+            queued: now - Date.parse(punch.at) > QUEUED_AFTER_MS,
+          }),
           signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
         });
       } catch {
@@ -183,14 +220,30 @@ export function flush(): Promise<FlushResult> {
         continue;
       }
 
-      // 5xx är oftast tillfälligt: låt trycket ligga kvar och försök igen.
-      if (response.status >= 500) {
-        return { sent, waiting: queue.length - sent, rejected, flexMinutes };
+      // ETT TRYCK TAS BARA BORT NÄR SERVERN SJÄLV PRÖVAT DET OCH SAGT NEJ.
+      //
+      // Förr räckte vilken 4xx som helst. Det betydde att en skärm som kopplats
+      // om (401) raderade hela sin kö, och att en felsida från proxyn (403,
+      // 413, 429) kunde göra detsamma. Arbetstid försvann för att något mellan
+      // skärmen och servern krånglade, inte för att trycket var fel.
+      //
+      // Nu måste svaret vara vårt eget besked: 400 eller 409 med ett
+      // felmeddelande i JSON. Allt annat — 5xx, 401, proxyns sidor — behandlas
+      // som att nätet är borta: trycket ligger kvar och skickas om.
+      const data: unknown = await response.json().catch(() => null);
+
+      if (!isVerdict(response.status, data)) {
+        return {
+          sent,
+          waiting: queue.length - sent,
+          rejected,
+          flexMinutes,
+          unpaired: response.status === 401,
+        };
       }
 
-      const data = await response.json().catch(() => ({}));
       await remove(punch.clientPunchId);
-      rejected.push({ punch, reason: data.error ?? "Avvisad av servern." });
+      rejected.push({ punch, reason: data.error });
     }
 
     return { sent, waiting: 0, rejected, flexMinutes };

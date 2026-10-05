@@ -102,6 +102,11 @@ export interface PunchContext {
    * att avvisas, se CLAUDE.md § 3 regel 2.
    */
   rejectedAt?: string;
+  /**
+   * Färdig not när skärmens klocka gick fel men tiden gick att rätta. `at`
+   * är då redan rättad. Se readPunchTime i punch-time.ts.
+   */
+  clockNote?: string;
 }
 
 /**
@@ -116,6 +121,16 @@ export function clockSkewNote(rejectedAt: string): string {
     `Skärmens klocka uppgav ${rejectedAt}, vilket är orimligt. Registrerad ` +
     `tid är serverns. Kontrollera innan fakturering.`
   );
+}
+
+/**
+ * Noten om skärmens klocka för ett tryck, eller undefined när klockan gick
+ * rätt. De två fallen — tiden förkastad eller tiden rättad — skrivs på samma
+ * sätt överallt, så att jobben och rasten ur samma tryck säger samma sak.
+ */
+export function skewNoteOf(input: PunchContext): string | undefined {
+  if (input.rejectedAt) return clockSkewNote(input.rejectedAt);
+  return input.clockNote;
 }
 
 /**
@@ -193,6 +208,13 @@ export async function getOpenEntryForMoment(
  * Allt sker i en transaktion: antingen stängs det gamla OCH öppnas det nya,
  * eller så händer ingenting. Utan det skulle ett avbrott mitt i kunna lämna
  * någon med två öppna stämplingar på samma maskin.
+ *
+ * ETT KÖAT TRYCK AVVISAS INTE FÖR ATT VÄRLDEN HUNNIT ÄNDRAS (2026-10-05).
+ * Trycket gjordes när ordern var öppen och ingen annan stämpling fanns. Kommer
+ * det fram en timme senare kan ordern ha stängts, eller personen ha stämplat
+ * på en annan skärm under tiden. Förr gav båda 409, offline-kön kastade
+ * trycket, och arbetstiden var borta. Nu registreras det och flaggas — se
+ * `staleJobNotes` och grenen för sena tryck nedan.
  */
 export async function clockIn(
   companyId: string,
@@ -200,6 +222,7 @@ export async function clockIn(
 ): Promise<ClockInResult> {
   const at = input.at ?? new Date();
   const db = forCompany(companyId);
+  const queued = input.fromOfflineQueue === true;
 
   if (input.clientPunchId) {
     const existing = await db.timeEntry.findFirst({
@@ -211,10 +234,14 @@ export async function clockIn(
     }
   }
 
-  const rates = await assertBelongsToCompany(db, input);
+  // Ett köat tryck prövas som historik: en order som stängts efter trycket
+  // stoppar det inte. Vad som ändrats skrivs i noten.
+  const rates = await assertBelongsToCompany(db, input, { historical: queued });
+  const staleNotes = queued ? await staleJobNotes(db, input) : [];
 
   // Helgen avgörs av väggklockan i verkstaden, inte av serverns tidszon.
   const weekend = isWeekend(at, await companyTimeZone(companyId));
+  const skewNote = skewNoteOf(input);
 
   // Att börja jobba avslutar rasten. Personen som kommer tillbaka från lunchen
   // och trycker på sin order ska inte behöva trycka "rast slut" först — det är
@@ -223,14 +250,95 @@ export async function clockIn(
   // Ligger före transaktionen med flit: rasten och stämplingen är två olika
   // register, och att blanda in ett annat register i jobbets transaktion vore
   // att låta en rast kunna fälla en instämpling.
-  await endOpenBreak(
-    db,
-    input.employeeId,
-    at,
-    input.rejectedAt ? clockSkewNote(input.rejectedAt) : undefined
-  );
+  await endOpenBreak(db, input.employeeId, at, skewNote);
 
   return db.$transaction(async (tx) => {
+    // EN INSTÄMPLING PER PERSON OCH MASKIN ÅT GÅNGEN.
+    //
+    // Två skärmar som tar emot samma persons tryck på samma moment i samma
+    // ögonblick läste båda "inget pågår" och skapade varsin öppen post — två
+    // öppna stämplingar på en maskin, alltså samma timme fakturerad två gånger.
+    // Låset gör att den andra väntar tills den första är klar, och då ser den
+    // första postens jobb och stänger det som vanligt.
+    //
+    // Rå SQL, men utan kunddata: låset är en siffra i minnet hos Postgres och
+    // släpps av sig själv när transaktionen tar slut.
+    const lockKey = `${companyId}:${input.employeeId}:${jobKeyId(input)}`;
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${lockKey}))`;
+
+    const reviewNotes = [
+      skewNote ?? null,
+      ...staleNotes,
+      weekend ? WEEKEND_NOTE : null,
+    ].filter((note): note is string => Boolean(note));
+
+    const fields = {
+      // companyId anges uttryckligen eftersom Prismas typer kräver det.
+      // Filtreringslagret kontrollerar att det stämmer med klienten och
+      // vägrar annars — se src/lib/tenant.ts.
+      companyId,
+      employeeId: input.employeeId,
+      ...jobFields(input),
+      clockInAt: at,
+      // Kopior av personens och maskinens timkostnad. Se schemat: en senare
+      // prishöjning får inte ändra en kalkyl som redan tagits ut och
+      // fakturerats.
+      ...rates,
+      source: queued ? ("KIOSK_OFFLINE_SYNC" as const) : ("KIOSK" as const),
+      kioskDeviceId: input.kioskDeviceId ?? null,
+      sourceIp: input.sourceIp ?? null,
+      clientPunchId: input.clientPunchId ?? null,
+    };
+
+    // ETT SENT TRYCK. Finns det redan en stämpling på samma moment som
+    // började EFTER trycket, har personen hunnit stämpla vidare någon annan
+    // stans medan det här låg i kön. Trycket registreras då som ett avslutat
+    // pass fram till nästa början, i stället för som ett pågående jobb som
+    // skulle överlappa allt som kom efter.
+    if (queued) {
+      const later = await tx.timeEntry.findFirst({
+        where: {
+          employeeId: input.employeeId,
+          ...jobKey(input),
+          clockInAt: { gt: at },
+        },
+        orderBy: { clockInAt: "asc" },
+        select: { clockInAt: true },
+      });
+
+      if (later) {
+        const covering = await tx.timeEntry.findFirst({
+          where: {
+            employeeId: input.employeeId,
+            ...jobKey(input),
+            clockInAt: { lte: at },
+            OR: [{ clockOutAt: null }, { clockOutAt: { gt: at } }],
+          },
+          select: { id: true },
+        });
+
+        // Tiden täcks redan av en annan stämpling på samma maskin. Att lägga
+        // en till vore samma timme två gånger; trycket kan inte placeras.
+        if (covering) {
+          throw new ClockError(
+            "Trycket kom fram efter andra stämplingar på samma arbetsmoment " +
+              "och krockar med dem. Lägg in tiden för hand under Stämplingar."
+          );
+        }
+
+        const started = await tx.timeEntry.create({
+          data: {
+            ...fields,
+            clockOutAt: later.clockInAt,
+            needsReview: true,
+            reviewNote: [...reviewNotes, LATE_PUNCH_NOTE].join(" "),
+          },
+        });
+
+        return { started, autoClosed: null, wasDuplicate: false };
+      }
+    }
+
     // Bara samma moment. Ett pågående jobb på en ANNAN maskin ska stå kvar —
     // det är hela poängen med att kunna köra två.
     const open = await tx.timeEntry.findFirst({
@@ -246,7 +354,8 @@ export async function clockIn(
 
     if (open) {
       if (open.clockInAt > at) {
-        // Kan hända när offline-kön levererar tryck i fel ordning.
+        // Ett tryck som inte legat i kön har serverns tid, och ingen post kan
+        // ha börjat efter "nu". Händer det ändå är något annat fel.
         throw new ClockError(
           "Stämplingen ligger före den pågående stämplingens starttid. " +
             "Registrera i rätt ordning eller låt en administratör rätta posten."
@@ -265,41 +374,77 @@ export async function clockIn(
 
     const started = await tx.timeEntry.create({
       data: {
-        // companyId anges uttryckligen eftersom Prismas typer kräver det.
-        // Filtreringslagret kontrollerar att det stämmer med klienten och
-        // vägrar annars — se src/lib/tenant.ts.
-        companyId,
-        employeeId: input.employeeId,
-        ...jobFields(input),
-        clockInAt: at,
-        // Kopior av personens och maskinens timkostnad. Se schemat: en senare
-        // prishöjning får inte ändra en kalkyl som redan tagits ut och
-        // fakturerats.
-        ...rates,
-        source: input.fromOfflineQueue ? "KIOSK_OFFLINE_SYNC" : "KIOSK",
-        kioskDeviceId: input.kioskDeviceId ?? null,
-        sourceIp: input.sourceIp ?? null,
-        clientPunchId: input.clientPunchId ?? null,
+        ...fields,
 
-        // Två skäl kan flagga samma post, och båda ska stå i noten: den som
+        // Flera skäl kan flagga samma post, och alla ska stå i noten: den som
         // rättar den behöver veta allt som var fel, inte det vi råkade
         // kontrollera först.
-        ...(input.rejectedAt || weekend
-          ? {
-              needsReview: true,
-              reviewNote: [
-                input.rejectedAt ? clockSkewNote(input.rejectedAt) : null,
-                weekend ? WEEKEND_NOTE : null,
-              ]
-                .filter(Boolean)
-                .join(" "),
-            }
+        ...(reviewNotes.length > 0
+          ? { needsReview: true, reviewNote: reviewNotes.join(" ") }
           : {}),
       },
     });
 
     return { started, autoClosed, wasDuplicate: false };
   });
+}
+
+const LATE_PUNCH_NOTE =
+  "Trycket låg kvar på skärmen och kom fram efter en senare stämpling på " +
+  "samma arbetsmoment. Passet är avslutat när nästa började. Kontrollera " +
+  "innan fakturering.";
+
+/**
+ * Vad som ändrats sedan ett köat tryck gjordes.
+ *
+ * Trycket släpps igenom ändå, se clockIn. Noten finns för att den som
+ * granskar ska se varför tid hamnat på en stängd order.
+ */
+async function staleJobNotes(
+  db: CompanyDb,
+  input: { employeeId: string } & JobRef
+): Promise<string[]> {
+  const notes: string[] = [];
+
+  const employee = await db.employee.findFirst({
+    where: { id: input.employeeId },
+    select: { active: true },
+  });
+  if (employee && !employee.active) {
+    notes.push("Den anställde avaktiverades innan trycket kom fram.");
+  }
+
+  if (input.kind === "ORDER") {
+    const [order, moment] = await Promise.all([
+      db.order.findFirst({
+        where: { id: input.orderId },
+        select: { status: true, orderNumber: true },
+      }),
+      db.workMoment.findFirst({
+        where: { id: input.momentId },
+        select: { active: true },
+      }),
+    ]);
+
+    if (order?.status === "CLOSED") {
+      notes.push(
+        `Order ${order.orderNumber} stängdes innan trycket kom fram.`
+      );
+    }
+    if (moment && !moment.active) {
+      notes.push("Arbetsmomentet avaktiverades innan trycket kom fram.");
+    }
+  } else {
+    const moment = await db.indirectMoment.findFirst({
+      where: { id: input.indirectMomentId },
+      select: { active: true },
+    });
+    if (moment && !moment.active) {
+      notes.push("Det improduktiva momentet avaktiverades innan trycket kom fram.");
+    }
+  }
+
+  return notes;
 }
 
 /**
@@ -392,7 +537,8 @@ export async function clockOut(
     );
   }
 
-  if (input.rejectedAt) notes.push(clockSkewNote(input.rejectedAt));
+  const skewNote = skewNoteOf(input);
+  if (skewNote) notes.push(skewNote);
 
   // Utstämplingen är också ett tryck. Ett pass som börjat på fredagen och
   // slutar på lördagen ska synas i granskningen, även om instämplingen inte
@@ -474,10 +620,10 @@ export async function clockOutAll(
     data: {
       clockOutAt: at,
       clockOutPunchId: input.clientPunchId ?? null,
-      ...(input.rejectedAt
+      ...(skewNoteOf(input)
         ? {
             needsReview: true,
-            reviewNote: clockSkewNote(input.rejectedAt),
+            reviewNote: skewNoteOf(input),
           }
         : {}),
     },
@@ -932,6 +1078,13 @@ function jobFields(job: JobRef) {
  * ett jobb i taget. För improduktiv tid är det det improduktiva momentet: man
  * städar inte två gånger samtidigt.
  */
+/** Samma nyckel som text, för låset i clockIn. */
+function jobKeyId(job: JobRef): string {
+  return job.kind === "ORDER"
+    ? `moment:${job.momentId}`
+    : `indirect:${job.indirectMomentId}`;
+}
+
 function jobKey(job: JobRef) {
   return job.kind === "ORDER"
     ? { momentId: job.momentId }

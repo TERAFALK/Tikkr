@@ -37,7 +37,12 @@ interface PunchBody {
   clientPunchId?: string;
   /** När personen tryckte — inte när anropet råkade komma fram. */
   at?: string;
-  /** true när trycket legat i offline-kön. Syns i audit-loggen. */
+  /**
+   * När skärmen skickade anropet, enligt SAMMA klocka som `at`. Låter servern
+   * mäta hur fel skärmens klocka går och rätta trycket. Se punch-time.ts.
+   */
+  sentAt?: string;
+  /** true när trycket legat kvar i offline-kön. Syns i audit-loggen. */
   queued?: boolean;
 }
 
@@ -68,7 +73,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Ofullständigt anrop." }, { status: 400 });
   }
 
-  const time = readPunchTime(body.at);
+  const time = readPunchTime(body.at, new Date(), body.sentAt);
 
   const context = {
     kioskDeviceId: session.deviceId,
