@@ -48,8 +48,13 @@ export async function GET(request: NextRequest) {
   // Samma räkning som rapportvyn gör, se rapporter/page.tsx.
   const timeZone = await timeZoneOf(companyId);
 
-  const fromDate = parseLocalDate(params.get("from") ?? "", timeZone);
-  const toDate = parseLocalDate(params.get("to") ?? "", timeZone);
+  // Datumen som de står i adressen. Används till filnamnet längre ned, där
+  // "2026-10-05" är vad man vill läsa — inte en tidpunkt.
+  const from = params.get("from");
+  const to = params.get("to");
+
+  const fromDate = parseLocalDate(from ?? "", timeZone);
+  const toDate = parseLocalDate(to ?? "", timeZone);
 
   const report = await buildReport(db, {
     from: fromDate ? startOfDayIn(fromDate, timeZone) : undefined,
