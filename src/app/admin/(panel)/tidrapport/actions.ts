@@ -13,6 +13,7 @@ import {
 } from "@/lib/absence";
 import { currentFlexMinutes } from "@/lib/payroll";
 import { parseLocalDate } from "@/lib/time-zone";
+import { auditEmployeeChange, employeeBefore } from "@/lib/audit";
 
 const PATH = "/admin/tidrapport";
 
@@ -112,7 +113,7 @@ export async function deleteAbsence(formData: FormData) {
   const id = String(formData.get("id") ?? "");
   if (!id) return;
 
-  await removeAbsence(session.db, id);
+  await removeAbsence(session.db, id, session.email);
   revalidatePath(PATH);
 }
 
@@ -162,7 +163,7 @@ export async function deleteCompEarned(formData: FormData) {
   const id = String(formData.get("id") ?? "");
   if (!id) return;
 
-  await removeCompAdjustment(session.db, id);
+  await removeCompAdjustment(session.db, id, session.email);
   revalidatePath(PATH);
 }
 
@@ -228,12 +229,19 @@ export async function adjustFlexBalance(
     };
   }
 
+  const before = await employeeBefore(db, employeeId);
+
   await db.employee.updateMany({
     where: { id: employeeId },
     data: {
       flexOpeningMinutes: employee.flexOpeningMinutes + (target - current),
     },
   });
+
+  // En rättning av ett saldo är en rättning av en lön. Den ska gå att spåra.
+  if (before) {
+    await auditEmployeeChange(db, { employeeId, actorEmail: session.email, before });
+  }
 
   revalidatePath(PATH);
   return { ok: "Flexsaldot är ändrat." };
@@ -267,6 +275,8 @@ export async function saveOpeningBalances(
 
   if (rawDate && !since) return { error: "Datumet går inte att läsa." };
 
+  const before = await employeeBefore(db, employeeId);
+
   await db.employee.updateMany({
     where: { id: employeeId },
     data: {
@@ -275,6 +285,10 @@ export async function saveOpeningBalances(
       balanceOpeningDate: since,
     },
   });
+
+  if (before) {
+    await auditEmployeeChange(db, { employeeId, actorEmail: session.email, before });
+  }
 
   revalidatePath(PATH);
   return { savedAt: Date.now() };

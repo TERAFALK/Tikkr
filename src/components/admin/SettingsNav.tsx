@@ -70,6 +70,12 @@ const pages: SettingsPage[] = [
     icon: IconPeople,
   },
   {
+    href: "/admin/installningar/logg",
+    label: "Ändringslogg",
+    description: "Vem ändrade vad",
+    icon: IconClock,
+  },
+  {
     href: "/admin/installningar/dataskydd",
     label: "Dataskydd",
     description: "GDPR och personuppgifter",

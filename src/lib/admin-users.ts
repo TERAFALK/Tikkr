@@ -3,6 +3,7 @@ import bcrypt from "bcryptjs";
 import { unsafeGlobalPrisma } from "./db";
 import { forCompany, type CompanyDb } from "./tenant";
 import { normalizeEmail } from "./signup";
+import { recordAudit } from "./audit";
 
 /**
  * FLERA ADMINISTRATÖRER PER FÖRETAG.
@@ -159,7 +160,7 @@ export async function acceptInvite(token: string, password: string) {
       throw new AdminUserError("Länken är redan använd.");
     }
 
-    return tx.adminUser.create({
+    const user = await tx.adminUser.create({
       data: {
         companyId: invite.companyId,
         email: invite.email,
@@ -167,6 +168,21 @@ export async function acceptInvite(token: string, password: string) {
         role: invite.role,
       },
     });
+
+    // Den som bjöd in står som upphov. Det var hen som gav behörigheten,
+    // inbjudan bara bar den.
+    await tx.auditEvent.create({
+      data: {
+        companyId: invite.companyId,
+        actorEmail: invite.invitedByEmail,
+        entity: "AdminUser",
+        entityId: user.id,
+        action: "create",
+        after: { email: user.email, role: user.role },
+      },
+    });
+
+    return user;
   });
 }
 
@@ -181,6 +197,8 @@ export async function removeAdmin(params: {
   companyId: string;
   actingUserId: string;
   actingRole: string;
+  /** Den som tar bort. Skrivs i ändringsloggen. */
+  actingEmail: string;
   targetUserId: string;
 }) {
   if (params.actingRole !== "OWNER") {
@@ -208,6 +226,17 @@ export async function removeAdmin(params: {
   }
 
   await db.adminUser.delete({ where: { id: params.targetUserId } });
+
+  // Vem som kom åt arbetsytan, och när det tog slut. E-postadressen står
+  // med: den är vad som identifierar kontot, och kontot är borta.
+  await recordAudit(db, {
+    companyId: params.companyId,
+    actorEmail: params.actingEmail,
+    entity: "AdminUser",
+    entityId: target.id,
+    action: "delete",
+    before: { email: target.email, role: target.role },
+  });
 }
 
 /** Återkallar en inbjudan som ännu inte lösts in. */

@@ -5,6 +5,7 @@ import bcrypt from "bcryptjs";
 import { assertWritable, requireAdmin } from "@/lib/admin-session";
 import { hasModule } from "@/lib/company-modules";
 import { parseOre } from "@/lib/money";
+import { auditEmployeeChange, employeeBefore } from "@/lib/audit";
 import { readScheduleDays, saveOwnScheduleDays } from "@/lib/schedule";
 import type { CompanyDb } from "@/lib/tenant";
 
@@ -275,6 +276,10 @@ export async function updateEmployee(
   const flexCode = await flexCodeFields(formData, payroll);
   if ("error" in flexCode) return { error: flexCode.error };
 
+  // Timkostnaden följer med varje ny stämpling. En ändring av den ska gå att
+  // spåra, se audit.ts.
+  const before = await employeeBefore(db, id);
+
   try {
     // updateMany och inte update: id:t kommer från formuläret och får aldrig
     // kunna peka på en annan kunds anställd. Företagsfiltret ser till att en
@@ -291,6 +296,14 @@ export async function updateEmployee(
     });
   } catch (error) {
     return { error: describeError(error) };
+  }
+
+  if (before) {
+    await auditEmployeeChange(db, {
+      employeeId: id,
+      actorEmail: session.email,
+      before,
+    });
   }
 
   const scheduleError = await saveSchedule(db, companyId, id, formData, payroll);
@@ -320,6 +333,11 @@ export async function toggleEmployee(formData: FormData) {
   const active = formData.get("active") === "true";
   if (!id) return;
 
-  await db.employee.update({ where: { id }, data: { active: !active } });
+  const before = await employeeBefore(db, id);
+  if (!before) return;
+
+  await db.employee.updateMany({ where: { id }, data: { active: !active } });
+  await auditEmployeeChange(db, { employeeId: id, actorEmail: session.email, before });
+
   revalidatePath(PATH);
 }

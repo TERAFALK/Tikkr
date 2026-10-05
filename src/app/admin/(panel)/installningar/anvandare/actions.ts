@@ -97,6 +97,7 @@ export async function deleteAdmin(formData: FormData) {
       companyId: session.companyId,
       actingUserId: session.userId,
       actingRole: session.role,
+      actingEmail: session.email,
       targetUserId: String(formData.get("userId") ?? ""),
     });
   } catch (error) {

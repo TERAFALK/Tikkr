@@ -336,7 +336,7 @@ describe("frånvaro", () => {
     expect(comp[0].minutes).toBe(-480);
 
     const absence = await db.absence.findFirst({ where: { employeeId: anna } });
-    await removeAbsence(db, absence!.id);
+    await removeAbsence(db, absence!.id, "admin@test.se");
 
     expect(await db.compAdjustment.findMany({ where: { employeeId: anna } })).toEqual([]);
     expect(await db.absence.findMany({ where: { employeeId: anna } })).toEqual([]);

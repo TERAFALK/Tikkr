@@ -146,6 +146,20 @@ export default async function EntriesPage({
       }),
     ]);
 
+  // Vilka av raderna som har ändrats. De får en länk till sin historik; en
+  // länk på varje rad vore brus, eftersom de flesta aldrig rörts.
+  const withHistory = new Set(
+    (
+      await db.auditEvent.groupBy({
+        by: ["entityId"],
+        where: {
+          entity: "TimeEntry",
+          entityId: { in: entries.map((entry) => entry.id) },
+        },
+      })
+    ).map((row) => row.entityId)
+  );
+
   const employeeOptions = employees.map((employee) => ({
     id: employee.id,
     label: employee.name,
@@ -347,7 +361,15 @@ export default async function EntriesPage({
                         // rad som försvinner går inte att få tillbaka. En
                         // ändrad post bär dessutom spår av vem som ändrade
                         // den, vilket en raderad inte gör.
-                        <div className="flex justify-end gap-2">
+                        <div className="flex items-center justify-end gap-2">
+                          {withHistory.has(entry.id) && (
+                            <Link
+                              href={`/admin/installningar/logg?post=${entry.id}`}
+                              className="px-2 text-[13px] font-medium text-tick-deep hover:underline"
+                            >
+                              Historik
+                            </Link>
+                          )}
                           {/* ActionDialog och inte FormDialog: den här rutan
                               KAN avvisas. En sluttid före starttiden, en
                               överlappande post eller en stängd order ska

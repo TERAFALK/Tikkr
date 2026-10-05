@@ -65,6 +65,8 @@ export const TENANT_SCOPED_MODELS = [
   // Tillvalen. Se company-modules.ts — skrivningarna sker via
   // unsafeGlobalPrisma, men raderna hör till kunden och filtreras därför här.
   "CompanyModule",
+  // Ändringsloggen. Kundens egen historik, och lika isolerad som resten.
+  "AuditEvent",
 ] as const;
 
 const TENANT_MODEL_SET: ReadonlySet<string> = new Set(TENANT_SCOPED_MODELS);

@@ -1,5 +1,6 @@
 import type { CompanyDb } from "./tenant";
 import { plannedMinutesForDay, isoWeekdayIn, schedulesForEmployees } from "./schedule";
+import { recordAudit } from "./audit";
 
 /**
  * FRÅNVARO — SJUKDOM, VAB, SEMESTER OCH UTTAGEN KOMP.
@@ -138,6 +139,10 @@ export async function markAbsence(
     }
   }
 
+  const existing = await db.absence.findFirst({
+    where: { employeeId: input.employeeId, date: input.date, reasonId: reason.id },
+  });
+
   const absence = await db.absence.upsert({
     where: {
       employeeId_date_reasonId: {
@@ -159,6 +164,17 @@ export async function markAbsence(
       minutes: input.minutes ?? null,
       note: input.note?.trim() || null,
     },
+  });
+
+  await recordAudit(db, {
+    companyId,
+    actorEmail: input.byEmail,
+    entity: "Absence",
+    entityId: absence.id,
+    action: existing ? "update" : "create",
+    before: existing ? absenceSnapshot(existing) : null,
+    after: absenceSnapshot(absence),
+    subjectEmployeeId: input.employeeId,
   });
 
   if (!reason.countsAsComp) return;
@@ -188,12 +204,49 @@ export async function markAbsence(
 /** Tar bort en frånvaropost, och uttaget som hörde till den. */
 export async function removeAbsence(
   db: CompanyDb,
-  absenceId: string
+  absenceId: string,
+  byEmail: string
 ): Promise<void> {
-  // deleteMany och inte delete: id:t kommer från ett formulär och får aldrig
-  // kunna peka på en annan kunds post. Företagsfiltret ger då noll rader.
+  // Uppslaget går genom företagsfiltret: id:t kommer från ett formulär och
+  // får aldrig kunna peka på en annan kunds post.
+  const absence = await db.absence.findFirst({ where: { id: absenceId } });
+  if (!absence) return;
+
   await db.compAdjustment.deleteMany({ where: { absenceId } });
   await db.absence.deleteMany({ where: { id: absenceId } });
+
+  await recordAudit(db, {
+    companyId: db.$companyId,
+    actorEmail: byEmail,
+    entity: "Absence",
+    entityId: absenceId,
+    action: "delete",
+    before: absenceSnapshot(absence),
+    subjectEmployeeId: absence.employeeId,
+  });
+}
+
+/**
+ * Det som betyder något för tidrapporten i en frånvaropost.
+ *
+ * Anteckningen står med, trots att den kan säga något om hälsa: den är en
+ * del av vad som ändrades. Raderna försvinner med personens frånvaro vid en
+ * anonymisering, se anonymizeEmployee.
+ */
+function absenceSnapshot(absence: {
+  employeeId: string;
+  date: Date;
+  reasonId: string;
+  minutes: number | null;
+  note: string | null;
+}): Record<string, unknown> {
+  return {
+    employeeId: absence.employeeId,
+    date: absence.date.toISOString(),
+    reasonId: absence.reasonId,
+    minutes: absence.minutes,
+    note: absence.note,
+  };
 }
 
 /** Planerad tid för en anställd en viss dag, i minuter. */
@@ -242,7 +295,7 @@ export async function addCompEarned(
 
   if (!employee) throw new AbsenceError("Okänd anställd.");
 
-  await db.compAdjustment.create({
+  const created = await db.compAdjustment.create({
     data: {
       companyId,
       employeeId: input.employeeId,
@@ -252,12 +305,52 @@ export async function addCompEarned(
       createdByEmail: input.byEmail,
     },
   });
+
+  await recordAudit(db, {
+    companyId,
+    actorEmail: input.byEmail,
+    entity: "CompAdjustment",
+    entityId: created.id,
+    action: "create",
+    after: compSnapshot(created),
+    subjectEmployeeId: input.employeeId,
+  });
+}
+
+function compSnapshot(row: {
+  employeeId: string;
+  date: Date;
+  minutes: number;
+  note: string | null;
+}): Record<string, unknown> {
+  return {
+    employeeId: row.employeeId,
+    date: row.date.toISOString(),
+    minutes: row.minutes,
+    note: row.note,
+  };
 }
 
 /** Tar bort en komprad. Uttag som hör till en frånvaro tas bort med frånvaron. */
 export async function removeCompAdjustment(
   db: CompanyDb,
-  id: string
+  id: string,
+  byEmail: string
 ): Promise<void> {
+  const row = await db.compAdjustment.findFirst({
+    where: { id, absenceId: null },
+  });
+  if (!row) return;
+
   await db.compAdjustment.deleteMany({ where: { id, absenceId: null } });
+
+  await recordAudit(db, {
+    companyId: db.$companyId,
+    actorEmail: byEmail,
+    entity: "CompAdjustment",
+    entityId: id,
+    action: "delete",
+    before: compSnapshot(row),
+    subjectEmployeeId: row.employeeId,
+  });
 }

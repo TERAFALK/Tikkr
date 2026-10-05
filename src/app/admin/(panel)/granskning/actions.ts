@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { assertWritable, requireAdmin } from "@/lib/admin-session";
 import { unsafeGlobalPrisma } from "@/lib/db";
 import { instantFromWallTime } from "@/lib/time-zone";
+import { recordAudit, timeEntrySnapshot } from "@/lib/audit";
 
 const PATH = "/admin/granskning";
 
@@ -90,19 +91,35 @@ export async function reviewEntry(
     entry.clockOutAt !== null &&
     toMinute(entry.clockOutAt) === toMinute(clockOutAt);
 
-  await db.timeEntry.update({
-    where: { id },
-    data: sameMinute
-      ? {
-          needsReview: false,
-          reviewNote: `Granskad och godkänd av ${email}.`,
-        }
-      : {
-          clockOutAt,
-          source: "ADMIN_MANUAL",
-          needsReview: false,
-          reviewNote: `Rättad av ${email}.`,
-        },
+  // Godkännandet och raden i ändringsloggen skrivs tillsammans. Även ett
+  // godkännande utan ändring loggas: att någon tittat på en beräknad tid och
+  // sagt ja är ett beslut, och det är det beslutet som gör tiden fakturerbar.
+  await db.$transaction(async (tx) => {
+    const updated = await tx.timeEntry.update({
+      where: { id },
+      data: sameMinute
+        ? {
+            needsReview: false,
+            reviewNote: `Granskad och godkänd av ${email}.`,
+          }
+        : {
+            clockOutAt,
+            source: "ADMIN_MANUAL",
+            needsReview: false,
+            reviewNote: `Rättad av ${email}.`,
+          },
+    });
+
+    await recordAudit(tx, {
+      companyId,
+      actorEmail: email,
+      entity: "TimeEntry",
+      entityId: id,
+      action: sameMinute ? "review" : "update",
+      before: timeEntrySnapshot(entry),
+      after: timeEntrySnapshot(updated),
+      subjectEmployeeId: entry.employeeId,
+    });
   });
 
   revalidatePath(PATH);

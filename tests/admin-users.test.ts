@@ -193,6 +193,7 @@ describe("ta bort administratörer", () => {
       companyId,
       actingUserId: ownerId,
       actingRole: "OWNER",
+      actingEmail: "agare@test.se",
       targetUserId: user.id,
     });
 
@@ -206,6 +207,7 @@ describe("ta bort administratörer", () => {
         companyId,
         actingUserId: ownerId,
         actingRole: "OWNER",
+        actingEmail: "agare@test.se",
         targetUserId: ownerId,
       })
     ).rejects.toThrow(AdminUserError);
@@ -220,6 +222,7 @@ describe("ta bort administratörer", () => {
       companyId,
       actingUserId: andraAgaren.id,
       actingRole: "OWNER",
+      actingEmail: "agare@test.se",
       targetUserId: ownerId,
     });
 
@@ -238,6 +241,7 @@ describe("ta bort administratörer", () => {
         companyId,
         actingUserId: vanlig.id,
         actingRole: "OWNER",
+        actingEmail: "agare@test.se",
         targetUserId: andraAgaren.id,
       })
     ).rejects.toThrow(AdminUserError);
@@ -249,6 +253,7 @@ describe("ta bort administratörer", () => {
         companyId,
         actingUserId: "nagon",
         actingRole: "ADMIN",
+        actingEmail: "admin@test.se",
         targetUserId: ownerId,
       })
     ).rejects.toThrow(AdminUserError);

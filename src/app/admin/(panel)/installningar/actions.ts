@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { assertWritable, requireAdmin } from "@/lib/admin-session";
 import { unsafeGlobalPrisma } from "@/lib/db";
+import { recordAudit } from "@/lib/audit";
 import { parseMarkupPercent } from "@/lib/money";
 import { saved, type SaveState } from "@/lib/save-state";
 import { normalizeTimeOfDay } from "@/lib/time-input";
@@ -66,10 +67,29 @@ export async function saveMarkup(
     };
   }
 
+  const before = await unsafeGlobalPrisma.company.findUnique({
+    where: { id: companyId },
+    select: { markupPercent: true },
+  });
+
   await unsafeGlobalPrisma.company.update({
     where: { id: companyId },
     data: { markupPercent: percent },
   });
+
+  // Påslaget sätter priset på varje order utan eget. En ändring av det är en
+  // ändring av vad kunderna faktureras.
+  if (before && before.markupPercent !== percent) {
+    await recordAudit(session.db, {
+      companyId,
+      actorEmail: session.email,
+      entity: "Company",
+      entityId: companyId,
+      action: "update",
+      before: { markupPercent: before.markupPercent },
+      after: { markupPercent: percent },
+    });
+  }
 
   revalidatePath("/admin/installningar");
 
@@ -203,10 +223,31 @@ export async function saveTimeSettings(
     return { error: "Välj en tidszon i listan." };
   }
 
+  const before = await unsafeGlobalPrisma.company.findUnique({
+    where: { id: companyId },
+    select: { autoCloseAt: true, timezone: true },
+  });
+
   await unsafeGlobalPrisma.company.update({
     where: { id: companyId },
     data: { autoCloseAt, timezone },
   });
+
+  // Klockslaget avgör var systemet sätter en sluttid ingen stämplat.
+  if (
+    before &&
+    (before.autoCloseAt !== autoCloseAt || before.timezone !== timezone)
+  ) {
+    await recordAudit(session.db, {
+      companyId,
+      actorEmail: session.email,
+      entity: "Company",
+      entityId: companyId,
+      action: "update",
+      before,
+      after: { autoCloseAt, timezone },
+    });
+  }
 
   revalidatePath("/admin/installningar/tider");
 
@@ -248,49 +289,84 @@ export async function anonymizeEmployee(
 
   const previousName = employee.name;
 
-  await db.employee.update({
-    where: { id },
-    data: {
-      name: `Anonymiserad anställd (${employee.id.slice(-4)})`,
-      active: false,
+  // Allt eller inget. En anonymisering som stannat halvvägs har tagit bort
+  // namnet men lämnat frånvaron, och ser ändå ut att ha lyckats.
+  await db.$transaction(async (tx) => {
+    await tx.employee.update({
+      where: { id },
+      data: {
+        name: `Anonymiserad anställd (${employee.id.slice(-4)})`,
+        active: false,
 
-      // Anställningsnumret pekar ut en person lika säkert som namnet — det är
-      // hela dess syfte. Det måste därför bort i samma steg, annars går
-      // personen att identifiera ur kundens eget register.
-      employeeNumber: null,
+        // Anställningsnumret pekar ut en person lika säkert som namnet — det är
+        // hela dess syfte. Det måste därför bort i samma steg, annars går
+        // personen att identifiera ur kundens eget register.
+        employeeNumber: null,
 
-      // Porträttet är en personuppgift och en av de mest identifierande som
-      // finns. Det raderas därför i samma steg som namnet — annars hade
-      // anonymiseringen lämnat kvar ett ansikte.
-      photoData: null,
-      photoMimeType: null,
-      photoUpdatedAt: new Date(),
+        // Porträttet är en personuppgift och en av de mest identifierande som
+        // finns. Det raderas därför i samma steg som namnet — annars hade
+        // anonymiseringen lämnat kvar ett ansikte.
+        photoData: null,
+        photoMimeType: null,
+        photoUpdatedAt: new Date(),
 
-      // Saldona pekar inte ut någon, men de är personens egna och saknar
-      // mening utan hen. Nollställs för att inte ligga kvar som skräp.
-      flexOpeningMinutes: 0,
-      compOpeningMinutes: 0,
-    },
-  });
+        // Saldona pekar inte ut någon, men de är personens egna och saknar
+        // mening utan hen. Nollställs för att inte ligga kvar som skräp.
+        flexOpeningMinutes: 0,
+        compOpeningMinutes: 0,
 
-  // FRÅNVARON RADERAS HELT, och det är en annan sorts beslut än ovan.
-  //
-  // Stämplingarna står kvar: de är fakturaunderlag mot kundens kund, och det
-  // underlaget får inte förändras i efterhand. En frånvaropost är inget
-  // underlag mot någon — den säger bara att en namngiven person var sjuk en
-  // tisdag, alltså en uppgift om hälsa. Den har inget skäl att finnas kvar när
-  // personen bett om att bli glömd.
-  //
-  // Komptidsboken följer med av samma skäl: den är personens eget saldo och
-  // dess anteckningar är fritext som kan innehålla vad som helst.
-  await db.compAdjustment.deleteMany({ where: { employeeId: id } });
-  await db.absence.deleteMany({ where: { employeeId: id } });
+        // Koden är personens egen och kan vara återanvänd från annat håll.
+        flexCodeHash: null,
 
-  // Rasterna står kvar — de är en del av närvaron, precis som stämplingarna —
-  // men granskningsanteckningen är fritext och kan bära ett namn.
-  await db.breakEntry.updateMany({
-    where: { employeeId: id },
-    data: { reviewNote: null },
+        // Vad personen kostade härleds ur lönen. Stämplingarna bär sin egen
+        // kopia av satsen, så fakturaunderlaget påverkas inte.
+        costRateOre: null,
+      },
+    });
+
+    // FRÅNVARON RADERAS HELT, och det är en annan sorts beslut än ovan.
+    //
+    // Stämplingarna står kvar: de är fakturaunderlag mot kundens kund, och det
+    // underlaget får inte förändras i efterhand. En frånvaropost är inget
+    // underlag mot någon — den säger bara att en namngiven person var sjuk en
+    // tisdag, alltså en uppgift om hälsa. Den har inget skäl att finnas kvar när
+    // personen bett om att bli glömd.
+    //
+    // Komptidsboken följer med av samma skäl: den är personens eget saldo och
+    // dess anteckningar är fritext som kan innehålla vad som helst.
+    await tx.compAdjustment.deleteMany({ where: { employeeId: id } });
+    await tx.absence.deleteMany({ where: { employeeId: id } });
+
+    // Ändringsloggens rader om frånvaron och komptiden följer med ut. De bär
+    // samma uppgifter som posterna själva, och en anonymisering som lämnar
+    // kvar en kopia i loggen har inte anonymiserat något.
+    //
+    // Raderna om stämplingarna och om personens satser står kvar. De bär inget
+    // namn, och de är historiken till ett fakturaunderlag.
+    await tx.auditEvent.deleteMany({
+      where: {
+        subjectEmployeeId: id,
+        entity: { in: ["Absence", "CompAdjustment"] },
+      },
+    });
+
+    // Rasterna står kvar — de är en del av närvaron, precis som stämplingarna —
+    // men granskningsanteckningen är fritext och kan bära ett namn.
+    await tx.breakEntry.updateMany({
+      where: { employeeId: id },
+      data: { reviewNote: null },
+    });
+
+    // Att någon anonymiserades är i sig en uppgift som ska gå att visa, utan
+    // vem det var.
+    await recordAudit(tx, {
+      companyId: session.companyId,
+      actorEmail: session.email,
+      entity: "Employee",
+      entityId: id,
+      action: "anonymize",
+      subjectEmployeeId: id,
+    });
   });
 
   revalidatePath("/admin/installningar/dataskydd");

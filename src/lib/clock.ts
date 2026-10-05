@@ -5,6 +5,7 @@ import { nextOccurrenceOf, wallTimeIn } from "./time-zone";
 import { companyTimeZone } from "./company";
 import { describeEntry } from "./entry-label";
 import { endOpenBreak } from "./break-close";
+import { recordAudit, SYSTEM_ACTOR, timeEntrySnapshot } from "./audit";
 
 /**
  * STÄMPLINGSLOGIKEN.
@@ -691,6 +692,19 @@ export async function autoCloseForgottenEntries(
 
     if (count === 0) continue;
 
+    // Tikkr räknade fram en sluttid. Den som rättar posten senare ska kunna
+    // se att det var systemet och inte en människa som satte den.
+    await recordAudit(db, {
+      companyId,
+      actorEmail: SYSTEM_ACTOR,
+      entity: "TimeEntry",
+      entityId: entry.id,
+      action: "auto-close",
+      before: { clockOutAt: null },
+      after: { clockOutAt: deadline.toISOString() },
+      subjectEmployeeId: entry.employeeId,
+    });
+
     const saved = await db.timeEntry.findUnique({ where: { id: entry.id } });
     if (saved) closed.push(saved);
   }
@@ -777,7 +791,7 @@ export async function closeOrder(
   return db.$transaction(async (tx) => {
     const open = await tx.timeEntry.findMany({
       where: { orderId, clockOutAt: null },
-      select: { id: true, clockInAt: true },
+      select: { id: true, clockInAt: true, employeeId: true },
     });
 
     for (const entry of open) {
@@ -798,6 +812,17 @@ export async function closeOrder(
             `${options.byEmail}. Systemet vet inte när arbetet faktiskt ` +
             `slutade. Kontrollera tiden innan fakturering.`,
         },
+      });
+
+      await recordAudit(tx, {
+        companyId,
+        actorEmail: options.byEmail,
+        entity: "TimeEntry",
+        entityId: entry.id,
+        action: "close-order",
+        before: { clockOutAt: null },
+        after: { clockOutAt: clockOutAt.toISOString() },
+        subjectEmployeeId: entry.employeeId,
       });
     }
 
@@ -841,25 +866,45 @@ export async function createManualEntry(
   assertSaneInterval(input.clockInAt, input.clockOutAt);
   await assertNoOverlap(db, input, input.clockInAt, input.clockOutAt);
 
-  return db.timeEntry.create({
-    data: {
+  return db.$transaction(async (tx) => {
+    const created = await tx.timeEntry.create({
+      data: {
+        companyId,
+        employeeId: input.employeeId,
+        ...jobFields(input),
+        clockInAt: input.clockInAt,
+        clockOutAt: input.clockOutAt,
+        // Satserna som de är NU. En tid som skrivs in i efterhand saknar egen
+        // historia — det enda systemet vet är vad personen och momentet
+        // kostar idag, och att anta något annat vore att hitta på.
+        ...rates,
+        source: "ADMIN_MANUAL",
+        needsReview: false,
+        reviewNote: `Inlagd för hand av ${input.byEmail}.`,
+      },
+    });
+
+    await recordAudit(tx, {
       companyId,
-      employeeId: input.employeeId,
-      ...jobFields(input),
-      clockInAt: input.clockInAt,
-      clockOutAt: input.clockOutAt,
-      // Satserna som de är NU. En tid som skrivs in i efterhand saknar egen
-      // historia — det enda systemet vet är vad personen och momentet kostar
-      // idag, och att anta något annat vore att hitta på.
-      ...rates,
-      source: "ADMIN_MANUAL",
-      needsReview: false,
-      reviewNote: `Inlagd för hand av ${input.byEmail}.`,
-    },
+      actorEmail: input.byEmail,
+      entity: "TimeEntry",
+      entityId: created.id,
+      action: "create",
+      after: timeEntrySnapshot(created),
+      subjectEmployeeId: created.employeeId,
+    });
+
+    return created;
   });
 }
 
-/** Ändrar en befintlig stämpling. Samma kontroller som vid nyinlägg. */
+/**
+ * Ändrar en befintlig stämpling. Samma kontroller som vid nyinlägg.
+ *
+ * Värdet FÖRE ändringen skrivs i ändringsloggen. Utan det visste man efteråt
+ * bara vem som ändrade sist, inte vad posten var innan — och det är det som
+ * avgör en tvist om en lön eller en faktura.
+ */
 export async function updateEntryManually(
   companyId: string,
   entryId: string,
@@ -867,27 +912,57 @@ export async function updateEntryManually(
 ): Promise<TimeEntry> {
   const db = forCompany(companyId);
 
+  const before = await db.timeEntry.findFirst({ where: { id: entryId } });
+  if (!before) throw new ClockError("Posten finns inte kvar.");
+
   const rates = await assertBelongsToCompany(db, input, {
     historical: true,
   });
   assertSaneInterval(input.clockInAt, input.clockOutAt);
   await assertNoOverlap(db, input, input.clockInAt, input.clockOutAt, entryId);
 
-  return db.timeEntry.update({
-    where: { id: entryId },
-    data: {
-      employeeId: input.employeeId,
-      ...jobFields(input),
-      clockInAt: input.clockInAt,
-      clockOutAt: input.clockOutAt,
-      // Följer med posten. Flyttas den till ett annat arbetsmoment eller en
-      // annan person ska den också kosta det som gäller där — annars hade
-      // kalkylen visat svetsning till måleripris.
-      ...rates,
-      source: "ADMIN_MANUAL",
-      needsReview: false,
-      reviewNote: `Ändrad för hand av ${input.byEmail}.`,
-    },
+  // SATSERNA RÄKNAS OM BARA NÄR PERSONEN ELLER JOBBET BYTS.
+  //
+  // Flyttas posten till ett annat arbetsmoment eller en annan person ska den
+  // kosta det som gäller där — annars hade kalkylen visat svetsning till
+  // måleripris. Men rättas bara klockslaget är det samma arbete, och då står
+  // satserna från stämplingstillfället kvar. Förr kopierades dagens satser in
+  // vid varje ändring, och en fakturerad post från mars fick oktoberpris för
+  // att någon flyttade sluttiden fem minuter.
+  const sameWork =
+    before.employeeId === input.employeeId &&
+    before.kind === input.kind &&
+    (input.kind === "ORDER"
+      ? before.momentId === input.momentId
+      : before.indirectMomentId === input.indirectMomentId);
+
+  return db.$transaction(async (tx) => {
+    const updated = await tx.timeEntry.update({
+      where: { id: entryId },
+      data: {
+        employeeId: input.employeeId,
+        ...jobFields(input),
+        clockInAt: input.clockInAt,
+        clockOutAt: input.clockOutAt,
+        ...(sameWork ? {} : rates),
+        source: "ADMIN_MANUAL",
+        needsReview: false,
+        reviewNote: `Ändrad för hand av ${input.byEmail}.`,
+      },
+    });
+
+    await recordAudit(tx, {
+      companyId,
+      actorEmail: input.byEmail,
+      entity: "TimeEntry",
+      entityId: entryId,
+      action: "update",
+      before: timeEntrySnapshot(before),
+      after: timeEntrySnapshot(updated),
+      subjectEmployeeId: updated.employeeId,
+    });
+
+    return updated;
   });
 }
 

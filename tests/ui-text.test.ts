@@ -232,6 +232,9 @@ const PROSE_FILES = [
   "src/lib/notices.ts",
   "src/lib/platform-admin.ts",
   "src/lib/emails.ts",
+  // Noten när skärmens klocka rättats, och ändringsloggens rubriker.
+  "src/lib/punch-time.ts",
+  "src/lib/audit-view.ts",
 ];
 
 describe("texterna utanför sidorna", () => {

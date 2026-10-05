@@ -179,6 +179,9 @@ model Company {
 
   modules CompanyModule[]
 
+  /// Ändringsloggen. Se AuditEvent.
+  auditEvents AuditEvent[]
+
   @@map("companies")
 }
 
@@ -1556,4 +1559,63 @@ model CompanyModule {
 
   @@unique([companyId, module])
   @@map("company_modules")
+}
+
+// ---------------------------------------------------------------------------
+// ÄNDRINGSLOGGEN
+// ---------------------------------------------------------------------------
+
+/// EN ÄNDRING AV NÅGOT SOM ÄR UNDERLAG FÖR EN FAKTURA ELLER EN LÖN.
+///
+/// Infördes 2026-10-05, före första riktiga kunden, och det är hela poängen
+/// med tidpunkten: historik går inte att skriva i efterhand. Fram till dess
+/// bar en ändrad stämpling bara "Ändrad för hand av X" i sin anteckning —
+/// vem som ändrade sist, men inte vad posten var innan. Vid en tvist om en
+/// lön eller en faktura är det just det värdet som behövs.
+///
+/// BARA TILLÄGG. Ingen kod uppdaterar en rad här, och ingen raderar en utom
+/// i två fall: företaget raderas (kaskad), eller en anställd anonymiseras och
+/// raderna om personens frånvaro och komp följer med frånvaron ut. Se
+/// anonymizeEmployee.
+///
+/// `before` och `after` är ögonblicksbilder av de fält som betyder något för
+/// underlaget — tider, order, moment, satser, minuter. Aldrig namn, foto
+/// eller anställningsnummer: loggen ska överleva en anonymisering utan att
+/// bära kvar det den tog bort.
+///
+/// Kioskens egna tryck loggas inte här. De ÄR sin egen logg — varje post bär
+/// skärm, IP, källa och tidpunkt — och en rad per tryck vore brus som gömmer
+/// de ändringar loggen finns för.
+model AuditEvent {
+  id        String @id @default(cuid())
+  companyId String @map("company_id")
+
+  /// E-postadressen till den som gjorde ändringen, eller "system" när Tikkr
+  /// gjorde den själv (automatisk utstämpling).
+  actorEmail String @map("actor_email")
+
+  /// Vad som ändrades: "TimeEntry", "Absence", "CompAdjustment", "Employee",
+  /// "AdminUser" eller "Company".
+  entity   String
+  entityId String @map("entity_id")
+
+  /// "create", "update", "delete", "review", "auto-close", "close-order",
+  /// "anonymize".
+  action String
+
+  before Json?
+  after  Json?
+
+  /// Den anställde ändringen gäller, när det finns en. Låter anonymiseringen
+  /// hitta raderna om personens frånvaro och komp.
+  subjectEmployeeId String? @map("subject_employee_id")
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@index([companyId, entity, entityId, createdAt])
+  @@index([companyId, createdAt])
+  @@index([companyId, subjectEmployeeId])
+  @@map("audit_events")
 }
