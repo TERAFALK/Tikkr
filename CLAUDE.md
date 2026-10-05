@@ -342,6 +342,27 @@ stripe_prices    — item, month_price_id, year_price_id, updated_by_email
    **Arbetad tid är HUVUDSTÄMPLINGEN** (`mainMinutes` i `spans.ts`), aldrig
    råsumman. Det är här de två underlagen skiljer sig, se avgränsningen överst.
 
+   **Perioden kapas till hela dygn i `buildPayrollPeriod`** (tillagt
+   2026-10-05). `from` och `to` pekar ut DAGAR men kommer in som tidpunkter,
+   och vilken tidpunkt beror på var de kommer ifrån: förvalet räknas ur
+   `startOfWeekIn` och landar vid midnatt, medan ett datum ur adressfältet går
+   genom `parseLocalDate`, som med flit landar klockan 12 för att undvika
+   natten då klockan ställs om.
+
+   Skickades de råa in i frågan föll halva första dagen bort. Samma vecka för
+   samma person visade 6:51 när man kom in på sidan och 3:23 när man växlat
+   vecka fram och tillbaka, eftersom förmiddagens stämplingar låg före gränsen
+   andra gången. Frånvaro och komprader, som dateras vid dygnets början,
+   försvann helt från första dagen.
+
+   Normaliseringen ligger i `buildPayrollPeriod` och inte hos anroparna: sidan,
+   PDF:en och flexsaldot kallar alla dit, och en regel som varje anropare måste
+   komma ihåg är ingen regel. Rapportvyn gör samma sak med `startOfDayIn` och
+   `endOfDayIn`, och **exportrutten gör det numera också** — den tolkade
+   datumen med `new Date("...T00:00:00")`, alltså i serverns zon, som är UTC.
+   Arket och skärmen kunde därmed visa olika summor för samma vecka, och det
+   ena är ett fakturaunderlag.
+
    **Två jobb som startar i exakt samma ögonblick: det LÄNGSTA räknas**
    (ändrat 2026-10-05). Ingetdera startade medan det andra pågick, så båda är
    huvudjobb, och då avgör längden.

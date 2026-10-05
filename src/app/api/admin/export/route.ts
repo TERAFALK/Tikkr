@@ -4,6 +4,7 @@ import { requireAdmin } from "@/lib/admin-session";
 import { buildReport, type ReportGroup } from "@/lib/report";
 import { formatDate, formatDuration, toDecimalHours } from "@/lib/format";
 import { unsafeGlobalPrisma } from "@/lib/db";
+import { endOfDayIn, parseLocalDate, startOfDayIn } from "@/lib/time-zone";
 import { buildReportPdf, type ReportView } from "@/lib/report-pdf";
 import type { ReportResult } from "@/lib/report";
 
@@ -22,16 +23,37 @@ import type { ReportResult } from "@/lib/report";
 
 export const runtime = "nodejs";
 
+/** Företagets tidszon. `Company` nås bara genom den globala klienten. */
+async function timeZoneOf(companyId: string): Promise<string> {
+  const company = await unsafeGlobalPrisma.company.findUnique({
+    where: { id: companyId },
+    select: { timezone: true },
+  });
+
+  return company?.timezone ?? "Europe/Stockholm";
+}
+
 export async function GET(request: NextRequest) {
   const { db, companyId, companyName } = await requireAdmin();
   const params = request.nextUrl.searchParams;
 
-  const from = params.get("from");
-  const to = params.get("to");
+  // DATUMEN RÄKNAS I FÖRETAGETS TIDSZON, inte i serverns.
+  //
+  // Stod som `new Date("2026-10-05T00:00:00")`, vilket Date tolkar i den
+  // lokala zonen — och servern kör UTC. Gränsen låg därför 02:00 på
+  // verkstadsgolvet om sommaren, så morgonens stämplingar föll ur arket
+  // medan de syntes på skärmen. Två dokument över samma vecka med olika
+  // summor, och det ena är ett fakturaunderlag.
+  //
+  // Samma räkning som rapportvyn gör, se rapporter/page.tsx.
+  const timeZone = await timeZoneOf(companyId);
+
+  const fromDate = parseLocalDate(params.get("from") ?? "", timeZone);
+  const toDate = parseLocalDate(params.get("to") ?? "", timeZone);
 
   const report = await buildReport(db, {
-    from: from ? new Date(`${from}T00:00:00`) : undefined,
-    to: to ? new Date(`${to}T23:59:59`) : undefined,
+    from: fromDate ? startOfDayIn(fromDate, timeZone) : undefined,
+    to: toDate ? endOfDayIn(toDate, timeZone) : undefined,
     employeeId: params.get("employeeId") ?? undefined,
     orderId: params.get("orderId") ?? undefined,
     momentId: params.get("momentId") ?? undefined,

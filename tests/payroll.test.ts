@@ -230,6 +230,30 @@ describe("kundens vecka 16 — facit ur deras gamla tidrapport", () => {
     expect(hours(period!.flex.closing)).toBe(-0.25);
   });
 
+  /**
+   * PERIODEN KAPAS TILL HELA DYGN.
+   *
+   * `from` och `to` pekar ut dagar men kommer in som tidpunkter, och
+   * `parseLocalDate` landar med flit klockan 12. Skickades de råa in i frågan
+   * föll förmiddagens stämplingar bort ur första dagen: samma vecka visade
+   * 6:51 när man kom in på sidan och 3:23 när man växlat vecka fram och
+   * tillbaka.
+   */
+  it("en period som börjar mitt på dagen räknar ändå hela första dagen", async () => {
+    const period = await buildPayrollPeriod(
+      forCompany(companyId),
+      TZ,
+      johan,
+      at(15, "12:00"),
+      at(18, "12:00")
+    );
+
+    // Exakt facit ovan. Måndagens stämplingar börjar 06:23 och ska med.
+    expect(hours(period!.totals.worked)).toBe(33.75);
+    expect(hours(period!.totals.planned)).toBe(34);
+    expect(period!.days).toHaveLength(4);
+  });
+
   it("produktiv tid är 0,17 och improduktiv 33,58", async () => {
     const period = await buildPayrollPeriod(
       forCompany(companyId),

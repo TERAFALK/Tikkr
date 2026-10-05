@@ -169,15 +169,33 @@ export async function buildPayrollPeriod(
 
   if (!employee) return null;
 
+  // ── PERIODEN KAPAS TILL HELA DYGN ──────────────────────────────────────
+  //
+  // `from` och `to` pekar ut DAGAR, men kommer hit som tidpunkter, och vilken
+  // tidpunkt på dagen beror på var de kommer ifrån. Förvalet räknas ur
+  // `startOfWeekIn` och landar vid midnatt; ett datum ur adressfältet går
+  // genom `parseLocalDate`, som med flit landar klockan 12 — se kommentaren
+  // där, den undviker natten då klockan ställs om.
+  //
+  // Skickades de råa in i frågan föll halva första dagen bort: samma vecka
+  // för samma person visade 6:51 när man kom in på sidan och 3:23 när man
+  // växlat vecka fram och tillbaka, eftersom förmiddagens stämplingar låg
+  // före gränsen andra gången. Sista dagen läckte åt andra hållet.
+  //
+  // Normaliseringen ligger HÄR och inte hos anroparna. Sidan, PDF:en och
+  // flexsaldot kallar alla hit, och en regel som varje anropare måste komma
+  // ihåg är ingen regel.
+  const periodStart = startOfDayIn(from, timeZone);
+
   // Sluttiden är dygnets SLUT, alltså början på dagen efter. En stämpling
   // 15:30 sista dagen ska med.
-  const periodEnd = addDaysInZone(to, 1, timeZone);
+  const periodEnd = startOfDayIn(addDaysInZone(to, 1, timeZone), timeZone);
 
   const [entries, breakEntries, absences, comp, schedules] = await Promise.all([
     db.timeEntry.findMany({
       where: {
         employeeId,
-        clockInAt: { gte: from, lt: periodEnd },
+        clockInAt: { gte: periodStart, lt: periodEnd },
       },
       // Id:t som andra sortering. Postgres lovar ingenting om ordningen
       // mellan rader som är lika, och två poster som stämplats in på samma
@@ -195,7 +213,7 @@ export async function buildPayrollPeriod(
       },
     }),
     db.breakEntry.findMany({
-      where: { employeeId, startedAt: { gte: from, lt: periodEnd } },
+      where: { employeeId, startedAt: { gte: periodStart, lt: periodEnd } },
       orderBy: { startedAt: "asc" },
       select: {
         id: true,
@@ -206,7 +224,7 @@ export async function buildPayrollPeriod(
       },
     }),
     db.absence.findMany({
-      where: { employeeId, date: { gte: from, lt: periodEnd } },
+      where: { employeeId, date: { gte: periodStart, lt: periodEnd } },
       orderBy: { date: "asc" },
       select: {
         id: true,
@@ -217,7 +235,7 @@ export async function buildPayrollPeriod(
       },
     }),
     db.compAdjustment.findMany({
-      where: { employeeId, date: { gte: from, lt: periodEnd } },
+      where: { employeeId, date: { gte: periodStart, lt: periodEnd } },
       orderBy: { date: "asc" },
       select: { id: true, date: true, minutes: true },
     }),
@@ -264,7 +282,7 @@ export async function buildPayrollPeriod(
 
   const days: PayrollDay[] = [];
 
-  for (const date of daysInPeriod(from, to, timeZone)) {
+  for (const date of daysInPeriod(periodStart, to, timeZone)) {
     const key = dayKey(date);
     const weekday = isoWeekdayIn(date, timeZone);
 
@@ -394,7 +412,7 @@ export async function buildPayrollPeriod(
   const [flexOpening, compOpening] = await openingBalances(
     db,
     employee,
-    from,
+    periodStart,
     timeZone
   );
 
