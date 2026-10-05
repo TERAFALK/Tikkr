@@ -6,10 +6,7 @@ import {
 } from "@/lib/kiosk-auth";
 import { clockIn, clockOut, clockOutAll, ClockError } from "@/lib/clock";
 import { startBreak, endBreak } from "@/lib/breaks";
-import { currentFlexMinutes } from "@/lib/payroll";
 import { hasModule } from "@/lib/company-modules";
-import { forCompany } from "@/lib/tenant";
-import { unsafeGlobalPrisma } from "@/lib/db";
 import { readPunchTime } from "@/lib/punch-time";
 import { clientIpFrom } from "@/lib/client-ip";
 
@@ -98,10 +95,7 @@ export async function POST(request: NextRequest) {
   // Uppslaget görs BARA för de tryck som behöver det. "in" och "out" är de
   // vanligaste och de som ska kännas omedelbara — de ska inte betala för en
   // extra fråga som ändå aldrig ändrar något för dem.
-  const needsPayroll =
-    body.action === "break" ||
-    body.action === "break-end" ||
-    body.action === "out-all";
+  const needsPayroll = body.action === "break" || body.action === "break-end";
 
   const payroll = needsPayroll
     ? await hasModule(session.companyId, "PAYROLL")
@@ -148,26 +142,11 @@ export async function POST(request: NextRequest) {
       });
       await Promise.all([touchDevice(session.deviceId), refreshKioskCookie()]);
 
-      // Flexsaldot följer med svaret på dagens sista tryck. Skärmen visar det
-      // en kort stund som kvitto. TID, aldrig kronor — kiosken visar inga
-      // belopp, se CLAUDE.md § 3 regel 4.
-      //
-      // Misslyckas räkningen svarar vi ändå ok: utstämplingen är gjord, och
-      // ett saldo som inte gick att räkna fram får aldrig se ut som att
-      // stämplingen inte gick igenom.
-      //
-      // Utan lönemodulen finns varken schema eller planerad tid, och då finns
-      // inget flex att visa. Kvittot uteblir helt i stället för att visa noll.
-      let flexMinutes: number | null = null;
-      if (payroll) {
-        try {
-          flexMinutes = await flexFor(session.companyId, body.employeeId);
-        } catch (error) {
-          console.error("Kunde inte räkna fram flexsaldot", error);
-        }
-      }
-
-      return NextResponse.json({ ok: true, closed, flexMinutes });
+      // INGET FLEXSALDO I SVARET (ändrat 2026-10-05). Det visades förr en
+      // stund som kvitto efter dagens sista utstämpling, utan kod — en uppgift
+      // om en namngiven person på en skärm där vem som helst går förbi. Saldot
+      // visas bara den som angett sin kod, se api/kiosk/flex.
+      return NextResponse.json({ ok: true, closed });
     }
 
     if (body.action === "out") {
@@ -229,27 +208,4 @@ export async function POST(request: NextRequest) {
       { status: 500 }
     );
   }
-}
-
-/**
- * Flexsaldot för en anställd, räknat på samma sätt som i tidrapporten.
- *
- * Går via payroll.ts och inte via en egen räkning. Skärmen och kontoret måste
- * visa samma tal — ett saldo som skiljer sig mellan verkstaden och lönelistan
- * är en diskussion ingen vinner.
- */
-async function flexFor(
-  companyId: string,
-  employeeId: string
-): Promise<number | null> {
-  const company = await unsafeGlobalPrisma.company.findUnique({
-    where: { id: companyId },
-    select: { timezone: true },
-  });
-
-  return currentFlexMinutes(
-    forCompany(companyId),
-    company?.timezone ?? "Europe/Stockholm",
-    employeeId
-  );
 }

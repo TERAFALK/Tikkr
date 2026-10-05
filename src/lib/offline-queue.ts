@@ -102,15 +102,6 @@ export interface FlushResult {
   /** Tryck servern avvisade permanent. De ligger inte kvar och försöks om. */
   rejected: { punch: QueuedPunch; reason: string }[];
   /**
-   * Flexsaldot servern räknade fram, i minuter, för den sist skickade
-   * utstämplingen för dagen.
-   *
-   * Följer med här och inte via ett eget anrop, eftersom skärmen ofta är
-   * offline när trycket görs: saldot finns först när trycket når fram, och då
-   * är det ändå det här svaret som kommer.
-   */
-  flexMinutes?: { employeeId: string; minutes: number } | null;
-  /**
    * true när servern inte känner igen skärmen (401). Kön ligger kvar och
    * skickas när skärmen kopplats på nytt — till samma företag hittar trycken
    * rätt, till ett annat avvisas de som okända anställda.
@@ -170,7 +161,6 @@ export function flush(): Promise<FlushResult> {
     const queue = await pending();
     const rejected: FlushResult["rejected"] = [];
     let sent = 0;
-    let flexMinutes: FlushResult["flexMinutes"] = null;
 
     for (const punch of queue) {
       let response: Response;
@@ -193,29 +183,12 @@ export function flush(): Promise<FlushResult> {
       } catch {
         // Ingen kontakt, eller för långsamt svar. Avbryt — resten ligger kvar
         // orörd och skickas om vid nästa försök.
-        return { sent, waiting: queue.length - sent, rejected, flexMinutes };
+        return { sent, waiting: queue.length - sent, rejected };
       }
 
       if (response.ok) {
         await remove(punch.clientPunchId);
         sent++;
-
-        // Saldot följer med utstämplingen för dagen. Ett trasigt svar får
-        // aldrig fälla tömningen — trycket ÄR levererat, och det är det
-        // viktiga.
-        if (punch.action === "out-all") {
-          try {
-            const data = (await response.json()) as { flexMinutes?: number | null };
-            if (typeof data.flexMinutes === "number") {
-              flexMinutes = {
-                employeeId: punch.employeeId,
-                minutes: data.flexMinutes,
-              };
-            }
-          } catch {
-            // Inget saldo att visa. Utstämplingen gick ändå igenom.
-          }
-        }
 
         continue;
       }
@@ -237,7 +210,6 @@ export function flush(): Promise<FlushResult> {
           sent,
           waiting: queue.length - sent,
           rejected,
-          flexMinutes,
           unpaired: response.status === 401,
         };
       }
@@ -246,7 +218,7 @@ export function flush(): Promise<FlushResult> {
       rejected.push({ punch, reason: data.error });
     }
 
-    return { sent, waiting: 0, rejected, flexMinutes };
+    return { sent, waiting: 0, rejected };
   })().finally(() => {
     flushing = null;
   });

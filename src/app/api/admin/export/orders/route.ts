@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { requireAdmin } from "@/lib/admin-session";
+import { lockedExportResponse } from "@/lib/export-access";
 import { unsafeGlobalPrisma } from "@/lib/db";
 import { getOrderExports, slugify } from "@/lib/order-export";
 import { getOrderCalcs } from "@/lib/order-calc";
@@ -51,8 +52,13 @@ function disposition(inline: boolean, fileName: string): string {
 }
 
 export async function GET(request: NextRequest) {
-  const { db, companyId, companyName } = await requireAdmin();
+  const session = await requireAdmin();
+  const { db, companyId, companyName } = session;
   const params = request.nextUrl.searchParams;
+
+  // Låst prenumeration: inga underlag, se export-access.ts.
+  const locked = await lockedExportResponse(session);
+  if (locked) return locked;
 
   // BARA PDF (ändrat 2026-10-01). Underlaget och efterkalkylen fanns också
   // som Excel-filer. Kunden använde dem inte: dokumenten är gjorda för att

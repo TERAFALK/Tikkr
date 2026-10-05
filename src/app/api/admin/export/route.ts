@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import ExcelJS from "exceljs";
 import { requireAdmin } from "@/lib/admin-session";
+import { lockedExportResponse } from "@/lib/export-access";
 import { buildReport, type ReportGroup } from "@/lib/report";
 import { formatDate, formatDuration, toDecimalHours } from "@/lib/format";
 import { unsafeGlobalPrisma } from "@/lib/db";
@@ -34,8 +35,13 @@ async function timeZoneOf(companyId: string): Promise<string> {
 }
 
 export async function GET(request: NextRequest) {
-  const { db, companyId, companyName } = await requireAdmin();
+  const session = await requireAdmin();
+  const { db, companyId, companyName } = session;
   const params = request.nextUrl.searchParams;
+
+  // Låst prenumeration: inga uttag, se export-access.ts.
+  const locked = await lockedExportResponse(session);
+  if (locked) return locked;
 
   // DATUMEN RÄKNAS I FÖRETAGETS TIDSZON, inte i serverns.
   //

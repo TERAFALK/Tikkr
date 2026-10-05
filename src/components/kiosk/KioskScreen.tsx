@@ -407,9 +407,6 @@ export default function KioskScreen({
     setBreaks(breaksByEmployee);
   }, [breaksByEmployee]);
 
-  // Flexsaldot efter dagens sista utstämpling. Visas en kort stund som kvitto.
-  const [flexMinutes, setFlexMinutes] = useState<number | null>(null);
-
   // Senaste jobb hämtas bara vid omladdning av sidan, inte i femsekunders-
   // pollningen. Det ändras ju först när någon stämplar ut, och den skärm som
   // gjorde det uppdaterar sin egen bild direkt nedan. Att en annan skärm visar
@@ -589,23 +586,9 @@ export default function KioskScreen({
       );
     }
 
-    // Flexsaldot efter dagens sista utstämpling. Kommer med svaret på trycket
-    // och visas som ett eget kvitto — tid, aldrig kronor.
-    if (result.flexMinutes) setFlexMinutes(result.flexMinutes.minutes);
-
     // Hämtar serverns bild, så att optimistiska gissningar rättas.
     if (result.sent > 0) router.refresh();
   }, [router, setQueueLength]);
-
-  // Saldot står kvar några sekunder och försvinner sedan av sig själv. Ingen
-  // ska behöva trycka bort det, och nästa person vid skärmen ska inte se
-  // föregående persons siffra.
-  useEffect(() => {
-    if (flexMinutes === null) return;
-
-    const timer = setTimeout(() => setFlexMinutes(null), 6000);
-    return () => clearTimeout(timer);
-  }, [flexMinutes]);
 
   /**
    * Registrerar ett tryck.
@@ -1123,16 +1106,6 @@ export default function KioskScreen({
         {receipt && (
           <Toast tone="ok" visible={receiptVisible}>
             {receipt}
-          </Toast>
-        )}
-
-        {/* Flexsaldot efter dagens sista utstämpling.
-            TID, aldrig kronor: kiosken visar inga belopp, och vad en person
-            kostar företaget hör inte på en skärm i verkstaden. Ett saldo är
-            personens egen arbetstid och är något annat. */}
-        {flexMinutes !== null && (
-          <Toast tone="ok" visible>
-            Flexsaldo {formatSignedDuration(flexMinutes)}
           </Toast>
         )}
 
