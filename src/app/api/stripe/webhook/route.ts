@@ -16,6 +16,19 @@ import { unsafeGlobalPrisma } from "@/lib/db";
  * Anropet kommer från internet och måste därför bevisas komma från Stripe.
  * Signaturen räknas på den råa texten i anropet — därför läses den som text
  * och inte som JSON. Tolkas den först stämmer inte signaturen längre.
+ *
+ * BESKEDET ÄR EN SIGNAL, INTE SANNINGEN (ändrat 2026-10-05).
+ *
+ * Stripe lovar varken ordning eller att ett besked bara kommer en gång. Förr
+ * lästes status och rader ur själva beskedet, och då kunde ett gammalt
+ * "updated" som kom sist skriva över ett nyare läge. Värst var `invoice.paid`,
+ * som satte ACTIVE utan att titta på prenumerationen: en slutfaktura som
+ * betalades efter en uppsägning öppnade en avslutad kund igen.
+ *
+ * Nu hämtas prenumerationen från Stripe vid varje besked, och det är DEN som
+ * skrivs. Ordningen spelar då ingen roll — det sista beskedet läser alltid det
+ * senaste läget — och ett besked som kommer två gånger skriver samma sak två
+ * gånger.
  */
 
 export const runtime = "nodejs";
@@ -73,12 +86,12 @@ async function handle(event: Stripe.Event) {
         data: {
           stripeCustomerId:
             typeof session.customer === "string" ? session.customer : undefined,
-          stripeSubscriptionId:
-            typeof session.subscription === "string"
-              ? session.subscription
-              : undefined,
         },
       });
+
+      if (typeof session.subscription === "string") {
+        await syncSubscription(companyId, session.subscription);
+      }
       return;
     }
 
@@ -89,80 +102,25 @@ async function handle(event: Stripe.Event) {
       const companyId = await findCompanyId(subscription);
       if (!companyId) return;
 
-      const status = toSubscriptionStatus(subscription.status);
-
-      // Antalet betalda platser är antalet licenser. Stripe är sanningen —
-      // ändrar kunden kvantiteten där, i kassan eller i kundportalen, följer
-      // vår siffra med.
-      //
-      // RADEN SLÅS UPP PÅ PRIS-ID OCH INTE PÅ PLATS. Sedan tillvalen finns
-      // kan prenumerationen ha flera rader, och `items.data[0]` kunde lika
-      // gärna vara löneunderlaget — kvantitet 1. Då hade en kund med tre
-      // skärmar tyst blivit en.
-      const item = screenItemOf(await priceBook(), subscription);
-      const quantity = item?.quantity;
-      const interval = item?.price?.recurring?.interval ?? null;
-
-      await unsafeGlobalPrisma.company.update({
-        where: { id: companyId },
-        data: {
-          subscriptionStatus: status,
-          subscriptionInterval:
-            event.type === "customer.subscription.deleted" ? null : interval,
-          ...(event.type !== "customer.subscription.deleted" &&
-            quantity && { screenLicenses: quantity }),
-          stripeSubscriptionId:
-            event.type === "customer.subscription.deleted"
-              ? null
-              : subscription.id,
-
-          // Klockan för respiten startar när betalningen först uteblev, och
-          // nollställs så fort den går igenom. Utan nollställningen skulle en
-          // kund som betalat sent låsas ute nästa gång direkt.
-          pastDueSince:
-            status === "PAST_DUE" ? await pastDueStart(companyId) : null,
-        },
-      });
-
-      // Tillvalen följer prenumerationens rader.
-      //
-      // En AVSLUTAD prenumeration är ett eget fall: Stripe skickar med
-      // raderna även i det beskedet, så en vanlig synkning hade behållit
-      // modulerna som om kunden fortfarande betalade. Här tas de bort.
-      //
-      // Kundens scheman, raster, frånvaro och komprader ligger orörda kvar
-      // och står där igen om kunden kommer tillbaka. Se CLAUDE.md § 3.1.
-      if (event.type === "customer.subscription.deleted") {
-        await clearModules(companyId);
-      } else {
-        await syncModulesFromSubscription(companyId, subscription);
-      }
-
+      await syncSubscription(companyId, subscription.id);
       return;
     }
 
-    case "invoice.paid": {
-      const companyId = await findCompanyIdByCustomer(event.data.object.customer);
-      if (!companyId) return;
-
-      await unsafeGlobalPrisma.company.update({
-        where: { id: companyId },
-        data: { subscriptionStatus: "ACTIVE", pastDueSince: null },
-      });
-      return;
-    }
-
+    case "invoice.paid":
     case "invoice.payment_failed": {
-      const companyId = await findCompanyIdByCustomer(event.data.object.customer);
+      const invoice = event.data.object;
+      const subscriptionId = subscriptionIdOf(invoice);
+
+      // En faktura utan prenumeration är en engångsfaktura. Den säger
+      // ingenting om vad kunden har tillgång till.
+      if (!subscriptionId) return;
+
+      const companyId =
+        (await findCompanyIdBySubscription(subscriptionId)) ??
+        (await findCompanyIdByCustomer(invoice.customer));
       if (!companyId) return;
 
-      await unsafeGlobalPrisma.company.update({
-        where: { id: companyId },
-        data: {
-          subscriptionStatus: "PAST_DUE",
-          pastDueSince: await pastDueStart(companyId),
-        },
-      });
+      await syncSubscription(companyId, subscriptionId);
       return;
     }
 
@@ -171,6 +129,93 @@ async function handle(event: Stripe.Event) {
       // dem gör att de inte köar upp och skickas om i evighet.
       return;
   }
+}
+
+/** Skriver prenumerationens läge, så som Stripe har det just nu. */
+async function syncSubscription(
+  companyId: string,
+  subscriptionId: string
+): Promise<void> {
+  const subscription = await stripe().subscriptions.retrieve(subscriptionId);
+
+  const company = await unsafeGlobalPrisma.company.findUnique({
+    where: { id: companyId },
+    select: { stripeSubscriptionId: true },
+  });
+  if (!company) return;
+
+  // EN ANNAN PRENUMERATION GÄLLER REDAN. Ett besked om en äldre — en kund som
+  // sagt upp och köpt på nytt — får inte skriva över den nya.
+  if (
+    company.stripeSubscriptionId &&
+    company.stripeSubscriptionId !== subscription.id
+  ) {
+    return;
+  }
+
+  const status = toSubscriptionStatus(subscription.status);
+
+  // Avslutad på riktigt, inte pausad. Då släpps kopplingen helt, så att en
+  // ny prenumeration kan ta dess plats.
+  const ended =
+    subscription.status === "canceled" ||
+    subscription.status === "incomplete_expired";
+
+  // Antalet betalda platser är antalet licenser. Raden slås upp på pris-id och
+  // inte på plats: med tillvalen kan items.data[0] lika gärna vara
+  // löneunderlaget, kvantitet 1, och då hade en kund med tre skärmar tyst
+  // blivit en.
+  const item = screenItemOf(await priceBook(), subscription);
+  const quantity = item?.quantity;
+  const interval = item?.price?.recurring?.interval ?? null;
+
+  await unsafeGlobalPrisma.company.update({
+    where: { id: companyId },
+    data: {
+      subscriptionStatus: status,
+      subscriptionInterval: ended ? null : interval,
+      ...(!ended && quantity && { screenLicenses: quantity }),
+      stripeSubscriptionId: ended ? null : subscription.id,
+
+      // Klockan för respiten startar när betalningen först uteblev, och
+      // nollställs så fort den går igenom. Utan nollställningen skulle en
+      // kund som betalat sent låsas ute nästa gång direkt.
+      pastDueSince:
+        status === "PAST_DUE" ? await pastDueStart(companyId) : null,
+    },
+  });
+
+  // Tillvalen följer prenumerationens rader. En avslutad prenumeration har
+  // kvar sina rader hos Stripe, så där tas modulerna bort uttryckligen.
+  //
+  // Kundens scheman, raster, frånvaro och komprader ligger orörda kvar och
+  // står där igen om kunden kommer tillbaka. Se CLAUDE.md § 3.1.
+  if (ended) {
+    await clearModules(companyId);
+  } else {
+    await syncModulesFromSubscription(companyId, subscription);
+  }
+}
+
+/**
+ * Prenumerationen en faktura hör till.
+ *
+ * Fältet har flyttat mellan versioner av Stripes API: `subscription` direkt på
+ * fakturan i äldre, under `parent.subscription_details` i nyare. Båda läses,
+ * så att en uppgradering av biblioteket inte tyst gör varje faktura till en
+ * engångsfaktura.
+ */
+function subscriptionIdOf(invoice: Stripe.Invoice): string | null {
+  const shaped = invoice as unknown as {
+    subscription?: string | { id: string } | null;
+    parent?: { subscription_details?: { subscription?: string | null } | null } | null;
+  };
+
+  const legacy = shaped.subscription;
+  if (typeof legacy === "string") return legacy;
+  if (legacy && typeof legacy === "object") return legacy.id;
+
+  return shaped.parent?.subscription_details?.subscription ?? null;
 }
 
 /**
@@ -198,13 +243,21 @@ async function findCompanyId(
   const fromMetadata = subscription.metadata?.companyId;
   if (fromMetadata) return fromMetadata;
 
-  const bySubscription = await unsafeGlobalPrisma.company.findUnique({
-    where: { stripeSubscriptionId: subscription.id },
+  return (
+    (await findCompanyIdBySubscription(subscription.id)) ??
+    findCompanyIdByCustomer(subscription.customer)
+  );
+}
+
+async function findCompanyIdBySubscription(
+  subscriptionId: string
+): Promise<string | null> {
+  const company = await unsafeGlobalPrisma.company.findUnique({
+    where: { stripeSubscriptionId: subscriptionId },
     select: { id: true },
   });
-  if (bySubscription) return bySubscription.id;
 
-  return findCompanyIdByCustomer(subscription.customer);
+  return company?.id ?? null;
 }
 
 async function findCompanyIdByCustomer(
