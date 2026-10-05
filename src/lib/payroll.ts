@@ -179,7 +179,10 @@ export async function buildPayrollPeriod(
         employeeId,
         clockInAt: { gte: from, lt: periodEnd },
       },
-      orderBy: { clockInAt: "asc" },
+      // Id:t som andra sortering. Postgres lovar ingenting om ordningen
+      // mellan rader som är lika, och två poster som stämplats in på samma
+      // minut bytte därför plats mellan två sidvisningar.
+      orderBy: [{ clockInAt: "asc" }, { id: "asc" }],
       select: {
         id: true,
         clockInAt: true,
@@ -464,7 +467,7 @@ async function balanceStart(
 
   const first = await db.timeEntry.findFirst({
     where: { employeeId: employee.id },
-    orderBy: { clockInAt: "asc" },
+    orderBy: [{ clockInAt: "asc" }, { id: "asc" }],
     select: { clockInAt: true },
   });
 

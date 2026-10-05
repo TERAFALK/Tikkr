@@ -122,7 +122,7 @@ export async function getOrderExports(
         // Improduktiv tid kan aldrig ha en order, men filtret sager vad
         // fragan handlar om och kostar ingenting.
         where: { kind: "ORDER" },
-        orderBy: { clockInAt: "asc" },
+        orderBy: [{ clockInAt: "asc" }, { id: "asc" }],
         select: {
           clockInAt: true,
           clockOutAt: true,

@@ -67,8 +67,36 @@ describe("sidojobb räknas inte", () => {
     expect(mainMinutes([span(8, 12), span(8, 12), span(8, 12)])).toBe(240);
   });
 
-  it("två jobb som startar i exakt samma ögonblick ger ett", () => {
-    expect(mainMinutes([span(8, 12), span(8, 16)])).toBe(240);
+  it("två jobb som startar samtidigt: det längsta räknas", () => {
+    // Ingetdera startade medan det andra pågick, så båda är huvudjobb. Då
+    // avgör längden: personen var på plats till 16, inte till 12.
+    //
+    // Svarade 240 till 2026-10-05, alltså det pass som råkade stå först i
+    // listan. Se nästa test för varför det inte dög.
+    expect(mainMinutes([span(8, 12), span(8, 16)])).toBe(480);
+  });
+
+  /**
+   * SAMMA PASS I EN ANNAN ORDNING SKA GE SAMMA SVAR.
+   *
+   * Passen kommer ur en databasfråga som sorterar på `clock_in_at` och
+   * ingenting mer. Postgres lovar ingenting om ordningen mellan rader som är
+   * lika, så två identiska frågor kan ge dem i olika följd — och gjorde det:
+   * samma vecka visade 6:51 ena gången och 3:23 den andra.
+   */
+  it("ordningen i listan ändrar inte svaret", () => {
+    const a = span(8, 12);
+    const b = span(8, 16);
+    const c = span(8, 14);
+
+    const svar = [
+      mainMinutes([a, b, c]),
+      mainMinutes([c, a, b]),
+      mainMinutes([b, c, a]),
+      mainMinutes([c, b, a]),
+    ];
+
+    expect(new Set(svar)).toEqual(new Set([480]));
   });
 
   it("ett jobb som börjar medan ett SIDOJOBB pågår är också ett sidojobb", () => {

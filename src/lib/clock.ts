@@ -581,7 +581,7 @@ export async function openEntriesOnOrder(
     // kind uttryckligen, fastän en improduktiv post aldrig kan ha en order.
     // Filtret säger vad frågan handlar om, och kostar ingenting.
     where: { orderId, kind: "ORDER", clockOutAt: null },
-    orderBy: { clockInAt: "asc" },
+    orderBy: [{ clockInAt: "asc" }, { id: "asc" }],
     select: {
       id: true,
       clockInAt: true,

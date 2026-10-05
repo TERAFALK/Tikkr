@@ -45,7 +45,7 @@ export default async function OverviewPage() {
   const [working, todaysEntries, needsReview, openOrders] = await Promise.all([
     db.timeEntry.findMany({
       where: { clockOutAt: null },
-      orderBy: { clockInAt: "asc" },
+      orderBy: [{ clockInAt: "asc" }, { id: "asc" }],
       select: {
         id: true,
         employeeId: true,

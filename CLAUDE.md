@@ -342,6 +342,22 @@ stripe_prices    — item, month_price_id, year_price_id, updated_by_email
    **Arbetad tid är HUVUDSTÄMPLINGEN** (`mainMinutes` i `spans.ts`), aldrig
    råsumman. Det är här de två underlagen skiljer sig, se avgränsningen överst.
 
+   **Två jobb som startar i exakt samma ögonblick: det LÄNGSTA räknas**
+   (ändrat 2026-10-05). Ingetdera startade medan det andra pågick, så båda är
+   huvudjobb, och då avgör längden.
+
+   Sorteringen tog tidigare bara hänsyn till starttiden, och vid lika tid
+   avgjorde den ordning passen råkade komma i. Den kommer ur en databasfråga
+   som sorterar på `clock_in_at` och ingenting mer, och Postgres lovar
+   ingenting om rader som är lika — samma vecka visade därför 6:51 ena gången
+   och 3:23 den andra, utan att något ändrats. Ett tal som hoppar är värre än
+   ett tal som är lågt.
+
+   Att det längsta vinner är inte godtyckligt: 08:00–12:00 och 08:00–16:00
+   betyder att personen var på plats till 16, och fyra timmar hade dragits
+   från hens flexsaldo. Tiden EFTER ett huvudjobb räknas fortfarande inte,
+   även om ett sidojobb fortsätter — det är avsiktligt och oförändrat.
+
    Den räknas i HELA MINUTER (tillagt 2026-10-01). En stämpling bär sekunder,
    eftersom den sätts när någon trycker, och det syns ingenstans utom i
    saldot: det lagras som hela minuter och läses tillbaka, så en justering gick

@@ -44,6 +44,26 @@ export interface Span {
  * fortfarande pågick räknats som ett nytt huvudjobb, fastän personen redan
  * stod vid en maskin.
  *
+ * ── LIKA STARTTID AVGÖRS AV LÄNGDEN ──────────────────────────────────────
+ *
+ * Två jobb som börjar i exakt samma ögonblick är båda huvudjobb: ingetdera
+ * startade medan det andra pågick. Då räknas det LÄNGSTA, och det andra blir
+ * sidojobbet.
+ *
+ * Sorteringen tog till 2026-10-05 bara hänsyn till starttiden, och vid lika
+ * tid avgjorde ordningen passen råkade komma i. Den ordningen kommer ur en
+ * databasfråga som bara sorterar på `clock_in_at`, och Postgres lovar
+ * ingenting om rader som är lika — samma vecka kunde därför visa 6:51 ena
+ * gången och 3:23 den andra, utan att något ändrats. Ett tal som hoppar är
+ * värre än ett tal som är lågt: det går inte att lita på något av dem.
+ *
+ * Att det längsta vinner och inte det kortaste är inte godtyckligt. Två jobb
+ * 08:00–12:00 och 08:00–16:00 betyder att personen var på plats till 16, och
+ * ett svar på fyra timmar hade dragit fyra timmar från hens flexsaldo.
+ *
+ * Tiden EFTER ett huvudjobb räknas fortfarande inte, även om ett sidojobb
+ * fortsätter. Det är avsiktligt och oförändrat, se ovan.
+ *
  * ── VARFÖR HELA MINUTER ──────────────────────────────────────────────────
  *
  * En stämpling bär sekunder, eftersom den sätts när någon trycker. Summan blir
@@ -64,9 +84,11 @@ export interface Span {
  * fakturerats ska inte ändras av att löneunderlaget räknar jämna minuter.
  */
 export function mainMinutes(spans: Span[]): number {
+  // SORTERINGEN MÅSTE VARA TOTAL. Lika starttid avgörs av längden, längst
+  // först. Se kommentaren ovanför om varför.
   const sorted = spans
     .filter((span) => span.to > span.from)
-    .sort((a, b) => a.from - b.from);
+    .sort((a, b) => a.from - b.from || b.to - a.to);
 
   let total = 0;
   let busyUntil = -Infinity;
