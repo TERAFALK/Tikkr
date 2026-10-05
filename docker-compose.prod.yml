@@ -1,0 +1,45 @@
+# Tillägg för produktionsservern: Caddy framför appen.
+#
+# Används TILLSAMMANS med docker-compose.yml, aldrig ensam:
+#
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+#
+# Labbet kör bara docker-compose.yml, bakom Nginx Proxy Manager.
+#
+# Caddy kopplas till samma nät som appen redan sitter på i labbet (npm_proxy).
+# Namnet är labbets, men nätet gör samma sak här: det är vägen in till appen,
+# och databasen ligger inte på det. Skapa det en gång på en ny server:
+#
+#   docker network create npm_proxy
+
+services:
+  caddy:
+    image: caddy:2-alpine
+    container_name: tikkr-caddy
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    environment:
+      ACME_EMAIL: ${ACME_EMAIL:?ACME_EMAIL saknas i .env}
+      PLATFORM_ALLOWED_IPS: ${PLATFORM_ALLOWED_IPS:?PLATFORM_ALLOWED_IPS saknas i .env}
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      # Certifikaten. Försvinner de begärs nya, och Let's Encrypt har tak för
+      # hur ofta det får ske.
+      - caddy_data:/data
+      - caddy_config:/config
+    networks:
+      - npm_proxy
+    depends_on:
+      - app
+
+volumes:
+  caddy_data:
+  caddy_config:

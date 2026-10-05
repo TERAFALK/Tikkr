@@ -23,6 +23,45 @@ const nextConfig: NextConfig = {
   outputFileTracingIncludes: {
     "/api/admin/export/orders/route": ["./node_modules/pdfkit/js/data/**"],
   },
+
+  /**
+   * SÄKERHETSHEADERS PÅ VARJE SVAR.
+   *
+   * Sätts i appen och inte i proxyn, så att de följer med oavsett om Tikkr
+   * står bakom Nginx Proxy Manager i labbet eller Caddy i produktion.
+   *
+   *   X-Frame-Options       Ingen annan sajt får rama in panelen och lura
+   *                         någon att klicka på "Anonymisera" genom en
+   *                         genomskinlig ruta. SAMEORIGIN och inte DENY:
+   *                         utskriftsknappen laddar underlaget i en egen ram.
+   *   nosniff               En uppladdad bild tolkas som bild, aldrig som
+   *                         skript.
+   *   Referrer-Policy       En återställningslänk bär sin token i adressen.
+   *                         Den ska inte följa med till en annan sajt.
+   *   Permissions-Policy    Tikkr använder varken kamera, mikrofon eller
+   *                         position, och ingen inbäddad kod ska kunna be om
+   *                         dem.
+   *   HSTS                  Webbläsaren använder bara HTTPS mot adressen ett
+   *                         år framåt. Ignoreras över vanlig http, alltså
+   *                         ofarlig i labbet.
+   */
+  async headers() {
+    return [
+      {
+        source: "/:path*",
+        headers: [
+          { key: "X-Frame-Options", value: "SAMEORIGIN" },
+          { key: "X-Content-Type-Options", value: "nosniff" },
+          { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+          {
+            key: "Permissions-Policy",
+            value: "camera=(), microphone=(), geolocation=()",
+          },
+          { key: "Strict-Transport-Security", value: "max-age=31536000" },
+        ],
+      },
+    ];
+  },
 };
 
 export default nextConfig;
