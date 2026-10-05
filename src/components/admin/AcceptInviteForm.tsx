@@ -32,6 +32,14 @@ export default function AcceptInviteForm({
         <Input value={email} readOnly disabled />
       </Field>
 
+      <Field label="Ditt namn" hint="Valfritt">
+        <Input name="name" autoComplete="name" autoFocus />
+      </Field>
+
+      <Field label="Telefonnummer" hint="Valfritt. T.ex. 070-123 45 67">
+        <Input name="phone" type="tel" autoComplete="tel" />
+      </Field>
+
       <Field label="Välj ett lösenord" hint="Minst 10 tecken">
         <Input
           name="password"
@@ -39,7 +47,6 @@ export default function AcceptInviteForm({
           autoComplete="new-password"
           minLength={10}
           required
-          autoFocus
         />
       </Field>
 

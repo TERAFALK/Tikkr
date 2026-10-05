@@ -677,6 +677,23 @@ model AdminUser {
   createdAt    DateTime  @default(now()) @map("created_at")
   updatedAt    DateTime  @updatedAt @map("updated_at")
 
+  /// Personens namn. Krävs av den som registrerar en arbetsyta, frivilligt för
+  /// den som bjuds in.
+  name String?
+
+  /// Telefonnummer, normaliserat till E.164 ("+46701234567"). Se phone.ts.
+  ///
+  /// Ligger på PERSONEN och inte på företaget (bestämt 2026-10-05). Numret är
+  /// en uppgift om en människa: det ska försvinna när kontot tas bort, gå att
+  /// ändra av personen själv, och följa med när ägarrollen flyttas. Ett fält på
+  /// Company hade blivit inaktuellt och legat kvar när personen slutat.
+  ///
+  /// Krävs av den som registrerar en arbetsyta. Används av oss för att nå
+  /// kunden om kontot, driften och betalningen, och visas på kundkortet i
+  /// plattformspanelen. Visas inte för andra administratörer, inte på
+  /// stämplingsskärmen och inte i något underlag.
+  phone String?
+
   /// När lösenordet senast byttes.
   ///
   /// Sessioner som skapats före den tidpunkten avvisas. Utan det fältet skulle

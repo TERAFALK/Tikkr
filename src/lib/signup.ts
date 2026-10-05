@@ -2,6 +2,7 @@ import bcrypt from "bcryptjs";
 import { DEFAULT_ABSENCE_REASONS } from "./absence";
 import { unsafeGlobalPrisma } from "./db";
 import { trialEndDate } from "./subscription";
+import { normalizePhone } from "./phone";
 
 /**
  * REGISTRERING AV NYTT FÖRETAG.
@@ -26,7 +27,17 @@ const MIN_PASSWORD_LENGTH = 10;
 
 export interface SignupInput {
   companyName: string;
+  /** Den som registrerar, och därmed blir ägare. */
+  ownerName: string;
   email: string;
+  /**
+   * Ägarens telefonnummer, i vilken form som helst. Sparas normaliserat.
+   *
+   * Krävs (bestämt 2026-10-05): det är så vi når kunden när något rör kontot,
+   * driften eller betalningen, och så support kan känna igen en ägare som
+   * blivit utelåst. Se AdminUser.phone i schemat.
+   */
+  phone: string;
   password: string;
 }
 
@@ -45,12 +56,20 @@ export function validateSignup(input: SignupInput): string | null {
     return "Ange företagets namn.";
   }
 
+  if (input.ownerName.trim().length < 2) {
+    return "Ange ditt namn.";
+  }
+
   const email = normalizeEmail(input.email);
   // Avsiktligt enkel kontroll. Den enda som med säkerhet avgör om en adress
   // fungerar är ett utskickat mejl — resten är gissningar som mest råkar
   // stänga ute ovanliga men giltiga adresser.
   if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) {
     return "Kontrollera e-postadressen.";
+  }
+
+  if (!normalizePhone(input.phone)) {
+    return "Kontrollera telefonnumret.";
   }
 
   if (input.password.length < MIN_PASSWORD_LENGTH) {
@@ -93,6 +112,9 @@ export async function createCompanyWithOwner(input: SignupInput) {
       data: {
         companyId: company.id,
         email,
+        name: input.ownerName.trim(),
+        // Kontrollerat av validateSignup ovan, så null förekommer inte här.
+        phone: normalizePhone(input.phone),
         passwordHash: await bcrypt.hash(input.password, 12),
         role: "OWNER",
       },

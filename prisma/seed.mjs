@@ -388,6 +388,10 @@ async function main() {
     create: {
       companyId: demo.id,
       email: adminEmail,
+      // Påhittat namn och ett nummer i den serie PTS reserverat för
+      // exempel och fiktion, så att ingen riktig person kan bli uppringd.
+      name: "Demo Ägare",
+      phone: "+46701740605",
       passwordHash: await bcrypt.hash("tikkr123", 12),
       role: "OWNER",
     },

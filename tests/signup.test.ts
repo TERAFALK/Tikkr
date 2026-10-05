@@ -24,7 +24,9 @@ async function signup(overrides: Partial<Parameters<typeof createCompanyWithOwne
   const unique = Math.random().toString(36).slice(2, 10);
   const result = await createCompanyWithOwner({
     companyName: `Testbolag ${unique}`,
+    ownerName: "Agneta Ägare",
     email: `agare-${unique}@example.com`,
+    phone: "070-123 45 67",
     password: "ett-langt-losenord",
     ...overrides,
   });
@@ -42,9 +44,20 @@ afterEach(async () => {
 describe("kontroll av uppgifter", () => {
   const base = {
     companyName: "Mekaniska AB",
+    ownerName: "Agneta Ägare",
     email: "chef@mekaniska.se",
+    phone: "070-123 45 67",
     password: "ett-langt-losenord",
   };
+
+  it("kräver ägarens namn", () => {
+    expect(validateSignup({ ...base, ownerName: " " })).toBeTruthy();
+  });
+
+  it("kräver ett telefonnummer som går att tolka", () => {
+    expect(validateSignup({ ...base, phone: "" })).toBeTruthy();
+    expect(validateSignup({ ...base, phone: "070-12" })).toBeTruthy();
+  });
 
   it("godkänner rimliga uppgifter", () => {
     expect(validateSignup(base)).toBeNull();
@@ -177,5 +190,27 @@ describe("den nya arbetsytan är tom och isolerad", () => {
 
     expect(utan.extras.some((step) => step.key === "schedule")).toBe(false);
     expect(med.extras.some((step) => step.key === "schedule")).toBe(true);
+  });
+});
+
+describe("ägarens kontaktuppgifter", () => {
+  it("namn och telefon sparas på ägaren, telefonen normaliserad", async () => {
+    const { owner } = await signup({
+      ownerName: "  Agneta Ägare ",
+      phone: "070-123 45 67",
+    });
+
+    const saved = await unsafeGlobalPrisma.adminUser.findUniqueOrThrow({
+      where: { id: owner.id },
+      select: { name: true, phone: true, role: true },
+    });
+
+    expect(saved.name).toBe("Agneta Ägare");
+    expect(saved.phone).toBe("+46701234567");
+    expect(saved.role).toBe("OWNER");
+  });
+
+  it("ett nummer som inte går att tolka stoppar registreringen", async () => {
+    await expect(signup({ phone: "ring mig" })).rejects.toThrow(SignupError);
   });
 });

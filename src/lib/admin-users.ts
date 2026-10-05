@@ -4,6 +4,7 @@ import { unsafeGlobalPrisma } from "./db";
 import { forCompany, type CompanyDb } from "./tenant";
 import { normalizeEmail } from "./signup";
 import { recordAudit } from "./audit";
+import { normalizePhone } from "./phone";
 
 /**
  * FLERA ADMINISTRATÖRER PER FÖRETAG.
@@ -130,11 +131,26 @@ export async function findInvite(token: string): Promise<PendingInvite | null> {
  * Inbjudan markeras som använd i samma transaktion som kontot skapas, så att
  * samma länk inte kan ge två konton om den öppnas i två flikar.
  */
-export async function acceptInvite(token: string, password: string) {
+export async function acceptInvite(
+  token: string,
+  password: string,
+  profile: { name?: string; phone?: string } = {}
+) {
   if (password.length < MIN_PASSWORD_LENGTH) {
     throw new AdminUserError(
       `Lösenordet måste vara minst ${MIN_PASSWORD_LENGTH} tecken.`
     );
+  }
+
+  // Namn och telefon är frivilliga för den som bjuds in. Ägaren som
+  // registrerade arbetsytan har redan lämnat sina, och det är dem vi ringer.
+  // Skrivs ett nummer ändå ska det gå att använda.
+  const name = profile.name?.trim() || null;
+  const rawPhone = profile.phone?.trim() ?? "";
+  const phone = rawPhone ? normalizePhone(rawPhone) : null;
+
+  if (rawPhone && !phone) {
+    throw new AdminUserError("Kontrollera telefonnumret.");
   }
 
   const invite = await unsafeGlobalPrisma.adminInvite.findUnique({
@@ -164,6 +180,8 @@ export async function acceptInvite(token: string, password: string) {
       data: {
         companyId: invite.companyId,
         email: invite.email,
+        name,
+        phone,
         passwordHash,
         role: invite.role,
       },
@@ -259,7 +277,7 @@ export async function listAdmins(db: CompanyDb) {
   const [users, invites] = await Promise.all([
     db.adminUser.findMany({
       orderBy: [{ role: "asc" }, { email: "asc" }],
-      select: { id: true, email: true, role: true, createdAt: true },
+      select: { id: true, email: true, name: true, role: true, createdAt: true },
     }),
     db.adminInvite.findMany({
       where: { acceptedAt: null, expiresAt: { gt: new Date() } },

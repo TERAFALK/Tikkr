@@ -42,6 +42,7 @@ import {
 import { startSupport, updateNote } from "./actions";
 import { unsafeGlobalPrisma } from "@/lib/db";
 import { getModulePricing, getScreenPricing } from "@/lib/stripe";
+import { formatPhone } from "@/lib/phone";
 
 export const dynamic = "force-dynamic";
 
@@ -82,6 +83,13 @@ export default async function CompanyPage({
   } = detail;
 
   const managedByStripe = Boolean(company.stripeSubscriptionId);
+
+  // Den som ringer först när något rör kontot: ägaren som registrerade
+  // arbetsytan, alltså den äldsta. Listan är sorterad på roll och e-post, inte
+  // på ålder, så den letas fram här.
+  const owner = admins
+    .filter((admin) => admin.role === "OWNER")
+    .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime())[0];
 
   const monthlyRevenue = monthlyRevenueFor(
     company,
@@ -155,6 +163,38 @@ export default async function CompanyPage({
             />
           </div>
         </Section>
+
+        {owner && (
+          <Section title="Kontaktperson">
+            <Card>
+              <div className="px-5 py-2">
+                <Facts>
+                  <Fact label="Ägare">{owner.name ?? "Saknas"}</Fact>
+                  <Fact label="Telefon">
+                    {owner.phone ? (
+                      <a
+                        href={`tel:${owner.phone}`}
+                        className="font-medium text-tick-deep hover:underline"
+                      >
+                        {formatPhone(owner.phone)}
+                      </a>
+                    ) : (
+                      "Saknas"
+                    )}
+                  </Fact>
+                  <Fact label="E-postadress">
+                    <a
+                      href={`mailto:${owner.email}`}
+                      className="font-medium text-tick-deep hover:underline"
+                    >
+                      {owner.email}
+                    </a>
+                  </Fact>
+                </Facts>
+              </div>
+            </Card>
+          </Section>
+        )}
 
         <Section title="Avtal">
           <div className="grid gap-4 lg:grid-cols-2">
@@ -260,7 +300,8 @@ export default async function CompanyPage({
               <Table>
                 <thead>
                   <tr>
-                    <Th>E-postadress</Th>
+                    <Th>Namn och e-post</Th>
+                    <Th>Telefon</Th>
                     <Th>Behörighet</Th>
                     <Th>Upplagd</Th>
                   </tr>
@@ -269,12 +310,27 @@ export default async function CompanyPage({
                   {admins.map((admin) => (
                     <Tr key={admin.id}>
                       <Td>
+                        {admin.name && (
+                          <span className="block font-medium">{admin.name}</span>
+                        )}
                         <a
                           href={`mailto:${admin.email}`}
-                          className="font-medium text-tick-deep hover:underline"
+                          className="text-tick-deep hover:underline"
                         >
                           {admin.email}
                         </a>
+                      </Td>
+                      <Td muted>
+                        {admin.phone ? (
+                          <a
+                            href={`tel:${admin.phone}`}
+                            className="hover:underline"
+                          >
+                            {formatPhone(admin.phone)}
+                          </a>
+                        ) : (
+                          "—"
+                        )}
                       </Td>
                       <Td muted>
                         {admin.role === "OWNER" ? "Ägare" : "Administratör"}

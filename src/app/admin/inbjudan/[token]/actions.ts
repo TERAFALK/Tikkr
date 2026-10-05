@@ -23,7 +23,10 @@ export async function acceptInvitation(
   let email: string;
 
   try {
-    const user = await acceptInvite(token, password);
+    const user = await acceptInvite(token, password, {
+      name: String(formData.get("name") ?? ""),
+      phone: String(formData.get("phone") ?? ""),
+    });
     email = user.email;
   } catch (error) {
     if (error instanceof AdminUserError) return { error: error.message };

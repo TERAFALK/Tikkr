@@ -16,8 +16,16 @@ export default function SignupForm() {
         <Input name="companyName" required autoFocus placeholder="Mekaniska AB" />
       </Field>
 
+      <Field label="Ditt namn">
+        <Input name="ownerName" autoComplete="name" required />
+      </Field>
+
       <Field label="E-postadress" hint="Används för inloggning">
         <Input name="email" type="email" autoComplete="username" required />
+      </Field>
+
+      <Field label="Telefonnummer" hint="T.ex. 070-123 45 67">
+        <Input name="phone" type="tel" autoComplete="tel" required />
       </Field>
 
       <Field label="Lösenord" hint="Minst 10 tecken">

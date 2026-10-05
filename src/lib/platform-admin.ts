@@ -287,7 +287,17 @@ export async function getCompanyDetail(companyId: string) {
       unsafeGlobalPrisma.adminUser.findMany({
         where: { companyId },
         orderBy: [{ role: "asc" }, { email: "asc" }],
-        select: { id: true, email: true, role: true, createdAt: true },
+        // Namn och telefon är kontaktuppgifter till kunden, inte
+        // verksamhetsinnehåll. Det är dem man behöver när något rör kontot
+        // eller betalningen, och därför de enda personuppgifterna här.
+        select: {
+          id: true,
+          email: true,
+          name: true,
+          phone: true,
+          role: true,
+          createdAt: true,
+        },
       }),
       unsafeGlobalPrisma.kioskDevice.findMany({
         where: { companyId },

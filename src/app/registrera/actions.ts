@@ -13,7 +13,9 @@ export async function register(
   formData: FormData
 ): Promise<SignupState> {
   const companyName = String(formData.get("companyName") ?? "");
+  const ownerName = String(formData.get("ownerName") ?? "");
   const email = String(formData.get("email") ?? "");
+  const phone = String(formData.get("phone") ?? "");
   const password = String(formData.get("password") ?? "");
   const repeat = String(formData.get("repeat") ?? "");
 
@@ -22,7 +24,13 @@ export async function register(
   }
 
   try {
-    await createCompanyWithOwner({ companyName, email, password });
+    await createCompanyWithOwner({
+      companyName,
+      ownerName,
+      email,
+      phone,
+      password,
+    });
   } catch (error) {
     // SignupError bär ett meddelande skrivet för att läsas av en människa.
     if (error instanceof SignupError) return { error: error.message };

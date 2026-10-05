@@ -2,6 +2,8 @@
 
 import { revalidatePath } from "next/cache";
 import { resolveAppUrl } from "@/lib/app-url";
+import { normalizePhone } from "@/lib/phone";
+import { saved, type SaveState } from "@/lib/save-state";
 import { assertWritable, requireAdmin } from "@/lib/admin-session";
 import {
   AdminUserError,
@@ -119,4 +121,41 @@ export async function cancelInvite(formData: FormData) {
   });
 
   revalidatePath(PATH);
+}
+
+/**
+ * Ändrar namn och telefonnummer på det EGNA kontot.
+ *
+ * Bara det egna: uppgifterna är personens, och ingen annan administratör ska
+ * kunna skriva in ett nummer åt någon. Id:t tas därför ur sessionen och aldrig
+ * ur formuläret.
+ *
+ * En ägare kan inte tömma sitt nummer. Det är så vi når arbetsytan när något
+ * rör kontot eller betalningen, och en ägare utan nummer går inte att ringa.
+ */
+export async function saveOwnProfile(
+  _previous: SaveState,
+  formData: FormData
+): Promise<SaveState> {
+  const session = await requireAdmin();
+  await assertWritable(session);
+
+  const name = String(formData.get("name") ?? "").trim();
+  const rawPhone = String(formData.get("phone") ?? "").trim();
+  const phone = rawPhone ? normalizePhone(rawPhone) : null;
+
+  if (rawPhone && !phone) return { error: "Kontrollera telefonnumret." };
+
+  if (session.role === "OWNER") {
+    if (name.length < 2) return { error: "Ange ditt namn." };
+    if (!phone) return { error: "Ange ett telefonnummer." };
+  }
+
+  await session.db.adminUser.updateMany({
+    where: { id: session.userId },
+    data: { name: name || null, phone },
+  });
+
+  revalidatePath(PATH);
+  return saved("Uppgifterna är sparade");
 }
