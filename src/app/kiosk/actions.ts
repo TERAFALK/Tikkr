@@ -1,7 +1,8 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { cookies, headers } from "next/headers";
+import { cookies } from "next/headers";
+import { requestIp } from "@/lib/client-ip";
 import {
   KIOSK_COOKIE,
   getKioskSession,
@@ -23,10 +24,20 @@ import {
  * skärm till någon annans företag.
  *
  * Bromsen är därför inte en artighet utan det som gör kortkoden försvarbar. Den
- * räknas per avsändare, med samma spärr som inloggningarna använder: fem försök,
- * sedan femton minuters låsning.
+ * har två lager:
+ *
+ *   1. Per avsändare: fem försök, sedan femton minuters låsning. Adressen tas
+ *      ur det vår proxy skrev, inte ur det klienten påstår — se client-ip.ts.
+ *   2. För hela installationen: koderna är gemensamma för alla kunder, så den
+ *      som gissar från tusen adresser gissar mot samma miljon. Ett tak på
+ *      misslyckade försök totalt gör att även det tar slut. Riktiga
+ *      kopplingar sker några gånger i veckan och märker inget av det; under
+ *      ett angrepp får admin vänta en kvart, vilket är rätt pris.
  */
 const THROTTLE_SCOPE = "kiosk-pairing";
+const GLOBAL_SCOPE = "kiosk-pairing-global";
+const GLOBAL_KEY = "*";
+const GLOBAL_MAX_FAILURES = 100;
 
 export interface PairingState {
   error?: string;
@@ -34,25 +45,17 @@ export interface PairingState {
   pairedAs?: string;
 }
 
-/** Avsändarens adress, så gott den går att avgöra bakom en proxy. */
-async function callerKey(): Promise<string> {
-  const headerList = await headers();
-
-  return (
-    headerList.get("x-forwarded-for")?.split(",")[0]?.trim() ??
-    headerList.get("x-real-ip") ??
-    "okänd"
-  );
-}
-
 export async function pairDevice(
   _previous: PairingState,
   formData: FormData
 ): Promise<PairingState> {
   const code = String(formData.get("code") ?? "").replace(/\D/g, "");
-  const key = await callerKey();
+  const key = (await requestIp()) ?? "okänd";
 
-  if (isLockedOut(THROTTLE_SCOPE, key)) {
+  if (
+    isLockedOut(THROTTLE_SCOPE, key) ||
+    isLockedOut(GLOBAL_SCOPE, GLOBAL_KEY, GLOBAL_MAX_FAILURES)
+  ) {
     return {
       error:
         "För många försök. Vänta femton minuter, eller be administratören om en ny kod.",
@@ -67,6 +70,7 @@ export async function pairDevice(
 
   if (!result) {
     noteFailedLogin(THROTTLE_SCOPE, key);
+    noteFailedLogin(GLOBAL_SCOPE, GLOBAL_KEY);
 
     // Medvetet knapphändigt. Ett svar som skiljer på "fel kod" och "utgången
     // kod" berättar för den som gissar att den var nära.

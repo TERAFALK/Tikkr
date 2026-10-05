@@ -1,7 +1,7 @@
 "use server";
 
-import { headers } from "next/headers";
 import { redirect } from "next/navigation";
+import { appUrl } from "@/lib/app-url";
 import { assertWritable, requireAdmin } from "@/lib/admin-session";
 import { revalidatePath } from "next/cache";
 import {
@@ -20,16 +20,14 @@ import { isModuleKey, moduleName } from "@/lib/modules";
 import { unsafeGlobalPrisma } from "@/lib/db";
 
 /**
- * Adressen byggs ur anropet istället för att gissas, så att Stripe skickar
- * tillbaka kunden dit den faktiskt kom ifrån — labbadress, portal.tikkr.se
- * eller något annat.
+ * Dit Stripe skickar tillbaka kunden efter kassan och kundportalen.
+ *
+ * Ur inställningen och inte ur anropet. Byggdes den ur `x-forwarded-host` gick
+ * det att få Stripes egen sida att skicka en betalande kund vidare till en
+ * annan värd — en trovärdig väg in för nätfiske. Se app-url.ts.
  */
 async function baseUrl(): Promise<string> {
-  const headerList = await headers();
-  const host =
-    headerList.get("x-forwarded-host") ?? headerList.get("host") ?? "";
-  const proto = headerList.get("x-forwarded-proto") ?? "https";
-  return `${proto}://${host}`;
+  return appUrl();
 }
 
 /**

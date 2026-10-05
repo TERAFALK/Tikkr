@@ -28,6 +28,16 @@ const LOCKOUT_MS = 15 * 60 * 1000;
 export const LOCKED_OUT_MESSAGE =
   "För många misslyckade försök. Försök igen om femton minuter.";
 
+/**
+ * Högsta antalet nycklar räknaren håller.
+ *
+ * Nycklarna kommer utifrån — en e-postadress, en IP — och den som skickar en
+ * ny för varje anrop fyller annars minnet tills processen dör. Vid taket rensas
+ * först det som löpt ut, sedan de äldsta. Att glömma en gammal räkning ger en
+ * gissare ett par försök till; att krascha ger alla kunder ett avbrott.
+ */
+const MAX_KEYS = 10_000;
+
 const attempts = new Map<string, { count: number; until: number }>();
 
 function key(scope: string, email: string): string {
@@ -40,8 +50,16 @@ function key(scope: string, email: string): string {
  * `scope` skiljer kundinloggningen från plattformsinloggningen, så att
  * misslyckade försök på den ena aldrig låser den andra. Samma person kan ha
  * konto på båda hållen.
+ *
+ * `maxAttempts` behövs för räknare som gäller fler än en person, som det
+ * gemensamma taket för kopplingskoder. Fem är rätt för ett konto men inte för
+ * en hel installation.
  */
-export function isLockedOut(scope: string, email: string): boolean {
+export function isLockedOut(
+  scope: string,
+  email: string,
+  maxAttempts: number = MAX_ATTEMPTS
+): boolean {
   const record = attempts.get(key(scope, email));
   if (!record) return false;
 
@@ -50,7 +68,7 @@ export function isLockedOut(scope: string, email: string): boolean {
     return false;
   }
 
-  return record.count >= MAX_ATTEMPTS;
+  return record.count >= maxAttempts;
 }
 
 /** Räknar upp ett misslyckat försök och förlänger låsningen. */
@@ -61,7 +79,25 @@ export function noteFailedLogin(scope: string, email: string): void {
   record.count += 1;
   record.until = Date.now() + LOCKOUT_MS;
 
+  // Tas bort och läggs in igen, så att kartans ordning blir "senast rörd sist"
+  // och rensningen nedan tar de äldsta först.
+  attempts.delete(id);
   attempts.set(id, record);
+
+  if (attempts.size > MAX_KEYS) prune();
+}
+
+function prune(): void {
+  const now = Date.now();
+
+  for (const [id, record] of attempts) {
+    if (record.until < now) attempts.delete(id);
+  }
+
+  for (const id of attempts.keys()) {
+    if (attempts.size <= MAX_KEYS) break;
+    attempts.delete(id);
+  }
 }
 
 /** Nollställer efter en lyckad inloggning. */

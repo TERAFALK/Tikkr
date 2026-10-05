@@ -11,6 +11,7 @@ import { hasModule } from "@/lib/company-modules";
 import { forCompany } from "@/lib/tenant";
 import { unsafeGlobalPrisma } from "@/lib/db";
 import { readPunchTime } from "@/lib/punch-time";
+import { clientIpFrom } from "@/lib/client-ip";
 
 // Tar emot en stämpling från kioskskärmen.
 //
@@ -71,7 +72,8 @@ export async function POST(request: NextRequest) {
 
   const context = {
     kioskDeviceId: session.deviceId,
-    sourceIp: clientIp(request),
+    // Det vår proxy skrev, inte det skärmen påstår. Se client-ip.ts.
+    sourceIp: clientIpFrom(request.headers),
     clientPunchId: body.clientPunchId,
     ...time,
     fromOfflineQueue: body.queued === true,
@@ -222,18 +224,6 @@ export async function POST(request: NextRequest) {
       { status: 500 }
     );
   }
-}
-
-/**
- * Vilken IP trycket kom ifrån, för audit-loggen.
- *
- * Bakom en reverse proxy är den direkta avsändaren proxyn själv. Den riktiga
- * adressen står i X-Forwarded-For, där första värdet är klienten.
- */
-function clientIp(request: NextRequest): string | undefined {
-  const forwarded = request.headers.get("x-forwarded-for");
-  if (forwarded) return forwarded.split(",")[0]?.trim();
-  return request.headers.get("x-real-ip") ?? undefined;
 }
 
 /**

@@ -1,6 +1,7 @@
 "use server";
 
-import { headers } from "next/headers";
+import { appUrl } from "@/lib/app-url";
+import { requestIp } from "@/lib/client-ip";
 import { requestPasswordReset } from "@/lib/password-reset";
 
 export interface ForgotPasswordState {
@@ -26,19 +27,14 @@ export async function requestReset(
     return { error: "Ange e-postadressen till ditt konto." };
   }
 
-  const headerList = await headers();
-  const host =
-    headerList.get("x-forwarded-host") ?? headerList.get("host") ?? "";
-  const proto = headerList.get("x-forwarded-proto") ?? "https";
-
   try {
     await requestPasswordReset({
       email,
-      baseUrl: `${proto}://${host}`,
+      // ALDRIG ur anropet. Länken går i ett äkta mejl från oss, och en värd
+      // som besökaren fick välja vore en väg att stjäla den. Se app-url.ts.
+      baseUrl: appUrl(),
       // Sparas på begäran, så att ett ifrågasatt lösenordsbyte går att reda ut.
-      ip:
-        headerList.get("x-forwarded-for")?.split(",")[0]?.trim() ??
-        headerList.get("x-real-ip"),
+      ip: await requestIp(),
     });
   } catch (error) {
     // Ett fel här är vårt, inte besökarens. Det loggas, men kvittensen ändras

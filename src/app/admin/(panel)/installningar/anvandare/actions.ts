@@ -1,7 +1,7 @@
 "use server";
 
-import { headers } from "next/headers";
 import { revalidatePath } from "next/cache";
+import { resolveAppUrl } from "@/lib/app-url";
 import { assertWritable, requireAdmin } from "@/lib/admin-session";
 import {
   AdminUserError,
@@ -50,20 +50,23 @@ export async function createInvite(
     // Mejlet är den vanliga vägen. Länken visas ändå i panelen — går utskicket
     // inte fram ska inbjudan inte vara omöjlig att slutföra, och den som bjuder
     // in ska kunna skicka den på annat sätt.
-    const headerList = await headers();
-    const host =
-      headerList.get("x-forwarded-host") ?? headerList.get("host") ?? "";
-    const proto = headerList.get("x-forwarded-proto") ?? "https";
+    //
+    // Adressen i mejlet kommer ur inställningen och aldrig ur anropet, se
+    // app-url.ts. Saknas inställningen skickas inget mejl; länken i panelen
+    // fungerar ändå.
+    const base = resolveAppUrl(process.env);
 
-    const result = await sendEmail(
-      adminInviteEmail({
-        to: invite.email,
-        link: `${proto}://${host}/admin/inbjudan/${invite.token}`,
-        companyName: session.companyName,
-        invitedByEmail: session.email,
-        daysValid: INVITE_DAYS,
-      })
-    );
+    const result = base
+      ? await sendEmail(
+          adminInviteEmail({
+            to: invite.email,
+            link: `${base}/admin/inbjudan/${invite.token}`,
+            companyName: session.companyName,
+            invitedByEmail: session.email,
+            daysValid: INVITE_DAYS,
+          })
+        )
+      : { delivered: false, provider: "none", problem: "APP_URL saknas i .env." };
 
     if (!result.delivered && result.provider !== "log") {
       console.error(
@@ -72,8 +75,8 @@ export async function createInvite(
       );
     }
 
-    // Adressen byggs inte här — serveråtgärder ser inte vilken adress
-    // besökaren använder. Sidan sätter ihop den fullständiga länken.
+    // Sökvägen och inte hela adressen. Sidan sätter ihop länken med samma
+    // inställning som mejlet använder.
     return {
       link: `/admin/inbjudan/${invite.token}`,
       email: invite.email,

@@ -1,5 +1,5 @@
-import { headers } from "next/headers";
 import { requireAdmin } from "@/lib/admin-session";
+import { resolveAppUrl } from "@/lib/app-url";
 import { listAdmins } from "@/lib/admin-users";
 import InviteAdminForm from "@/components/admin/InviteAdminForm";
 import ConfirmButton from "@/components/admin/ConfirmButton";
@@ -24,9 +24,9 @@ export default async function AdminUsersPage() {
 
   const isOwner = session.role === "OWNER";
 
-  const headerList = await headers();
-  const host = headerList.get("x-forwarded-host") ?? headerList.get("host") ?? "";
-  const proto = headerList.get("x-forwarded-proto") ?? "http";
+  // Samma adress som i mejlet, se app-url.ts. Saknas inställningen visas
+  // sökvägen ensam hellre än en länk till en värd anropet hittat på.
+  const baseUrl = resolveAppUrl(process.env) ?? "";
 
   return (
     <div className="space-y-6">
@@ -45,7 +45,7 @@ export default async function AdminUsersPage() {
           <CardHeader
             title="Bjud in en administratör"
           />
-          <InviteAdminForm baseUrl={`${proto}://${host}`} />
+          <InviteAdminForm baseUrl={baseUrl} />
         </Card>
       )}
 

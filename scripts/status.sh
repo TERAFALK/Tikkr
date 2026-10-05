@@ -152,6 +152,17 @@ for VAR in AUTH_SECRET POSTGRES_PASSWORD; do
   fi
 done
 
+# Länkarna i återställnings- och inbjudningsmejl byggs ur APP_URL och aldrig ur
+# anropet. Utan den går inga återställningsmejl ut. Se src/lib/app-url.ts.
+if [ -z "${APP_URL:-}" ] && [ -z "${PORTAL_HOST:-}" ]; then
+  bad "APP_URL saknas i .env — inga återställningsmejl skickas"
+  echo "      echo 'APP_URL=https://www.tikkr.se' >> .env && docker compose up -d"
+elif [ -n "${APP_URL:-}" ] && ! echo "$APP_URL" | grep -q '^https://'; then
+  warn "APP_URL börjar inte med https:// ($APP_URL)"
+else
+  ok "APP_URL är satt"
+fi
+
 # --- Sammanfattning ---------------------------------------------------------
 printf '\n\033[1mSammanfattning:\033[0m %d klara, %d varningar, %d att åtgärda\n\n' \
   "$OK" "$WARN" "$FAIL"

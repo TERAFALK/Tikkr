@@ -83,6 +83,9 @@ services:
       NODE_ENV: production
       AUTH_SECRET: ${AUTH_SECRET:?AUTH_SECRET saknas i .env}
       AUTH_TRUST_HOST: ${AUTH_TRUST_HOST:-true}
+      # Adressen i mejlade länkar och i Stripes återvägar. Utan den skickas
+      # inga återställningsmejl. Se src/lib/app-url.ts.
+      APP_URL: ${APP_URL:-}
       CRON_SECRET: ${CRON_SECRET:-}
       MAIL_PROVIDER: ${MAIL_PROVIDER:-log}
       GRAPH_TENANT_ID: ${GRAPH_TENANT_ID:-}

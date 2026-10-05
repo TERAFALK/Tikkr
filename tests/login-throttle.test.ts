@@ -83,6 +83,34 @@ describe("låsningen släpper", () => {
   });
 });
 
+describe("gemensamma räknare", () => {
+  it("ett eget tak gäller i stället för fem", () => {
+    // Taket för kopplingskoder gäller hela installationen. Fem fel i hela
+    // landet får inte låsa alla kunders skärmkopplingar.
+    failTimes("kiosk-pairing-global", "*", 99);
+    expect(isLockedOut("kiosk-pairing-global", "*", 100)).toBe(false);
+
+    noteFailedLogin("kiosk-pairing-global", "*");
+    expect(isLockedOut("kiosk-pairing-global", "*", 100)).toBe(true);
+  });
+});
+
+describe("minnet har ett tak", () => {
+  it("en ny nyckel per anrop fyller inte minnet, och den senaste räknas", () => {
+    // Nycklarna kommer utifrån. Utan tak kunde den som skickade en ny adress
+    // vid varje anrop fylla minnet tills processen dog.
+    for (let i = 0; i < 10_050; i += 1) {
+      noteFailedLogin("admin", `gissning-${i}@example.com`);
+    }
+
+    failTimes("admin", "chef@mekaniska.se", 5);
+    expect(isLockedOut("admin", "chef@mekaniska.se")).toBe(true);
+
+    // Den äldsta har fått ge plats.
+    expect(isLockedOut("admin", "gissning-0@example.com", 1)).toBe(false);
+  });
+});
+
 describe("panelerna räknas var för sig", () => {
   it("en låst kundinloggning låser inte plattformspanelen", () => {
     // Samma person kan ha konto på båda hållen. Att någon gissar på det ena
