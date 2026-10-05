@@ -1668,3 +1668,73 @@ describe("stämpling med opålitlig klocka", () => {
     expect(started.needsReview).toBe(false);
   });
 });
+
+/**
+ * ÖVERTID EFTER DEN AUTOMATISKA UTSTÄMPLINGEN.
+ *
+ * Klockslaget stänger allt som är öppet, också för den som står kvar vid
+ * maskinen. Förr blev personens egen utstämpling senare ett tryck utan
+ * effekt, och övertiden försvann. Nu förlängs passet till trycket, flaggat.
+ */
+describe("utstämpling efter den automatiska", () => {
+  async function autoStangt() {
+    await clockIn(companyId, {
+      kind: "ORDER",
+      employeeId: anna,
+      orderId: orderA,
+      momentId: svetsning,
+      at: new Date("2026-08-05T04:00:00Z"), // 06:00 i Stockholm
+    });
+
+    // 18:00 i Stockholm är 16:00 UTC på sommaren.
+    const [closed] = await autoCloseForgottenEntries(
+      companyId,
+      new Date("2026-08-05T16:15:00Z")
+    );
+    expect(closed.clockOutAt?.toISOString()).toBe("2026-08-05T16:00:00.000Z");
+    return closed;
+  }
+
+  it("samma kväll förlänger passet till trycket och behåller flaggan", async () => {
+    const closed = await autoStangt();
+
+    const extended = await clockOut(companyId, {
+      employeeId: anna,
+      momentId: svetsning,
+      at: new Date("2026-08-05T18:00:00Z"), // 20:00 i Stockholm
+    });
+
+    expect(extended?.id).toBe(closed.id);
+    expect(extended?.clockOutAt?.toISOString()).toBe("2026-08-05T18:00:00.000Z");
+    expect(extended?.needsReview).toBe(true);
+    expect(extended?.reviewNote).toContain("Utstämplad på skärmen 20:00");
+  });
+
+  it("nästa morgon rör ingenting", async () => {
+    const closed = await autoStangt();
+
+    const result = await clockOut(companyId, {
+      employeeId: anna,
+      momentId: svetsning,
+      at: new Date("2026-08-06T05:00:00Z"),
+    });
+
+    expect(result).toBeNull();
+    const saved = await unsafeGlobalPrisma.timeEntry.findUniqueOrThrow({
+      where: { id: closed.id },
+    });
+    expect(saved.clockOutAt?.toISOString()).toBe("2026-08-05T16:00:00.000Z");
+  });
+
+  it("ett annat arbetsmoment rör ingenting", async () => {
+    await autoStangt();
+
+    const result = await clockOut(companyId, {
+      employeeId: anna,
+      momentId: montering,
+      at: new Date("2026-08-05T18:00:00Z"),
+    });
+
+    expect(result).toBeNull();
+  });
+});

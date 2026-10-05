@@ -5,7 +5,13 @@ import { nextOccurrenceOf, wallTimeIn } from "./time-zone";
 import { companyTimeZone } from "./company";
 import { describeEntry } from "./entry-label";
 import { endOpenBreak } from "./break-close";
-import { recordAudit, SYSTEM_ACTOR, timeEntrySnapshot } from "./audit";
+import {
+  KIOSK_ACTOR,
+  recordAudit,
+  SYSTEM_ACTOR,
+  timeEntrySnapshot,
+} from "./audit";
+import { formatTime } from "./format";
 
 /**
  * STÄMPLINGSLOGIKEN.
@@ -494,7 +500,11 @@ export async function clockOut(
   }
 
   const open = await getOpenEntries(db, input.employeeId);
-  if (open.length === 0) return null;
+  if (open.length === 0) {
+    return input.momentId || input.indirectMomentId
+      ? extendAutoClosed(companyId, input, at)
+      : null;
+  }
 
   let target: TimeEntry;
   let ambiguous = false;
@@ -507,8 +517,10 @@ export async function clockOut(
         ? entry.momentId === input.momentId
         : entry.indirectMomentId === input.indirectMomentId
     );
-    // Redan utstämplad från just det jobbet. Ingen effekt, inget fel.
-    if (!onJob) return null;
+    // Redan utstämplad från just det jobbet. Antingen av personen själv —
+    // då ingen effekt och inget fel — eller av den automatiska
+    // utstämplingen medan personen fortfarande jobbade. Se extendAutoClosed.
+    if (!onJob) return extendAutoClosed(companyId, input, at);
     target = onJob;
   } else {
     target = open[0];
@@ -574,6 +586,119 @@ export async function clockOut(
   // skrivningen noll rader hann någon annan före, och då är det den andres
   // sluttid som gäller — inte vår.
   return db.timeEntry.findUnique({ where: { id: target.id } });
+}
+
+/**
+ * Hur länge efter den automatiska utstämplingen en utstämpling på skärmen
+ * fortfarande räknas som samma pass.
+ *
+ * Sex timmar täcker en kväll med övertid efter klockslaget. Längre än så är
+ * det inte längre övertid utan en glömd utstämpling från igår, och den som
+ * trycker "ut" på morgonen ska inte få nattens timmar tillagda.
+ */
+export const OVERTIME_WINDOW_MS = 6 * 60 * 60 * 1000;
+
+/**
+ * ÖVERTID EFTER DEN AUTOMATISKA UTSTÄMPLINGEN (beslutat 2026-10-05).
+ *
+ * Den automatiska utstämplingen stänger allt som är öppet vid företagets
+ * klockslag, också för den som fortfarande står vid maskinen. Förr blev
+ * personens egen utstämpling två timmar senare ett tryck utan effekt, och
+ * övertiden försvann ur både fakturan och flexen.
+ *
+ * Nu förlängs det automatiskt stängda passet till trycket — om det gäller
+ * samma jobb, kommer inom sex timmar och ingenting har startats på maskinen
+ * sedan dess. Posten förblir flaggad: systemet vet att personen tryckte, men
+ * inte att hen arbetade hela tiden däremellan. Den bedömningen gör den som
+ * granskar.
+ */
+async function extendAutoClosed(
+  companyId: string,
+  input: PunchContext & {
+    employeeId: string;
+    momentId?: string;
+    indirectMomentId?: string;
+  },
+  at: Date
+): Promise<TimeEntry | null> {
+  const db = forCompany(companyId);
+
+  const job = input.momentId
+    ? { momentId: input.momentId }
+    : { indirectMomentId: input.indirectMomentId };
+
+  const candidate = await db.timeEntry.findFirst({
+    where: {
+      employeeId: input.employeeId,
+      ...job,
+      source: "AUTO_CLOSE",
+      needsReview: true,
+      clockOutAt: {
+        lte: at,
+        gte: new Date(at.getTime() - OVERTIME_WINDOW_MS),
+      },
+    },
+    orderBy: { clockOutAt: "desc" },
+  });
+
+  if (!candidate) return null;
+
+  // Har något startats på samma maskin efter passet gäller trycket inte det.
+  const later = await db.timeEntry.findFirst({
+    where: {
+      employeeId: input.employeeId,
+      ...job,
+      clockInAt: { gt: candidate.clockInAt },
+      id: { not: candidate.id },
+    },
+    select: { id: true },
+  });
+  if (later) return null;
+
+  // Ett pass längre än ett dygn är inte övertid. Samma gräns som för tid
+  // som skrivs in för hand.
+  if (at.getTime() - candidate.clockInAt.getTime() > 24 * 60 * 60 * 1000) {
+    return null;
+  }
+
+  const timeZone = await companyTimeZone(companyId);
+  const note = [
+    candidate.reviewNote,
+    `Utstämplad på skärmen ${formatTime(at, timeZone)}. Tiden efter den ` +
+      `automatiska utstämplingen är tillagd. Kontrollera innan fakturering.`,
+  ]
+    .filter(Boolean)
+    .join(" ");
+
+  return db.$transaction(async (tx) => {
+    // Villkoret på sluttiden gör att två tryck som kommer samtidigt inte
+    // båda förlänger: den andra hittar ingen rad.
+    const { count } = await tx.timeEntry.updateMany({
+      where: { id: candidate.id, clockOutAt: candidate.clockOutAt },
+      data: {
+        clockOutAt: at,
+        clockOutPunchId: input.clientPunchId ?? null,
+        reviewNote: note,
+      },
+    });
+
+    if (count === 0) {
+      return tx.timeEntry.findUnique({ where: { id: candidate.id } });
+    }
+
+    await recordAudit(tx, {
+      companyId,
+      actorEmail: KIOSK_ACTOR,
+      entity: "TimeEntry",
+      entityId: candidate.id,
+      action: "update",
+      before: { clockOutAt: candidate.clockOutAt?.toISOString() ?? null },
+      after: { clockOutAt: at.toISOString() },
+      subjectEmployeeId: candidate.employeeId,
+    });
+
+    return tx.timeEntry.findUnique({ where: { id: candidate.id } });
+  });
 }
 
 /**

@@ -212,7 +212,12 @@ export async function describeAuditEvents(
     return {
       id: event.id,
       at: formatDateTime(event.createdAt, timeZone),
-      actor: event.actorEmail === "system" ? "Tikkr" : event.actorEmail,
+      actor:
+        event.actorEmail === "system"
+          ? "Tikkr"
+          : event.actorEmail === "kiosk"
+            ? "Stämplingsskärmen"
+            : event.actorEmail,
       what: `${ENTITY_LABELS[event.entity] ?? event.entity}: ${(
         ACTION_LABELS[event.action] ?? event.action
       ).toLowerCase()}`,

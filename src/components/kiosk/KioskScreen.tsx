@@ -125,6 +125,15 @@ export interface KioskRecentJob {
   choice: KioskJobChoice;
 }
 
+/**
+ * Ett jobb den automatiska utstämplingen stängde nyss, medan personen kanske
+ * fortfarande arbetade. Se extendAutoClosed i src/lib/clock.ts.
+ */
+export interface KioskAutoClosedJob extends KioskActiveJob {
+  /** Klockslaget det stängdes, som det står på väggen: "18:00". */
+  closedAt: string;
+}
+
 type ActiveJob = KioskActiveJob;
 
 /**
@@ -231,6 +240,8 @@ interface Props {
   activeByEmployee: Record<string, ActiveJob[]>;
   /** Senast avslutade jobb per anställd. Underlaget för "Fortsätt". */
   recentByEmployee: Record<string, RecentJob>;
+  /** Jobb som stängts automatiskt de senaste timmarna, per anställd. */
+  autoClosedByEmployee: Record<string, KioskAutoClosedJob[]>;
   /** Kunderna ur registret. Underlaget för snabbjobbets kundval. */
   customers: KioskCustomer[];
   /** Frukost, lunch, fika. Tom lista döljer rastknappen helt. */
@@ -349,6 +360,7 @@ export default function KioskScreen({
   moments,
   indirectMoments,
   activeByEmployee,
+  autoClosedByEmployee,
   recentByEmployee,
   customers,
   breakTypes,
@@ -406,6 +418,13 @@ export default function KioskScreen({
     if (waitingRef.current > 0) return;
     setBreaks(breaksByEmployee);
   }, [breaksByEmployee]);
+
+  // Automatiskt stängda jobb. Samma regel om kön som listorna ovan.
+  const [autoClosed, setAutoClosed] = useState(autoClosedByEmployee);
+  useEffect(() => {
+    if (waitingRef.current > 0) return;
+    setAutoClosed(autoClosedByEmployee);
+  }, [autoClosedByEmployee]);
 
   // Senaste jobb hämtas bara vid omladdning av sidan, inte i femsekunders-
   // pollningen. Det ändras ju först när någon stämplar ut, och den skärm som
@@ -917,6 +936,18 @@ export default function KioskScreen({
       // Jobbet hen lämnar blir förslaget nästa gång hen kommer fram.
       rememberRecent(employee.id, job);
 
+      // Ett automatiskt stängt jobb är nu utstämplat på riktigt.
+      setAutoClosed((current) => {
+        const rest = (current[employee.id] ?? []).filter(
+          (entry) => jobKey(entry.choice) !== jobKey(job.choice)
+        );
+
+        const next = { ...current };
+        if (rest.length > 0) next[employee.id] = rest;
+        else delete next[employee.id];
+        return next;
+      });
+
       // Bara det här jobbet tas bort. Att radera personens nyckel hade fått
       // skärmen att visa någon som utstämplad medan maskin två räknar vidare.
       setActive((current) => {
@@ -1142,6 +1173,7 @@ export default function KioskScreen({
             onPick={(employee) =>
               setView(
                 active[employee.id]?.length ||
+                autoClosed[employee.id]?.length ||
                 recent[employee.id] ||
                 breaks[employee.id]
                   ? { name: "action", employee }
@@ -1155,6 +1187,7 @@ export default function KioskScreen({
           <ActionChoice
             employee={view.employee}
             jobs={active[view.employee.id] ?? []}
+            autoClosed={autoClosed[view.employee.id] ?? []}
             recent={recent[view.employee.id]}
             onBreak={breaks[view.employee.id] ?? null}
             hasBreaks={breakTypes.length > 0}
@@ -1767,6 +1800,7 @@ function EmployeeGrid({
 function ActionChoice({
   employee,
   jobs,
+  autoClosed,
   recent,
   onBreak,
   hasBreaks,
@@ -1780,6 +1814,8 @@ function ActionChoice({
 }: {
   employee: Employee;
   jobs: ActiveJob[];
+  /** Jobb den automatiska utstämplingen stängt nyss. */
+  autoClosed: KioskAutoClosedJob[];
   recent?: RecentJob;
   /** Den pågående rasten, eller null. */
   onBreak: KioskBreak | null;
@@ -1839,6 +1875,35 @@ function ActionChoice({
           </div>
         )}
       </div>
+
+      {/* AUTOMATISKT UTSTÄMPLAD, MEN KANSKE KVAR. Den som jobbade över
+          klockslaget ser här att skärmen stängde jobbet, och stämplar ut när
+          hen faktiskt går. Servern förlänger då passet och flaggar det. */}
+      {!onBreak && autoClosed.length > 0 && (
+        <div className="mt-3 space-y-3">
+          {autoClosed.map((job) => (
+            <div
+              key={jobKey(job.choice)}
+              className="flex items-center gap-3 rounded-xl border border-amber-300 bg-amber-50 p-4"
+            >
+              <span className="min-w-0 flex-1">
+                <span className="block truncate text-2xl font-semibold leading-snug text-neutral-900">
+                  {job.label}
+                </span>
+                <span className="mt-1 block text-sm text-amber-900">
+                  Utstämplad automatiskt {job.closedAt}
+                </span>
+              </span>
+              <button
+                onClick={() => onClockOut(job)}
+                className="kiosk-press shrink-0 rounded-xl bg-blue-600 px-6 py-4 text-lg font-semibold text-white active:bg-blue-700"
+              >
+                Stämpla ut nu
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* Flera jobb får varsin rad med egen utstämplingsknapp. En gemensam
           knapp hade tvingat servern att välja vilket som avsågs, och ett

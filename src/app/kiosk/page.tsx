@@ -6,8 +6,11 @@ import { hasModule } from "@/lib/company-modules";
 import { activeNotices } from "@/lib/notices";
 import { pickableCustomers } from "@/lib/quick-order";
 import { describeEntry } from "@/lib/entry-label";
+import { OVERTIME_WINDOW_MS } from "@/lib/clock";
+import { formatTime } from "@/lib/format";
 import type {
   KioskActiveJob,
+  KioskAutoClosedJob,
   KioskJobChoice,
   KioskRecentJob,
 } from "@/components/kiosk/KioskScreen";
@@ -66,6 +69,7 @@ export default async function KioskPage() {
       trialEndsAt: true,
       pastDueSince: true,
       logoSquareMimeType: true,
+      timezone: true,
     },
   });
 
@@ -201,6 +205,29 @@ export default async function KioskPage() {
       : [],
   ]);
 
+  // AUTOMATISKT UTSTÄMPLADE DE SENASTE SEX TIMMARNA.
+  //
+  // Den som stod kvar vid maskinen när klockslaget slog till ser sig själv
+  // som utstämplad. Skärmen erbjuder då "Stämpla ut nu", och servern
+  // förlänger passet till trycket — se extendAutoClosed i clock.ts.
+  const autoClosedEntries = await db.timeEntry.findMany({
+    where: {
+      source: "AUTO_CLOSE",
+      needsReview: true,
+      clockOutAt: { gte: new Date(Date.now() - OVERTIME_WINDOW_MS) },
+    },
+    orderBy: { clockOutAt: "desc" },
+    select: {
+      employeeId: true,
+      clockInAt: true,
+      clockOutAt: true,
+      kind: true,
+      order: { select: { id: true, orderNumber: true } },
+      moment: { select: { id: true, name: true } },
+      indirectMoment: { select: { id: true, name: true } },
+    },
+  });
+
   // Vilka som är på rast. En person på lunch har inga öppna stämplingar och
   // skulle annars se ledig ut.
   const breaksByEmployee: Record<string, { since: string; name: string }> = {};
@@ -225,6 +252,34 @@ export default async function KioskPage() {
       since: entry.clockInAt.toISOString(),
       label: describeEntry(entry).text,
       choice,
+    });
+  }
+
+  // Ett jobb som pågår igen på samma maskin har redan en egen utstämpling,
+  // och då gäller trycket det i stället.
+  const autoClosedByEmployee: Record<string, KioskAutoClosedJob[]> = {};
+
+  for (const entry of autoClosedEntries) {
+    const choice = toJobChoice(entry);
+    if (!choice || !entry.clockOutAt) continue;
+
+    const key = choice.kind === "ORDER" ? choice.moment.id : choice.indirectMoment.id;
+    const running = (activeByEmployee[entry.employeeId] ?? []).some(
+      (job) =>
+        (job.choice.kind === "ORDER"
+          ? job.choice.moment.id
+          : job.choice.indirectMoment.id) === key
+    );
+    if (running) continue;
+
+    (autoClosedByEmployee[entry.employeeId] ??= []).push({
+      since: entry.clockInAt.toISOString(),
+      label: describeEntry(entry).text,
+      choice,
+      closedAt: formatTime(
+        entry.clockOutAt,
+        company?.timezone ?? "Europe/Stockholm"
+      ),
     });
   }
 
@@ -273,6 +328,7 @@ export default async function KioskPage() {
       indirectMoments={indirectMoments}
       activeByEmployee={activeByEmployee}
       recentByEmployee={recentByEmployee}
+      autoClosedByEmployee={autoClosedByEmployee}
       customers={customers}
       breakTypes={breakTypes}
       breaksByEmployee={breaksByEmployee}

@@ -20,6 +20,13 @@ import type { CompanyDb } from "./tenant";
 /** Den som gjorde ändringen när ingen människa gjorde den. */
 export const SYSTEM_ACTOR = "system";
 
+/**
+ * När ändringen kom från ett tryck på stämplingsskärmen. Skärmen vet inte vem
+ * som stod vid den, bara vilken anställd trycket gällde, och den står i
+ * `subjectEmployeeId`.
+ */
+export const KIOSK_ACTOR = "kiosk";
+
 export type AuditEntity =
   | "TimeEntry"
   | "Absence"
