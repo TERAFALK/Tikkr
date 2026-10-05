@@ -36,12 +36,26 @@ fi
 echo "Stoppar appen så att inget skriver under tiden..."
 docker compose stop app
 
-echo "Läser tillbaka..."
-gunzip -c "$FILE" | docker compose exec -T db psql \
-  -U "${POSTGRES_USER:-tikkr}" \
-  -d "${POSTGRES_DB:-tikkr}"
+START="$(date +%s)"
 
-echo "Startar appen igen..."
-docker compose start app
+# Appen startas igen även om återläsningen misslyckas. Databasen är då
+# orörd — se nästa stycke — och kunderna ska inte stå utan system för att
+# en kopia var trasig.
+trap 'echo "Startar appen igen..."; docker compose start app' EXIT
+
+# ON_ERROR_STOP och --single-transaction: allt eller inget. Utan dem fortsatte
+# psql förbi varje fel, och en trasig kopia gav en halvt återläst databas som
+# såg lyckad ut.
+echo "Läser tillbaka..."
+if ! gunzip -c "$FILE" | docker compose exec -T db psql \
+  -v ON_ERROR_STOP=1 --single-transaction --quiet \
+  -U "${POSTGRES_USER:-tikkr}" \
+  -d "${POSTGRES_DB:-tikkr}" >/dev/null; then
+  echo
+  echo "ÅTERLÄSNINGEN MISSLYCKADES. Databasen är oförändrad."
+  exit 1
+fi
+
+echo "Återläst på $(( $(date +%s) - START )) sekunder."
 
 echo "Klart. Kontrollera: curl -s localhost:${APP_PORT:-3000}/api/health"

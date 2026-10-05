@@ -27,10 +27,29 @@ fi
 
 PORT="${APP_PORT:-3000}"
 
+# Övervakningens adress, t.ex. en kontroll hos Healthchecks.io. Valfri.
+#
+# Ett schemajobb som slutar köra märks inte — det är frånvaron av något som
+# ska upptäckas. Tjänsten larmar när pingen uteblir, och när den kommer till
+# /fail. Pingen bär ingenting om kunderna, bara att jobbet gick.
+ping() {
+  [ -n "${CRON_PING_URL:-}" ] || return 0
+  curl -fsS -m 10 --retry 3 -o /dev/null "${CRON_PING_URL}${1:-}" || true
+}
+
 # Anropar appen lokalt på servern, inte via internet. Trafiken lämnar alltså
 # aldrig maskinen.
-RESPONSE="$(curl -sS -X POST \
+#
+# --fail-with-body: ett felsvar från appen (500, 503) ska bli ett misslyckat
+# jobb. Utan flaggan räknade curl allt som kom tillbaka som lyckat, och ett
+# trasigt jobb skrev bara en rad i en logg ingen läser.
+if RESPONSE="$(curl -sS --fail-with-body -m 120 -X POST \
   -H "Authorization: Bearer $CRON_SECRET" \
-  "http://127.0.0.1:${PORT}/api/cron/auto-close")"
-
-echo "[$(date -Is)] $RESPONSE"
+  "http://127.0.0.1:${PORT}/api/cron/auto-close")"; then
+  echo "[$(date -Is)] $RESPONSE"
+  ping
+else
+  echo "[$(date -Is)] MISSLYCKADES: $RESPONSE"
+  ping /fail
+  exit 1
+fi

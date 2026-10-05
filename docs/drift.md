@@ -91,23 +91,53 @@ Prova direkt utan att vänta:
 skyddar mot råkade raderingar, men inte mot att servern dör, blir hackad eller
 krypteras — och det är just då man behöver den.
 
-Installera rclone och koppla en objektlagring. Backblaze B2 är billigast för
-den här mängden data. Observera dock att integritetspolicyn anger att data
-lagras i Sverige — välj ett mål inom EU, helst svenskt, så att även kopiorna
-stämmer med det som utlovats.
+Installera rclone och koppla en objektlagring. Integritetspolicyn anger att
+data lagras i Sverige — välj ett mål inom EU, helst svenskt (t.ex. Glesys
+Object Storage eller Hetzner Storage Box), så att även kopiorna stämmer med
+det som utlovats. Leverantören blir ett underbiträde och ska stå i
+förteckningen.
 
 ```bash
 sudo apt update && sudo apt install -y rclone && rclone config
 ```
 
-`rclone config` ställer frågor. Svara `n` för nytt mål, döp det till `b2`, välj
-Backblaze B2, och klistra in nyckeln du skapat hos leverantören.
+`rclone config` ställer frågor. Gör det **två gånger**:
+
+1. Ett mål för själva lagringen. Döp det till `lagring` och klistra in
+   nyckeln du skapat hos leverantören.
+2. Ett krypterat mål ovanpå. Svara `n`, döp det till `tikkr-krypterad`, välj
+   typen **crypt**, ange `lagring:tikkr-backups` som remote och låt rclone
+   slumpa båda lösenorden.
+
+**Spara de två lösenorden i lösenordshanteraren, utanför servern.** Går
+servern förlorad är de enda vägen in i kopiorna — utan dem är varje backup
+oläsbar, även för dig.
 
 Skriv sedan in målet i `.env`:
 
 ```bash
-echo 'BACKUP_REMOTE=b2:tikkr-backups' >> .env
+echo 'BACKUP_REMOTE=tikkr-krypterad:' >> .env
 ```
+
+Kopior äldre än 30 dagar tas bort även där (`BACKUP_REMOTE_KEEP_DAYS`).
+Integritetspolicyn ska ange samma siffra.
+
+### Larm när jobben tystnar
+
+Skapa två gratiskontroller hos Healthchecks.io: en för backupen (förväntad
+en gång per dygn) och en för den automatiska utstämplingen (var 15:e minut).
+Koppla larm till din telefon. Skriv in adresserna:
+
+```bash
+echo 'BACKUP_PING_URL=https://hc-ping.com/<din-kod>' >> .env
+```
+
+```bash
+echo 'CRON_PING_URL=https://hc-ping.com/<din-andra-kod>' >> .env
+```
+
+Skripten pingar när allt gått bra och skickar `/fail` när något gått fel.
+Uteblir pingen larmar tjänsten — det är så ett jobb som slutat köra upptäcks.
 
 Testa att det fungerar, och schemalägg:
 
@@ -134,7 +164,14 @@ crontab -e
 
 > **Öva återläsning då och då.** En backup ingen provat att läsa tillbaka är
 > bara en förhoppning. `./scripts/restore.sh <fil>` gör det — men den skriver
-> över databasen, så gör det i en testmiljö.
+> över databasen, så gör det i en testmiljö. Skriptet skriver ut hur lång tid
+> det tog; anteckna siffran, den är svaret på "hur länge står vi still".
+>
+> Hämta en kopia från det krypterade målet till labbet och läs tillbaka den:
+>
+> ```bash
+> rclone copy tikkr-krypterad: ./backups --include 'tikkr_*.sql.gz' --max-age 2d
+> ```
 
 ---
 
