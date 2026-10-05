@@ -8,7 +8,7 @@
  */
 
 /** Datumet som visas som "senast uppdaterad" i samtliga dokument. */
-export const LEGAL_UPDATED = "12 augusti 2026";
+export const LEGAL_UPDATED = "5 oktober 2026";
 
 /**
  * Samma dag som raden ovan, i maskinläsbar form. Används av sitemap.
@@ -20,7 +20,7 @@ export const LEGAL_UPDATED = "12 augusti 2026";
  *
  * `tests/seo.test.ts` kontrollerar att dag och år stämmer mellan de två.
  */
-export const LEGAL_UPDATED_AT = new Date("2026-08-12T00:00:00Z");
+export const LEGAL_UPDATED_AT = new Date("2026-10-05T00:00:00Z");
 
 /**
  * Var tjänsten driftas.
@@ -45,9 +45,29 @@ export const HOSTING_LOCATION = "Sverige";
  */
 export const SUBPROCESSOR_NOTICE_DAYS = 30;
 
-/** Bolaget bakom tjänsten. */
+/**
+ * Bolaget bakom tjänsten.
+ *
+ * ORGANISATIONSNUMMER OCH POSTADRESS SKA FYLLAS I FÖRE LANSERING. Den som
+ * säljer en tjänst på nätet ska enligt lagen om elektronisk handel ange dem
+ * på webbplatsen, och "anges på fakturan" räcker inte. Tomma värden döljer
+ * sig själva, så att en halvfylld rad aldrig visas.
+ */
 export const PROVIDER = {
   name: "TERAFALK AB",
   service: "Tikkr",
   support: "support@tikkr.se",
+  orgNumber: "",
+  address: "",
 } as const;
+
+/** "TERAFALK AB, org.nr 556…, Gatan 1, 123 45 Ort" med det som är ifyllt. */
+export function providerLine(): string {
+  return [
+    PROVIDER.name,
+    PROVIDER.orgNumber && `org.nr ${PROVIDER.orgNumber}`,
+    PROVIDER.address,
+  ]
+    .filter(Boolean)
+    .join(", ");
+}

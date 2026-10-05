@@ -82,7 +82,7 @@ const sections: Section[] = [
             {
               term: "Föremål",
               description:
-                "Behandling som krävs för att tillhandahålla tidregistrering per kundorder och arbetsmoment.",
+                "Behandling som krävs för att tillhandahålla tidregistrering per kundorder och arbetsmoment. För den ansvarige som har tillvalet Löneunderlag även behandling som krävs för att ta fram underlag för lön: arbetstidsschema, raster, flex, komptid och frånvaro.",
             },
             {
               term: "Varaktighet",
@@ -102,15 +102,23 @@ const sections: Section[] = [
             {
               term: "Kategorier av uppgifter",
               description:
-                "Namn, frivilligt porträtt samt registrerad arbetstid med tidpunkt, kundorder, arbetsmoment, stämplingsskärm och IP-adress. För administratörer även e-postadress och krypterat lösenord.",
+                "Namn, frivilligt anställningsnummer, frivilligt porträtt, frivillig timkostnad per person samt registrerad arbetstid med tidpunkt, kundorder, arbetsmoment, stämplingsskärm och IP-adress. Med tillvalet Löneunderlag även arbetstidsschema, stämplade raster, flex- och komptidssaldo, frånvaro med orsak och anteckning, samt en personlig kod för att visa saldot, lagrad som envägskryptering. För administratörer namn, e-postadress, telefonnummer och krypterat lösenord.",
             },
           ]}
         />
         <p>
-          Inga särskilda kategorier av personuppgifter enligt artikel 9 behandlas
-          i tjänsten. Systemet saknar fält för hälsouppgifter,
-          fackföreningstillhörighet, frånvaroorsak och liknande, och kan därför
-          inte innehålla sådant vid avsedd användning.
+          Utan tillvalet Löneunderlag behandlas inga särskilda kategorier av
+          personuppgifter enligt artikel 9. Tjänsten saknar då fält för
+          frånvaro och frånvaroorsak.
+        </p>
+        <p>
+          Med tillvalet Löneunderlag registreras frånvaro med orsak, till
+          exempel sjukdom eller vård av barn. Sådana uppgifter kan avslöja
+          uppgifter om hälsa. De registreras bara av den ansvariges
+          administratörer och aldrig på stämplingsskärmen, och varje post bär
+          uppgift om vem som registrerade den. Den ansvarige bestämmer vilka
+          frånvaroorsaker som finns och ansvarar för att det finns stöd för
+          behandlingen.
         </p>
       </>
     ),
@@ -138,12 +146,20 @@ const sections: Section[] = [
     id: "konfidentialitet",
     heading: "Konfidentialitet",
     body: (
-      <p>
-        Biträdet säkerställer att de personer som behandlar uppgifterna har
-        åtagit sig att iaktta konfidentialitet. Åtkomsten begränsas till dem som
-        behöver den för att fullgöra biträdets skyldigheter, och driftpersonal
-        har inte tillgång till innehållet i den ansvariges verksamhetsdata.
-      </p>
+      <>
+        <p>
+          Biträdet säkerställer att de personer som behandlar uppgifterna har
+          åtagit sig att iaktta konfidentialitet. Åtkomsten begränsas till dem
+          som behöver den för att fullgöra biträdets skyldigheter.
+        </p>
+        <p>
+          Biträdets personal tar del av innehållet i den ansvariges data bara
+          när det behövs för att lösa ett ärende, genom ett supportläge som
+          endast tillåter läsning och som upphör efter 30 minuter. Varje sådant
+          besök registreras med vem som gjorde det och när, och förteckningen
+          lämnas till den ansvarige på begäran.
+        </p>
+      </>
     ),
   },
   {
@@ -163,7 +179,8 @@ const sections: Section[] = [
             "Stämplingsskärmar identifieras med långa, slumpmässiga och återkallbara nycklar. Ingen anställd loggar in på skärmen.",
             "Begränsat antal inloggningsförsök, och omedelbart upphörd åtkomst när ett konto tas bort eller ett lösenord ändras.",
             "Loggning av varje registrering med tidpunkt, skärm och IP-adress, samt märkning av manuella ändringar.",
-            "Dagliga säkerhetskopior till annan plats än driftservern.",
+            "Ändringslogg över ändringar av registrerad tid, saldon och frånvaro, med vem som ändrade, när, och värdet före och efter.",
+            "Dagliga, krypterade säkerhetskopior till annan plats än driftservern. Kopiorna sparas i 30 dagar.",
             "Regelbundna säkerhetsuppdateringar av servermiljön.",
           ]}
         />
@@ -183,8 +200,8 @@ const sections: Section[] = [
         <p>
           Den ansvarige lämnar ett allmänt förhandsgodkännande till att biträdet
           anlitar underbiträden. Underbiträden anlitas för drift av servrar, för
-          betalningshantering och för utskick av systemets e-post. Samtliga
-          behandlar uppgifter inom EU eller EES.
+          lagring av säkerhetskopior, för betalningshantering och för utskick av
+          systemets e-post. Samtliga behandlar uppgifter inom EU eller EES.
         </p>
         <p>
           En aktuell förteckning över underbiträden, med namn, ändamål och

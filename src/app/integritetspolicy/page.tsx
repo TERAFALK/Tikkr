@@ -5,7 +5,7 @@ import LegalPage, {
   List,
   type Section,
 } from "@/components/marketing/LegalPage";
-import { HOSTING_LOCATION, LEGAL_UPDATED } from "@/lib/legal";
+import { HOSTING_LOCATION, LEGAL_UPDATED, providerLine } from "@/lib/legal";
 
 /**
  * Byggs om varje minut, likt startsidan.
@@ -72,10 +72,24 @@ const sections: Section[] = [
           <strong className="font-medium text-neutral-900">
             Om en anställd hos kunden
           </strong>{" "}
-          lagras namnet och den tid som registrerats, samt ett porträtt om
-          arbetsgivaren valt att lägga upp ett. Ingenting mer. Systemet har inga
-          fält för personnummer, adress, telefonnummer, anställningsform eller
-          lön, och kan därför inte innehålla sådant.
+          lagras namnet och den tid som registrerats, samt ett
+          anställningsnummer och ett porträtt om arbetsgivaren valt att lägga
+          upp dem. Arbetsgivaren kan också ange vad personens arbetstimme kostar
+          företaget, för att räkna på ordrarna. Den uppgiften visas aldrig på
+          stämplingsskärmen. Systemet har inga fält för personnummer, adress,
+          telefonnummer eller anställningsform.
+        </p>
+        <p>
+          <strong className="font-medium text-neutral-900">
+            Med tillvalet Löneunderlag
+          </strong>{" "}
+          lagras dessutom personens arbetstidsschema, stämplade raster, flex-
+          och komptidssaldo, frånvaro med orsak och anteckning, och en personlig
+          kod som visar saldot på stämplingsskärmen. Frånvaroorsaken kan säga
+          något om hälsa, till exempel sjukdom eller vård av barn. Frånvaro
+          registreras bara av arbetsgivarens administratörer, aldrig på
+          stämplingsskärmen, och varje post visar vem som registrerade den.
+          Koden lagras som envägskryptering och går inte att läsa ut.
         </p>
         <p>
           Porträttet är frivilligt och används enbart för att göra rätt knapp
@@ -102,8 +116,8 @@ const sections: Section[] = [
           <strong className="font-medium text-neutral-900">
             Om en administratör
           </strong>{" "}
-          lagras e-postadress, ett krypterat lösenord och vilken behörighet
-          kontot har. Lösenordet lagras som en envägskryptering och går inte att
+          lagras namn, e-postadress, telefonnummer, ett krypterat lösenord och
+          vilken behörighet kontot har. Lösenordet lagras som en envägskryptering och går inte att
           läsa ut, vare sig av oss eller av någon som skulle komma över
           databasen.
         </p>
@@ -124,8 +138,10 @@ const sections: Section[] = [
       <>
         <p>
           Ändamålet är att kunden ska kunna registrera arbetad tid per kundorder
-          och använda den som underlag för fakturering. Uppgifterna används inte
-          för något annat. De säljs inte, lämnas inte ut för marknadsföring och
+          och använda den som underlag för fakturering. Med tillvalet
+          Löneunderlag är ändamålet också att ta fram underlag för lön: arbetad
+          tid, flex, komptid och frånvaro. Uppgifterna används inte för något
+          annat. De säljs inte, lämnas inte ut för marknadsföring och
           används inte för att träna maskininlärningsmodeller.
         </p>
         <p>
@@ -135,6 +151,12 @@ const sections: Section[] = [
           Kundföretaget ansvarar för att bedöma och dokumentera grunden för sin
           egen behandling, och för att informera sina anställda om att tiden
           registreras.
+        </p>
+        <p>
+          Namn och telefonnummer till den som registrerar en arbetsyta används
+          av TERAFALK AB för att nå personen i frågor om kontot, driften och
+          betalningen. De används inte för marknadsföring. Grunden är avtalet
+          med kundföretaget.
         </p>
       </>
     ),
@@ -149,6 +171,11 @@ const sections: Section[] = [
           prenumerationen raderas kundens data senast 90 dagar därefter, om
           kunden inte dessförinnan begärt att den raderas tidigare eller lämnas
           ut.
+        </p>
+        <p>
+          Säkerhetskopior sparas i 30 dagar och skrivs därefter över. En
+          uppgift som raderats ur tjänsten finns alltså kvar i en
+          säkerhetskopia som längst så länge.
         </p>
         <p>
           Registrerad tid som ingår i ett fakturaunderlag omfattas av
@@ -197,7 +224,13 @@ const sections: Section[] = [
       <>
         <p>
           Tjänsten och databasen driftas på servrar i {HOSTING_LOCATION}, och
-          säkerhetskopiorna förvaras på en annan plats än driftservern.
+          säkerhetskopiorna förvaras krypterade på en annan plats än
+          driftservern.
+        </p>
+        <p>
+          Vår support kan, när ett ärende kräver det, se kundens adminpanel i
+          ett läge som bara tillåter läsning. Varje sådant besök registreras med
+          vem som gjorde det och när.
         </p>
         <p>
           För betalningar och för systemets e-postutskick anlitas
@@ -231,7 +264,8 @@ const sections: Section[] = [
             "Lösenord lagras som envägskryptering och går inte att läsa ut.",
             "Stämplingsskärmar identifieras med en lång, slumpmässig nyckel som kan återkallas när som helst. Ingen anställd loggar in på skärmen.",
             "Antalet inloggningsförsök är begränsat, och ett borttaget administratörskonto förlorar åtkomsten omedelbart.",
-            "Databasen säkerhetskopieras dagligen till en annan plats än servern.",
+            "Ändringar av registrerad tid, saldon och frånvaro loggas med vem som ändrade och värdet före och efter.",
+            "Databasen säkerhetskopieras dagligen, krypterat, till en annan plats än servern.",
           ]}
         />
         <p>
@@ -266,7 +300,7 @@ const sections: Section[] = [
     body: (
       <>
         <p>
-          TERAFALK AB, {" "}
+          {providerLine()},{" "}
           <a
             href="mailto:support@tikkr.se"
             className="font-medium text-tick-deep hover:underline"

@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { pageMetadata } from "@/lib/seo";
 import Link from "next/link";
 import LegalPage, { List, type Section } from "@/components/marketing/LegalPage";
-import { LEGAL_UPDATED } from "@/lib/legal";
+import { LEGAL_UPDATED, providerLine } from "@/lib/legal";
 
 /**
  * Byggs om varje minut, likt startsidan.
@@ -223,9 +223,8 @@ export default function TermsPage() {
       updated={LEGAL_UPDATED}
       intro={
         <p>
-          Villkoren gäller mellan TERAFALK AB, organisationsnummer anges på
-          fakturan, och det företag som använder Tikkr. De accepteras när en
-          arbetsyta skapas.
+          Villkoren gäller mellan {providerLine()} och det företag som använder
+          Tikkr. De accepteras när en arbetsyta skapas.
         </p>
       }
       sections={sections}
