@@ -262,6 +262,50 @@ export function passwordResetEmail(params: {
   });
 }
 
+/**
+ * Bekräftelse av e-postadressen, skickad vid registreringen.
+ *
+ * Ett välkomstmejl och en kontroll i samma utskick. Kommer det inte fram är
+ * adressen fel, och det ska märkas första dagen och inte den dag lösenordet
+ * glömts och återställningen går till fel inkorg.
+ */
+export function emailVerificationEmail(params: {
+  to: string;
+  link: string;
+  companyName: string;
+  daysValid: number;
+}): EmailMessage {
+  const validity = `Länken gäller i ${params.daysValid} dagar.`;
+
+  const unknown =
+    "Har du inte skapat någon arbetsyta i Tikkr kan du bortse från det här " +
+    "mejlet.";
+
+  return compose({
+    to: params.to,
+    subject: "Bekräfta din e-postadress i Tikkr",
+    lines: [
+      `Arbetsytan ${params.companyName} är skapad i Tikkr. Bekräfta att`,
+      "adressen är din genom att öppna länken nedan:",
+      "",
+      params.link,
+      "",
+      validity,
+      "",
+      unknown,
+    ],
+    layout: {
+      preheader: `Bekräfta e-postadressen för ${params.companyName}.`,
+      heading: "Bekräfta din e-postadress",
+      paragraphs: [
+        `Arbetsytan ${escape(params.companyName)} är skapad i Tikkr. Bekräfta att adressen är din.`,
+      ],
+      button: { label: "Bekräfta adressen", href: params.link },
+      afterword: [validity, unknown],
+    },
+  });
+}
+
 /** Inbjudan till en ny administratör. */
 export function adminInviteEmail(params: {
   to: string;

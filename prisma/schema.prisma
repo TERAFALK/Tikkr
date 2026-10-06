@@ -702,8 +702,21 @@ model AdminUser {
   /// kontot.
   passwordChangedAt DateTime? @map("password_changed_at")
 
-  company        Company         @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  passwordResets PasswordReset[]
+  /// När personen loggade ut på alla enheter. Sessioner utfärdade före den
+  /// tidpunkten avvisas, på samma sätt som efter ett lösenordsbyte.
+  ///
+  /// Eget fält och inte passwordChangedAt: att logga ut överallt är inte att
+  /// byta lösenord, och kvittensmejlet om ett nytt lösenord ska inte gå ut för
+  /// något som inte hänt.
+  sessionsRevokedAt DateTime? @map("sessions_revoked_at")
+
+  /// När e-postadressen bekräftades genom länken i välkomstmejlet. Tomt
+  /// betyder obekräftad. Se email-verification.ts.
+  emailVerifiedAt DateTime? @map("email_verified_at")
+
+  company             Company             @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  passwordResets      PasswordReset[]
+  emailVerifications  EmailVerification[]
 
   @@index([companyId])
   @@map("admin_users")
@@ -734,6 +747,32 @@ model PasswordReset {
 
   @@index([userId, usedAt])
   @@map("password_resets")
+}
+
+/// En länk som bekräftar en administratörs e-postadress.
+///
+/// Byggd som PasswordReset: bara fingeravtrycket sparas, den har en utgångstid
+/// och går att lösa in en gång. Skälet att den finns: en adress med ett
+/// stavfel syns inte förrän lösenordet glömts, och då går återställningen till
+/// fel inkorg. Bekräftelsen gör att felet syns första dagen i stället.
+model EmailVerification {
+  id     String @id @default(cuid())
+  userId String @map("user_id")
+
+  tokenHash String @unique @map("token_hash")
+
+  /// Adressen länken gäller. Byts adressen innan länken används ska den
+  /// gamla länken inte bekräfta den nya.
+  email String
+
+  expiresAt DateTime  @map("expires_at")
+  usedAt    DateTime? @map("used_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  user AdminUser @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, usedAt])
+  @@map("email_verifications")
 }
 
 /// Ett konto för den som driver hela Tikkr — inte en kund.

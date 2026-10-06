@@ -12,6 +12,15 @@ export default function SignupForm() {
     <form action={action} className="space-y-4">
       {state.error && <Alert>{state.error}</Alert>}
 
+      {/* Fälla för skript. Dold för människor och för skärmläsare, och
+          utan autoifyllning. Se registrera/actions.ts. */}
+      <div aria-hidden="true" className="absolute -left-[9999px] h-px w-px overflow-hidden">
+        <label>
+          Webbplats
+          <input name="website" tabIndex={-1} autoComplete="off" />
+        </label>
+      </div>
+
       <Field label="Företagets namn">
         <Input name="companyName" required autoFocus placeholder="Mekaniska AB" />
       </Field>

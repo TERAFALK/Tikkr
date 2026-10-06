@@ -391,6 +391,7 @@ async function main() {
       // Påhittat namn och ett nummer i den serie PTS reserverat för
       // exempel och fiktion, så att ingen riktig person kan bli uppringd.
       name: "Demo Ägare",
+      emailVerifiedAt: new Date(),
       phone: "+46701740605",
       passwordHash: await bcrypt.hash("tikkr123", 12),
       role: "OWNER",

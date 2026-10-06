@@ -178,7 +178,8 @@ export async function redeemPasswordReset(
 
     await tx.adminUser.update({
       where: { id: reset.user.id },
-      data: { passwordHash, passwordChangedAt: now },
+      // Länken kom till adressen, alltså fungerar den. Se email-verification.ts.
+      data: { passwordHash, passwordChangedAt: now, emailVerifiedAt: now },
     });
 
     // Övriga väntande länkar för kontot slängs. Bad någon om två i rad ska den

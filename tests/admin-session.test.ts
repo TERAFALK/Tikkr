@@ -200,6 +200,30 @@ describe("lösenordsbyte ogiltigförklarar äldre sessioner", () => {
   });
 });
 
+describe("utloggning på alla enheter", () => {
+  it("session utfärdad före utloggningen nekas", async () => {
+    sessionIssuedAt = Math.floor(Date.now() / 1000) - 3600;
+
+    await unsafeGlobalPrisma.adminUser.update({
+      where: { id: ownerId },
+      data: { sessionsRevokedAt: new Date() },
+    });
+
+    expect(await currentAdmin()).toBeNull();
+  });
+
+  it("ny inloggning efter utloggningen gäller", async () => {
+    await unsafeGlobalPrisma.adminUser.update({
+      where: { id: ownerId },
+      data: { sessionsRevokedAt: new Date(Date.now() - 3600 * 1000) },
+    });
+
+    sessionIssuedAt = Math.floor(Date.now() / 1000);
+
+    expect(await currentAdmin()).not.toBeNull();
+  });
+});
+
 describe("företagsnamnet läses ur databasen", () => {
   it("ett byte syns utan ny inloggning", async () => {
     await unsafeGlobalPrisma.company.update({

@@ -18,12 +18,37 @@ import {
 } from "@/components/ui";
 import { formatPhone } from "@/lib/phone";
 import { formatDate, formatDateTime } from "@/lib/format";
-import { cancelInvite, deleteAdmin, saveOwnProfile } from "./actions";
+import {
+  cancelInvite,
+  changeEmail,
+  changePassword,
+  deleteAdmin,
+  logoutEverywhere,
+  saveOwnProfile,
+} from "./actions";
+
+/** Beskedet efter "Skicka igen" i remsan. Se resendVerification. */
+const RESEND_MESSAGES: Record<string, { tone: "info" | "warning"; text: string }> = {
+  sent: { tone: "info", text: "En ny länk är skickad." },
+  cooldown: {
+    tone: "info",
+    text: "En länk skickades nyss. Vänta ett par minuter innan du begär en till.",
+  },
+  failed: {
+    tone: "warning",
+    text: "Länken kunde inte skickas. Försök igen senare, eller kontakta support@tikkr.se.",
+  },
+};
 
 export const dynamic = "force-dynamic";
 
-export default async function AdminUsersPage() {
+export default async function AdminUsersPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ bekraftelse?: string }>;
+}) {
   const session = await requireAdmin();
+  const resend = RESEND_MESSAGES[(await searchParams).bekraftelse ?? ""];
   const { users, invites } = await listAdmins(session.db);
 
   const isOwner = session.role === "OWNER";
@@ -34,7 +59,7 @@ export default async function AdminUsersPage() {
     ? null
     : await session.db.adminUser.findFirst({
         where: { id: session.userId },
-        select: { name: true, phone: true },
+        select: { name: true, phone: true, email: true, emailVerifiedAt: true },
       });
 
   // Samma adress som i mejlet, se app-url.ts. Saknas inställningen visas
@@ -52,6 +77,8 @@ export default async function AdminUsersPage() {
         Lägg upp minst två konton. Med ett enda konto kommer ingen annan in i
         arbetsytan.
       </Alert>
+
+      {resend && <Alert tone={resend.tone}>{resend.text}</Alert>}
 
       {me && (
         <Card>
@@ -78,6 +105,78 @@ export default async function AdminUsersPage() {
               />
             </Field>
           </SaveForm>
+        </Card>
+      )}
+
+      {/* En OBEKRÄFTAD adress går att rätta här, för stavfelet vid
+          registreringen. En bekräftad är kontots identitet och byts via
+          support. Se email-verification.ts. */}
+      {me && !me.emailVerifiedAt && (
+        <Card>
+          <CardHeader
+            title="E-postadress"
+            description={`${me.email} är inte bekräftad.`}
+          />
+          <SaveForm action={changeEmail} submitLabel="Ändra adress">
+            <Field label="Ny e-postadress">
+              <Input name="email" type="email" autoComplete="email" required />
+            </Field>
+            <Field label="Lösenord">
+              <Input
+                name="password"
+                type="password"
+                autoComplete="current-password"
+                required
+              />
+            </Field>
+          </SaveForm>
+        </Card>
+      )}
+
+      {me && (
+        <Card>
+          <CardHeader title="Lösenord" />
+          <SaveForm action={changePassword} submitLabel="Byt lösenord">
+            <Field label="Nuvarande lösenord">
+              <Input
+                name="current"
+                type="password"
+                autoComplete="current-password"
+                required
+              />
+            </Field>
+            <Field label="Nytt lösenord" hint="Minst 10 tecken">
+              <Input
+                name="next"
+                type="password"
+                autoComplete="new-password"
+                minLength={10}
+                required
+              />
+            </Field>
+            <Field label="Upprepa det nya lösenordet">
+              <Input
+                name="repeat"
+                type="password"
+                autoComplete="new-password"
+                minLength={10}
+                required
+              />
+            </Field>
+          </SaveForm>
+
+          <form
+            action={logoutEverywhere}
+            className="border-t border-neutral-100 p-5"
+          >
+            <ConfirmButton
+              type="submit"
+              tone="secondary"
+              question="Logga ut på alla enheter? Du loggas också ut här."
+            >
+              Logga ut på alla enheter
+            </ConfirmButton>
+          </form>
         </Card>
       )}
 

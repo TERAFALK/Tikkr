@@ -148,7 +148,9 @@ time_entries   — id, company_id, employee_id, kind,
                  clock_in_at, clock_out_at, source,
                  moment_cost_rate_ore, employee_cost_rate_ore,
                  needs_review, review_note, kiosk_device_id, source_ip
-admin_users    — id, company_id, email, name?, phone?, password_hash, role
+admin_users    — id, company_id, email, name?, phone?, password_hash, role,
+                 password_changed_at?, sessions_revoked_at?, email_verified_at?
+email_verifications — id, user_id, token_hash, email, expires_at, used_at
 audit_events   — id, company_id, actor_email, entity, entity_id, action,
                  before, after, subject_employee_id
 kiosk_devices  — id, company_id, name, device_token, active, last_seen_at
@@ -855,6 +857,14 @@ inställningarna.
    klienten och en återställningslänk annars kunde peka till en angripare.
    Klientens IP är SISTA värdet i `X-Forwarded-For`, det vår egen proxy satte.
    Se `app-url.ts` och `client-ip.ts`.
+
+   **Sessionen gäller tolv timmar** (ändrat 2026-10-06, var trettio dagar). Ett
+   lösenordsbyte eller "Logga ut på alla enheter" under Användare gör äldre
+   sessioner ogiltiga. **E-postadressen bekräftas** med en länk vid
+   registreringen; det spärrar ingenting, men panelen visar en remsa tills
+   det är gjort, och en obekräftad adress går att rätta själv. Registreringen
+   tar högst fem nya arbetsytor per kvart och IP-adress. Se `account.ts` och
+   `email-verification.ts`.
 4. **Anomali-varningar** (senare fas, ej MVP-kritiskt) — flagga t.ex. ett jobb
    som pågått orimligt länge, eller en person med fler parallella jobb än hen
    rimligen hinner sköta. Däremot INTE "instämplad på två ställen samtidigt" —

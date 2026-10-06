@@ -1,6 +1,14 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
+import { signIn, signOut } from "@/lib/auth";
+import { AccountError, changeOwnPassword, revokeOwnSessions } from "@/lib/account";
+import {
+  changeUnverifiedEmail,
+  EmailVerificationError,
+  sendEmailVerification,
+} from "@/lib/email-verification";
 import { resolveAppUrl } from "@/lib/app-url";
 import { normalizePhone } from "@/lib/phone";
 import { saved, type SaveState } from "@/lib/save-state";
@@ -158,4 +166,97 @@ export async function saveOwnProfile(
 
   revalidatePath(PATH);
   return saved("Uppgifterna är sparade");
+}
+
+/**
+ * Byter lösenord på det egna kontot och loggar in på nytt.
+ *
+ * Alla andra inloggningar slutar gälla i samma stund, se account.ts. Den
+ * egna loggas in igen med det nya lösenordet, så att den som just bytt inte
+ * kastas ut av sin egen ändring.
+ */
+export async function changePassword(
+  _previous: SaveState,
+  formData: FormData
+): Promise<SaveState> {
+  const session = await requireAdmin();
+  await assertWritable(session);
+
+  const current = String(formData.get("current") ?? "");
+  const next = String(formData.get("next") ?? "");
+  const repeat = String(formData.get("repeat") ?? "");
+
+  if (next !== repeat) return { error: "Lösenorden är inte lika." };
+
+  let email: string;
+  try {
+    ({ email } = await changeOwnPassword({
+      userId: session.userId,
+      current,
+      next,
+    }));
+  } catch (error) {
+    if (error instanceof AccountError) return { error: error.message };
+    throw error;
+  }
+
+  // Kastar en omdirigering när det gått bra, precis som vid registreringen.
+  await signIn("credentials", { email, password: next, redirectTo: PATH });
+  return saved("Lösenordet är bytt");
+}
+
+/**
+ * Loggar ut det egna kontot på alla enheter, den här inräknad.
+ *
+ * För den som glömt logga ut på en dator någon annan använder, eller
+ * misstänker att någon annan är inne.
+ */
+export async function logoutEverywhere() {
+  const session = await requireAdmin();
+  await assertWritable(session);
+
+  await revokeOwnSessions(session.userId);
+  await signOut({ redirectTo: "/admin/login" });
+}
+
+/** Skickar bekräftelselänken på nytt, från remsan i panelen. */
+export async function resendVerification() {
+  const session = await requireAdmin();
+  await assertWritable(session);
+
+  const outcome = await sendEmailVerification(session.userId);
+
+  // Remsan läser utfallet ur adressen. Ett formulär utan svar hade sett ut
+  // som en knapp som inte gör något.
+  redirect(`${PATH}?bekraftelse=${outcome}`);
+}
+
+/**
+ * Rättar en obekräftad e-postadress och skickar en ny länk dit.
+ *
+ * Se changeUnverifiedEmail för varför bara en obekräftad adress går att byta
+ * här, och varför lösenordet krävs.
+ */
+export async function changeEmail(
+  _previous: SaveState,
+  formData: FormData
+): Promise<SaveState> {
+  const session = await requireAdmin();
+  await assertWritable(session);
+
+  try {
+    await changeUnverifiedEmail({
+      userId: session.userId,
+      email: String(formData.get("email") ?? ""),
+      password: String(formData.get("password") ?? ""),
+    });
+  } catch (error) {
+    if (error instanceof EmailVerificationError) return { error: error.message };
+    throw error;
+  }
+
+  await sendEmailVerification(session.userId);
+
+  revalidatePath("/admin", "layout");
+  return saved("Adressen är ändrad. En ny länk är skickad");
 }

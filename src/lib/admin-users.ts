@@ -184,6 +184,10 @@ export async function acceptInvite(
         phone,
         passwordHash,
         role: invite.role,
+        // Länken kom med mejl till just den här adressen. Att den används
+        // bevisar att adressen fungerar, och någon bekräftelse till behövs
+        // inte.
+        emailVerifiedAt: new Date(),
       },
     });
 

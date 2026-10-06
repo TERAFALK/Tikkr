@@ -45,7 +45,15 @@ const IP_SCOPE = "admin-ip";
 const IP_MAX_FAILURES = 30;
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
-  session: { strategy: "jwt" },
+  /**
+   * TOLV TIMMAR, inte trettio dagar (ändrat 2026-10-06).
+   *
+   * Standardvärdet lät en inloggning gälla en månad, också på en dator i ett
+   * delat kontor där någon glömt logga ut. Panelen bär lönerelaterade uppgifter
+   * och kan ändra tid som faktureras, och en arbetsdag är vad den som använder
+   * den behöver. Den som kommer tillbaka nästa morgon loggar in igen.
+   */
+  session: { strategy: "jwt", maxAge: 12 * 60 * 60 },
 
   pages: {
     signIn: "/admin/login",

@@ -16,6 +16,8 @@ import SupportBanner from "@/components/admin/SupportBanner";
 import ReadOnlyToast from "@/components/admin/ReadOnlyToast";
 import ReloadOnDeploy from "@/components/ui/ReloadOnDeploy";
 import SubscriptionLocked from "@/components/admin/SubscriptionLocked";
+import Link from "next/link";
+import { resendVerification } from "./installningar/anvandare/actions";
 
 /**
  * Skalet runt de inloggade adminsidorna.
@@ -68,6 +70,21 @@ export default async function PanelLayout({
 
   const reviewCount = reviewEntries + quickJobs;
 
+  // OBEKRÄFTAD E-POSTADRESS. Remsan står tills länken använts, så att ett
+  // stavfel vid registreringen syns första dagen och inte den dag lösenordet
+  // glömts. Den spärrar ingenting. Se email-verification.ts.
+  //
+  // Inte i supportläget: där är ingen inloggad som kunden, och remsan gäller
+  // den som sitter vid skärmen.
+  const unverifiedEmail = session.support
+    ? null
+    : (
+        await session.db.adminUser.findFirst({
+          where: { id: session.userId, emailVerifiedAt: null },
+          select: { email: true },
+        })
+      )?.email ?? null;
+
   // Vilka menypunkter som ska synas. ATT DÖLJA DEM ÄR BARA KOSMETIK —
   // sidorna bakom vaktas var för sig av requireModule() och svarar 404
   // oavsett vad menyn visar. Samma hållning som prenumerationslåset nedan:
@@ -104,6 +121,28 @@ export default async function PanelLayout({
             Vilket läge man är i avgör hur allt annat på sidan ska läsas. */}
         {session.support && <SupportBanner companyName={session.companyName} />}
         <ReadOnlyToast show={deniedWrite} />
+
+        {unverifiedEmail && (
+          <div className="border-b border-amber-200 bg-amber-50 px-4 py-2.5 sm:px-6 lg:px-8">
+            <div className="mx-auto flex max-w-7xl flex-wrap items-center gap-x-4 gap-y-1 text-[13px] text-amber-900">
+              <p>
+                <strong>Bekräfta e-postadressen {unverifiedEmail}.</strong>{" "}
+                Länken finns i mejlet från Tikkr.
+              </p>
+              <form action={resendVerification}>
+                <button type="submit" className="font-medium underline">
+                  Skicka igen
+                </button>
+              </form>
+              <Link
+                href="/admin/installningar/anvandare"
+                className="font-medium underline"
+              >
+                Ändra adress
+              </Link>
+            </div>
+          </div>
+        )}
 
         {access.level === "warning" && (
           <div className="border-b border-amber-200 bg-amber-50 px-4 py-2.5 sm:px-6 lg:px-8">
