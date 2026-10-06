@@ -7,7 +7,6 @@ import {
   formatDuration,
   formatSignedDuration,
   minutesBetween,
-  toDecimalHours,
 } from "./format";
 import { formatCurrency } from "./money";
 import { describeAuditEvents } from "./audit-view";
@@ -147,8 +146,10 @@ export async function buildPersonExport(
   punches.columns = [
     { header: "Instämplad", key: "in", width: 18 },
     { header: "Utstämplad", key: "out", width: 18 },
+    // Bara tim:min. Utdraget är till för att LÄSAS av den som begärt det, inte
+    // för att räkna vidare i — därför ingen decimalkolumn, till skillnad från
+    // rapportens ark. Se tests/format.test.ts.
     { header: "Tid (tim:min)", key: "duration", width: 14 },
-    { header: "Timmar (decimal)", key: "hours", width: 16 },
     { header: "Jobb", key: "job", width: 32 },
     { header: "Kund", key: "customer", width: 24 },
     { header: "Källa", key: "source", width: 28 },
@@ -164,7 +165,6 @@ export async function buildPersonExport(
       in: formatDateTime(entry.clockInAt, timeZone),
       out: entry.clockOutAt ? formatDateTime(entry.clockOutAt, timeZone) : "Pågår",
       duration: formatDuration(minutes),
-      hours: toDecimalHours(minutes),
       job: describeEntry(entry).text,
       customer: entry.order?.customer?.name ?? "",
       source: SOURCE_LABELS[entry.source] ?? entry.source,
@@ -175,8 +175,6 @@ export async function buildPersonExport(
         .join(" "),
     });
   }
-
-  punches.getColumn("hours").numFmt = "0.00";
 
   /* --- Löneunderlagets register, när de har innehåll ------------------------ */
 
