@@ -53,6 +53,25 @@ export function wallTimeIn(instant: Date, timeZone: string): WallTime {
 }
 
 /**
+ * En tidpunkt som ett Excel-ark ska VISA den, i företagets tidszon.
+ *
+ * Excel har inga tidszoner: en cell är ett klockslag och inget mer. ExcelJS
+ * räknar om ett Date till det klockslag tidpunkten har i UTC, och en
+ * instämpling 07:00 i Stockholm stod därför som 05:00 i arket på sommaren och
+ * 06:00 på vintern. Arket är ett fakturaunderlag.
+ *
+ * Svaret är väggklockans klockslag förklätt till UTC. Det är inte en riktig
+ * tidpunkt och får bara användas för att skriva en cell.
+ */
+export function excelWallTime(instant: Date, timeZone: string): Date {
+  const { year, month, day, hour, minute, second } = partsInZone(
+    instant,
+    timeZone
+  );
+  return new Date(Date.UTC(year, month - 1, day, hour, minute, second));
+}
+
+/**
  * Översätter ett klockslag på väggen till den faktiska tidpunkten.
  *
  * "18:00 den 3 juli i Stockholm" är en annan tidpunkt än "18:00 den 3 januari",

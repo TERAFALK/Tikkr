@@ -5,7 +5,12 @@ import { lockedExportResponse } from "@/lib/export-access";
 import { buildReport, type ReportGroup } from "@/lib/report";
 import { formatDate, formatDuration, toDecimalHours } from "@/lib/format";
 import { unsafeGlobalPrisma } from "@/lib/db";
-import { endOfDayIn, parseLocalDate, startOfDayIn } from "@/lib/time-zone";
+import {
+  endOfDayIn,
+  excelWallTime,
+  parseLocalDate,
+  startOfDayIn,
+} from "@/lib/time-zone";
 import { buildReportPdf, type ReportView } from "@/lib/report-pdf";
 import type { ReportResult } from "@/lib/report";
 
@@ -127,8 +132,10 @@ export async function GET(request: NextRequest) {
       order: row.orderNumber ?? "",
       customer: row.customerName ?? "",
       moment: row.momentName,
-      in: row.clockInAt,
-      out: row.clockOutAt ?? "",
+      // I företagets tidszon, se excelWallTime. Stod som rå Date och visades
+      // därför i UTC: två timmar fel på sommaren.
+      in: excelWallTime(row.clockInAt, timeZone),
+      out: row.clockOutAt ? excelWallTime(row.clockOutAt, timeZone) : "",
       duration: formatDuration(row.minutes),
       hours: toDecimalHours(row.minutes),
       note: notes.join(". "),

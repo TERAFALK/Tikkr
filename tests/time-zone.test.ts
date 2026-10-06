@@ -282,3 +282,18 @@ describe("datum i länkar och fält", () => {
     expect(parseLocalDate("2026-07-03T08:00", SE)).toBeNull();
   });
 });
+
+describe("excelWallTime", () => {
+  it("visar Stockholms klockslag på sommaren", async () => {
+    const { excelWallTime } = await import("@/lib/time-zone");
+    // 05:00 UTC är 07:00 i Stockholm i augusti.
+    const cell = excelWallTime(new Date("2026-08-05T05:00:00Z"), "Europe/Stockholm");
+    expect(cell.toISOString()).toBe("2026-08-05T07:00:00.000Z");
+  });
+
+  it("och på vintern", async () => {
+    const { excelWallTime } = await import("@/lib/time-zone");
+    const cell = excelWallTime(new Date("2026-01-05T05:00:00Z"), "Europe/Stockholm");
+    expect(cell.toISOString()).toBe("2026-01-05T06:00:00.000Z");
+  });
+});
