@@ -120,13 +120,13 @@ function SiteHeaderBar() {
         <div className="ml-auto flex items-center gap-4">
           <Link
             href="/admin/login"
-            className="text-[13px] text-neutral-400 transition-colors hover:text-white"
+            className="whitespace-nowrap text-[13px] text-neutral-400 transition-colors hover:text-white"
           >
             Logga in
           </Link>
           <Link
             href="/registrera"
-            className="rounded-md bg-tick px-3.5 py-2 text-[13px] font-semibold text-neutral-900 transition-colors hover:bg-emerald-300"
+            className="whitespace-nowrap rounded-md bg-tick px-3.5 py-2 text-[13px] font-semibold text-neutral-900 transition-colors hover:bg-emerald-300"
           >
             Prova gratis
           </Link>
