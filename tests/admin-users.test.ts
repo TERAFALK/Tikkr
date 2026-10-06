@@ -8,6 +8,7 @@ import {
   inviteAdmin,
   listAdmins,
   removeAdmin,
+  resetTwoStepByOwner,
   revokeInvite,
   AdminUserError,
 } from "@/lib/admin-users";
@@ -271,5 +272,92 @@ describe("isolering mellan företag", () => {
 
     const mine = await listAdmins(forCompany(companyId));
     expect(mine.users).toHaveLength(1);
+  });
+});
+
+/**
+ * Ägaren nollställer administratörers tvåstegsinloggning, Tikkr nollställer
+ * ägarnas. Det testerna skyddar: rätt person får göra det, åt rätt håll, och
+ * bara i det egna företaget.
+ */
+describe("nollställa tvåstegsinloggning", () => {
+  async function adminWithTwoStep(role: "OWNER" | "ADMIN" = "ADMIN") {
+    return unsafeGlobalPrisma.adminUser.create({
+      data: {
+        companyId,
+        email: addr(`tvasteg-${role.toLowerCase()}`),
+        passwordHash: "inte-en-riktig-hash",
+        role,
+        totpSecret: "v1.x.y.z",
+        totpEnabledAt: new Date(),
+      },
+    });
+  }
+
+  function reset(targetUserId: string, actingRole = "OWNER", actingUserId = ownerId) {
+    return resetTwoStepByOwner({
+      companyId,
+      actingUserId,
+      actingRole,
+      actingEmail: ownerEmail,
+      targetUserId,
+    });
+  }
+
+  it("ägaren nollställer en administratör, och det syns i ändringsloggen", async () => {
+    const admin = await adminWithTwoStep();
+
+    await reset(admin.id);
+
+    const saved = await unsafeGlobalPrisma.adminUser.findUniqueOrThrow({
+      where: { id: admin.id },
+    });
+    expect(saved.totpSecret).toBeNull();
+    expect(saved.totpEnabledAt).toBeNull();
+    expect(saved.sessionsRevokedAt).not.toBeNull();
+
+    const event = await unsafeGlobalPrisma.auditEvent.findFirstOrThrow({
+      where: { companyId, entityId: admin.id },
+    });
+    expect(event.actorEmail).toBe(ownerEmail);
+  });
+
+  it("en administratör får inte nollställa någon", async () => {
+    const admin = await adminWithTwoStep();
+    const other = await adminWithTwoStep();
+
+    await expect(reset(other.id, "ADMIN", admin.id)).rejects.toThrow(AdminUserError);
+  });
+
+  it("en ägare kan inte nollställa en annan ägare", async () => {
+    const otherOwner = await adminWithTwoStep("OWNER");
+
+    await expect(reset(otherOwner.id)).rejects.toThrow(AdminUserError);
+  });
+
+  it("en ägare kan inte nollställa sig själv", async () => {
+    await expect(reset(ownerId)).rejects.toThrow(AdminUserError);
+  });
+
+  it("ett konto hos ett annat företag går inte att nå", async () => {
+    const other = await unsafeGlobalPrisma.company.create({
+      data: { name: `Anvandartest annat ${unique}` },
+    });
+    const foreign = await unsafeGlobalPrisma.adminUser.create({
+      data: {
+        companyId: other.id,
+        email: addr("annat-foretag"),
+        passwordHash: "inte-en-riktig-hash",
+        role: "ADMIN",
+        totpEnabledAt: new Date(),
+      },
+    });
+
+    await expect(reset(foreign.id)).rejects.toThrow(AdminUserError);
+
+    const untouched = await unsafeGlobalPrisma.adminUser.findUniqueOrThrow({
+      where: { id: foreign.id },
+    });
+    expect(untouched.totpEnabledAt).not.toBeNull();
   });
 });

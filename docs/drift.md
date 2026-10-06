@@ -368,10 +368,16 @@ och andra). Därefter frågar inloggningen efter koden appen visar.
 Befintliga konton får QR-koden vid nästa inloggning. Ingen kommer in i
 panelen förrän appen är uppsatt.
 
-**Kund som tappat sin telefon:** plattformspanelen, kundkortet, tabellen
+**Administratör som tappat sin telefon:** kundens ägare nollställer själv,
+under Inställningar, Användare, **Nollställ tvåsteg**.
+
+**Ägare som tappat sin telefon:** plattformspanelen, kundkortet, tabellen
 Administratörer, **Nollställ**. Kontrollera först att det är personen själv
-som ber om det, till exempel genom att ringa upp på ägarens nummer. Nästa
-inloggning visar en ny QR-kod, och alla inloggade sessioner avslutas.
+som ber om det, till exempel genom att ringa upp på ägarens nummer. En ägare
+kan inte nollställa en annan ägare, så det här går alltid via dig.
+
+I båda fallen visar nästa inloggning en ny QR-kod, och personens inloggade
+sessioner avslutas.
 
 **Du själv:** nollställ från servern, och logga in igen för en ny QR-kod.
 

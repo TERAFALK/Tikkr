@@ -24,6 +24,7 @@ import {
   changePassword,
   deleteAdmin,
   logoutEverywhere,
+  resetTwoStep,
   saveOwnProfile,
 } from "./actions";
 
@@ -199,6 +200,7 @@ export default async function AdminUsersPage({
             <tr>
               <Th>Namn</Th>
               <Th>Behörighet</Th>
+              <Th>Tvåsteg</Th>
               <Th>Upplagd</Th>
               <Th>
                 <span className="sr-only">Åtgärder</span>
@@ -226,8 +228,32 @@ export default async function AdminUsersPage({
                     <Badge>Administratör</Badge>
                   )}
                 </Td>
+                <Td>
+                  {user.totpEnabledAt ? (
+                    <Badge tone="active">Uppsatt</Badge>
+                  ) : (
+                    <Badge tone="muted">Inte uppsatt</Badge>
+                  )}
+                </Td>
                 <Td muted>{formatDate(user.createdAt)}</Td>
                 <Td>
+                  <div className="flex justify-end gap-2">
+                  {/* Ägaren nollställer administratörer, Tikkr nollställer
+                      ägare. Se resetTwoStepByOwner i admin-users.ts. */}
+                  {isOwner &&
+                    user.role === "ADMIN" &&
+                    user.totpEnabledAt && (
+                      <form action={resetTwoStep}>
+                        <input type="hidden" name="userId" value={user.id} />
+                        <ConfirmButton
+                          type="submit"
+                          tone="secondary"
+                          question={`Nollställ tvåstegsinloggningen för ${user.email}? Nästa inloggning visar en ny QR-kod, och personen loggas ut överallt.`}
+                        >
+                          Nollställ tvåsteg
+                        </ConfirmButton>
+                      </form>
+                    )}
                   {isOwner && user.id !== session.userId && (
                     <form action={deleteAdmin}>
                       <input type="hidden" name="userId" value={user.id} />
@@ -240,6 +266,7 @@ export default async function AdminUsersPage({
                       </ConfirmButton>
                     </form>
                   )}
+                  </div>
                 </Td>
               </Tr>
             ))}

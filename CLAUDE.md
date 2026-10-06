@@ -898,9 +898,12 @@ inställningarna.
    återställning går samma väg. `currentAdmin()` släpper inte in ett konto
    utan bekräftad app. Nycklarna lagras krypterade med `AUTH_SECRET`.
 
-   Kundens tvåsteg nollställs från plattformspanelen, efter att vi
-   kontrollerat vem som ringer; det loggas både hos oss och i kundens
-   ändringslogg. Plattformens nollställs med `scripts/platform-user.sh
+   Nollställning sker åt ett håll i taget: ägaren nollställer
+   administratörer i sin arbetsyta (`resetTwoStepByOwner`), och vi
+   nollställer ägare från plattformspanelen, efter att ha kontrollerat vem
+   som ringer. En ägare kan inte nollställa en annan ägare — då kunde den som
+   kommit åt ett ägarkonto ta över de andra också. Båda loggas i kundens
+   ändringslogg, plattformens dessutom hos oss. Plattformens nollställs med `scripts/platform-user.sh
    <adress> --kod`. En spärr på IP-adress i Caddy övervägdes och valdes
    bort: den krävde en fast adress hos den som administrerar.
 

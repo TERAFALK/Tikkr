@@ -5,6 +5,7 @@ import { forCompany, type CompanyDb } from "./tenant";
 import { normalizeEmail } from "./signup";
 import { recordAudit } from "./audit";
 import { normalizePhone } from "./phone";
+import { resetAdminMfa } from "./admin-mfa";
 
 /**
  * FLERA ADMINISTRATÖRER PER FÖRETAG.
@@ -261,6 +262,67 @@ export async function removeAdmin(params: {
   });
 }
 
+/**
+ * ÄGAREN NOLLSTÄLLER EN ADMINISTRATÖRS TVÅSTEGSINLOGGNING (infört 2026-10-06).
+ *
+ * För administratören som tappat sin telefon. Ägaren känner personen och kan
+ * avgöra om det verkligen är hen som frågar, och slipper gå via oss.
+ *
+ * Samma uppdelning som behörigheterna i övrigt, åt ett håll i taget: ägaren
+ * nollställer ADMINISTRATÖRER, och vi nollställer ÄGARE från plattformspanelen.
+ * En ägare kan alltså inte nollställa en annan ägare. Annars kunde den som
+ * kommit åt ett ägarkonto ta över de andra ägarnas konton också, och det är
+ * just de som ska kunna stänga ute en inkräktare.
+ *
+ * Nästa inloggning visar en ny QR-kod, och personens sessioner avslutas, se
+ * resetAdminMfa. Skrivs i kundens ändringslogg.
+ */
+export async function resetTwoStepByOwner(params: {
+  companyId: string;
+  actingUserId: string;
+  actingRole: string;
+  actingEmail: string;
+  targetUserId: string;
+}) {
+  if (params.actingRole !== "OWNER") {
+    throw new AdminUserError(
+      "Endast ägare kan nollställa tvåstegsinloggningen."
+    );
+  }
+
+  if (params.actingUserId === params.targetUserId) {
+    throw new AdminUserError(
+      "Din egen tvåstegsinloggning nollställs av Tikkr. Kontakta support@tikkr.se."
+    );
+  }
+
+  const db = forCompany(params.companyId);
+  const target = await db.adminUser.findFirst({
+    where: { id: params.targetUserId },
+    select: { id: true, role: true, totpEnabledAt: true },
+  });
+
+  if (!target) throw new AdminUserError("Kontot finns inte.");
+
+  if (target.role === "OWNER") {
+    throw new AdminUserError(
+      "En ägares tvåstegsinloggning nollställs av Tikkr. Kontakta support@tikkr.se."
+    );
+  }
+
+  await resetAdminMfa(target.id);
+
+  await recordAudit(db, {
+    companyId: params.companyId,
+    actorEmail: params.actingEmail,
+    entity: "AdminUser",
+    entityId: target.id,
+    action: "update",
+    before: { twoStep: target.totpEnabledAt ? "Uppsatt" : "Inte uppsatt" },
+    after: { twoStep: "Nollställd" },
+  });
+}
+
 /** Återkallar en inbjudan som ännu inte lösts in. */
 export async function revokeInvite(params: {
   companyId: string;
@@ -281,7 +343,14 @@ export async function listAdmins(db: CompanyDb) {
   const [users, invites] = await Promise.all([
     db.adminUser.findMany({
       orderBy: [{ role: "asc" }, { email: "asc" }],
-      select: { id: true, email: true, name: true, role: true, createdAt: true },
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        role: true,
+        createdAt: true,
+        totpEnabledAt: true,
+      },
     }),
     db.adminInvite.findMany({
       where: { acceptedAt: null, expiresAt: { gt: new Date() } },

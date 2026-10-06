@@ -19,6 +19,7 @@ import {
   INVITE_DAYS,
   inviteAdmin,
   removeAdmin,
+  resetTwoStepByOwner,
   revokeInvite,
 } from "@/lib/admin-users";
 import { sendEmail } from "@/lib/email";
@@ -105,6 +106,27 @@ export async function deleteAdmin(formData: FormData) {
 
   try {
     await removeAdmin({
+      companyId: session.companyId,
+      actingUserId: session.userId,
+      actingRole: session.role,
+      actingEmail: session.email,
+      targetUserId: String(formData.get("userId") ?? ""),
+    });
+  } catch (error) {
+    if (error instanceof AdminUserError) return;
+    throw error;
+  }
+
+  revalidatePath(PATH);
+}
+
+/** Ägaren nollställer en administratörs tvåstegsinloggning. Se admin-users.ts. */
+export async function resetTwoStep(formData: FormData) {
+  const session = await requireAdmin();
+  await assertWritable(session);
+
+  try {
+    await resetTwoStepByOwner({
       companyId: session.companyId,
       actingUserId: session.userId,
       actingRole: session.role,
