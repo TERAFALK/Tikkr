@@ -11,6 +11,7 @@ import {
 import { TRIAL_LICENSES } from "./licenses";
 import { isModuleKey, moduleName, type ModuleKey } from "./modules";
 import { moduleStates, setModuleManually } from "./company-modules";
+import { resetAdminMfa } from "./admin-mfa";
 
 /**
  * PLATTFORMSADMINISTRATION.
@@ -297,6 +298,9 @@ export async function getCompanyDetail(companyId: string) {
           phone: true,
           role: true,
           createdAt: true,
+          // Om tvåstegsinloggningen är uppsatt. Ett driftfaktum, och svaret på
+          // första frågan när någon ringer och inte kommer in.
+          totpEnabledAt: true,
         },
       }),
       unsafeGlobalPrisma.kioskDevice.findMany({
@@ -587,6 +591,56 @@ export async function setSubscriptionStatus(params: {
       (backToTrial && before.screenLicenses !== TRIAL_LICENSES
         ? ` Licenser återställda från ${before.screenLicenses} till ${TRIAL_LICENSES}.`
         : ""),
+  });
+}
+
+/**
+ * NOLLSTÄLLER EN KUNDADMINISTRATÖRS TVÅSTEGSINLOGGNING.
+ *
+ * För den som tappat bort sin telefon och inte kommer in. Nästa inloggning
+ * visar en ny QR-kod efter lösenordet. Inloggade sessioner avslutas samtidigt,
+ * se resetAdminMfa.
+ *
+ * Den farliga delen är inte knappen utan samtalet före: den som ringer och
+ * säger att telefonen är borta kan vara någon annan. Kontrollera identiteten
+ * innan, till exempel genom att ringa upp på ägarens nummer på kundkortet.
+ *
+ * Skrivs i två loggar: vår egen åtgärdslogg, och kundens ändringslogg. Kunden
+ * ska kunna se att leverantören gjort något med ett av deras konton.
+ */
+export async function resetAdminTwoStep(params: {
+  actorEmail: string;
+  companyId: string;
+  userId: string;
+}) {
+  const user = await unsafeGlobalPrisma.adminUser.findFirst({
+    where: { id: params.userId, companyId: params.companyId },
+    select: { id: true, email: true, totpEnabledAt: true },
+  });
+
+  if (!user) {
+    throw new PlatformActionError("Kontot finns inte hos det här företaget.");
+  }
+
+  await resetAdminMfa(user.id);
+
+  await record({
+    actorEmail: params.actorEmail,
+    action: "Nollställde tvåstegsinloggning",
+    targetCompanyId: params.companyId,
+    detail: user.email,
+  });
+
+  await unsafeGlobalPrisma.auditEvent.create({
+    data: {
+      companyId: params.companyId,
+      actorEmail: params.actorEmail,
+      entity: "AdminUser",
+      entityId: user.id,
+      action: "update",
+      before: { twoStep: user.totpEnabledAt ? "Uppsatt" : "Inte uppsatt" },
+      after: { twoStep: "Nollställd" },
+    },
   });
 }
 

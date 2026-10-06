@@ -1,7 +1,7 @@
 "use server";
 
-import { AuthError } from "next-auth";
-import { signIn } from "@/lib/auth";
+import { redirect } from "next/navigation";
+import { issueTicket } from "@/lib/login-ticket";
 import {
   redeemPasswordReset,
   PasswordResetError,
@@ -12,11 +12,11 @@ export interface ResetState {
 }
 
 /**
- * Sätter det nya lösenordet och loggar in direkt.
+ * Sätter det nya lösenordet och går vidare till tvåstegsinloggningen.
  *
- * Den som just bevisat att de når kontots inkorg har bevisat tillräckligt. Att
- * skicka dem till inloggningssidan för att skriva samma lösenord en gång till
- * är ett steg utan syfte.
+ * Den som just bevisat att de når kontots inkorg har bevisat lösenordet, och
+ * får inte skriva det en gång till. Koden från appen krävs ändå: en inkorg
+ * som någon annan kommit åt ska inte räcka för att komma in i panelen.
  */
 export async function setNewPassword(
   _previous: ResetState,
@@ -30,27 +30,16 @@ export async function setNewPassword(
     return { error: "Lösenorden är inte lika." };
   }
 
-  let email: string;
+  let userId: string;
 
   try {
     const result = await redeemPasswordReset(token, password);
-    email = result.email;
+    userId = result.userId;
   } catch (error) {
     if (error instanceof PasswordResetError) return { error: error.message };
     throw error;
   }
 
-  try {
-    await signIn("credentials", { email, password, redirectTo: "/admin" });
-  } catch (error) {
-    if (error instanceof AuthError) {
-      return {
-        error:
-          "Lösenordet är ändrat, men inloggningen misslyckades. Logga in med det nya lösenordet.",
-      };
-    }
-    throw error;
-  }
-
-  return {};
+  await issueTicket("admin", userId);
+  redirect("/admin/login");
 }

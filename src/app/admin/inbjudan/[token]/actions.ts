@@ -1,8 +1,8 @@
 "use server";
 
-import { AuthError } from "next-auth";
-import { signIn } from "@/lib/auth";
+import { redirect } from "next/navigation";
 import { acceptInvite, AdminUserError } from "@/lib/admin-users";
+import { issueTicket } from "@/lib/login-ticket";
 
 export interface AcceptState {
   error?: string;
@@ -20,29 +20,21 @@ export async function acceptInvitation(
     return { error: "Lösenorden är inte lika." };
   }
 
-  let email: string;
+  let userId: string;
 
   try {
     const user = await acceptInvite(token, password, {
       name: String(formData.get("name") ?? ""),
       phone: String(formData.get("phone") ?? ""),
     });
-    email = user.email;
+    userId = user.id;
   } catch (error) {
     if (error instanceof AdminUserError) return { error: error.message };
     throw error;
   }
 
-  try {
-    await signIn("credentials", { email, password, redirectTo: "/admin" });
-  } catch (error) {
-    if (error instanceof AuthError) {
-      return {
-        error: "Kontot är skapat, men inloggningen misslyckades. Logga in nedan.",
-      };
-    }
-    throw error;
-  }
-
-  return {};
+  // Lösenordet är just valt. Vidare till tvåstegsinloggningen, där QR-koden
+  // visas, i stället för till e-post och lösenord en gång till.
+  await issueTicket("admin", userId);
+  redirect("/admin/login");
 }

@@ -39,7 +39,8 @@ import {
   Section,
   SubscriptionBadge,
 } from "@/components/platform/Pieces";
-import { startSupport, updateNote } from "./actions";
+import { resetTwoStep, startSupport, updateNote } from "./actions";
+import ConfirmButton from "@/components/admin/ConfirmButton";
 import { unsafeGlobalPrisma } from "@/lib/db";
 import { getModulePricing, getScreenPricing } from "@/lib/stripe";
 import { formatPhone } from "@/lib/phone";
@@ -303,6 +304,7 @@ export default async function CompanyPage({
                     <Th>Namn och e-post</Th>
                     <Th>Telefon</Th>
                     <Th>Behörighet</Th>
+                    <Th>Tvåsteg</Th>
                     <Th>Upplagd</Th>
                   </tr>
                 </thead>
@@ -334,6 +336,28 @@ export default async function CompanyPage({
                       </Td>
                       <Td muted>
                         {admin.role === "OWNER" ? "Ägare" : "Administratör"}
+                      </Td>
+                      <Td>
+                        <span className="flex items-center gap-2">
+                          {admin.totpEnabledAt ? (
+                            <Badge tone="active">Uppsatt</Badge>
+                          ) : (
+                            <Badge tone="muted">Inte uppsatt</Badge>
+                          )}
+                          {admin.totpEnabledAt && (
+                            <form action={resetTwoStep}>
+                              <input type="hidden" name="companyId" value={company.id} />
+                              <input type="hidden" name="userId" value={admin.id} />
+                              <ConfirmButton
+                                type="submit"
+                                tone="secondary"
+                                question={`Nollställ tvåstegsinloggningen för ${admin.email}? Kontrollera först att det är personen själv som ber om det. Nästa inloggning visar en ny QR-kod, och alla inloggade sessioner avslutas.`}
+                              >
+                                Nollställ
+                              </ConfirmButton>
+                            </form>
+                          )}
+                        </span>
                       </Td>
                       <Td muted>{formatDate(admin.createdAt)}</Td>
                     </Tr>

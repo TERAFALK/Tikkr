@@ -714,6 +714,20 @@ model AdminUser {
   /// betyder obekräftad. Se email-verification.ts.
   emailVerifiedAt DateTime? @map("email_verified_at")
 
+  /// TVÅSTEGSINLOGGNING, obligatorisk för alla (beslutat 2026-10-06).
+  ///
+  /// Nyckeln till autentiseringsappen, krypterad. Skapas vid första
+  /// inloggningen efter lösenordet, när QR-koden visas. Se admin-mfa.ts.
+  totpSecret String? @map("totp_secret")
+
+  /// När den första koden godkändes, alltså när appen bevisligen är uppsatt.
+  /// Tomt betyder att nyckeln bara visats, och då släpps ingen in i panelen.
+  totpEnabledAt DateTime? @map("totp_enabled_at")
+
+  /// Perioden för den senast godkända koden. En kod går inte att använda två
+  /// gånger.
+  totpLastStep Int? @map("totp_last_step")
+
   company             Company             @relation(fields: [companyId], references: [id], onDelete: Cascade)
   passwordResets      PasswordReset[]
   emailVerifications  EmailVerification[]
@@ -802,6 +816,10 @@ model PlatformUser {
   /// Perioden för den senast godkända koden. En kod går inte att använda två
   /// gånger.
   totpLastStep Int? @map("totp_last_step")
+
+  /// När den första koden godkändes. Tomt med en nyckel betyder att QR-koden
+  /// visats men aldrig bekräftats.
+  totpEnabledAt DateTime? @map("totp_enabled_at")
 
   createdAt    DateTime  @default(now()) @map("created_at")
   updatedAt    DateTime  @updatedAt @map("updated_at")

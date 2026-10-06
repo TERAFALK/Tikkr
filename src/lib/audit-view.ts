@@ -57,6 +57,7 @@ const FIELD_LABELS: Record<string, string> = {
   minutes: "Tid",
   note: "Anteckning",
   email: "E-postadress",
+  twoStep: "Tvåstegsinloggning",
   role: "Behörighet",
   markupPercent: "Påslag",
   autoCloseAt: "Automatisk utstämpling",

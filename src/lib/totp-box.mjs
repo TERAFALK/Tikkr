@@ -1,4 +1,4 @@
-// KRYPTERING AV TVÅSTEGSNYCKELN FÖR PLATTFORMSKONTON.
+// KRYPTERING AV TVÅSTEGSNYCKLARNA.
 //
 // Nyckeln i autentiseringsappen är en hemlighet som gäller för alltid. Låg den
 // i klartext i databasen räckte en databaskopia för att räkna fram varje kod.
@@ -6,13 +6,11 @@
 // .env — samma tanke som resten av plattformsinloggningen: databasen ensam och
 // servern ensam räcker inte, båda krävs. Se platform-auth.ts.
 //
-// Vanlig JavaScript och inte TypeScript, eftersom skriptet som sätter upp
-// nyckeln (scripts/platform-user.mjs) körs med node direkt och måste kryptera
-// på exakt samma sätt som appen dekrypterar. En fil för båda, så att de inte
-// kan glida isär.
+// Gäller både kundernas och plattformens nycklar. Vanlig JavaScript, så att
+// ett skript som körs med node direkt kan läsa samma format som appen.
 //
-// Byts AUTH_SECRET går nyckeln inte längre att läsa, och tvåstegsinloggningen
-// måste sättas upp på nytt med skriptet.
+// Byts AUTH_SECRET går nycklarna inte längre att läsa, och alla måste sätta
+// upp appen på nytt.
 
 import {
   createCipheriv,

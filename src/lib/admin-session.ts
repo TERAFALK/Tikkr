@@ -156,11 +156,17 @@ export async function currentAdmin(): Promise<AdminSession | null> {
       companyId: true,
       passwordChangedAt: true,
       sessionsRevokedAt: true,
+      totpEnabledAt: true,
       company: { select: { name: true } },
     },
   });
 
   if (!account) return null;
+
+  // Tvåstegsinloggning är obligatorisk (2026-10-06). En session från innan
+  // kravet, eller ett konto vars tvåsteg nollställts, kommer inte in förrän
+  // appen satts upp — inloggningen visar då QR-koden.
+  if (!account.totpEnabledAt) return null;
 
   // En session som utfärdades före det senaste lösenordsbytet, eller före en
   // utloggning på alla enheter, gäller inte. Annars vore det meningslöst att

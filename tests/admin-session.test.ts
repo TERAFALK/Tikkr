@@ -94,6 +94,9 @@ beforeEach(async () => {
       email: `agare-${unique}@example.com`,
       passwordHash: await bcrypt.hash("ett-langt-losenord", 12),
       role: "OWNER",
+      // Tvåstegsinloggning är obligatorisk. Utan den släpps ingen in, och
+      // testerna här handlar om annat.
+      totpEnabledAt: new Date(),
     },
   });
 
@@ -197,6 +200,17 @@ describe("lösenordsbyte ogiltigförklarar äldre sessioner", () => {
     sessionIssuedAt = Math.floor(Date.now() / 1000) - 30 * 24 * 3600;
 
     expect(await currentAdmin()).not.toBeNull();
+  });
+});
+
+describe("tvåstegsinloggning är obligatorisk", () => {
+  it("ett konto utan uppsatt app släpps inte in, trots giltig session", async () => {
+    await unsafeGlobalPrisma.adminUser.update({
+      where: { id: ownerId },
+      data: { totpEnabledAt: null },
+    });
+
+    expect(await currentAdmin()).toBeNull();
   });
 });
 

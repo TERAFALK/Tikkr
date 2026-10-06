@@ -8,7 +8,11 @@ import {
   verifyTotp,
 } from "@/lib/totp";
 import { openSecret, sealSecret } from "@/lib/totp-box.mjs";
-import { verifyPlatformLogin } from "@/lib/platform-auth";
+import {
+  checkPlatformPassword,
+  platformTwoStep,
+  verifyPlatformCode,
+} from "@/lib/platform-auth";
 import { __resetThrottle } from "@/lib/login-throttle";
 import { unsafeGlobalPrisma } from "@/lib/db";
 
@@ -92,7 +96,7 @@ describe("nyckeln lagras krypterad", () => {
   });
 });
 
-describe("inloggningen kräver koden", () => {
+describe("plattformens inloggning kräver koden", () => {
   const email = "plattform-totp-test@example.com";
   const password = "ett-mycket-langt-losenord";
   const authSecret = "test-auth-secret";
@@ -104,18 +108,17 @@ describe("inloggningen kräver koden", () => {
     process.env.PLATFORM_ADMIN_EMAILS = email;
     process.env.AUTH_SECRET = authSecret;
 
+    const data = {
+      passwordHash: await bcrypt.hash(password, 4),
+      totpSecret: sealSecret(RFC_SECRET, authSecret),
+      totpEnabledAt: new Date(),
+      totpLastStep: null,
+    };
+
     await unsafeGlobalPrisma.platformUser.upsert({
       where: { email },
-      update: {
-        passwordHash: await bcrypt.hash(password, 4),
-        totpSecret: sealSecret(RFC_SECRET, authSecret),
-        totpLastStep: null,
-      },
-      create: {
-        email,
-        passwordHash: await bcrypt.hash(password, 4),
-        totpSecret: sealSecret(RFC_SECRET, authSecret),
-      },
+      update: data,
+      create: { email, ...data },
     });
   });
 
@@ -130,29 +133,51 @@ describe("inloggningen kräver koden", () => {
 
   const now = new Date(1111111111 * 1000);
 
-  it("rätt lösenord och rätt kod släpper in", async () => {
-    const outcome = await verifyPlatformLogin(email, password, "050471", now);
+  it("rätt lösenord leder till steg två, men ger ingen inloggning ensamt", async () => {
+    const outcome = await checkPlatformPassword(email, password);
     expect(outcome.ok).toBe(true);
+    expect(await platformTwoStep(email)).toEqual({ mode: "code" });
   });
 
-  it("rätt lösenord utan rätt kod släpper inte in", async () => {
-    const outcome = await verifyPlatformLogin(email, password, "000000", now);
-    expect(outcome.ok).toBe(false);
+  it("fel lösenord stannar i steg ett", async () => {
+    expect((await checkPlatformPassword(email, "fel")).ok).toBe(false);
+  });
+
+  it("rätt kod släpper in", async () => {
+    expect((await verifyPlatformCode(email, "050471", now)).ok).toBe(true);
+  });
+
+  it("fel kod släpper inte in", async () => {
+    expect((await verifyPlatformCode(email, "000000", now)).ok).toBe(false);
   });
 
   it("samma kod två gånger släpper bara in den första", async () => {
-    expect((await verifyPlatformLogin(email, password, "050471", now)).ok).toBe(true);
-    expect((await verifyPlatformLogin(email, password, "050471", now)).ok).toBe(false);
+    expect((await verifyPlatformCode(email, "050471", now)).ok).toBe(true);
+    expect((await verifyPlatformCode(email, "050471", now)).ok).toBe(false);
   });
 
-  it("ett konto utan nyckel kommer inte in, och får veta varför", async () => {
+  it("ett nollställt konto får en QR-kod, och den första koden bekräftar den", async () => {
     await unsafeGlobalPrisma.platformUser.update({
       where: { email },
-      data: { totpSecret: null },
+      data: { totpSecret: null, totpEnabledAt: null },
     });
 
-    const outcome = await verifyPlatformLogin(email, password, "050471", now);
-    expect(outcome.ok).toBe(false);
-    expect(outcome.problem).toContain("--kod");
+    const step = await platformTwoStep(email);
+    expect(step?.mode).toBe("enroll");
+
+    // Nyckeln återanvänds tills den bekräftats.
+    const again = await platformTwoStep(email);
+    expect(again?.mode === "enroll" && again.enrollment.key).toBe(
+      step?.mode === "enroll" && step.enrollment.key
+    );
+
+    const saved = await unsafeGlobalPrisma.platformUser.findUniqueOrThrow({
+      where: { email },
+    });
+    const secret = openSecret(saved.totpSecret!, authSecret)!;
+    const code = codeForStep(secret, stepAt(new Date()));
+
+    expect((await verifyPlatformCode(email, code)).ok).toBe(true);
+    expect(await platformTwoStep(email)).toEqual({ mode: "code" });
   });
 });

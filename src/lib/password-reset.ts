@@ -144,7 +144,7 @@ export async function findPasswordReset(
 export async function redeemPasswordReset(
   token: string,
   password: string
-): Promise<{ email: string }> {
+): Promise<{ email: string; userId: string }> {
   if (password.length < MIN_PASSWORD_LENGTH) {
     throw new PasswordResetError(
       `Lösenordet måste vara minst ${MIN_PASSWORD_LENGTH} tecken.`
@@ -193,5 +193,5 @@ export async function redeemPasswordReset(
   // bytt lösenord på deras konto.
   await sendEmail(passwordChangedEmail({ to: reset.user.email }));
 
-  return { email: reset.user.email };
+  return { email: reset.user.email, userId: reset.user.id };
 }

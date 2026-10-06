@@ -7,7 +7,7 @@
 # det här kommandot har redan tillgång till servern.
 #
 #   ./scripts/platform-user.sh adi@terafalk.com
-#   ./scripts/platform-user.sh adi@terafalk.com --kod      (tvåstegsinloggning)
+#   ./scripts/platform-user.sh adi@terafalk.com --kod      (nollställ tvåsteg)
 #   ./scripts/platform-user.sh gammal@adress.se --ta-bort
 set -euo pipefail
 
@@ -19,8 +19,8 @@ if [ -z "$EMAIL" ]; then
   exit 1
 fi
 
-# En ny nyckel till autentiseringsappen. Gör den gamla ogiltig, så samma
-# kommando används om telefonen kommit bort.
+# Nollställer tvåstegsinloggningen. Nästa inloggning visar en ny QR-kod,
+# så samma kommando används om telefonen kommit bort.
 if [ "${2:-}" = "--kod" ]; then
   docker compose run --rm --no-TTY migrate     node scripts/platform-user.mjs "$EMAIL" --kod < /dev/null
   exit 0

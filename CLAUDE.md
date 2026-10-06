@@ -858,7 +858,7 @@ inställningarna.
    Klientens IP är SISTA värdet i `X-Forwarded-For`, det vår egen proxy satte.
    Se `app-url.ts` och `client-ip.ts`.
 
-   **Sessionen gäller tolv timmar** (ändrat 2026-10-06, var trettio dagar). Ett
+   **Sessionen gäller sju dagar** (ändrat 2026-10-06, var trettio dagar). Ett
    lösenordsbyte eller "Logga ut på alla enheter" under Användare gör äldre
    sessioner ogiltiga. **E-postadressen bekräftas** med en länk vid
    registreringen; det spärrar ingenting, men panelen visar en remsa tills
@@ -889,12 +889,20 @@ inställningarna.
    Supportläget släpps igenom prenumerationslåset — en obetald faktura är
    oftast precis varför kunden ringer.
 
-   **Plattformspanelen kräver tvåstegsinloggning** (infört 2026-10-06):
-   lösenord och en kod från en autentiseringsapp (TOTP, `src/lib/totp.ts`).
-   Nyckeln sätts upp från servern med `scripts/platform-user.sh <adress>
-   --kod`, aldrig via webben, och lagras krypterad med `AUTH_SECRET`. En
-   spärr på IP-adress i Caddy övervägdes och valdes bort: den krävde en fast
-   adress hos den som administrerar.
+   **Tvåstegsinloggning är obligatorisk för alla** (beslutat 2026-10-06):
+   kundernas ägare och administratörer och plattformspanelen, med samma
+   flöde. Steg ett är lösenordet, som bara lämnar en signerad lapp i tio
+   minuter (`login-ticket.ts`). Steg två visar en QR-kod första gången och
+   frågar sedan efter koden (TOTP, `totp.ts`, `two-step.ts`). Sessionen
+   skapas först när koden godkänts, och registrering, inbjudan och
+   återställning går samma väg. `currentAdmin()` släpper inte in ett konto
+   utan bekräftad app. Nycklarna lagras krypterade med `AUTH_SECRET`.
+
+   Kundens tvåsteg nollställs från plattformspanelen, efter att vi
+   kontrollerat vem som ringer; det loggas både hos oss och i kundens
+   ändringslogg. Plattformens nollställs med `scripts/platform-user.sh
+   <adress> --kod`. En spärr på IP-adress i Caddy övervägdes och valdes
+   bort: den krävde en fast adress hos den som administrerar.
 
    Kvarstående glapp, uttryckligen: `$queryRaw`/`$executeRaw` går inte att
    blockera i en Prisma-extension. Ingen adminåtgärd använder rå SQL.

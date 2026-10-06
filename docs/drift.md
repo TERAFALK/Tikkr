@@ -358,26 +358,26 @@ Checka sedan in filen. Dockerfilen använder `npm ci` så fort den finns.
 
 ---
 
-## 10. Tvåstegsinloggning till plattformspanelen
+## 10. Tvåstegsinloggning
 
-Plattformspanelen kräver lösenord **och** en sexsiffrig kod från en
-autentiseringsapp (Microsoft Authenticator, Google Authenticator eller
-liknande). Ett konto utan uppsatt nyckel kommer inte in alls.
+Krävs för alla: kundernas ägare och administratörer, och plattformspanelen.
+Efter lösenordet visas en QR-kod första gången, som skannas med valfri
+autentiseringsapp (Microsoft Authenticator, Google Authenticator, 1Password
+och andra). Därefter frågar inloggningen efter koden appen visar.
 
-Sätt upp nyckeln på servern, en gång per konto:
+Befintliga konton får QR-koden vid nästa inloggning. Ingen kommer in i
+panelen förrän appen är uppsatt.
+
+**Kund som tappat sin telefon:** plattformspanelen, kundkortet, tabellen
+Administratörer, **Nollställ**. Kontrollera först att det är personen själv
+som ber om det, till exempel genom att ringa upp på ägarens nummer. Nästa
+inloggning visar en ny QR-kod, och alla inloggade sessioner avslutas.
+
+**Du själv:** nollställ från servern, och logga in igen för en ny QR-kod.
 
 ```bash
 ./scripts/platform-user.sh adi@terafalk.com --kod
 ```
 
-Skriptet visar en nyckel i grupper om fyra tecken. I appen: lägg till ett
-konto, välj **Ange nyckel manuellt**, skriv av nyckeln och välj
-**tidsbaserad**. Logga sedan in med lösenordet och koden appen visar.
-
-Nyckeln visas bara den gången och lagras krypterad med `AUTH_SECRET`.
-
-**Ny telefon eller borttappad telefon:** kör samma kommando igen. Den gamla
-nyckeln slutar gälla i samma stund.
-
-**Byts `AUTH_SECRET`** går nyckeln inte längre att läsa, och kommandot måste
-köras igen för varje konto.
+Nycklarna lagras krypterade med `AUTH_SECRET`. **Byts `AUTH_SECRET`** går de
+inte längre att läsa, och alla måste sätta upp appen på nytt.

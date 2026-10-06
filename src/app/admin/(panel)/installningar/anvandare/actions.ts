@@ -2,7 +2,8 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { signIn, signOut } from "@/lib/auth";
+import { signOut } from "@/lib/auth";
+import { issueTicket } from "@/lib/login-ticket";
 import { AccountError, changeOwnPassword, revokeOwnSessions } from "@/lib/account";
 import {
   changeUnverifiedEmail,
@@ -188,21 +189,17 @@ export async function changePassword(
 
   if (next !== repeat) return { error: "Lösenorden är inte lika." };
 
-  let email: string;
   try {
-    ({ email } = await changeOwnPassword({
-      userId: session.userId,
-      current,
-      next,
-    }));
+    await changeOwnPassword({ userId: session.userId, current, next });
   } catch (error) {
     if (error instanceof AccountError) return { error: error.message };
     throw error;
   }
 
-  // Kastar en omdirigering när det gått bra, precis som vid registreringen.
-  await signIn("credentials", { email, password: next, redirectTo: PATH });
-  return saved("Lösenordet är bytt");
+  // Bytet avslutar alla sessioner, den här inräknad. Lösenordet är just
+  // bevisat, så personen hamnar direkt på koden från appen och sedan här igen.
+  await issueTicket("admin", session.userId, PATH);
+  redirect("/admin/login");
 }
 
 /**

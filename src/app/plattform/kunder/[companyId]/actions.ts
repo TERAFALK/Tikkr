@@ -13,6 +13,7 @@ import {
   deleteCompany,
   PlatformActionError,
   requirePlatformAdmin,
+  resetAdminTwoStep,
   saveNote,
   setLicensesManually,
   setModule,
@@ -186,6 +187,26 @@ export async function updateNote(
   revalidatePath(`/plattform/kunder/${companyId}`);
 
   return saved();
+}
+
+/**
+ * Nollställer en kundadministratörs tvåstegsinloggning. Se resetAdminTwoStep.
+ */
+export async function resetTwoStep(formData: FormData) {
+  const { email } = await requirePlatformAdmin();
+
+  const companyId = String(formData.get("companyId") ?? "");
+  const userId = String(formData.get("userId") ?? "");
+  if (!companyId || !userId) return;
+
+  try {
+    await resetAdminTwoStep({ actorEmail: email, companyId, userId });
+  } catch (error) {
+    if (error instanceof PlatformActionError) return;
+    throw error;
+  }
+
+  revalidatePath(`/plattform/kunder/${companyId}`);
 }
 
 export interface DeleteCompanyState {

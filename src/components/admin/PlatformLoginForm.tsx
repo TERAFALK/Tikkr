@@ -31,17 +31,6 @@ export default function PlatformLoginForm() {
         />
       </Field>
 
-      <Field label="Kod" hint="Sex siffror från autentiseringsappen">
-        <Input
-          name="code"
-          inputMode="numeric"
-          autoComplete="one-time-code"
-          pattern="[0-9 ]{6,7}"
-          maxLength={7}
-          required
-        />
-      </Field>
-
       <SubmitButton />
     </form>
   );

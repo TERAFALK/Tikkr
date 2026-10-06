@@ -1,7 +1,7 @@
 "use server";
 
-import { AuthError } from "next-auth";
-import { signIn } from "@/lib/auth";
+import { redirect } from "next/navigation";
+import { issueTicket } from "@/lib/login-ticket";
 import { createCompanyWithOwner, SignupError } from "@/lib/signup";
 import { sendEmailVerification } from "@/lib/email-verification";
 import { requestIp } from "@/lib/client-ip";
@@ -78,24 +78,9 @@ export async function register(
   // mejlet inte iväg visar panelen en remsa med en knapp för att försöka igen.
   await sendEmailVerification(ownerId);
 
-  try {
-    // Logga in direkt. Att tvinga någon att skriva lösenordet igen tio
-    // sekunder efter att de valt det är bara ett hinder.
-    await signIn("credentials", {
-      email,
-      password,
-      redirectTo: "/admin/kom-igang",
-    });
-  } catch (error) {
-    if (error instanceof AuthError) {
-      // Kontot finns men inloggningen krånglade. Skicka dem till
-      // inloggningssidan istället för att låtsas att inget hänt.
-      return {
-        error: "Kontot är skapat, men inloggningen misslyckades. Logga in nedan.",
-      };
-    }
-    throw error;
-  }
-
-  return {};
+  // Vidare till tvåstegsinloggningen, utan att skriva lösenordet igen: det
+  // valdes för tio sekunder sedan. Inloggningssidan visar QR-koden, och efter
+  // den första koden hamnar den nya ägaren i kom igång-guiden.
+  await issueTicket("admin", ownerId, "/admin/kom-igang");
+  redirect("/admin/login");
 }
