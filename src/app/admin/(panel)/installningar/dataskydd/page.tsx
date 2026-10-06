@@ -4,7 +4,7 @@ import { hasModule } from "@/lib/company-modules";
 import SaveForm from "@/components/admin/SaveForm";
 import {
   Alert,
-  ButtonLink,
+  Button,
   Card,
   CardHeader,
   Field,
@@ -35,15 +35,29 @@ export default async function DataProtectionPage() {
           title="Lämna ut en persons uppgifter"
           description="Allt som registrerats om en anställd."
         />
-        <div className="space-y-4 p-5 text-[13px] text-neutral-600">
-          <p>
-            Filtrera på personen i rapporterna och exportera till Excel. Filen
-            innehåller varje stämpling med tidpunkt, order och arbetsmoment.
-          </p>
-          <ButtonLink href="/admin/rapporter" tone="secondary">
-            Till rapporter
-          </ButtonLink>
-        </div>
+        {/* Ett vanligt formulär med GET, utan skript: valet hamnar i
+            adressen och rutten svarar med en fil. Se person-export.ts. */}
+        <form
+          action="/api/admin/export/person"
+          method="get"
+          className="max-w-md space-y-4 p-5"
+        >
+          <Field label="Anställd">
+            <Select name="employeeId" required defaultValue="">
+              <option value="" disabled>
+                Välj person…
+              </option>
+              {employees.map((employee) => (
+                <option key={employee.id} value={employee.id}>
+                  {employee.name}
+                </option>
+              ))}
+            </Select>
+          </Field>
+          <Button type="submit" tone="secondary">
+            Ta ut registerutdrag
+          </Button>
+        </form>
       </Card>
 
       <Card>

@@ -253,7 +253,7 @@ const sections: Section[] = [
         </p>
         <List
           items={[
-            "Registerutdrag tas fram genom att filtrera på personen i rapporterna och exportera resultatet.",
+            "Registerutdrag tas ut per person under Inställningar, Dataskydd, och innehåller samtliga register: uppgifterna om personen, stämplingar, raster, frånvaro, komptid, ändringar och porträtt.",
             "Radering sker genom anonymisering: namnet tas bort permanent medan den registrerade tiden finns kvar utan koppling till en namngiven person. Skälet är att rätten att bli glömd och bokföringslagens krav på bevarande av räkenskapsinformation annars står i konflikt.",
             "Rättelse av felaktig tid görs av den ansvariges administratör, och märks som manuell ändring.",
           ]}
