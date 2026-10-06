@@ -17,7 +17,8 @@ export async function platformLogin(
 ): Promise<PlatformLoginState> {
   const outcome = await verifyPlatformLogin(
     String(formData.get("email") ?? ""),
-    String(formData.get("password") ?? "")
+    String(formData.get("password") ?? ""),
+    String(formData.get("code") ?? "")
   );
 
   if (!outcome.ok || !outcome.email) {

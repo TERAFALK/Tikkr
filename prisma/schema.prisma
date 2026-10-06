@@ -791,6 +791,18 @@ model EmailVerification {
 model PlatformUser {
   email        String    @id
   passwordHash String    @map("password_hash")
+
+  /// Nyckeln till autentiseringsappen, krypterad. Se src/lib/totp-box.mjs.
+  ///
+  /// Krävs för att logga in (infört 2026-10-06). Sätts bara från servern, med
+  /// scripts/platform-user.sh, av samma skäl som lösenordet: den som har ett
+  /// stulet lösenord ska inte kunna koppla in sin egen telefon.
+  totpSecret String? @map("totp_secret")
+
+  /// Perioden för den senast godkända koden. En kod går inte att använda två
+  /// gånger.
+  totpLastStep Int? @map("totp_last_step")
+
   createdAt    DateTime  @default(now()) @map("created_at")
   updatedAt    DateTime  @updatedAt @map("updated_at")
   lastLoginAt  DateTime? @map("last_login_at")

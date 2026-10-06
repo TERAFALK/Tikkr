@@ -10,9 +10,12 @@
 # Startas med:
 #   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
 #
-# Två värden kommer ur .env:
-#   ACME_EMAIL             dit Let's Encrypt skriver om något är fel med ett certifikat
-#   PLATFORM_ALLOWED_IPS   adresserna som får nå plattformspanelen, mellanslag emellan
+# Ett värde kommer ur .env:
+#   ACME_EMAIL   dit Let's Encrypt skriver om något är fel med ett certifikat
+#
+# Plattformspanelen skyddas av tvåstegsinloggning i appen, inte av en spärr
+# här. En spärr på IP-adress krävde en fast adress hos den som administrerar,
+# och stängde ute den som jobbade hemifrån eller från mobilen.
 
 {
 	email {$ACME_EMAIL}
@@ -27,19 +30,6 @@ www.tikkr.se, tikkr.se {
 
 portal.tikkr.se {
 	encode zstd gzip
-
-	# PLATTFORMSPANELEN NÅS BARA FRÅN KÄNDA ADRESSER.
-	#
-	# Panelen ser alla kunders driftdata och kan öppna en kunds panel. Den
-	# skyddas av lösenord och av en lista på servern, men ett lösenord går att
-	# stjäla. Med den här spärren räcker det inte: den som inte sitter på en av
-	# adresserna får 404 och vet inte ens att panelen finns.
-	@plattform path /plattform /plattform/*
-	@okand not remote_ip {$PLATFORM_ALLOWED_IPS}
-	handle @plattform {
-		respond @okand 404
-		reverse_proxy tikkr-app:3000
-	}
 
 	# Caddy skriver själv X-Forwarded-For, -Proto och -Host och litar inte
 	# på värden klienten skickat. Det är vad src/lib/client-ip.ts förutsätter.

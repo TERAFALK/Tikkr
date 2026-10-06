@@ -286,7 +286,8 @@ SPF, DKIM och DMARC måste vara satta för `tikkr.se`, annars hamnar
 - [ ] Repot satt till **privat** på GitHub
 - [ ] Adminlösenordet från testdatan (`tikkr123`) borttaget eller bytt
 - [ ] Testskärmen från seed-datan (fast kopplingskod `123456`) raderad under Skärmar
-- [ ] Produktionsservern med Caddy och `PLATFORM_ALLOWED_IPS` (punkt 8)
+- [ ] Produktionsservern med Caddy (punkt 8)
+- [ ] Tvåstegsinloggning uppsatt för varje plattformskonto (punkt 10)
 - [ ] `./scripts/status.sh` utan röda punkter
 
 ---
@@ -305,7 +306,7 @@ docker network create npm_proxy
 ```
 
 4. Fyll i `.env` utifrån `.env.example`. Utöver labbets värden krävs
-   `ACME_EMAIL`, `PLATFORM_ALLOWED_IPS`, `APP_URL=https://portal.tikkr.se`,
+   `ACME_EMAIL`, `APP_URL=https://portal.tikkr.se`,
    `MARKETING_HOST=www.tikkr.se,tikkr.se`, `PORTAL_HOST=portal.tikkr.se` och
    `APP_BIND=127.0.0.1`
 5. Starta:
@@ -314,8 +315,7 @@ docker network create npm_proxy
 docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
 ```
 
-Caddy hämtar certifikaten själv första gången. Plattformspanelen svarar 404
-för alla adresser utom de i `PLATFORM_ALLOWED_IPS`.
+Caddy hämtar certifikaten själv första gången.
 
 ---
 
@@ -355,3 +355,29 @@ Checka sedan in filen. Dockerfilen använder `npm ci` så fort den finns.
 | Kör testerna | `./scripts/test.sh` |
 | Ny migration | `./scripts/create-migration.sh <namn>` |
 | Säkerhetskopia nu | `./scripts/backup.sh` |
+
+---
+
+## 10. Tvåstegsinloggning till plattformspanelen
+
+Plattformspanelen kräver lösenord **och** en sexsiffrig kod från en
+autentiseringsapp (Microsoft Authenticator, Google Authenticator eller
+liknande). Ett konto utan uppsatt nyckel kommer inte in alls.
+
+Sätt upp nyckeln på servern, en gång per konto:
+
+```bash
+./scripts/platform-user.sh adi@terafalk.com --kod
+```
+
+Skriptet visar en nyckel i grupper om fyra tecken. I appen: lägg till ett
+konto, välj **Ange nyckel manuellt**, skriv av nyckeln och välj
+**tidsbaserad**. Logga sedan in med lösenordet och koden appen visar.
+
+Nyckeln visas bara den gången och lagras krypterad med `AUTH_SECRET`.
+
+**Ny telefon eller borttappad telefon:** kör samma kommando igen. Den gamla
+nyckeln slutar gälla i samma stund.
+
+**Byts `AUTH_SECRET`** går nyckeln inte längre att läsa, och kommandot måste
+köras igen för varje konto.

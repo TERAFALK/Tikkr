@@ -7,6 +7,7 @@
 # det här kommandot har redan tillgång till servern.
 #
 #   ./scripts/platform-user.sh adi@terafalk.com
+#   ./scripts/platform-user.sh adi@terafalk.com --kod      (tvåstegsinloggning)
 #   ./scripts/platform-user.sh gammal@adress.se --ta-bort
 set -euo pipefail
 
@@ -14,8 +15,15 @@ cd "$(dirname "$0")/.."
 
 EMAIL="${1:-}"
 if [ -z "$EMAIL" ]; then
-  echo "Användning: ./scripts/platform-user.sh <e-postadress> [--ta-bort]"
+  echo "Användning: ./scripts/platform-user.sh <e-postadress> [--kod | --ta-bort]"
   exit 1
+fi
+
+# En ny nyckel till autentiseringsappen. Gör den gamla ogiltig, så samma
+# kommando används om telefonen kommit bort.
+if [ "${2:-}" = "--kod" ]; then
+  docker compose run --rm --no-TTY migrate     node scripts/platform-user.mjs "$EMAIL" --kod < /dev/null
+  exit 0
 fi
 
 if [ "${2:-}" = "--ta-bort" ]; then

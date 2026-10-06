@@ -28,7 +28,6 @@ services:
       - "443:443/udp"
     environment:
       ACME_EMAIL: ${ACME_EMAIL:?ACME_EMAIL saknas i .env}
-      PLATFORM_ALLOWED_IPS: ${PLATFORM_ALLOWED_IPS:?PLATFORM_ALLOWED_IPS saknas i .env}
     volumes:
       - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
       # Certifikaten. Försvinner de begärs nya, och Let's Encrypt har tak för

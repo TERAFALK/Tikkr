@@ -1,6 +1,8 @@
 import bcrypt from "bcryptjs";
 import { unsafeGlobalPrisma } from "./db";
 import { isPlatformAdmin } from "./platform-access";
+import { verifyTotp } from "./totp";
+import { openSecret } from "./totp-box.mjs";
 import {
   clearFailedLogins,
   isLockedOut,
@@ -23,6 +25,11 @@ import {
  * Lösenord sätts BARA från servern, med scripts/platform-user.sh. Det finns
  * ingen registreringssida — en sådan skulle låta den som gissar en tillåten
  * adress hinna först och sätta lösenordet innan den rätta personen gjort det.
+ *
+ * TVÅSTEGSINLOGGNING KRÄVS (infört 2026-10-06). Utöver lösenordet en kod från
+ * en autentiseringsapp, se totp.ts. Nyckeln sätts upp från servern med samma
+ * skript, så att ett stulet lösenord inte räcker för att koppla in en annan
+ * telefon. Ett konto utan nyckel kommer inte in alls.
  */
 
 /** Hash av ett lösenord ingen har. Ger samma svarstid för okända konton. */
@@ -44,14 +51,19 @@ export interface LoginOutcome {
   problem?: string;
 }
 
+/** Samma besked för varje sorts fel. Se nedan. */
+const WRONG = "Fel adress, lösenord eller kod.";
+
 export async function verifyPlatformLogin(
   rawEmail: string,
-  password: string
+  password: string,
+  code: string,
+  now: Date = new Date()
 ): Promise<LoginOutcome> {
   const email = rawEmail.trim().toLowerCase();
 
   if (!email || !password) {
-    return { ok: false, problem: "Fyll i både adress och lösenord." };
+    return { ok: false, problem: "Fyll i adress, lösenord och kod." };
   }
 
   if (isLockedOut(SCOPE, email)) {
@@ -81,15 +93,48 @@ export async function verifyPlatformLogin(
 
     // Samma meddelande oavsett vad som var fel. Ett mer hjälpsamt svar är
     // hjälpsamt även för den som inte ska in.
-    return { ok: false, problem: "Fel adress eller lösenord." };
+    return { ok: false, problem: WRONG };
+  }
+
+  // Den här raden når bara den som redan kan lösenordet. Att den säger rakt
+  // ut vad som saknas avslöjar alltså ingenting för en främling, och utan den
+  // står den rätta personen utelåst utan att förstå varför.
+  const secret = account.totpSecret
+    ? openSecret(account.totpSecret, process.env.AUTH_SECRET ?? "")
+    : null;
+
+  if (!secret) {
+    return {
+      ok: false,
+      problem:
+        "Tvåstegsinloggning är inte uppsatt för kontot. Kör " +
+        `./scripts/platform-user.sh ${email} --kod på servern.`,
+    };
+  }
+
+  const step = verifyTotp(secret, code, now, account.totpLastStep);
+
+  if (step === null) {
+    noteFailedLogin(SCOPE, email);
+    return { ok: false, problem: WRONG };
+  }
+
+  // Perioden skrivs med villkor, så att två inloggningar med samma kod i
+  // samma ögonblick inte båda går igenom: den andra hittar ingen rad.
+  const claimed = await unsafeGlobalPrisma.platformUser.updateMany({
+    where: {
+      email,
+      OR: [{ totpLastStep: null }, { totpLastStep: { lt: step } }],
+    },
+    data: { totpLastStep: step, lastLoginAt: now },
+  });
+
+  if (claimed.count === 0) {
+    noteFailedLogin(SCOPE, email);
+    return { ok: false, problem: WRONG };
   }
 
   clearFailedLogins(SCOPE, email);
-
-  await unsafeGlobalPrisma.platformUser.update({
-    where: { email },
-    data: { lastLoginAt: new Date() },
-  });
 
   await unsafeGlobalPrisma.platformAuditLog.create({
     data: { actorEmail: email, action: "Loggade in i plattformspanelen" },

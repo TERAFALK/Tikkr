@@ -889,6 +889,13 @@ inställningarna.
    Supportläget släpps igenom prenumerationslåset — en obetald faktura är
    oftast precis varför kunden ringer.
 
+   **Plattformspanelen kräver tvåstegsinloggning** (infört 2026-10-06):
+   lösenord och en kod från en autentiseringsapp (TOTP, `src/lib/totp.ts`).
+   Nyckeln sätts upp från servern med `scripts/platform-user.sh <adress>
+   --kod`, aldrig via webben, och lagras krypterad med `AUTH_SECRET`. En
+   spärr på IP-adress i Caddy övervägdes och valdes bort: den krävde en fast
+   adress hos den som administrerar.
+
    Kvarstående glapp, uttryckligen: `$queryRaw`/`$executeRaw` går inte att
    blockera i en Prisma-extension. Ingen adminåtgärd använder rå SQL.
 
@@ -932,8 +939,7 @@ en rullande omstart. Labbet är staging tills vidare: en gren provas där innan
 den slås ihop med `main`.
 
 Produktionsservern kör Caddy framför appen (`deploy/Caddyfile`,
-`docker-compose.prod.yml`). Plattformspanelen nås där bara från adresserna i
-`PLATFORM_ALLOWED_IPS`.
+`docker-compose.prod.yml`).
 
 Måste finnas stöd för:
 

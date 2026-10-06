@@ -61,6 +61,9 @@ services:
         condition: service_healthy
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER:-tikkr}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-tikkr}?schema=public
+      # Behövs av scripts/platform-user.sh för att kryptera nyckeln till
+      # tvåstegsinloggningen på samma sätt som appen läser den.
+      AUTH_SECRET: ${AUTH_SECRET:?AUTH_SECRET saknas i .env}
     command: ["sh", "./scripts/migrate.sh"]
 
   app:
