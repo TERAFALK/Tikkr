@@ -281,11 +281,14 @@ describe("isolering mellan företag", () => {
  * bara i det egna företaget.
  */
 describe("nollställa tvåstegsinloggning", () => {
+  let serial = 0;
+
   async function adminWithTwoStep(role: "OWNER" | "ADMIN" = "ADMIN") {
     return unsafeGlobalPrisma.adminUser.create({
       data: {
         companyId,
-        email: addr(`tvasteg-${role.toLowerCase()}`),
+        // Löpnummer, så att två konton i samma test får olika adresser.
+        email: addr(`tvasteg-${role.toLowerCase()}-${++serial}`),
         passwordHash: "inte-en-riktig-hash",
         role,
         totpSecret: "v1.x.y.z",
