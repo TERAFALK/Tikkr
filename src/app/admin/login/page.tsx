@@ -31,7 +31,7 @@ export default function LoginPage() {
             Glömt lösenordet?
           </Link>
           <br />
-          Stämplingsskärmar loggar inte in här. De kopplas via en egen länk från
+          Stämplingsskärmar loggar inte in här. De kopplas med en kod från
           adminpanelen.
         </>
       }

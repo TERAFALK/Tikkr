@@ -235,8 +235,15 @@ export function Stat({
 /* Formulärfält                                                                */
 /* -------------------------------------------------------------------------- */
 
+/**
+ * 16 px på en telefon, 13 px därifrån och uppåt.
+ *
+ * Safari på iPhone zoomar in hela sidan när man trycker i ett fält med mindre
+ * text än 16 px, och zoomar inte ut igen. Varje formulär i panelen hamnade
+ * därmed halvvägs utanför skärmen så fort man började skriva.
+ */
 const fieldBase =
-  "rounded-md border-0 bg-white px-2.5 py-1.5 text-[13px] " +
+  "rounded-md border-0 bg-white px-2.5 py-1.5 text-base sm:text-[13px] " +
   "text-neutral-900 ring-1 ring-inset ring-neutral-200 " +
   "placeholder:text-neutral-400 focus:ring-2 focus:ring-inset focus:ring-blue-600";
 
@@ -247,7 +254,7 @@ const fieldStyles = `block w-full ${fieldBase}`;
  * tillägg: två ringfärger på samma element avgörs av ordningen i stilmallen.
  */
 const fieldInvalid =
-  "rounded-md border-0 bg-red-50 px-2.5 py-1.5 text-[13px] " +
+  "rounded-md border-0 bg-red-50 px-2.5 py-1.5 text-base sm:text-[13px] " +
   "text-red-900 ring-1 ring-inset ring-red-400 " +
   "placeholder:text-red-300 focus:ring-2 focus:ring-inset focus:ring-red-600";
 
