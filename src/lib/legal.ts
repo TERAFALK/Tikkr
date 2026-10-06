@@ -57,8 +57,8 @@ export const PROVIDER = {
   name: "TERAFALK AB",
   service: "Tikkr",
   support: "support@tikkr.se",
-  orgNumber: "",
-  address: "",
+  orgNumber: "559376-1504",
+  address: "Saleby Rasagården 10, 531 98 Lidköping",
 } as const;
 
 /** "TERAFALK AB, org.nr 556…, Gatan 1, 123 45 Ort" med det som är ifyllt. */
