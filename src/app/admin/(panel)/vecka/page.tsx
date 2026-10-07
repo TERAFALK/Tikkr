@@ -80,7 +80,7 @@ export default async function WeekPage({
         title="Veckovy"
         description="Huvudstämplingen per person och dag."
         action={
-          {/* Samma reglage som på tidrapporten. Se WeekStepper. */}
+          // Samma reglage som på tidrapporten. Se WeekStepper.
           <div className="flex items-center gap-2">
             {!thisWeek && <NavLink href="/admin/vecka" label="Denna vecka" />}
             <WeekStepper
