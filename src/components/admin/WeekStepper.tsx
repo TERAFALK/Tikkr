@@ -3,15 +3,27 @@ import Link from "next/link";
 /**
  * EN VECKA BAKÅT, EN FRAMÅT, OCH VECKONUMRET EMELLAN.
  *
- * Samma reglage på varje sida som räknar i veckor. Låg först bara på
- * tidrapporten, medan veckovyn hade tre textknappar ("Föregående", "Denna
- * vecka", "Nästa") och veckonumret på ett helt annat ställe på sidan. Två
- * sätt att göra samma sak betyder att man får lära sig båda.
+ * Samma reglage på varje sida som räknar i veckor: Rapporter, Stämplingar,
+ * Tidrapport och Veckovy.
  *
- * Numret står i mitten och inte som en rubrik någon annanstans: det är det
- * man läser för att veta var man är, och det hör ihop med pilarna som flyttar
- * en därifrån.
+ * UTSEENDET ÄR PLANERINGENS. Den hade tre fristående knappar långt innan den
+ * här komponenten fanns, och den första versionen av den här ritade i stället
+ * ett sammanhållet reglage med pilar i svg. Två växlare som gör samma sak men
+ * ser olika ut är sämre än den fulare av dem, och planeringens är dessutom
+ * den finare: tre lika höga knappar med luft emellan, i samma form som
+ * panelens övriga knappar.
+ *
+ * Numret står i mitten och inte som en rubrik någon annanstans: det är det man
+ * läser för att veta var man är, och det hör ihop med pilarna som flyttar en
+ * därifrån. Mittenrutan är en etikett och inte en länk, eftersom det inte
+ * finns något att trycka på den för.
  */
+
+/** Delas med planeringens växlare. Ändras formen ändras den på båda. */
+const stepBase =
+  "inline-flex h-8 items-center justify-center rounded-md border " +
+  "border-neutral-300 bg-white text-[13px] font-medium";
+
 export default function WeekStepper({
   backHref,
   forwardHref,
@@ -23,51 +35,26 @@ export default function WeekStepper({
   label: string;
 }) {
   return (
-    <div className="flex items-stretch overflow-hidden rounded-md bg-white ring-1 ring-inset ring-neutral-300">
-      <StepLink href={backHref} direction="back" label="Föregående vecka" />
+    <div className="flex items-center gap-2">
+      <Link
+        href={backHref}
+        aria-label="Föregående vecka"
+        className={`${stepBase} w-8 text-neutral-600 hover:bg-neutral-50`}
+      >
+        ‹
+      </Link>
 
-      <span className="flex flex-1 items-center justify-center whitespace-nowrap px-3 text-[13px] font-medium text-neutral-900">
+      <span className={`${stepBase} px-3 whitespace-nowrap text-neutral-700`}>
         {label}
       </span>
 
-      <StepLink href={forwardHref} direction="forward" label="Nästa vecka" />
-    </div>
-  );
-}
-
-/** En pil i stegaren. */
-function StepLink({
-  href,
-  direction,
-  label,
-}: {
-  href: string;
-  direction: "back" | "forward";
-  label: string;
-}) {
-  return (
-    <Link
-      href={href}
-      aria-label={label}
-      title={label}
-      className="flex items-center px-2.5 py-1.5 text-neutral-600 hover:bg-neutral-50 hover:text-neutral-900"
-    >
-      <svg
-        viewBox="0 0 20 20"
-        className="h-4 w-4"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth={1.75}
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        aria-hidden="true"
+      <Link
+        href={forwardHref}
+        aria-label="Nästa vecka"
+        className={`${stepBase} w-8 text-neutral-600 hover:bg-neutral-50`}
       >
-        {direction === "back" ? (
-          <path d="M12 4 6 10l6 6" />
-        ) : (
-          <path d="m8 4 6 6-6 6" />
-        )}
-      </svg>
-    </Link>
+        ›
+      </Link>
+    </div>
   );
 }

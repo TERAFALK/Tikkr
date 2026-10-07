@@ -253,11 +253,22 @@ export function Stat({
  *
  * Lav är kvar som linje mellan rader och runt kort. Där är den rätt: en linje
  * som delar av är inte en kant man ska träffa med fingret.
+ *
+ * ── FOKUSRINGEN RITAS EN GÅNG, INTE TVÅ ─────────────────────────────────
+ *
+ * `focus:outline-hidden` släcker webbläsarens egen fokusram. Utan den ritade
+ * Chrome sin `outline: auto` OVANPÅ vår tvåpixelsring, och ett fält man klickat
+ * i fick en kant som såg ut som en svart ram runt hela rutan — kunden hörde av
+ * sig om just det.
+ *
+ * `outline-hidden` och inte `outline-none`: den förra lämnar kvar en genomskinlig
+ * ram, som blir synlig i Windows högkontrastläge. Där ritas inte vår ring, och
+ * ett fält utan synligt fokus går inte att använda med tangentbord.
  */
 const fieldBase =
   "rounded-md border-0 bg-white px-2.5 py-1.5 text-base sm:text-[13px] " +
   "text-neutral-900 ring-1 ring-inset ring-neutral-400 " +
-  "placeholder:text-neutral-400 focus:ring-2 focus:ring-inset focus:ring-blue-600";
+  "placeholder:text-neutral-400 focus:outline-hidden focus:ring-2 focus:ring-inset focus:ring-blue-600";
 
 const fieldStyles = `block w-full ${fieldBase}`;
 
@@ -268,7 +279,7 @@ const fieldStyles = `block w-full ${fieldBase}`;
 const fieldInvalid =
   "rounded-md border-0 bg-red-50 px-2.5 py-1.5 text-base sm:text-[13px] " +
   "text-red-900 ring-1 ring-inset ring-red-400 " +
-  "placeholder:text-red-300 focus:ring-2 focus:ring-inset focus:ring-red-600";
+  "placeholder:text-red-300 focus:outline-hidden focus:ring-2 focus:ring-inset focus:ring-red-600";
 
 export function Field({
   label,

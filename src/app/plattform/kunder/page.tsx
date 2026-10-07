@@ -93,7 +93,7 @@ export default async function CompaniesPage({
                   name="q"
                   defaultValue={query}
                   placeholder="Sök kund…"
-                  className="w-44 rounded-md border-0 bg-white px-2.5 py-1.5 text-[13px] text-neutral-900 ring-1 ring-inset ring-neutral-400 placeholder:text-neutral-400 focus:ring-2 focus:ring-inset focus:ring-blue-600"
+                  className="w-44 rounded-md border-0 bg-white px-2.5 py-1.5 text-[13px] text-neutral-900 ring-1 ring-inset ring-neutral-400 placeholder:text-neutral-400 focus:outline-hidden focus:ring-2 focus:ring-inset focus:ring-blue-600"
                 />
                 <Button type="submit" tone="secondary">
                   Sök

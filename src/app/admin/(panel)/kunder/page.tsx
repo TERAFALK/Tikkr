@@ -90,7 +90,7 @@ export default async function CustomersPage({
                   name="q"
                   defaultValue={query}
                   placeholder="Namn, kundnr, org.nr…"
-                  className="w-52 rounded-md border-0 bg-white px-2.5 py-1.5 text-[13px] text-neutral-900 ring-1 ring-inset ring-neutral-400 placeholder:text-neutral-400 focus:ring-2 focus:ring-inset focus:ring-blue-600"
+                  className="w-52 rounded-md border-0 bg-white px-2.5 py-1.5 text-[13px] text-neutral-900 ring-1 ring-inset ring-neutral-400 placeholder:text-neutral-400 focus:outline-hidden focus:ring-2 focus:ring-inset focus:ring-blue-600"
                 />
                 <Button type="submit" tone="secondary">
                   Sök

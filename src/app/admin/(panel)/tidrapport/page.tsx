@@ -126,7 +126,7 @@ export default async function TimesheetPage({
             type="date"
             name="from"
             defaultValue={toDateInput(from, timeZone)}
-            className="block w-full rounded-md border-0 bg-white px-2.5 py-1.5 text-[13px] text-neutral-900 ring-1 ring-inset ring-neutral-400 focus:ring-2 focus:ring-inset focus:ring-blue-600"
+            className="block w-full rounded-md border-0 bg-white px-2.5 py-1.5 text-[13px] text-neutral-900 ring-1 ring-inset ring-neutral-400 focus:outline-hidden focus:ring-2 focus:ring-inset focus:ring-blue-600"
           />
         </Field>
 
@@ -135,16 +135,14 @@ export default async function TimesheetPage({
             type="date"
             name="to"
             defaultValue={toDateInput(to, timeZone)}
-            className="block w-full rounded-md border-0 bg-white px-2.5 py-1.5 text-[13px] text-neutral-900 ring-1 ring-inset ring-neutral-400 focus:ring-2 focus:ring-inset focus:ring-blue-600"
+            className="block w-full rounded-md border-0 bg-white px-2.5 py-1.5 text-[13px] text-neutral-900 ring-1 ring-inset ring-neutral-400 focus:outline-hidden focus:ring-2 focus:ring-inset focus:ring-blue-600"
           />
         </Field>
 
         {/* STEGA EN VECKA I TAGET. Hela perioden flyttas, lika lång som den
             var, så att den som valt en längre period behåller sin längd. */}
         <div className="flex items-end">
-          <div className="w-full">
-            <WeekStepper {...week} />
-          </div>
+          <WeekStepper {...week} />
         </div>
       </FilterForm>
     </Card>

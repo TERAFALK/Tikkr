@@ -1163,6 +1163,13 @@ WCAG 1.4.11 begär för kanten på en kontroll man ska kunna urskilja.
 Lav är kvar som linje mellan rader och runt kort. Där är den rätt: en linje som
 delar av är inte en kant man ska träffa med fingret.
 
+**Fokusringen ritas en gång, inte två.** Fälten släcker webbläsarens egen
+fokusram med `focus:outline-hidden`. Utan den ritade Chrome sin `outline: auto`
+ovanpå vår tvåpixelsring, och ett fält man klickat i fick en svart ram runt
+hela rutan. `outline-hidden` och inte `outline-none`: den förra lämnar kvar en
+genomskinlig ram, som blir synlig i Windows högkontrastläge, där vår ring inte
+ritas alls.
+
 **Paletten ägs av två filer, och de ska hållas i takt.**
 `src/app/globals.css` har tokens för gränssnittet; `src/lib/brand.ts` har
 samma sex färger som TypeScript, för dokumenten som ritas av pdfkit och inte
