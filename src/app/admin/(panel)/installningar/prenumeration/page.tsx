@@ -10,6 +10,12 @@ import { Alert, Button, Card, CardHeader, Field, Input } from "@/components/ui";
 import { formatDate } from "@/lib/format";
 import { openBillingPortal, startCheckout } from "./actions";
 
+/**
+ * Belopp med tusentalsavgränsare. Ligger på modulnivå och inte i
+ * sidkomponenten, eftersom raderna under också skriver belopp.
+ */
+const kr = (amount: number) => amount.toLocaleString("sv-SE");
+
 export const dynamic = "force-dynamic";
 
 export default async function SubscriptionPage({
@@ -47,7 +53,6 @@ export default async function SubscriptionPage({
   const overview = await getBillingOverview(companyId);
 
   const { pricing } = overview;
-  const kr = (amount: number) => amount.toLocaleString("sv-SE");
 
   // Avgifter visas bara när det faktiskt finns en avgift. Under provperioden
   // betalar kunden ingenting, och då ska ingen summa stå någonstans.
