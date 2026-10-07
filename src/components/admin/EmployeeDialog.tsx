@@ -65,6 +65,8 @@ export default function EmployeeDialog({
     hasPhoto: boolean;
     /** true när en kod för flexsaldot redan är satt. Koden går inte att läsa. */
     hasFlexCode: boolean;
+    /** Timanställd: inget schema, inget flexsaldo, ingen komptid. */
+    hourly: boolean;
   };
   /**
    * Personens egna arbetstider, eller null när hen går på företagets schema.
@@ -86,10 +88,13 @@ export default function EmployeeDialog({
   const [preview, setPreview] = useState<string | null>(null);
   const [removePhoto, setRemovePhoto] = useState(false);
   const [ownHours, setOwnHours] = useState(Boolean(scheduleDays?.length));
+  const [hourly, setHourly] = useState(Boolean(employee?.hourly));
 
   function open() {
     setPreview(null);
     setRemovePhoto(false);
+    setHourly(Boolean(employee?.hourly));
+    setOwnHours(Boolean(scheduleDays?.length));
     setOwnHours(Boolean(scheduleDays?.length));
     dialog.current?.showModal();
   }
@@ -266,7 +271,37 @@ export default function EmployeeDialog({
               </div>
             )}
 
+            {/* TIMANSTÄLLD. Står före arbetstiderna, eftersom krysset
+                gömmer dem: den som är timanställd mäts inte mot något schema
+                alls, och ett schemaformulär under krysset hade sett ut som
+                att tiderna ändå gäller.
+
+                Den enda förklaringen i rutan som behövs, eftersom följden
+                inte går att se på skärmen: flexsaldot och komptiden försvinner
+                för personen. */}
             {payroll && (
+              <div className="border-t border-neutral-200 pt-4">
+                <label className="flex cursor-pointer items-start gap-2 text-[13px]">
+                  <input
+                    type="checkbox"
+                    name="hourly"
+                    checked={hourly}
+                    onChange={(event) => setHourly(event.target.checked)}
+                    className="mt-0.5 h-3.5 w-3.5 rounded border-neutral-300 text-blue-600 focus:ring-blue-600"
+                  />
+                  <span>
+                    <span className="block font-medium text-neutral-900">
+                      Timanställd
+                    </span>
+                    <span className="block text-neutral-500">
+                      Inget schema, inget flexsaldo och ingen komptid
+                    </span>
+                  </span>
+                </label>
+              </div>
+            )}
+
+            {payroll && !hourly && (
               <div className="border-t border-neutral-200 pt-4">
                 <label className="flex cursor-pointer items-start gap-2 text-[13px]">
                   <input

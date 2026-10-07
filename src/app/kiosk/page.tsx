@@ -122,6 +122,7 @@ export default async function KioskPage() {
         name: true,
         photoMimeType: true,
         flexCodeHash: true,
+        hourly: true,
       },
     }),
     db.order.findMany({
@@ -320,7 +321,10 @@ export default async function KioskPage() {
         id: employee.id,
         name: employee.name,
         hasPhoto: Boolean(employee.photoMimeType),
-        hasFlexCode: Boolean(employee.flexCodeHash),
+        // Timanställd har inget flexsaldo att visa, så i-knappen ritas
+        // inte. Rutten svarar null för samma person ändå, se
+        // currentFlexMinutes.
+        hasFlexCode: Boolean(employee.flexCodeHash) && !employee.hourly,
       }))}
       orders={sortedOrders.map((order) => ({
         id: order.id,

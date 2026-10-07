@@ -143,7 +143,7 @@ admin-UI m.m.). Kraftfullt, men det motsäger målet om *ett* enkelt paket.
 ```
 companies      — id, name, subscription_status, created_at
 employees      — id, company_id, name, active, cost_rate_ore,
-                 schedule_id?, flex_opening_minutes, flex_code_hash?
+                 schedule_id?, flex_opening_minutes, flex_code_hash?, hourly
 customers      — id, company_id, name, customer_number, org_number,
                  contact_name, email, phone,
                  address_line, postal_code, city,
@@ -352,6 +352,30 @@ stripe_prices    — item, month_price_id, year_price_id, updated_by_email
 
    Ett eget schema utan dagar finns inte. Kryssas rutan ur raderas schemat och
    kopplingen, samma princip som att raden ÄR tillståndet i § 3.1.
+
+   **TIMANSTÄLLD MÄTS INTE MOT NÅGOT SCHEMA** (tillagt 2026-10-07).
+   `employees.hourly` stänger av planerad tid, flexsaldo och komptid för den
+   personen. Arbetad tid, raster och frånvaro registreras som för alla andra.
+
+   Utan fältet föll en timanställd tillbaka på företagets standardschema, se
+   `schedulesForEmployees`. Det gav fyrtio timmar planerat i veckan och ett
+   flexsaldo som sjönk med varje timme hen inte arbetat — ett tal som ser ut
+   som en skuld, för någon som inte lovat några timmar.
+
+   Att noll planerat inte heller duger är hela skälet att flexen sätts till
+   noll och inte räknas: formeln hade annars gjort varje arbetad timme till
+   ett plus i flex.
+
+   Krysset sitter i rutan under Anställda, före arbetstiderna, och gömmer dem
+   — ett schemaformulär under krysset hade sett ut som att tiderna ändå
+   gäller. Ett eget schema raderas när krysset sätts. Rutan som justerar
+   saldot och åtgärden för godkänd komptid avvisar personen på servern, inte
+   bara i menyn.
+
+   **ATF är inte byggt** (2026-10-07). Hur många timmar någon tjänar in står i
+   kollektivavtalet, och det räknar Tikkr aldrig. Blir det aktuellt är formen
+   given av komptiden: ett saldo kontoret fyller på, och uttag genom en
+   frånvaroorsak som drar på det.
 
    **Rasterna STÄMPLAS** (kundens val), och ett rasttryck stänger ALLA
    pågående jobb. Därmed faller rasten bort ur närvarotiden av sig själv, och

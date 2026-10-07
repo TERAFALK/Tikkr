@@ -264,6 +264,17 @@ model Employee {
   /// Komptidssaldot när Tikkr togs i bruk, i minuter.
   compOpeningMinutes Int @default(0) @map("comp_opening_minutes")
 
+  /// TIMANSTÄLLD: ingen planerad tid, inget flexsaldo, ingen komptid.
+  ///
+  /// Den som är timanställd har inte lovat några timmar, och mäts därför inte
+  /// mot något schema. Utan det här fältet föll hen tillbaka på företagets
+  /// standardschema och fick 40 timmar planerat i veckan — alltså ett
+  /// flexsaldo som sjönk med varje timme hen inte arbetat.
+  ///
+  /// Arbetad tid, raster och frånvaro registreras som för alla andra. Det är
+  /// bara mätningen mot ett schema som faller bort.
+  hourly Boolean @default(false)
+
   /// Dagen saldona ovan gällde. Tikkr räknar från och med denna dag och
   /// framåt; allt före den ligger i ingående saldo.
   ///

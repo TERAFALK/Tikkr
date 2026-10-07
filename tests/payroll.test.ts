@@ -507,6 +507,61 @@ describe("multi-tenant", () => {
     );
   });
 
+  /**
+   * TIMANSTÄLLD MÄTS INTE MOT NÅGOT SCHEMA.
+   *
+   * Företaget HAR ett standardschema här, och utan `hourly` föll personen
+   * tillbaka på det: fyrtio timmar planerat i veckan och ett flexsaldo som
+   * sjönk med varje timme hen inte arbetat. En timanställd har inte lovat
+   * några timmar.
+   */
+  it("en timanställd får ingen planerad tid och ingen flex", async () => {
+    const tim = (
+      await unsafeGlobalPrisma.employee.create({
+        data: { companyId, name: "Tim Timsson", hourly: true },
+      })
+    ).id;
+
+    await unsafeGlobalPrisma.timeEntry.create({
+      data: {
+        companyId,
+        employeeId: tim,
+        kind: "ORDER",
+        orderId: order,
+        momentId: svetsning,
+        clockInAt: at(16, "08:00"),
+        clockOutAt: at(16, "12:00"),
+      },
+    });
+
+    const period = await buildPayrollPeriod(
+      forCompany(companyId),
+      TZ,
+      tim,
+      dayStart(16),
+      dayStart(16)
+    );
+
+    // Fyra timmar arbete, noll planerat. Flexen ska vara noll och inte plus
+    // fyra: hen har ingenting att ta igen.
+    expect(hours(period!.totals.worked)).toBe(4);
+    expect(hours(period!.totals.planned)).toBe(0);
+    expect(hours(period!.totals.flex)).toBe(0);
+    expect(hours(period!.flex.closing)).toBe(0);
+    expect(period!.employee.hourly).toBe(true);
+    expect(period!.schedule).toBeNull();
+  });
+
+  it("en timanställd har inget flexsaldo på stämplingsskärmen", async () => {
+    const tim = (
+      await unsafeGlobalPrisma.employee.create({
+        data: { companyId, name: "Tina Timsson", hourly: true },
+      })
+    ).id;
+
+    expect(await currentFlexMinutes(forCompany(companyId), TZ, tim)).toBeNull();
+  });
+
   it("saldot räknar inte dagar före första stämplingen", async () => {
     const sen = (
       await unsafeGlobalPrisma.employee.create({

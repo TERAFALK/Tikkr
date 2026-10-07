@@ -57,6 +57,7 @@ export default async function EmployeesPage() {
       photoMimeType: true,
       // Bara OM en kod finns. Hashen lamnar aldrig servern.
       flexCodeHash: true,
+      hourly: true,
       _count: { select: { timeEntries: true } },
     },
   });
@@ -129,11 +130,20 @@ export default async function EmployeesPage() {
                     )}
                   </Td>
                   <Td>
-                    {employee.active ? (
-                      <Badge tone="active">Aktiv</Badge>
-                    ) : (
-                      <Badge tone="muted">Avaktiverad</Badge>
-                    )}
+                    <span className="flex flex-wrap items-center gap-1.5">
+                      {employee.active ? (
+                        <Badge tone="active">Aktiv</Badge>
+                      ) : (
+                        <Badge tone="muted">Avaktiverad</Badge>
+                      )}
+
+                      {/* Syns i listan och inte bara i rutan: att en person
+                          saknar flexsaldo är det första man undrar över när
+                          man står i tidrapporten. */}
+                      {payroll && employee.hourly && (
+                        <Badge>Timanställd</Badge>
+                      )}
+                    </span>
                   </Td>
                   <Td numeric muted>
                     {employee._count.timeEntries}
@@ -153,6 +163,7 @@ export default async function EmployeesPage() {
                           costRateOre: employee.costRateOre,
                           hasPhoto: Boolean(employee.photoMimeType),
                           hasFlexCode: Boolean(employee.flexCodeHash),
+                          hourly: employee.hourly,
                         }}
                         payroll={payroll}
                         scheduleDays={toDayValues(schedules.get(employee.id))}

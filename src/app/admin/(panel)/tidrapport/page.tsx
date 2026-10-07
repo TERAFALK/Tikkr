@@ -218,7 +218,10 @@ export default async function TimesheetPage({
           <div className="flex flex-wrap gap-2">
             {/* JUSTERA SALDOT FÖR HAND. Skriv vad det ska vara; servern
                 räknar ut skillnaden mot det framräknade och flyttar det
-                ingående saldot. Se adjustFlexBalance. */}
+                ingående saldot. Se adjustFlexBalance.
+
+                Inte för en timanställd: det finns inget saldo att justera. */}
+            {!period.employee.hourly && (
             <ActionDialog<BalanceState>
               trigger="Justera flexsaldo"
               title={`Flexsaldo för ${period.employee.name}`}
@@ -241,6 +244,7 @@ export default async function TimesheetPage({
                 />
               </Field>
             </ActionDialog>
+            )}
 
             <ButtonLink href={exportHref} tone="secondary">
               PDF
@@ -277,19 +281,27 @@ export default async function TimesheetPage({
           value={formatDuration(period.totals.worked)}
           hint="tim:min"
         />
-        <Stat
-          label="Flextid, perioden"
-          value={formatSignedDuration(period.totals.flex)}
-          tone={period.totals.flex >= 0 ? "active" : "warning"}
-          hint={`saldo ${formatSignedDuration(period.flex.closing)}`}
-        />
-        <Stat
-          label="Komptid"
-          value={formatSignedDuration(period.comp.closing)}
-          hint={`${formatSignedDuration(period.comp.earned)} intjänat, ${formatDuration(
-            period.comp.taken
-          )} uttaget`}
-        />
+        {/* FLEX OCH KOMP GÖMS FÖR EN TIMANSTÄLLD. Hen mäts inte mot något
+            schema, så det finns ingen planerad tid att ligga över eller under.
+            Två rutor med 0:00 hade sett ut som ett saldo i jämvikt, vilket är
+            något helt annat än att saldot inte finns. */}
+        {!period.employee.hourly && (
+          <>
+            <Stat
+              label="Flextid, perioden"
+              value={formatSignedDuration(period.totals.flex)}
+              tone={period.totals.flex >= 0 ? "active" : "warning"}
+              hint={`saldo ${formatSignedDuration(period.flex.closing)}`}
+            />
+            <Stat
+              label="Komptid"
+              value={formatSignedDuration(period.comp.closing)}
+              hint={`${formatSignedDuration(period.comp.earned)} intjänat, ${formatDuration(
+                period.comp.taken
+              )} uttaget`}
+            />
+          </>
+        )}
       </div>
 
       <div className="mb-6 grid gap-4 sm:grid-cols-3">

@@ -126,6 +126,8 @@ export interface PayrollPeriod {
     id: string;
     name: string;
     employeeNumber: string | null;
+    /** Timanställd: ingen planerad tid, inget flexsaldo, ingen komptid. */
+    hourly: boolean;
   };
   from: Date;
   to: Date;
@@ -164,6 +166,7 @@ export async function buildPayrollPeriod(
       flexOpeningMinutes: true,
       compOpeningMinutes: true,
       balanceOpeningDate: true,
+      hourly: true,
     },
   });
 
@@ -380,8 +383,12 @@ export async function buildPayrollPeriod(
       })),
       compEarnedMinutes,
       compTakenMinutes,
-      flexMinutes:
-        workedMinutes + absenceMinutes - plannedMinutes - compEarnedMinutes,
+      // TIMANSTÄLLD HAR INGEN FLEX. Utan schema är planerad tid noll, och
+      // formeln hade då gjort varje arbetad timme till ett plus — ett saldo
+      // som växer för den som inte har något att ta igen. Se Employee.hourly.
+      flexMinutes: employee.hourly
+        ? 0
+        : workedMinutes + absenceMinutes - plannedMinutes - compEarnedMinutes,
       entries: rows,
       breaks: breakRows,
     });
@@ -419,11 +426,18 @@ export async function buildPayrollPeriod(
   const earned = sum(days, (d) => d.compEarnedMinutes);
   const taken = sum(days, (d) => d.compTakenMinutes);
 
+  // En timanställd har varken flex eller komp, och saldona ska då stå på noll
+  // rakt igenom. Ett ingående saldo från tiden som fast anställd räknas inte
+  // med — det hör till ett annat anställningsförhållande, och visades det här
+  // skulle det se ut som ett saldo hen kan ta ut.
+  const zeroBalances = employee.hourly;
+
   return {
     employee: {
       id: employee.id,
       name: employee.name,
       employeeNumber: employee.employeeNumber,
+      hourly: employee.hourly,
     },
     from,
     to,
@@ -433,16 +447,16 @@ export async function buildPayrollPeriod(
     indirectByMoment,
     absenceByReason,
     flex: {
-      opening: flexOpening,
+      opening: zeroBalances ? 0 : flexOpening,
       period: totals.flex,
-      closing: flexOpening + totals.flex,
+      closing: zeroBalances ? 0 : flexOpening + totals.flex,
     },
     comp: {
-      opening: compOpening,
-      earned,
-      taken,
-      period: earned - taken,
-      closing: compOpening + earned - taken,
+      opening: zeroBalances ? 0 : compOpening,
+      earned: zeroBalances ? 0 : earned,
+      taken: zeroBalances ? 0 : taken,
+      period: zeroBalances ? 0 : earned - taken,
+      closing: zeroBalances ? 0 : compOpening + earned - taken,
     },
   };
 }
@@ -614,10 +628,20 @@ export async function currentFlexMinutes(
 ): Promise<number | null> {
   const employee = await db.employee.findFirst({
     where: { id: employeeId },
-    select: { id: true, balanceOpeningDate: true, flexOpeningMinutes: true },
+    select: {
+      id: true,
+      balanceOpeningDate: true,
+      flexOpeningMinutes: true,
+      hourly: true,
+    },
   });
 
   if (!employee) return null;
+
+  // Timanställd har inget flexsaldo att visa, varken på skärmen i verkstaden
+  // eller i rutan som justerar det. Null betyder "går inte att räkna fram",
+  // vilket är precis vad det är. Se Employee.hourly.
+  if (employee.hourly) return null;
 
   const since = await balanceStart(db, employee, timeZone);
 

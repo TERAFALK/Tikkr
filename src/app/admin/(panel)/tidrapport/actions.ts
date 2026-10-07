@@ -138,6 +138,17 @@ export async function saveCompEarned(
   const timeZone = await timeZoneOf(companyId);
   const date = parseLocalDate(String(formData.get("date") ?? ""), timeZone);
   if (!date) return { error: "Ange ett datum." };
+  // TIMANSTÄLLD HAR INGEN KOMPTID. Knappen göms i panelen, men en
+  // serveråtgärd ska inte lita på att gränssnittet gömde den.
+  const person = await db.employee.findFirst({
+    where: { id: employeeId },
+    select: { hourly: true },
+  });
+
+  if (person?.hourly) {
+    return { error: "Personen är timanställd och har ingen komptid." };
+  }
+
 
   // Samma tolkning som frånvaron: godkänd komptid skrivs av från ett saldo
   // som står i tim:min.
@@ -219,10 +230,15 @@ export async function adjustFlexBalance(
 
   const employee = await db.employee.findFirst({
     where: { id: employeeId },
-    select: { flexOpeningMinutes: true },
+    select: { flexOpeningMinutes: true, hourly: true },
   });
 
   if (!employee) return { error: "Personen finns inte kvar." };
+
+  // Timanställd mäts inte mot något schema och har därför inget flexsaldo.
+  if (employee.hourly) {
+    return { error: "Personen är timanställd och har inget flexsaldo." };
+  }
 
   const timeZone = await timeZoneOf(companyId);
   const current = await currentFlexMinutes(db, timeZone, employeeId);

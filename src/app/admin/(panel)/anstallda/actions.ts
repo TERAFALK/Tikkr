@@ -128,6 +128,16 @@ interface PhotoFields {
  *
  * Ger ett felmeddelande att visa, eller inget alls.
  */
+/**
+ * TIMANSTÄLLD: ingen planerad tid, inget flexsaldo, ingen komptid.
+ *
+ * Krysset är bara läsbart med löneunderlaget. Utan modulen finns varken
+ * schema eller flex att stänga av, och fältet ritas inte heller.
+ */
+function readHourly(formData: FormData, payroll: boolean): boolean {
+  return payroll && formData.get("hourly") === "on";
+}
+
 async function saveSchedule(
   db: CompanyDb,
   companyId: string,
@@ -136,6 +146,15 @@ async function saveSchedule(
   payroll: boolean
 ): Promise<string | null> {
   if (!payroll) return null;
+
+  // EN TIMANSTÄLLD HAR INGET SCHEMA ALLS, inte ens ett eget. Fälten göms i
+  // rutan när krysset sätts, men ett formulär kan skickas av annat än
+  // skärmen — och ett schema som ligger kvar hade mätt hen mot tider hen
+  // inte lovat så fort krysset togs bort igen.
+  if (readHourly(formData, payroll)) {
+    await saveOwnScheduleDays(db, companyId, employeeId, []);
+    return null;
+  }
 
   const read = readScheduleDays(formData);
   if ("error" in read) return read.error;
@@ -222,6 +241,7 @@ export async function createEmployee(
         companyId,
         employeeNumber: readNumber(formData),
         costRateOre: parseOre(formData.get("costRate")),
+        hourly: readHourly(formData, payroll),
         ...photoFields(photo, false),
         ...flexCode,
       },
@@ -290,6 +310,7 @@ export async function updateEmployee(
         name,
         employeeNumber: readNumber(formData),
         costRateOre: parseOre(formData.get("costRate")),
+        hourly: readHourly(formData, payroll),
         ...photoFields(photo, removePhoto),
         ...flexCode,
       },

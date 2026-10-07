@@ -125,7 +125,7 @@ export async function schedulesForEmployees(
   const [employees, schedules] = await Promise.all([
     db.employee.findMany({
       where: { id: { in: employeeIds } },
-      select: { id: true, scheduleId: true },
+      select: { id: true, scheduleId: true, hourly: true },
     }),
     db.workSchedule.findMany({
       select: {
@@ -160,6 +160,15 @@ export async function schedulesForEmployees(
   const result = new Map<string, Schedule | null>();
 
   for (const employee of employees) {
+    // TIMANSTÄLLD MÄTS INTE MOT NÅGOT SCHEMA, inte ens företagets. Hen har
+    // inte lovat några timmar, och föll förut tillbaka på standardschemat —
+    // alltså 40 timmar planerat i veckan och ett flexsaldo som sjönk med
+    // varje timme hen inte arbetat. Se Employee.hourly.
+    if (employee.hourly) {
+      result.set(employee.id, null);
+      continue;
+    }
+
     const own = employee.scheduleId ? byId.get(employee.scheduleId) : undefined;
     result.set(employee.id, own ?? fallbackSchedule);
   }
