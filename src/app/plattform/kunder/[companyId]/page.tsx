@@ -109,6 +109,15 @@ export default async function CompanyPage({
     prices
   );
 
+  // Vad kunden hade betalat utan överenskommelse. Finns bara för att den som
+  // tittar ska se vad rabatten kostar oss — intäktssiffran ovanför är det
+  // som räknas in i dashboarden.
+  const listRevenue = monthlyRevenueFor(
+    company,
+    screenPricing,
+    modulePricing
+  );
+
   // Raderna i prisrutan: skärmlicensen först, sedan tillvalen i registrets
   // ordning. Listpriset kommer från Stripe, det avtalade från kunden.
   const priceRow = (
@@ -280,11 +289,45 @@ export default async function CompanyPage({
                         : "—"}
                   </Fact>
                   <Fact label="Månadsintäkt">
-                    {monthlyRevenue > 0
-                      ? `${monthlyRevenue.toLocaleString("sv-SE")} kr`
-                      : "—"}
+                    <span className="flex items-baseline justify-end gap-2">
+                      {listRevenue !== monthlyRevenue && (
+                        <span className="font-normal text-neutral-400 line-through">
+                          {listRevenue.toLocaleString("sv-SE")} kr
+                        </span>
+                      )}
+                      <span>
+                        {company.subscriptionStatus === "ACTIVE"
+                          ? `${monthlyRevenue.toLocaleString("sv-SE")} kr`
+                          : "—"}
+                      </span>
+                    </span>
                   </Fact>
                 </Facts>
+              </div>
+
+              {/* PRISERNA LIGGER I SAMMA KORT som status och licenser.
+                  
+                  De låg i ett eget kort i högerspalten, och svarar ändå på
+                  samma fråga: vad betalar den här kunden. Uppdelningen gav
+                  dessutom fyra rader till vänster mot tre kort till höger,
+                  alltså en halv skärm vit yta under prenumerationsrutan. */}
+              <div className="border-t border-neutral-100 px-5 py-4">
+                <div className="mb-2 flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5">
+                  <h3 className="text-[13px] font-semibold text-neutral-900">
+                    Avtalat pris
+                  </h3>
+                  <span className="text-xs text-neutral-400">
+                    {managedByStripe
+                      ? "Styrs av artiklarna hos Stripe"
+                      : "Visas för kunden med listpriset överstruket"}
+                  </span>
+                </div>
+
+                <AgreedPriceForm
+                  companyId={company.id}
+                  prices={priceRows}
+                  managedByStripe={managedByStripe}
+                />
               </div>
 
               {/* EN förklaring, inte en per knapp. Status, licenser och tillval
@@ -307,26 +350,6 @@ export default async function CompanyPage({
                   <ModuleForm
                     companyId={company.id}
                     modules={modules}
-                    managedByStripe={managedByStripe}
-                  />
-                </div>
-              </Card>
-
-              {/* AVTALADE PRISER. Egen ruta och inte en kolumn i tillvalen:
-                  skärmlicensen har också ett pris, och den är inget tillval. */}
-              <Card>
-                <CardHeader
-                  title="Avtalat pris"
-                  description={
-                    managedByStripe
-                      ? "Priset styrs av artiklarna hos Stripe."
-                      : "Visas för kunden med listpriset överstruket."
-                  }
-                />
-                <div className="p-5">
-                  <AgreedPriceForm
-                    companyId={company.id}
-                    prices={priceRows}
                     managedByStripe={managedByStripe}
                   />
                 </div>
