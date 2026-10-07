@@ -31,7 +31,9 @@ import SubscriptionOverrideForm from "@/components/platform/SubscriptionOverride
 import PlatformShell from "@/components/platform/PlatformShell";
 import ManualLicenseForm from "@/components/platform/ManualLicenseForm";
 import ModuleForm from "@/components/platform/ModuleForm";
-import PriceForm, { type PriceRow } from "@/components/platform/PriceForm";
+import AgreedPriceForm, {
+  type AgreedPriceRow,
+} from "@/components/platform/AgreedPriceForm";
 import DeleteCompanyForm from "@/components/platform/DeleteCompanyForm";
 import ActivityTable from "@/components/platform/ActivityTable";
 import {
@@ -114,7 +116,7 @@ export default async function CompanyPage({
     name: string,
     listMonth: number,
     agreed: number | undefined
-  ): PriceRow => ({
+  ): AgreedPriceRow => ({
     item,
     name,
     listMonth,
@@ -123,7 +125,7 @@ export default async function CompanyPage({
       agreed === undefined ? null : discountFrom(listMonth, agreed),
   });
 
-  const priceRows: PriceRow[] = [
+  const priceRows: AgreedPriceRow[] = [
     priceRow(
       SCREEN_ITEM,
       "Skärmlicens",
@@ -318,7 +320,7 @@ export default async function CompanyPage({
                   }
                 />
                 <div className="p-5">
-                  <PriceForm
+                  <AgreedPriceForm
                     companyId={company.id}
                     prices={priceRows}
                     managedByStripe={managedByStripe}
