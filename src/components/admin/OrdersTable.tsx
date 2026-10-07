@@ -147,7 +147,20 @@ export default function OrdersTable({
           title ??
           `${orders.length} ${orders.length === 1 ? "order" : "ordrar"}`
         }
-        description={selecting ? "Varje order blir en egen fil." : undefined}
+        /* SÄGER ATT DET BLIR ETT ZIP-ARKIV, och vad som ligger i det.
+           
+           Stod "Varje order blir en egen fil", vilket är sant men inte vad
+           man ser: nedladdningen är EN fil som heter .zip, och kunden hörde
+           av sig och undrade om det inte skulle bli flera PDF:er. Det blir
+           det — de ligger inuti.
+           
+           Bara när flera är markerade. En enda order kommer som en vanlig
+           PDF, och då finns ingenting att förklara. */
+        description={
+          selecting && count > 1
+            ? "Du får en PDF per order, samlade i ett zip-arkiv."
+            : undefined
+        }
         action={
           selecting ? (
             <div className="flex flex-wrap items-center justify-end gap-2">

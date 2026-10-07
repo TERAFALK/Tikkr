@@ -28,6 +28,8 @@ import {
 } from "@/components/ui";
 import { formatDateTime, formatDuration } from "@/lib/format";
 import { datePresets } from "@/lib/date-presets";
+import { weekStep } from "@/lib/week-nav";
+import WeekStepper from "@/components/admin/WeekStepper";
 import { customerOptions } from "@/lib/customers";
 import type { ReportResult, ReportRow } from "@/lib/report";
 import type { ReportView } from "@/lib/report-pdf";
@@ -61,6 +63,7 @@ export default async function ReportsPage({
   });
   const timeZone = company?.timezone ?? "Europe/Stockholm";
   const { presets } = datePresets(timeZone);
+  const week = weekStep("/admin/rapporter", params, timeZone);
 
   const [employees, orders, moments, customers] = await Promise.all([
     db.employee.findMany({ orderBy: { name: "asc" }, select: { id: true, name: true } }),
@@ -160,25 +163,33 @@ export default async function ReportsPage({
           action={
             // Snabbval istället för att skriva datum för hand. Det är det man
             // gör oftast, och två datumfält per gång blir många knapptryck.
-            <div className="flex flex-wrap gap-1">
-              {presets.map((preset) => {
-                const active =
-                  params.from === preset.from && params.to === preset.to;
+            //
+            // Veckostegaren bredvid: snabbvalen tar en till en bestämd period,
+            // pilarna bläddrar därifrån. Utan dem var "veckan före förra"
+            // två datum att skriva in för hand.
+            <div className="flex flex-wrap items-center gap-2">
+              <WeekStepper {...week} />
 
-                return (
-                  <Link
-                    key={preset.label}
-                    href={`/admin/rapporter?from=${preset.from}&to=${preset.to}`}
-                    className={`rounded-md px-2.5 py-1 text-xs font-medium transition-colors ${
-                      active
-                        ? "bg-neutral-900 text-white"
-                        : "bg-neutral-100 text-neutral-600 hover:bg-neutral-200"
-                    }`}
-                  >
-                    {preset.label}
-                  </Link>
-                );
-              })}
+              <div className="flex flex-wrap gap-1">
+                {presets.map((preset) => {
+                  const active =
+                    params.from === preset.from && params.to === preset.to;
+
+                  return (
+                    <Link
+                      key={preset.label}
+                      href={`/admin/rapporter?from=${preset.from}&to=${preset.to}`}
+                      className={`rounded-md px-2.5 py-1 text-xs font-medium transition-colors ${
+                        active
+                          ? "bg-neutral-900 text-white"
+                          : "bg-neutral-100 text-neutral-600 hover:bg-neutral-200"
+                      }`}
+                    >
+                      {preset.label}
+                    </Link>
+                  );
+                })}
+              </div>
             </div>
           }
         />

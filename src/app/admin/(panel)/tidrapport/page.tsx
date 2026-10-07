@@ -5,6 +5,7 @@ import { unsafeGlobalPrisma } from "@/lib/db";
 import FilterForm from "@/components/admin/FilterForm";
 import TimesheetView from "@/components/admin/TimesheetView";
 import WeekStepper from "@/components/admin/WeekStepper";
+import { weekStep } from "@/lib/week-nav";
 import type { TimesheetDayRow } from "@/components/admin/TimesheetTable";
 import {
   Alert,
@@ -26,7 +27,6 @@ import {
   formatTime,
 } from "@/lib/format";
 import { startOfWeekIn, addDaysInZone, parseLocalDate, toDateInput } from "@/lib/time-zone";
-import { isoWeekNumber } from "@/lib/week";
 import ActionDialog from "@/components/ui/ActionDialog";
 import { adjustFlexBalance, saveAbsence, type BalanceState } from "./actions";
 
@@ -101,21 +101,9 @@ export default async function TimesheetPage({
     ? await currentFlexMinutes(db, timeZone, employeeId)
     : null;
 
-  /** Samma period, flyttad ett antal dagar. */
-  const shiftedHref = (days: number) =>
-    `/admin/tidrapport?anstalld=${employeeId}&from=${toDateInput(
-      addDaysInZone(from, days, timeZone),
-      timeZone
-    )}&to=${toDateInput(addDaysInZone(to, days, timeZone), timeZone)}`;
-
-  // Spänner perioden över flera veckor skrivs båda ut. En period som inte är
-  // en vecka ska inte få heta en vecka.
-  const firstWeek = isoWeekNumber(from, timeZone);
-  const lastWeekNumber = isoWeekNumber(to, timeZone);
-  const weekLabel =
-    firstWeek === lastWeekNumber
-      ? `Vecka ${firstWeek}`
-      : `Vecka ${firstWeek}–${lastWeekNumber}`;
+  // Pilarna och veckonumret. Samma räkning som på Rapporter och Stämplingar,
+  // se weekStep.
+  const week = weekStep("/admin/tidrapport", params, timeZone);
 
   const filters = (
     <Card className="mb-6">
@@ -155,11 +143,7 @@ export default async function TimesheetPage({
             var, så att den som valt en längre period behåller sin längd. */}
         <div className="flex items-end">
           <div className="w-full">
-            <WeekStepper
-              backHref={shiftedHref(-7)}
-              forwardHref={shiftedHref(7)}
-              label={weekLabel}
-            />
+            <WeekStepper {...week} />
           </div>
         </div>
       </FilterForm>

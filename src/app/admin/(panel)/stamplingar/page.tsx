@@ -30,6 +30,8 @@ import {
   toLocalDateTimeInput,
 } from "@/lib/time-zone";
 import { datePresets } from "@/lib/date-presets";
+import { weekStep } from "@/lib/week-nav";
+import WeekStepper from "@/components/admin/WeekStepper";
 import { editEntry, type EditEntryState } from "./actions";
 
 export const dynamic = "force-dynamic";
@@ -82,6 +84,7 @@ export default async function EntriesPage({
   const toDayEnd = toDate ? endOfDayIn(toDate, timeZone) : null;
 
   const { presets } = datePresets(timeZone);
+  const week = weekStep("/admin/stamplingar", params, timeZone);
 
   const [employees, orders, moments, indirectMoments, entries] =
     await Promise.all([
@@ -218,29 +221,34 @@ export default async function EntriesPage({
           action={
             // Samma snabbval som i rapportvyn, av samma skäl: två datumfält per
             // gång blir många knapptryck för det man gör oftast.
-            <div className="flex flex-wrap gap-1">
-              {presets.map((preset) => {
-                const active =
-                  params.from === preset.from && params.to === preset.to;
+            <div className="flex flex-wrap items-center gap-2">
+              {/* Veckostegaren bredvid snabbvalen, som i rapportvyn. */}
+              <WeekStepper {...week} />
 
-                return (
-                  <Link
-                    key={preset.label}
-                    href={`/admin/stamplingar?from=${preset.from}&to=${preset.to}${
-                      params.employeeId
-                        ? `&employeeId=${params.employeeId}`
-                        : ""
-                    }`}
-                    className={`rounded-md px-2.5 py-1 text-xs font-medium transition-colors ${
-                      active
-                        ? "bg-neutral-900 text-white"
-                        : "bg-neutral-100 text-neutral-600 hover:bg-neutral-200"
-                    }`}
-                  >
-                    {preset.label}
-                  </Link>
-                );
-              })}
+              <div className="flex flex-wrap gap-1">
+                {presets.map((preset) => {
+                  const active =
+                    params.from === preset.from && params.to === preset.to;
+
+                  return (
+                    <Link
+                      key={preset.label}
+                      href={`/admin/stamplingar?from=${preset.from}&to=${preset.to}${
+                        params.employeeId
+                          ? `&employeeId=${params.employeeId}`
+                          : ""
+                      }`}
+                      className={`rounded-md px-2.5 py-1 text-xs font-medium transition-colors ${
+                        active
+                          ? "bg-neutral-900 text-white"
+                          : "bg-neutral-100 text-neutral-600 hover:bg-neutral-200"
+                      }`}
+                    >
+                      {preset.label}
+                    </Link>
+                  );
+                })}
+              </div>
             </div>
           }
         />
