@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { requireAdmin } from "@/lib/admin-session";
 import { buildWeek, isoWeekNumber } from "@/lib/week";
+import WeekStepper from "@/components/admin/WeekStepper";
 import { companyTimeZone } from "@/lib/company";
 import {
   addDaysInZone,
@@ -79,10 +80,14 @@ export default async function WeekPage({
         title="Veckovy"
         description="Huvudstämplingen per person och dag."
         action={
-          <div className="flex items-center gap-1">
-            <NavLink href={`/admin/vecka?v=${shift(-7)}`} label="Föregående" />
+          {/* Samma reglage som på tidrapporten. Se WeekStepper. */}
+          <div className="flex items-center gap-2">
             {!thisWeek && <NavLink href="/admin/vecka" label="Denna vecka" />}
-            <NavLink href={`/admin/vecka?v=${shift(7)}`} label="Nästa" />
+            <WeekStepper
+              backHref={`/admin/vecka?v=${shift(-7)}`}
+              forwardHref={`/admin/vecka?v=${shift(7)}`}
+              label={`Vecka ${isoWeekNumber(week.from, timeZone)}`}
+            />
           </div>
         }
       />
@@ -94,8 +99,7 @@ export default async function WeekPage({
       ) : (
         <Card>
           <CardHeader
-            title={`Vecka ${isoWeekNumber(week.from, timeZone)}`}
-            description={`${formatDate(week.from, timeZone)} – ${formatDate(week.to, timeZone)}`}
+            title={`${formatDate(week.from, timeZone)} – ${formatDate(week.to, timeZone)}`}
             action={
               <span className="text-[13px] font-medium tabular-nums text-neutral-900">
                 {formatDuration(week.totalMinutes)} totalt

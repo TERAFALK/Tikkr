@@ -1,5 +1,6 @@
 import { requireAdmin } from "@/lib/admin-session";
 import FormDialog from "@/components/admin/FormDialog";
+import ConfirmButton from "@/components/admin/ConfirmButton";
 import {
   Alert,
   Badge,
@@ -17,6 +18,7 @@ import {
 } from "@/components/ui";
 import {
   createIndirectMoment,
+  deleteIndirectMoment,
   renameIndirectMoment,
   toggleIndirectMoment,
 } from "./actions";
@@ -132,6 +134,24 @@ export default async function IndirectMomentsPage() {
                           {moment.active ? "Avaktivera" : "Återaktivera"}
                         </Button>
                       </form>
+
+                      {/* TA BORT finns bara för moment som aldrig stämplats
+                          på. Ett moment med registrerad tid avaktiveras, för
+                          tiden är underlag för en lön och en post vars moment
+                          försvunnit går inte att förklara. Se
+                          deleteIndirectMoment. */}
+                      {moment._count.timeEntries === 0 && (
+                        <form action={deleteIndirectMoment}>
+                          <input type="hidden" name="id" value={moment.id} />
+                          <ConfirmButton
+                            type="submit"
+                            tone="danger"
+                            question={`Ta bort ${moment.name}? Kan inte ångras.`}
+                          >
+                            Ta bort
+                          </ConfirmButton>
+                        </form>
+                      )}
                     </div>
                   </Td>
                 </Tr>

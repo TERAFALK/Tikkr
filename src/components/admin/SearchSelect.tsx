@@ -187,7 +187,7 @@ export default function SearchSelect({
             }
           }}
           placeholder={placeholder}
-          className={`w-full rounded-md border-0 bg-white py-1.5 pr-3 text-base sm:text-[13px] text-neutral-900 ring-1 ring-inset ring-neutral-200 focus:ring-2 focus:ring-inset focus:ring-blue-600 ${
+          className={`w-full rounded-md border-0 bg-white py-1.5 pr-3 text-base sm:text-[13px] text-neutral-900 ring-1 ring-inset ring-neutral-400 focus:ring-2 focus:ring-inset focus:ring-blue-600 ${
             variant === "search" ? "pl-8" : "pl-3"
           }`}
         />

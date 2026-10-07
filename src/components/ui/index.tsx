@@ -242,9 +242,21 @@ export function Stat({
  * text än 16 px, och zoomar inte ut igen. Varje formulär i panelen hamnade
  * därmed halvvägs utanför skärmen så fort man började skriva.
  */
+/*
+ * RAMEN ÄR SYNLIG MED FLIT.
+ *
+ * Stod på Lav (`neutral-200`), som är linjefärgen i varumärkesguiden. Mot vitt
+ * ger den en kontrast på ungefär 1,3:1 — ett fält såg ut som en vit yta utan
+ * kant, och kunden hörde av sig om att det inte gick att se vad som gick att
+ * fylla i. `neutral-400` ligger på drygt 3:1 och är den nivå WCAG begär för
+ * kanten på en kontroll man ska kunna urskilja.
+ *
+ * Lav är kvar som linje mellan rader och runt kort. Där är den rätt: en linje
+ * som delar av är inte en kant man ska träffa med fingret.
+ */
 const fieldBase =
   "rounded-md border-0 bg-white px-2.5 py-1.5 text-base sm:text-[13px] " +
-  "text-neutral-900 ring-1 ring-inset ring-neutral-200 " +
+  "text-neutral-900 ring-1 ring-inset ring-neutral-400 " +
   "placeholder:text-neutral-400 focus:ring-2 focus:ring-inset focus:ring-blue-600";
 
 const fieldStyles = `block w-full ${fieldBase}`;

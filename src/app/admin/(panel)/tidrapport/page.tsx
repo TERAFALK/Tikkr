@@ -3,8 +3,8 @@ import { requireAdmin } from "@/lib/admin-session";
 import { requireModule } from "@/lib/company-modules";
 import { unsafeGlobalPrisma } from "@/lib/db";
 import FilterForm from "@/components/admin/FilterForm";
-import PrintButton from "@/components/admin/PrintButton";
 import TimesheetView from "@/components/admin/TimesheetView";
+import WeekStepper from "@/components/admin/WeekStepper";
 import type { TimesheetDayRow } from "@/components/admin/TimesheetTable";
 import {
   Alert,
@@ -27,7 +27,6 @@ import {
 } from "@/lib/format";
 import { startOfWeekIn, addDaysInZone, parseLocalDate, toDateInput } from "@/lib/time-zone";
 import { isoWeekNumber } from "@/lib/week";
-import { datePresets } from "@/lib/date-presets";
 import ActionDialog from "@/components/ui/ActionDialog";
 import { adjustFlexBalance, saveAbsence, type BalanceState } from "./actions";
 
@@ -139,7 +138,7 @@ export default async function TimesheetPage({
             type="date"
             name="from"
             defaultValue={toDateInput(from, timeZone)}
-            className="block w-full rounded-md border-0 bg-white px-2.5 py-1.5 text-[13px] text-neutral-900 ring-1 ring-inset ring-neutral-200 focus:ring-2 focus:ring-inset focus:ring-blue-600"
+            className="block w-full rounded-md border-0 bg-white px-2.5 py-1.5 text-[13px] text-neutral-900 ring-1 ring-inset ring-neutral-400 focus:ring-2 focus:ring-inset focus:ring-blue-600"
           />
         </Field>
 
@@ -148,30 +147,18 @@ export default async function TimesheetPage({
             type="date"
             name="to"
             defaultValue={toDateInput(to, timeZone)}
-            className="block w-full rounded-md border-0 bg-white px-2.5 py-1.5 text-[13px] text-neutral-900 ring-1 ring-inset ring-neutral-200 focus:ring-2 focus:ring-inset focus:ring-blue-600"
+            className="block w-full rounded-md border-0 bg-white px-2.5 py-1.5 text-[13px] text-neutral-900 ring-1 ring-inset ring-neutral-400 focus:ring-2 focus:ring-inset focus:ring-blue-600"
           />
         </Field>
 
         {/* STEGA EN VECKA I TAGET. Hela perioden flyttas, lika lång som den
-            var, så att den som valt en längre period behåller sin längd.
-            Ersätter knappen "Föregående vecka", som bara kunde gå åt ett
-            håll. */}
+            var, så att den som valt en längre period behåller sin längd. */}
         <div className="flex items-end">
-          <div className="flex w-full items-stretch overflow-hidden rounded-md bg-white ring-1 ring-inset ring-neutral-200">
-            <StepLink
-              href={shiftedHref(-7)}
-              direction="back"
-              label="Föregående vecka"
-            />
-
-            <span className="flex flex-1 items-center justify-center whitespace-nowrap px-2 text-[13px] font-medium text-neutral-900">
-              {weekLabel}
-            </span>
-
-            <StepLink
-              href={shiftedHref(7)}
-              direction="forward"
-              label="Nästa vecka"
+          <div className="w-full">
+            <WeekStepper
+              backHref={shiftedHref(-7)}
+              forwardHref={shiftedHref(7)}
+              label={weekLabel}
             />
           </div>
         </div>
@@ -235,22 +222,6 @@ export default async function TimesheetPage({
     `/api/admin/export/timesheet?anstalld=${employeeId}` +
     `&from=${toDateInput(from, timeZone)}&to=${toDateInput(to, timeZone)}`;
 
-  /*
-   * Förra veckans stämplingar för ALLA anställda, en person per sida.
-   *
-   * Samma knapp som i rapportvyn, och med flit densamma: utskriften görs på
-   * måndagen när veckan ska stämmas av, och det är då man står här. Att den
-   * finns på två ställen är inte en dubblett utan två vägar till samma papper.
-   *
-   * Den hämtar sitt dokument från rapportexporten och inte från tidrapportens
-   * egen. Det är en stämplingslista, inte ett löneunderlag: kind=ALL ger både
-   * fakturerbar och improduktiv tid, och inga frånvarouppgifter följer med.
-   */
-  const lastWeek = datePresets(timeZone).lastWeek;
-  const lastWeekHref =
-    `/api/admin/export?from=${lastWeek.from}&to=${lastWeek.to}` +
-    `&visning=persondetalj&kind=ALL&format=pdf`;
-
   return (
     <>
       <PageHeader
@@ -287,10 +258,6 @@ export default async function TimesheetPage({
               </Field>
             </ActionDialog>
 
-            <PrintButton
-              href={lastWeekHref}
-              label="Förra veckan per anställd"
-            />
             <ButtonLink href={exportHref} tone="secondary">
               PDF
             </ButtonLink>
@@ -411,41 +378,4 @@ export default async function TimesheetPage({
 
 function dayName(weekday: number): string {
   return ["Må", "Ti", "On", "To", "Fr", "Lö", "Sö"][weekday - 1];
-}
-
-/** En pil i veckostegaren. */
-function StepLink({
-  href,
-  direction,
-  label,
-}: {
-  href: string;
-  direction: "back" | "forward";
-  label: string;
-}) {
-  return (
-    <Link
-      href={href}
-      aria-label={label}
-      title={label}
-      className="flex items-center px-2.5 py-1.5 text-neutral-600 hover:bg-neutral-50 hover:text-neutral-900"
-    >
-      <svg
-        viewBox="0 0 20 20"
-        className="h-4 w-4"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth={1.75}
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        aria-hidden="true"
-      >
-        {direction === "back" ? (
-          <path d="M12 4 6 10l6 6" />
-        ) : (
-          <path d="m8 4 6 6-6 6" />
-        )}
-      </svg>
-    </Link>
-  );
 }

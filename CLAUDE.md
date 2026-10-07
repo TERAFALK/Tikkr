@@ -82,6 +82,16 @@ visar en anställds eget flexsaldo, och den rör inte stämplingen — se regel 
 eller byta jobb har ordernumret på ritningen framför sig; rutnätet med öppna
 ordrar ligger ett tryck bort, på "Visa öppna ordrar".
 
+Rutnätet visar det **högsta ordernumret först** (ändrat 2026-10-07). Nya
+ordrar får höga nummer, och det är dem folk stämplar på. Sorteringen sker i
+koden och inte i databasen, eftersom numret är en textsträng — som text kommer
+"99" efter "426". Nummer som inte är tal hamnar sist, i bokstavsordning.
+
+**Snabbjobb nås från båda hållen** (ändrat 2026-10-07): knappen i ordervyn och
+en egen knapp under knappsatsen. Vägen fanns redan via ett okänt nummer, men
+den som inte HAR ett nummer såg ingen väg alls, och knappsatsen är första vyn
+även vid jobbyte.
+
 ### Adminflöde
 
 Administratör loggar in separat i en adminpanel, hanterar anställda/ordrar/
@@ -198,6 +208,12 @@ stripe_prices    — item, month_price_id, year_price_id, updated_by_email
    Villkoret kan inte uttryckas i databasen (`db push` saknar CHECK) och vaktas
    därför i `src/lib/clock.ts`, som är enda vägen in. Ordrar och moment med
    registrerad tid går inte att radera (`onDelete: Restrict`) — de stängs.
+
+   **Ett improduktivt moment som ALDRIG stämplats på går däremot att ta bort**
+   (tillagt 2026-10-07). Det bär ingenting, och den som provat sig fram ska
+   inte tvingas leva med "Städnign" i listan för alltid. Samma avvägning som
+   för stationer utan planer, se regel 8. Knappen visas bara när räknaren står
+   på noll, och åtgärden räknar om själv innan den raderar.
 2. **En anställd kan ha flera pågående stämplingar — en per arbetsmoment.**
    (Ändrat 2026-09-23. Tidigare gällde högst en stämpling alls.)
 
@@ -793,8 +809,13 @@ instämplad ändras ingenting förrän administratören sett vilka.
 och en, och flöt personerna ihop gick den inte att dela ut utan att någon fick
 läsa någon annans rader. Därför finns heller ingen slutsumma sist — den skulle
 hamna på den sista personens papper och påstå att raden ovanför gäller hen.
-Periodens totaler står på förstasidan. Knappen finns både under Rapporter och
-på Tidrapport, eftersom det är där man står på måndagen.
+Periodens totaler står på förstasidan.
+
+**Snabbknappen till den är borttagen** (ändrat 2026-10-07, beslutat av
+produktägaren efter att pilotkunden bett om det). Den låg både under Rapporter
+och på Tidrapport, och kunden ville inte ha den på någondera. Vyn finns kvar:
+`visning=persondetalj` i rapportexporten ger samma dokument, och den väljs i
+rapportvyn som vilken annan vy som helst.
 
 **Underlaget och efterkalkylen finns BARA som PDF** (ändrat 2026-10-01). Båda
 fanns också som Excel-ark, och kunden använde dem inte: det ena bifogas en
@@ -1108,6 +1129,15 @@ röd   = går inte att ångra
 
 Gult och rött har ingen motsvarighet i guiden och är kvar som funktionella
 färger. En varning som ser ut som allt annat är ingen varning.
+
+**Ett fält man kan skriva i har en SYNLIG kant** (tillagt 2026-10-07). Kanten
+stod på Lav, som är guidens linjefärg, och mot vitt ger den 1,38:1 — ett fält
+såg ut som en vit yta, och kunden hörde av sig om att det inte gick att se vad
+som gick att fylla i. Den ligger nu på `neutral-400`, drygt 3:1, vilket är vad
+WCAG 1.4.11 begär för kanten på en kontroll man ska kunna urskilja.
+
+Lav är kvar som linje mellan rader och runt kort. Där är den rätt: en linje som
+delar av är inte en kant man ska träffa med fingret.
 
 **Paletten ägs av två filer, och de ska hållas i takt.**
 `src/app/globals.css` har tokens för gränssnittet; `src/lib/brand.ts` har

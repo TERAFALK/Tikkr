@@ -309,6 +309,9 @@ export default async function KioskPage() {
     };
   }
 
+  // Högsta ordernumret först. Se byOrderNumberDesc längst ned.
+  const sortedOrders = [...orders].sort(byOrderNumberDesc);
+
   return (
     <KioskScreen
       companyName={session.companyName}
@@ -319,7 +322,7 @@ export default async function KioskPage() {
         hasPhoto: Boolean(employee.photoMimeType),
         hasFlexCode: Boolean(employee.flexCodeHash),
       }))}
-      orders={orders.map((order) => ({
+      orders={sortedOrders.map((order) => ({
         id: order.id,
         orderNumber: order.orderNumber,
         customerName: order.customer?.name ?? null,
@@ -352,4 +355,34 @@ export default async function KioskPage() {
       }))}
     />
   );
+}
+
+/**
+ * Öppna ordrar med det HÖGSTA NUMRET FÖRST.
+ *
+ * Nya ordrar får höga nummer, och det är dem folk stämplar på. Listan började
+ * på det lägsta, så den som skulle välja dagens jobb fick skrolla förbi varje
+ * gammal order som ännu stod öppen.
+ *
+ * Sorteringen är NUMERISK och inte alfabetisk. Databasen kan bara det senare,
+ * eftersom numret är en textsträng — och som text kommer "99" efter "426".
+ * Nummer som inte är tal (en bokstav i serien, till exempel) hamnar sist och
+ * sinsemellan i bokstavsordning, så att de har en bestämd plats i stället för
+ * att hoppa omkring.
+ */
+function byOrderNumberDesc(
+  a: { orderNumber: string },
+  b: { orderNumber: string }
+): number {
+  const left = Number(a.orderNumber);
+  const right = Number(b.orderNumber);
+
+  const leftIsNumber = Number.isFinite(left);
+  const rightIsNumber = Number.isFinite(right);
+
+  if (leftIsNumber && rightIsNumber) return right - left;
+  if (leftIsNumber) return -1;
+  if (rightIsNumber) return 1;
+
+  return a.orderNumber.localeCompare(b.orderNumber, "sv");
 }

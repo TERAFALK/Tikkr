@@ -104,7 +104,7 @@ export default async function OnboardingPage() {
               name="names"
               rows={5}
               placeholder={"Anna Andersson\nBjörn Bergqvist\nCarina Cederlund"}
-              className="block w-full rounded-md border-0 bg-white px-2.5 py-1.5 text-[13px] text-neutral-900 ring-1 ring-inset ring-neutral-200 placeholder:text-neutral-400 focus:ring-2 focus:ring-inset focus:ring-blue-600"
+              className="block w-full rounded-md border-0 bg-white px-2.5 py-1.5 text-[13px] text-neutral-900 ring-1 ring-inset ring-neutral-400 placeholder:text-neutral-400 focus:ring-2 focus:ring-inset focus:ring-blue-600"
             />
           </Field>
           <Button type="submit">Lägg till</Button>
@@ -156,7 +156,7 @@ export default async function OnboardingPage() {
               name="names"
               rows={3}
               placeholder={"Kantpressning\nBlästring"}
-              className="block w-full rounded-md border-0 bg-white px-2.5 py-1.5 text-[13px] text-neutral-900 ring-1 ring-inset ring-neutral-200 placeholder:text-neutral-400 focus:ring-2 focus:ring-inset focus:ring-blue-600"
+              className="block w-full rounded-md border-0 bg-white px-2.5 py-1.5 text-[13px] text-neutral-900 ring-1 ring-inset ring-neutral-400 placeholder:text-neutral-400 focus:ring-2 focus:ring-inset focus:ring-blue-600"
             />
           </Field>
 

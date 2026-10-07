@@ -82,23 +82,50 @@ export default function ActionDialog<S extends DialogState>({
   children: ReactNode;
 }) {
   const dialog = useRef<HTMLDialogElement>(null);
+  const form = useRef<HTMLFormElement>(null);
   const [state, submit] = useActionState<DialogState, FormData>(
     action,
     initial
   );
 
-  // Stänger när åtgärden svarat att det gick. Reffen hindrar att samma svar
-  // stänger rutan en gång till om den öppnas direkt igen — useActionState
-  // behåller sitt tillstånd tills nästa körning.
-  const handled = useRef<string | undefined>(undefined);
+  /**
+   * Stänger när åtgärden svarat att det gick.
+   *
+   * JÄMFÖR SVARET SOM OBJEKT, inte dess text. Reffen höll förut
+   * `state.ok`-strängen, och eftersom varje åtgärd svarar med samma mening
+   * ("Flexsaldot är ändrat.") blev andra sparandet i samma sidladdning
+   * identiskt med det första. Effekten kördes aldrig om, rutan stängdes inte,
+   * och det såg ut som att ingenting hänt — fast ändringen var sparad. Man
+   * tryckte alltså igen.
+   *
+   * `useActionState` ger ett nytt objekt för varje körning och behåller samma
+   * objekt däremellan. Identiteten är därför exakt det vi vill jämföra: ny
+   * körning stänger, en omöppnad ruta gör det inte.
+   */
+  const handled = useRef<DialogState | null>(null);
 
   useEffect(() => {
-    if (!state.ok || state.ok === handled.current) return;
+    if (!state.ok || handled.current === state) return;
 
-    handled.current = state.ok;
+    handled.current = state;
     dialog.current?.close();
     onDone?.(state.ok);
-  }, [state.ok, onDone]);
+  }, [state, onDone]);
+
+  /**
+   * Stänger och nollställer fälten.
+   *
+   * Utan återställningen stod det man skrivit kvar till nästa gång rutan
+   * öppnades: ändrade man en timkostnad från 140 till 14 och tryckte Avbryt
+   * låg 14 där igen, som om det vore det sparade värdet. Webbläsaren behåller
+   * det som skrivits; `reset()` lägger tillbaka `defaultValue`.
+   *
+   * Ligger på dialogens egen `onClose` och inte bara på Avbryt-knappen, så
+   * att Escape och ett tryck utanför rutan gör samma sak.
+   */
+  function close() {
+    dialog.current?.close();
+  }
 
   return (
     <>
@@ -116,6 +143,7 @@ export default function ActionDialog<S extends DialogState>({
           subtila fel. Samma val som i FormDialog. */}
       <dialog
         ref={dialog}
+        onClose={() => form.current?.reset()}
         className={`w-[min(38rem,calc(100vw-2rem))] ${dialogSurface}`}
       >
         <div className={`${dialogEdge} border-b border-neutral-200 px-5 py-4`}>
@@ -127,7 +155,11 @@ export default function ActionDialog<S extends DialogState>({
           )}
         </div>
 
-        <form action={submit} className="flex min-h-0 flex-1 flex-col">
+        <form
+          ref={form}
+          action={submit}
+          className="flex min-h-0 flex-1 flex-col"
+        >
           <div className={`${dialogBody} space-y-4 px-5 py-5`}>
             {/* Felet står överst i rutan, där blicken är efter ett tryck som
                 inte gav något. */}
@@ -138,11 +170,7 @@ export default function ActionDialog<S extends DialogState>({
           <div
             className={`${dialogEdge} flex justify-end gap-2 border-t border-neutral-200 bg-neutral-50 px-5 py-3`}
           >
-            <Button
-              type="button"
-              tone="secondary"
-              onClick={() => dialog.current?.close()}
-            >
+            <Button type="button" tone="secondary" onClick={close}>
               Avbryt
             </Button>
             <Submit

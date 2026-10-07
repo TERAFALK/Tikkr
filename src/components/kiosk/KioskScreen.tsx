@@ -1314,6 +1314,15 @@ export default function KioskScreen({
                 from: "orderNumber",
               })
             }
+            onQuickJob={() =>
+              setView({
+                name: "quickCustomer",
+                employee: view.employee,
+                // Tomt nummer betyder att ordern får ett tillfälligt.
+                orderNumber: "",
+                from: "orderNumber",
+              })
+            }
             // Knappsatsen är numera första vyn även vid instämpling, så den
             // som ska registrera improduktiv tid hamnar här först. Vägen dit
             // måste därför finnas både här och i åtgärdsvyn.
@@ -2243,6 +2252,7 @@ function OrderNumberPad({
   onPick,
   onBrowse,
   onCreate,
+  onQuickJob,
   onIndirect,
   hasIndirect,
 }: {
@@ -2254,6 +2264,8 @@ function OrderNumberPad({
   onBrowse: () => void;
   /** Numret som slagits in, eller tom sträng när inget angetts. */
   onCreate: (orderNumber: string) => void;
+  /** Snabbjobb utan nummer. Ordern får ett tillfälligt. */
+  onQuickJob: () => void;
   /** false döljer knappen: företaget saknar modulen, eller personen en kod. */
   /** Städning, möte, underhåll. Tid som aldrig når ett fakturaunderlag. */
   onIndirect: () => void;
@@ -2423,6 +2435,23 @@ function OrderNumberPad({
           className="kiosk-press min-h-11 flex-1 rounded-xl border border-neutral-200 bg-white px-4 py-2.5 text-lg font-semibold text-neutral-900 active:bg-neutral-50"
         >
           Visa öppna ordrar
+        </button>
+
+        {/* SNABBJOBB, också härifrån.
+            
+            Vägen fanns: slår man in ett nummer som inte finns blir den stora
+            knappen "Skapa order NNN". Men den som INTE har ett nummer — en
+            akut reparation som kontoret får lägga upp efteråt — såg ingen väg
+            alls, och knappsatsen är numera första vyn även vid jobbyte.
+            
+            Samma amber som i ordervyn. Att lägga upp en ny order är något
+            annat än att välja en befintlig, och skillnaden ska synas innan
+            man trycker. */}
+        <button
+          onClick={onQuickJob}
+          className="kiosk-press min-h-11 rounded-xl border border-amber-300 bg-amber-50 px-5 py-2.5 text-lg font-semibold text-amber-900 active:bg-amber-100"
+        >
+          Snabbjobb
         </button>
 
         {hasIndirect && (

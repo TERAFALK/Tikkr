@@ -61,7 +61,7 @@ export default function SubscriptionLocked({
                   max={100}
                   defaultValue={Math.max(1, screens)}
                   required
-                  className="block w-32 rounded-md border-0 bg-white px-2.5 py-1.5 text-[13px] text-neutral-900 ring-1 ring-inset ring-neutral-200 focus:ring-2 focus:ring-inset focus:ring-blue-600"
+                  className="block w-32 rounded-md border-0 bg-white px-2.5 py-1.5 text-[13px] text-neutral-900 ring-1 ring-inset ring-neutral-400 focus:ring-2 focus:ring-inset focus:ring-blue-600"
                 />
               </label>
 

@@ -246,7 +246,7 @@ export default function BudgetMoments({
                 data-bwignore
                 data-np-ignore
                 data-form-type="other"
-                className="block w-full rounded-md border-0 bg-white py-1.5 pl-2.5 pr-8 text-[13px] text-neutral-900 ring-1 ring-inset ring-neutral-200 placeholder:text-neutral-400 focus:ring-2 focus:ring-inset focus:ring-blue-600"
+                className="block w-full rounded-md border-0 bg-white py-1.5 pl-2.5 pr-8 text-[13px] text-neutral-900 ring-1 ring-inset ring-neutral-400 placeholder:text-neutral-400 focus:ring-2 focus:ring-inset focus:ring-blue-600"
               />
               <span className="pointer-events-none absolute inset-y-0 right-2.5 flex items-center text-xs text-neutral-400">
                 tim

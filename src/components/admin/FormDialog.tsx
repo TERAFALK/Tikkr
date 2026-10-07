@@ -43,6 +43,7 @@ export default function FormDialog({
   children: ReactNode;
 }) {
   const dialog = useRef<HTMLDialogElement>(null);
+  const form = useRef<HTMLFormElement>(null);
 
   return (
     <>
@@ -54,8 +55,19 @@ export default function FormDialog({
         {trigger}
       </Button>
 
+      {/* NOLLSTÄLLER FÄLTEN NÄR RUTAN STÄNGS.
+          
+          Avbryt stängde bara rutan, och webbläsaren behåller det som skrivits
+          i ett fält. Ändrade man en timkostnad från 140 till 14 och tryckte
+          Avbryt låg 14 kvar nästa gång rutan öppnades, som om det vore det
+          sparade värdet — och nästa person som gick in trodde att det var det.
+
+          Ligger på dialogens egen onClose och inte på Avbryt-knappen, så att
+          Escape och ett tryck utanför rutan gör samma sak. `reset()` lägger
+          tillbaka varje fälts defaultValue, alltså det som står i databasen. */}
       <dialog
         ref={dialog}
+        onClose={() => form.current?.reset()}
         className={`w-[min(42rem,calc(100vw-2rem))] ${dialogSurface}`}
       >
         <div className={`${dialogEdge} border-b border-neutral-200 px-5 py-4`}>
@@ -69,6 +81,7 @@ export default function FormDialog({
 
         {action ? (
           <form
+            ref={form}
             action={action}
             // Rutan stängs när formuläret skickas. Serveråtgärden laddar om
             // sidan med det nya innehållet, så den som väntar kvar i en öppen

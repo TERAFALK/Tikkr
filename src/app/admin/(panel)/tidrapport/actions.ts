@@ -32,19 +32,27 @@ async function timeZoneOf(companyId: string): Promise<string> {
 }
 
 /**
- * Läser ett timfält och ger minuter.
+ * Läser frånvarons timfält och ger minuter.
  *
  * Tomt betyder hela den schemalagda dagen, vilket är det vanliga fallet — en
  * sjukdag är en hel dag. Bara ett ifyllt men obegripligt värde är ett fel.
+ *
+ * GÅR GENOM SAMMA TOLKNING SOM ALLA ANDRA TIDFÄLT. Fältet läste förut bara
+ * decimaltimmar medan skärmen visar tim:min, och det blev fel varje gång
+ * någon skrev av det hen såg: ett flexsaldo på −1:44 som skulle täckas av
+ * frånvaro gav 1,44 timmar, alltså en timme och 26 minuter, och arton
+ * minuter blev kvar som minus. Se CLAUDE.md § 7.1 punkt 8.
  */
-function parseHours(raw: FormDataEntryValue | null): number | null | "error" {
-  const text = String(raw ?? "").trim().replace(",", ".");
-  if (!text) return null;
+function parseAbsenceHours(
+  raw: FormDataEntryValue | null
+): number | null | "error" {
+  const minutes = hoursInputToMinutes(raw);
 
-  const hours = Number(text);
-  if (!Number.isFinite(hours) || hours <= 0) return "error";
+  // Noll och minus är inte en frånvaro. Tomt är det däremot: då gäller hela
+  // den schemalagda dagen.
+  if (minutes !== null && minutes !== "error" && minutes <= 0) return "error";
 
-  return Math.round(hours * 60);
+  return minutes;
 }
 
 export async function saveAbsence(
@@ -74,11 +82,9 @@ export async function saveAbsence(
   if (!to) return { error: "Slutdatumet går inte att läsa." };
   if (to < from) return { error: "Slutdatumet ligger före startdatumet." };
 
-  const minutes = parseHours(formData.get("hours"));
+  const minutes = parseAbsenceHours(formData.get("hours"));
   if (minutes === "error") {
-    return {
-      error: "Skriv antalet timmar som ett tal, till exempel 4 eller 3,5.",
-    };
+    return { error: "Skriv tiden som 4:00 eller 3,5." };
   }
 
   // En period skrivs som en post per dag. Det gör att en enskild dag går att
@@ -133,9 +139,11 @@ export async function saveCompEarned(
   const date = parseLocalDate(String(formData.get("date") ?? ""), timeZone);
   if (!date) return { error: "Ange ett datum." };
 
-  const minutes = parseHours(formData.get("hours"));
+  // Samma tolkning som frånvaron: godkänd komptid skrivs av från ett saldo
+  // som står i tim:min.
+  const minutes = parseAbsenceHours(formData.get("hours"));
   if (minutes === "error" || minutes === null) {
-    return { error: "Ange antalet timmar som godkänts som komptid." };
+    return { error: "Skriv tiden som 2:00 eller 2,5." };
   }
 
   try {
