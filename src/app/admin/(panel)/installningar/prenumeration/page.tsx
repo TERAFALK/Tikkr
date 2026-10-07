@@ -8,6 +8,7 @@ import LicenseForm from "@/components/admin/LicenseForm";
 import ModuleSection from "@/components/admin/ModuleSection";
 import { Alert, Button, Card, CardHeader, Field, Input } from "@/components/ui";
 import { formatDate } from "@/lib/format";
+import { discountFrom } from "@/lib/company-prices";
 import { openBillingPortal, startCheckout } from "./actions";
 
 /**
@@ -56,7 +57,12 @@ export default async function SubscriptionPage({
 
   // Avgifter visas bara när det faktiskt finns en avgift. Under provperioden
   // betalar kunden ingenting, och då ska ingen summa stå någonstans.
-  const paying = overview.hasSubscription;
+  //
+  // FAKTURAKUNDERNA RÄKNAS MED. De har ingen prenumeration hos Stripe men
+  // betalar mot faktura, och sidan visade därför ingen avgift alls för dem —
+  // inte ens det avtalade priset, som är hela skälet att de har ett. Se
+  // platformManaged i billing.ts.
+  const paying = overview.hasSubscription || overview.platformManaged;
 
   return (
     <div className="space-y-6">
@@ -98,12 +104,29 @@ export default async function SubscriptionPage({
               value={`${overview.used} av ${overview.screens}`}
             />
 
-            {/* Ingen avgift visas under provperioden. En kostnad i en tabell
-                läses som något som ska betalas, och det ska den inte. */}
-            {/* AVTALAT PRIS visas med listpriset överstruket och rabatten
-                i procent. Kunden ska förstå vad hen fått, inte bara se ett
-                tal som avviker från säljsidan. En gratiskund ser 0 kr och
-                100 %, vilket är hela poängen. */}
+            {/* PRISET PER LICENS, med listpriset överstruket när vi
+                kommit överens om något annat. Står som en egen rad och inte
+                bara i rubriken ovanför: rubriken är en mening, och en
+                överstruken siffra hör hemma bredvid den den gäller. */}
+            {overview.agreement &&
+              overview.agreement.perScreen !== overview.agreement.listPerScreen && (
+                <AgreedRow
+                  label="Pris per licens"
+                  list={overview.agreement.listPerScreen}
+                  agreed={overview.agreement.perScreen}
+                  discountPercent={discountFrom(
+                    overview.agreement.listPerScreen,
+                    overview.agreement.perScreen
+                  )}
+                />
+              )}
+
+            {/* Ingen avgift visas under provperioden: en kostnad i en tabell
+                läses som något som ska betalas, och det ska den inte.
+                
+                Finns en överenskommelse visas listpriset överstruket och
+                rabatten i procent. En gratiskund ser 0 kr och 100 %, vilket
+                är hela poängen. */}
             {paying && overview.agreement ? (
               <AgreedRow
                 label="Avgift per månad"

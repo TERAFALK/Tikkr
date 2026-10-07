@@ -237,7 +237,11 @@ export default async function CompanyPage({
         )}
 
         <Section title="Avtal">
-          <div className="grid gap-4 lg:grid-cols-2">
+          {/* items-start: utan den sträcks vänsterkortet till höjden på
+              kortstapeln bredvid, och prenumerationsrutan blev en vit yta med
+              fyra rader överst och en halv skärm tomrum under. Grid sträcker
+              sina rutor i höjd som standard. */}
+          <div className="grid items-start gap-4 lg:grid-cols-2">
             <Card>
               <CardHeader
                 title="Prenumeration"
@@ -354,7 +358,7 @@ export default async function CompanyPage({
         </Section>
 
         <Section title="Åtkomst">
-          <div className="grid gap-4 lg:grid-cols-2">
+          <div className="grid items-start gap-4 lg:grid-cols-2">
             <Card>
               <CardHeader title="Administratörer" />
               <Table>
@@ -478,7 +482,7 @@ export default async function CompanyPage({
             ) : undefined
           }
         >
-          <div className="grid gap-4 lg:grid-cols-2">
+          <div className="grid items-start gap-4 lg:grid-cols-2">
             <Card>
               <CardHeader title="Senaste åtgärderna" />
               {history.length === 0 ? (

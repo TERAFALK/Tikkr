@@ -45,6 +45,17 @@ export default function ModuleSection({
   const kr = (amount: number) => amount.toLocaleString("sv-SE");
   const per = interval === "year" ? "år" : "månad";
 
+  /**
+   * Rabatten mot listpriset, i procent.
+   *
+   * Räknas här och inte i company-prices.ts: den filen importerar Prisma, och
+   * det här är en klientkomponent. Samma skäl som i AgreedPriceForm.
+   */
+  const discount = (list: number, paying: number): number | null => {
+    if (list <= 0 || paying >= list) return null;
+    return Math.round(((list - paying) / list) * 100);
+  };
+
   return (
     <div className="space-y-4">
       {state.error && <Alert>{state.error}</Alert>}
@@ -72,8 +83,23 @@ export default function ModuleSection({
               </p>
             </div>
 
-            <span className="text-[13px] font-medium tabular-nums text-neutral-900">
-              {kr(module.amount)} kr/{per}
+            {/* AVTALAT PRIS visas med listpriset överstruket och rabatten
+                i procent, precis som totalen ovanför. Kunden ska se vad hen
+                fått, och samma sak ska se likadan ut på hela sidan. */}
+            <span className="flex items-baseline gap-2 text-[13px] tabular-nums">
+              {module.listAmount !== module.amount && (
+                <span className="text-neutral-400 line-through">
+                  {kr(module.listAmount)} kr
+                </span>
+              )}
+              <span className="font-medium text-neutral-900">
+                {kr(module.amount)} kr/{per}
+              </span>
+              {discount(module.listAmount, module.amount) !== null && (
+                <span className="rounded bg-emerald-50 px-1.5 py-0.5 text-xs font-semibold text-emerald-700">
+                  {discount(module.listAmount, module.amount)} %
+                </span>
+              )}
             </span>
 
             {managed ? (
