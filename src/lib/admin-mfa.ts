@@ -1,3 +1,4 @@
+import { createHash, randomInt, timingSafeEqual } from "node:crypto";
 import bcrypt from "bcryptjs";
 import { unsafeGlobalPrisma } from "./db";
 import {
@@ -9,6 +10,8 @@ import {
 import { verifyTotp } from "./totp";
 import { openSecret, sealSecret } from "./totp-box.mjs";
 import { enrollmentFor, newTotpSecret, type Enrollment } from "./two-step";
+import { sendEmail } from "./email";
+import { loginCodeEmail } from "./emails";
 
 /**
  * INLOGGNINGEN TILL ADMINPANELEN, I TVÅ STEG (infört 2026-10-06).
@@ -217,7 +220,176 @@ export async function resetAdminMfa(userId: string): Promise<void> {
       totpSecret: null,
       totpEnabledAt: null,
       totpLastStep: null,
+      loginCodeHash: null,
+      loginCodeExpiresAt: null,
+      // Avslutar också ihågkomna datorer, se trusted-device.ts.
       sessionsRevokedAt: new Date(),
     },
   });
+}
+
+/* -------------------------------------------------------------------------- */
+/* Inloggningsalternativ: kod via e-post (infört 2026-10-07)                   */
+/* -------------------------------------------------------------------------- */
+
+/** Hur länge en kod via e-post gäller. */
+export const EMAIL_CODE_MINUTES = 10;
+
+/** Hur ofta en ny kod får skickas. Annars blir knappen ett sätt att fylla
+ *  någons inkorg. */
+const EMAIL_CODE_COOLDOWN_MS = 60 * 1000;
+
+function hashCode(code: string): string {
+  return createHash("sha256").update(code).digest("hex");
+}
+
+/** "anna@mekaniska.se" som "a•••@mekaniska.se". Visas innan koden skickas. */
+export function maskEmail(email: string): string {
+  const [local, domain] = email.split("@");
+  if (!local || !domain) return email;
+  return `${local[0]}•••@${domain}`;
+}
+
+/**
+ * Vilka alternativ till appen kontot har just nu.
+ *
+ * Appen är obligatorisk och sätts alltid upp först (beslutat 2026-10-07).
+ * E-post är ett ALTERNATIV vid inloggningen, som Microsofts "Logga in på ett
+ * annat sätt", för dagen telefonen ligger hemma. Två villkor:
+ *
+ *   1. Adressen är bekräftad. En obekräftad adress kan ha ett stavfel, och
+ *      koden skulle då gå till någon annan.
+ *   2. Lösenordet har inte just återställts via mejl. Annars hade den som
+ *      kommit åt inkorgen kunnat byta lösenordet OCH ta emot koden, och
+ *      tvåstegsinloggningen skyddat mot ingenting. Efter en återställning
+ *      krävs appen.
+ */
+export async function loginAlternatives(
+  userId: string,
+  afterReset: boolean
+): Promise<{ email: string | null }> {
+  if (afterReset) return { email: null };
+
+  const user = await unsafeGlobalPrisma.adminUser.findUnique({
+    where: { id: userId },
+    select: { email: true, emailVerifiedAt: true, totpEnabledAt: true },
+  });
+
+  if (!user?.totpEnabledAt || !user.emailVerifiedAt) return { email: null };
+  return { email: maskEmail(user.email) };
+}
+
+export type EmailCodeOutcome = "sent" | "cooldown" | "unavailable" | "failed";
+
+/**
+ * Skickar en sexsiffrig kod till kontots adress.
+ *
+ * Anroparen har redan kontrollerat lösenordet (lappen i login-ticket.ts) och
+ * att alternativet är tillåtet. Villkoren prövas ändå här igen: en funktion
+ * som skickar koder ska inte lita på att den anropats från rätt ställe.
+ */
+export async function sendEmailLoginCode(
+  userId: string,
+  afterReset: boolean
+): Promise<EmailCodeOutcome> {
+  const allowed = await loginAlternatives(userId, afterReset);
+  if (!allowed.email) return "unavailable";
+
+  const user = await unsafeGlobalPrisma.adminUser.findUnique({
+    where: { id: userId },
+    select: { email: true, loginCodeSentAt: true },
+  });
+  if (!user) return "unavailable";
+
+  if (
+    user.loginCodeSentAt &&
+    Date.now() - user.loginCodeSentAt.getTime() < EMAIL_CODE_COOLDOWN_MS
+  ) {
+    return "cooldown";
+  }
+
+  // randomInt ger jämn fördelning, vilket modulo på ett slumptal inte gör.
+  const code = String(randomInt(0, 1_000_000)).padStart(6, "0");
+  const now = new Date();
+
+  await unsafeGlobalPrisma.adminUser.update({
+    where: { id: userId },
+    data: {
+      loginCodeHash: hashCode(code),
+      loginCodeExpiresAt: new Date(now.getTime() + EMAIL_CODE_MINUTES * 60 * 1000),
+      loginCodeSentAt: now,
+    },
+  });
+
+  const result = await sendEmail(
+    loginCodeEmail({ to: user.email, code, minutesValid: EMAIL_CODE_MINUTES })
+  );
+
+  if (!result.delivered && result.provider !== "log") {
+    console.error(
+      `[inloggningskod] Mejlet till ${user.email} gick inte fram: ` +
+        `${result.problem ?? "okänd orsak"}`
+    );
+    return "failed";
+  }
+
+  return "sent";
+}
+
+/**
+ * Prövar en kod som skickats via e-post. Används en gång, sedan töms den.
+ *
+ * Felaktiga försök räknas av samma broms som lösenord och appkoder: fem fel
+ * och kontot vilar en kvart. Sex siffror är en miljon kombinationer, och utan
+ * bromsen vore tio minuter gott om tid.
+ */
+export async function verifyEmailLoginCode(
+  userId: string,
+  code: string,
+  afterReset: boolean,
+  now: Date = new Date()
+): Promise<boolean> {
+  if (afterReset) return false;
+
+  const user = await unsafeGlobalPrisma.adminUser.findUnique({
+    where: { id: userId },
+    select: {
+      email: true,
+      loginCodeHash: true,
+      loginCodeExpiresAt: true,
+      emailVerifiedAt: true,
+      totpEnabledAt: true,
+    },
+  });
+
+  if (!user?.loginCodeHash || !user.loginCodeExpiresAt) return false;
+  if (!user.emailVerifiedAt || !user.totpEnabledAt) return false;
+  if (isLockedOut(THROTTLE_SCOPE, user.email)) return false;
+
+  const given = code.replace(/\s/g, "");
+  const expected = Buffer.from(user.loginCodeHash);
+  const actual = Buffer.from(hashCode(given));
+
+  const correct =
+    /^\d{6}$/.test(given) &&
+    user.loginCodeExpiresAt > now &&
+    expected.length === actual.length &&
+    timingSafeEqual(expected, actual);
+
+  if (!correct) {
+    noteFailedLogin(THROTTLE_SCOPE, user.email);
+    return false;
+  }
+
+  // Töms med villkor på samma fingeravtryck, så att två inloggningar med
+  // samma kod i samma ögonblick inte båda går igenom.
+  const claimed = await unsafeGlobalPrisma.adminUser.updateMany({
+    where: { id: userId, loginCodeHash: user.loginCodeHash },
+    data: { loginCodeHash: null, loginCodeExpiresAt: null },
+  });
+
+  if (claimed.count === 0) return false;
+
+  clearFailedLogins(THROTTLE_SCOPE, user.email);
+  return true;
 }

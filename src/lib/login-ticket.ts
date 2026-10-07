@@ -37,6 +37,12 @@ export interface LoginTicket {
   sub: string;
   /** Vart personen ska efter steg två. Alltid en sökväg i appen. */
   next?: string;
+  /**
+   * Satt när lösenordet just återställts via mejl. Då räcker inte en kod via
+   * e-post i steg två: den som kommit åt inkorgen hade annars både kunnat
+   * byta lösenordet och ta emot koden. Se loginAlternatives i admin-mfa.ts.
+   */
+  afterReset?: boolean;
   /** Utgångstid, sekunder sedan epoch. */
   exp: number;
 }
@@ -60,12 +66,14 @@ export function encodeTicket(
   scope: TicketScope,
   sub: string,
   next?: string,
-  now: Date = new Date()
+  now: Date = new Date(),
+  extra: { afterReset?: boolean } = {}
 ): string {
   const payload: LoginTicket = {
     sub,
     next: safeNext(next),
     exp: Math.floor(now.getTime() / 1000) + LIFETIME_SECONDS,
+    ...(extra.afterReset ? { afterReset: true } : {}),
   };
   const body = Buffer.from(JSON.stringify(payload)).toString("base64url");
   return `${body}.${sign(scope, body)}`;
@@ -105,9 +113,10 @@ export function decodeTicket(
 export async function issueTicket(
   scope: TicketScope,
   sub: string,
-  next?: string
+  next?: string,
+  extra: { afterReset?: boolean } = {}
 ): Promise<void> {
-  (await cookies()).set(COOKIE[scope], encodeTicket(scope, sub, next), {
+  (await cookies()).set(COOKIE[scope], encodeTicket(scope, sub, next, new Date(), extra), {
     httpOnly: true,
     sameSite: "lax",
     secure: process.env.NODE_ENV === "production",

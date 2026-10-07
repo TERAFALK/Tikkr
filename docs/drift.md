@@ -368,6 +368,17 @@ och andra). Därefter frågar inloggningen efter koden appen visar.
 Befintliga konton får QR-koden vid nästa inloggning. Ingen kommer in i
 panelen förrän appen är uppsatt.
 
+**Kod via e-post** (kunder, inte plattformen). Under fältet för koden finns
+**Inloggningsalternativ**, där en kod kan skickas till kontots adress. Den
+gäller i tio minuter och en gång. Alternativet finns bara när appen är uppsatt
+och adressen bekräftad, och inte direkt efter "Glömt lösenordet?": den som
+kommit åt inkorgen ska inte kunna både byta lösenordet och ta emot koden.
+
+**Kom ihåg den här datorn** (kunder, inte plattformen). En ruta i kodsteget.
+Datorn slipper koden i 30 dagar; lösenordet krävs fortfarande när sessionen
+gått ut efter sju dagar. Ett nytt lösenord, **Logga ut på alla enheter** och
+en nollställd tvåstegsinloggning glömmer alla datorer för kontot.
+
 **Administratör som tappat sin telefon:** kundens ägare nollställer själv,
 under Inställningar, Användare, **Nollställ tvåsteg**.
 

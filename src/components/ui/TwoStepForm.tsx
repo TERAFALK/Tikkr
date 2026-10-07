@@ -1,5 +1,6 @@
 "use client";
 
+import type { ReactNode } from "react";
 import { useActionState } from "react";
 import { useFormStatus } from "react-dom";
 import { Alert, Button, Field, Input } from "@/components/ui";
@@ -16,6 +17,11 @@ import { Alert, Button, Field, Input } from "@/components/ui";
  * direkt för den som loggar in på telefonen. Den första koden bekräftar att
  * uppsättningen gick rätt.
  *
+ * Kundernas panel har två tillägg (2026-10-07), som plattformen saknar:
+ * `method="email"` när koden kommit via e-post, och `rememberDays`, som visar
+ * rutan "Kom ihåg den här datorn". `alternatives` är platsen under knappen
+ * där sidan lägger länken till inloggningsalternativen.
+ *
  * QR-koden kommer som färdig SVG från servern (two-step.ts) och skrivs in som
  * den är. Innehållet är vår egen länk, inget en användare skrivit.
  */
@@ -28,17 +34,35 @@ export default function TwoStepForm({
   action,
   cancel,
   enrollment,
+  method = "app",
+  intro,
+  rememberDays,
+  alternatives,
 }: {
   action: (state: TwoStepState, formData: FormData) => Promise<TwoStepState>;
   cancel: () => Promise<void>;
   enrollment?: { key: string; uri: string; qrSvg: string };
+  method?: "app" | "email";
+  intro?: ReactNode;
+  rememberDays?: number;
+  alternatives?: ReactNode;
 }) {
   const [state, submit] = useActionState<TwoStepState, FormData>(action, {});
+
+  const hint = enrollment
+    ? "Sex siffror som appen visar efter skanningen"
+    : method === "email"
+      ? "Sex siffror från mejlet"
+      : "Sex siffror från autentiseringsappen";
 
   return (
     <div className="space-y-4">
       <form action={submit} className="space-y-4">
+        <input type="hidden" name="method" value={method} />
+
         {state.error && <Alert>{state.error}</Alert>}
+
+        {intro}
 
         {enrollment && (
           <div className="space-y-3 text-center">
@@ -65,10 +89,7 @@ export default function TwoStepForm({
           </div>
         )}
 
-        <Field
-          label="Kod"
-          hint={enrollment ? "Sex siffror som appen visar efter skanningen" : "Sex siffror från autentiseringsappen"}
-        >
+        <Field label="Kod" hint={hint}>
           <Input
             name="code"
             inputMode="numeric"
@@ -80,8 +101,28 @@ export default function TwoStepForm({
           />
         </Field>
 
+        {rememberDays && (
+          <label className="flex cursor-pointer items-start gap-2 text-[13px]">
+            <input
+              type="checkbox"
+              name="remember"
+              className="mt-0.5 h-3.5 w-3.5 rounded border-neutral-300 text-blue-600 focus:ring-blue-600"
+            />
+            <span>
+              <span className="block font-medium text-neutral-900">
+                Kom ihåg den här datorn i {rememberDays} dagar
+              </span>
+              <span className="block text-neutral-500">
+                Inte på en dator som andra använder
+              </span>
+            </span>
+          </label>
+        )}
+
         <SubmitButton label={enrollment ? "Bekräfta och logga in" : "Logga in"} />
       </form>
+
+      {alternatives}
 
       <form action={cancel} className="text-center">
         <button

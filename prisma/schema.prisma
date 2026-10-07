@@ -728,6 +728,15 @@ model AdminUser {
   /// gånger.
   totpLastStep Int? @map("totp_last_step")
 
+  /// KOD VIA E-POST, ett inloggningsalternativ till appen (2026-10-07).
+  ///
+  /// Fingeravtrycket av den senast skickade koden, när den slutar gälla och
+  /// när den skickades. En kod åt gången: en ny ersätter den förra, och en
+  /// använd kod töms. Se sendEmailLoginCode i admin-mfa.ts.
+  loginCodeHash      String?   @map("login_code_hash")
+  loginCodeExpiresAt DateTime? @map("login_code_expires_at")
+  loginCodeSentAt    DateTime? @map("login_code_sent_at")
+
   company             Company             @relation(fields: [companyId], references: [id], onDelete: Cascade)
   passwordResets      PasswordReset[]
   emailVerifications  EmailVerification[]

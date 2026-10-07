@@ -1,8 +1,9 @@
 import NextAuth from "next-auth";
 import Credentials from "next-auth/providers/credentials";
 import { unsafeGlobalPrisma } from "./db";
-import { verifyAdminCode } from "./admin-mfa";
+import { verifyAdminCode, verifyEmailLoginCode } from "./admin-mfa";
 import { decodeTicket } from "./login-ticket";
+import { isTrustedDevice } from "./trusted-device";
 
 /**
  * INLOGGNING FÖR ADMINISTRATÖRER.
@@ -17,6 +18,13 @@ import { decodeTicket } from "./login-ticket";
  * Det finns ingen väg in med bara ett lösenord — inte heller från
  * registreringen, inbjudan eller återställningen, som alla lämnar en lapp och
  * skickar vidare hit.
+ *
+ * Steg två klaras på ett av tre sätt (2026-10-07):
+ *
+ *   app      koden från autentiseringsappen, som alltid finns
+ *   email    en kod via e-post, inloggningsalternativet, se admin-mfa.ts
+ *   device   en dator där personen bett oss komma ihåg den, se
+ *            trusted-device.ts — lösenordet är ändå kontrollerat i steg ett
  *
  * Uppslaget av användaren går via den ofiltrerade databasklienten, eftersom vi
  * inte vet vilket företag personen tillhör förrän vi hittat kontot. Efter
@@ -45,6 +53,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       credentials: {
         ticket: { type: "text" },
         code: { type: "text" },
+        method: { type: "text" },
+        device: { type: "text" },
       },
 
       async authorize(credentials) {
@@ -52,7 +62,20 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         if (!ticket) return null;
 
         const code = String(credentials?.code ?? "");
-        if (!(await verifyAdminCode(ticket.sub, code))) return null;
+        const method = String(credentials?.method ?? "app");
+
+        const passed =
+          method === "device"
+            ? await isTrustedDevice(String(credentials?.device ?? ""), ticket.sub)
+            : method === "email"
+              ? await verifyEmailLoginCode(
+                  ticket.sub,
+                  code,
+                  ticket.afterReset === true
+                )
+              : await verifyAdminCode(ticket.sub, code);
+
+        if (!passed) return null;
 
         const user = await unsafeGlobalPrisma.adminUser.findUnique({
           where: { id: ticket.sub },

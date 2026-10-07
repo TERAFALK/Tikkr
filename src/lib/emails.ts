@@ -306,6 +306,49 @@ export function emailVerificationEmail(params: {
   });
 }
 
+/**
+ * En inloggningskod, när personen valt e-post i stället för appen.
+ *
+ * Koden står i ämnesraden. Den syns då i telefonens avisering, och den som
+ * loggar in på datorn behöver inte öppna mejlet för att läsa av den.
+ */
+export function loginCodeEmail(params: {
+  to: string;
+  code: string;
+  minutesValid: number;
+}): EmailMessage {
+  const validity = `Koden gäller i ${params.minutesValid} minuter och kan användas en gång.`;
+
+  const unknown =
+    "Har du inte försökt logga in just nu har någon annan ditt lösenord. " +
+    "Byt lösenord under Inställningar, Användare, och svara på det här " +
+    "mejlet så hjälper vi dig.";
+
+  return compose({
+    to: params.to,
+    subject: `Din inloggningskod till Tikkr: ${params.code}`,
+    lines: [
+      "Din inloggningskod:",
+      "",
+      `    ${params.code}`,
+      "",
+      validity,
+      "",
+      unknown,
+    ],
+    layout: {
+      preheader: `Din inloggningskod: ${params.code}`,
+      heading: "Din inloggningskod",
+      paragraphs: [
+        `<span style="font-size:28px;font-weight:600;letter-spacing:6px;color:${COLORS.heading};">${escape(
+          params.code
+        )}</span>`,
+      ],
+      afterword: [validity, unknown],
+    },
+  });
+}
+
 /** Inbjudan till en ny administratör. */
 export function adminInviteEmail(params: {
   to: string;

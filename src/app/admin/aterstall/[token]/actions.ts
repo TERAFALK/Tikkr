@@ -40,6 +40,8 @@ export async function setNewPassword(
     throw error;
   }
 
-  await issueTicket("admin", userId);
+  // Märkt som efter en återställning: steg två kräver då koden från appen,
+  // inte en kod via e-post. Se LoginTicket.afterReset.
+  await issueTicket("admin", userId, undefined, { afterReset: true });
   redirect("/admin/login");
 }

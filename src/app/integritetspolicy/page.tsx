@@ -286,10 +286,11 @@ const sections: Section[] = [
           besöksmätning eller spårning.
         </p>
         <p>
-          I systemet används två nödvändiga kakor: en som håller en inloggad
-          administratör inloggad, och en som identifierar en kopplad
-          stämplingsskärm. Ingen av dem används för mätning eller marknadsföring,
-          och de kräver därför inget samtycke.
+          I systemet används bara nödvändiga kakor: de som håller en
+          administratör inloggad, en som låter en administratör som valt det
+          slippa inloggningskoden på samma dator i 30 dagar, och en som
+          identifierar en kopplad stämplingsskärm. Ingen av dem används för
+          mätning eller marknadsföring, och de kräver därför inget samtycke.
         </p>
       </>
     ),

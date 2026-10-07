@@ -898,6 +898,17 @@ inställningarna.
    återställning går samma väg. `currentAdmin()` släpper inte in ett konto
    utan bekräftad app. Nycklarna lagras krypterade med `AUTH_SECRET`.
 
+   **Två lättnader för kunderna, ingen för plattformen** (beslutat
+   2026-10-07, eftersom pilotkunden tyckte koden var jobbig). Appen sätts
+   alltid upp först. Därefter finns **Inloggningsalternativ** under
+   kodfältet, som Microsofts, där en kod via e-post kan väljas — bara med
+   bekräftad adress och aldrig direkt efter en återställning via mejl, annars
+   räckte en kapad inkorg för både lösenord och kod. Och rutan **Kom ihåg den
+   här datorn**, som hoppar över koden i 30 dagar med en signerad cookie
+   (`trusted-device.ts`). Ingen tabell: lösenordsbyte, "Logga ut på alla
+   enheter" och nollställning flyttar redan de tidpunkter cookien prövas
+   mot. Plattformspanelen ser alla kunder och kräver appen varje gång.
+
    Nollställning sker åt ett håll i taget: ägaren nollställer
    administratörer i sin arbetsyta (`resetTwoStepByOwner`), och vi
    nollställer ägare från plattformspanelen, efter att ha kontrollerat vem

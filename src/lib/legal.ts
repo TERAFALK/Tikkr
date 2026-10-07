@@ -8,7 +8,7 @@
  */
 
 /** Datumet som visas som "senast uppdaterad" i samtliga dokument. */
-export const LEGAL_UPDATED = "5 oktober 2026";
+export const LEGAL_UPDATED = "7 oktober 2026";
 
 /**
  * Samma dag som raden ovan, i maskinläsbar form. Används av sitemap.
@@ -20,7 +20,7 @@ export const LEGAL_UPDATED = "5 oktober 2026";
  *
  * `tests/seo.test.ts` kontrollerar att dag och år stämmer mellan de två.
  */
-export const LEGAL_UPDATED_AT = new Date("2026-10-05T00:00:00Z");
+export const LEGAL_UPDATED_AT = new Date("2026-10-07T00:00:00Z");
 
 /**
  * Var tjänsten driftas.
