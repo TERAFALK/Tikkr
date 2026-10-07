@@ -138,6 +138,7 @@ export async function saveCompEarned(
   const timeZone = await timeZoneOf(companyId);
   const date = parseLocalDate(String(formData.get("date") ?? ""), timeZone);
   if (!date) return { error: "Ange ett datum." };
+
   // TIMANSTÄLLD HAR INGEN KOMPTID. Knappen göms i panelen, men en
   // serveråtgärd ska inte lita på att gränssnittet gömde den.
   const person = await db.employee.findFirst({
@@ -148,7 +149,6 @@ export async function saveCompEarned(
   if (person?.hourly) {
     return { error: "Personen är timanställd och har ingen komptid." };
   }
-
 
   // Samma tolkning som frånvaron: godkänd komptid skrivs av från ett saldo
   // som står i tim:min.

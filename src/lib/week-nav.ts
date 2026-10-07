@@ -22,25 +22,42 @@ import { addDaysInZone, startOfWeekIn, toDateInput } from "./time-zone";
  */
 export function weekStep(
   basePath: string,
-  search: Record<string, string | undefined>,
+  search: object,
   timeZone: string
 ): { backHref: string; forwardHref: string; label: string } {
+  // `object` OCH INTE `Record<string, string | undefined>`.
+  //
+  // Sidorna typar sina adressparametrar olika: tidrapporten med en Record,
+  // Rapporter och Stämplingar med varsitt `interface SearchParams` som räknar
+  // upp fälten. TypeScript ger inte ett interface någon implicit
+  // indexsignatur, så ett sådant går inte att skicka till en Record — bygget
+  // föll på just det.
+  //
+  // Funktionen behöver bara två fält och bryr sig inte om resten, så den läser
+  // dem med en kontroll av att värdet faktiskt är en sträng. Då fungerar varje
+  // anropare, och en parameter som råkar vara något annat än text blir
+  // utelämnad i stället för att hamna i adressen som "[object Object]".
+  const values = search as Record<string, unknown>;
+  const text = (key: string) =>
+    typeof values[key] === "string" ? (values[key] as string) : undefined;
+
   const thisMonday = startOfWeekIn(new Date(), timeZone);
 
-  const from = search.from || toDateInput(thisMonday, timeZone);
+  const from = text("from") || toDateInput(thisMonday, timeZone);
 
   // Ett startdatum utan slutdatum betyder sju dagar framåt, inte innevarande
   // vecka. Samma regel som sidorna själva använder när de läser filtret.
   const to =
-    search.to ||
-    (search.from
-      ? shift(search.from, 6, timeZone)
+    text("to") ||
+    (text("from")
+      ? shift(text("from")!, 6, timeZone)
       : toDateInput(addDaysInZone(thisMonday, 6, timeZone), timeZone));
 
   const href = (days: number) => {
     const next = new URLSearchParams();
 
-    for (const [key, value] of Object.entries(search)) {
+    for (const key of Object.keys(values)) {
+      const value = text(key);
       if (value && key !== "from" && key !== "to") next.set(key, value);
     }
 
