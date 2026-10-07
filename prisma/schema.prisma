@@ -168,6 +168,7 @@ model Company {
   breakTypes      BreakType[]
   breakEntries    BreakEntry[]
   absenceReasons  AbsenceReason[]
+  prices          CompanyPrice[]
   absences        Absence[]
   compAdjustments CompAdjustment[]
 
@@ -1029,6 +1030,45 @@ model StripePrice {
   updatedAt      DateTime @updatedAt @map("updated_at")
 
   @@map("stripe_prices")
+}
+
+/// AVTALAT PRIS FÖR EN ENSKILD KUND.
+///
+/// Listpriset står hos Stripe och gäller alla, se StripePrice. Den här raden
+/// säger vad VI kommit överens om med ett företag: en pilotkund som får
+/// systemet gratis, en kund som förhandlat ner skärmlicensen.
+///
+/// En rad per prissatt artikel. SAKNAS RADEN GÄLLER LISTPRISET, och noll är
+/// ett giltigt pris som betyder gratis. Det är hela skälet att beloppet ligger
+/// i en egen rad och inte som ett nollbart fält på företaget: "ej satt" och
+/// "noll kronor" måste gå att skilja åt.
+///
+/// GÄLLER BARA FÖRETAG UTAN PRENUMERATION HOS STRIPE. Har kunden ett kort
+/// draget på 399 vore det en lögn att visa 299 på deras sida, och
+/// plattformspanelen vägrar sätta priset då, se isPlatformManaged i billing.ts.
+///
+/// Bara månadsbelopp. En plattformsstyrd kund har inget intervall hos Stripe,
+/// och fakturan skrivs för hand vid sidan om.
+model CompanyPrice {
+  id        String @id @default(cuid())
+  companyId String @map("company_id")
+
+  /// "SCREEN", eller en nyckel ur CompanyModuleKey. Samma nycklar som
+  /// StripePrice.item.
+  item String
+
+  /// Avtalat månadspris i ÖRE. Noll betyder gratis.
+  monthlyOre Int @map("monthly_ore")
+
+  updatedByEmail String   @map("updated_by_email")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@unique([companyId, item])
+  @@index([companyId])
+  @@map("company_prices")
 }
 
 /// En inbjudan att bli administratör.

@@ -1,9 +1,16 @@
 import type Stripe from "stripe";
 import { unsafeGlobalPrisma } from "./db";
+import {
+  agreedPrices,
+  discountFrom,
+  hasAgreement,
+  priceFor,
+  type AgreedPrices,
+} from "./company-prices";
 import { getLicenseState, setLicenseCount } from "./licenses";
 import { enabledModules } from "./company-modules";
 import { MODULES, MODULE_KEYS, type ModuleKey } from "./modules";
-import { priceBook, type PriceBook } from "./price-book";
+import { priceBook, SCREEN_ITEM, type PriceBook } from "./price-book";
 import {
   getModulePricing,
   getScreenPricing,
@@ -253,8 +260,10 @@ export interface ModuleOffer {
   name: string;
   summary: string;
   enabled: boolean;
-  /** Priset i det intervall kunden betalar i. */
+  /** Priset kunden betalar, avtalat eller enligt listan. */
   amount: number;
+  /** Listpriset i samma intervall. Skiljer sig bara vid ett avtalat pris. */
+  listAmount: number;
   /** false när artikeln saknas för det intervall kunden betalar i. */
   forSale: boolean;
   /** Vilka intervall modulen alls går att köpa i. Styr vad UI:t kan säga. */
@@ -313,6 +322,30 @@ export interface BillingOverview {
    * alltid ger ett felmeddelande är inget val.
    */
   blocksYearly: string[];
+  /**
+   * AVTALAT PRIS, när vi kommit överens om något annat än listpriset.
+   *
+   * Null för den stora merparten av kunderna, som betalar vad som står på
+   * säljsidan. Finns den visar prenumerationssidan listpriset överstruket
+   * bredvid det avtalade, med rabatten i procent — kunden ska förstå vad hen
+   * fått, inte bara se ett tal som avviker från säljsidan.
+   *
+   * Gäller bara företag utan prenumeration hos Stripe. Se company-prices.ts.
+   */
+  agreement: Agreement | null;
+}
+
+export interface Agreement {
+  /** Hela månadsbeloppet till listpris, skärmar och tillval. */
+  listTotal: number;
+  /** Hela månadsbeloppet enligt överenskommelsen. */
+  total: number;
+  /** Rabatten på totalen i procent. Null när det inte är en rabatt. */
+  discountPercent: number | null;
+  /** Listpriset per skärm och månad. */
+  listPerScreen: number;
+  /** Det avtalade priset per skärm och månad. */
+  perScreen: number;
 }
 
 /**
@@ -327,7 +360,9 @@ function moduleOffers(
   book: PriceBook,
   pricing: ModulePricing,
   enabled: ModuleKey[],
-  interval: BillingInterval
+  interval: BillingInterval,
+  /** Avtalade priser. Tomt betyder listpris. */
+  agreed: AgreedPrices = {}
 ): ModuleOffer[] {
   return MODULE_KEYS.map((key) => {
     const price = pricing[key];
@@ -337,7 +372,12 @@ function moduleOffers(
       name: MODULES[key].name,
       summary: MODULES[key].summary,
       enabled: enabled.includes(key),
-      amount:
+      amount: priceFor(
+        agreed,
+        key,
+        interval === "year" ? (price.year ?? price.month * 12) : price.month
+      ),
+      listAmount:
         interval === "year" ? (price.year ?? price.month * 12) : price.month,
       forSale: Boolean(modulePriceId(book, key, interval)),
       soldMonthly: Boolean(modulePriceId(book, key, "month")),
@@ -383,11 +423,12 @@ export async function platformManagedCompany(
 export async function getBillingOverview(
   companyId: string
 ): Promise<BillingOverview> {
-  const [licenses, pricing, modulePricing, book] = await Promise.all([
+  const [licenses, pricing, modulePricing, book, deal] = await Promise.all([
     getLicenseState(companyId),
     getScreenPricing(),
     getModulePricing(),
     priceBook(),
+    agreedPrices(companyId),
   ]);
 
   const screens = licenses.total;
@@ -397,11 +438,24 @@ export async function getBillingOverview(
     select: { stripeSubscriptionId: true, subscriptionStatus: true },
   });
 
+  // ETT AVTALAT PRIS GÄLLER BARA DEN VI FAKTURERAR SJÄLVA. Har kunden ett
+  // kort hos Stripe är det kortet som dras, och att visa ett annat tal vore
+  // en lögn. Raden kan ligga kvar från tiden före prenumerationen.
+  const agreed: AgreedPrices = company?.stripeSubscriptionId ? {} : deal;
+
+  const perScreen = priceFor(agreed, SCREEN_ITEM, pricing.month);
+
   const amounts = (count: number) => ({
-    monthlyAmount: count * pricing.month,
-    yearlyAmount: pricing.year === null ? null : count * pricing.year,
+    monthlyAmount: count * perScreen,
+    // ÅRSBELOPPEN FALLER BORT VID ETT AVTALAT PRIS. Överenskommelsen är ett
+    // månadspris, och ett årsbelopp räknat på listpriset bredvid det hade
+    // varit ett tal kunden inte kan betala.
+    yearlyAmount:
+      pricing.year === null || hasAgreement(agreed) ? null : count * pricing.year,
     yearlySaving:
-      pricing.year === null ? null : count * (pricing.month * 12 - pricing.year),
+      pricing.year === null || hasAgreement(agreed)
+        ? null
+        : count * (pricing.month * 12 - pricing.year),
   });
 
   const overview: BillingOverview = {
@@ -420,6 +474,7 @@ export async function getBillingOverview(
     modules: [],
     moduleAmount: 0,
     blocksYearly: [],
+    agreement: null,
   };
 
   // Tillvalen räknas fram sist, när intervallet är känt. Utan prenumeration
@@ -427,7 +482,13 @@ export async function getBillingOverview(
   const describeModules = async (interval: BillingInterval) => {
     const enabled = await enabledModules(companyId);
 
-    overview.modules = moduleOffers(book, modulePricing, enabled, interval);
+    overview.modules = moduleOffers(
+      book,
+      modulePricing,
+      enabled,
+      interval,
+      agreed
+    );
 
     const on = overview.modules.filter((module) => module.enabled);
 
@@ -435,6 +496,26 @@ export async function getBillingOverview(
     overview.blocksYearly = on
       .filter((module) => !module.soldYearly)
       .map((module) => module.name);
+
+    // ÖVERENSKOMMELSEN SAMMANFATTAS när den finns, så att sidan kan visa
+    // listpriset överstruket bredvid det avtalade. Räknas här och inte i
+    // sidan: rabatten är ett tal som ska stämma med beloppen ovanför, och två
+    // räkningar av samma sak hinner alltid sluta säga samma sak.
+    if (hasAgreement(agreed)) {
+      const listTotal =
+        screens * pricing.month +
+        on.reduce((sum, module) => sum + module.listAmount, 0);
+
+      const total = screens * perScreen + overview.moduleAmount;
+
+      overview.agreement = {
+        listTotal,
+        total,
+        discountPercent: discountFrom(listTotal, total),
+        listPerScreen: pricing.month,
+        perScreen,
+      };
+    }
   };
 
   if (!company?.stripeSubscriptionId) {

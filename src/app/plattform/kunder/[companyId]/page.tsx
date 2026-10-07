@@ -31,6 +31,7 @@ import SubscriptionOverrideForm from "@/components/platform/SubscriptionOverride
 import PlatformShell from "@/components/platform/PlatformShell";
 import ManualLicenseForm from "@/components/platform/ManualLicenseForm";
 import ModuleForm from "@/components/platform/ModuleForm";
+import PriceForm, { type PriceRow } from "@/components/platform/PriceForm";
 import DeleteCompanyForm from "@/components/platform/DeleteCompanyForm";
 import ActivityTable from "@/components/platform/ActivityTable";
 import {
@@ -43,6 +44,9 @@ import { resetTwoStep, startSupport, updateNote } from "./actions";
 import ConfirmButton from "@/components/admin/ConfirmButton";
 import { unsafeGlobalPrisma } from "@/lib/db";
 import { getModulePricing, getScreenPricing } from "@/lib/stripe";
+import { SCREEN_ITEM } from "@/lib/price-book";
+import { discountFrom } from "@/lib/company-prices";
+import { MODULES, MODULE_KEYS } from "@/lib/modules";
 import { formatPhone } from "@/lib/phone";
 
 export const dynamic = "force-dynamic";
@@ -81,6 +85,7 @@ export default async function CompanyPage({
     historyTotal,
     stats,
     modules,
+    prices,
   } = detail;
 
   const managedByStripe = Boolean(company.stripeSubscriptionId);
@@ -92,11 +97,43 @@ export default async function CompanyPage({
     .filter((admin) => admin.role === "OWNER")
     .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime())[0];
 
+  const screenPricing = await getScreenPricing();
+  const modulePricing = await getModulePricing();
+
   const monthlyRevenue = monthlyRevenueFor(
     company,
-    await getScreenPricing(),
-    await getModulePricing()
+    screenPricing,
+    modulePricing,
+    prices
   );
+
+  // Raderna i prisrutan: skärmlicensen först, sedan tillvalen i registrets
+  // ordning. Listpriset kommer från Stripe, det avtalade från kunden.
+  const priceRow = (
+    item: string,
+    name: string,
+    listMonth: number,
+    agreed: number | undefined
+  ): PriceRow => ({
+    item,
+    name,
+    listMonth,
+    agreed: agreed ?? null,
+    discountPercent:
+      agreed === undefined ? null : discountFrom(listMonth, agreed),
+  });
+
+  const priceRows: PriceRow[] = [
+    priceRow(
+      SCREEN_ITEM,
+      "Skärmlicens",
+      screenPricing.month,
+      prices[SCREEN_ITEM]
+    ),
+    ...MODULE_KEYS.map((key) =>
+      priceRow(key, MODULES[key].name, modulePricing[key].month, prices[key])
+    ),
+  ];
 
   // Senaste tjugo besöken. Går utanför tenant-filtreringen med flit: raden
   // gäller LEVERANTÖRENS åtkomst till kunden, inte kundens egen data, och läses
@@ -264,6 +301,26 @@ export default async function CompanyPage({
                   <ModuleForm
                     companyId={company.id}
                     modules={modules}
+                    managedByStripe={managedByStripe}
+                  />
+                </div>
+              </Card>
+
+              {/* AVTALADE PRISER. Egen ruta och inte en kolumn i tillvalen:
+                  skärmlicensen har också ett pris, och den är inget tillval. */}
+              <Card>
+                <CardHeader
+                  title="Avtalat pris"
+                  description={
+                    managedByStripe
+                      ? "Priset styrs av artiklarna hos Stripe."
+                      : "Visas för kunden med listpriset överstruket."
+                  }
+                />
+                <div className="p-5">
+                  <PriceForm
+                    companyId={company.id}
+                    prices={priceRows}
                     managedByStripe={managedByStripe}
                   />
                 </div>

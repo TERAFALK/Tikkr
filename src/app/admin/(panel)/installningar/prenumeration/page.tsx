@@ -75,7 +75,11 @@ export default async function SubscriptionPage({
       <Card>
         <CardHeader
           title="Prenumeration"
-          description={`${kr(pricing.month)} kr per licens och månad, exkl. moms. Ingen bindningstid.`}
+          description={
+            overview.agreement
+              ? `${kr(overview.agreement.perScreen)} kr per licens och månad, exkl. moms. Ert avtalade pris.`
+              : `${kr(pricing.month)} kr per licens och månad, exkl. moms. Ingen bindningstid.`
+          }
         />
 
         <div className="space-y-5 p-5">
@@ -91,17 +95,30 @@ export default async function SubscriptionPage({
 
             {/* Ingen avgift visas under provperioden. En kostnad i en tabell
                 läses som något som ska betalas, och det ska den inte. */}
-            {paying && (
-              <Row
-                label={
-                  overview.interval === "year" ? "Avgift per år" : "Avgift per månad"
-                }
-                value={`${kr(
-                  (overview.interval === "year"
-                    ? (overview.yearlyAmount ?? 0)
-                    : overview.monthlyAmount) + overview.moduleAmount
-                )} kr`}
+            {/* AVTALAT PRIS visas med listpriset överstruket och rabatten
+                i procent. Kunden ska förstå vad hen fått, inte bara se ett
+                tal som avviker från säljsidan. En gratiskund ser 0 kr och
+                100 %, vilket är hela poängen. */}
+            {paying && overview.agreement ? (
+              <AgreedRow
+                label="Avgift per månad"
+                list={overview.agreement.listTotal}
+                agreed={overview.agreement.total}
+                discountPercent={overview.agreement.discountPercent}
               />
+            ) : (
+              paying && (
+                <Row
+                  label={
+                    overview.interval === "year" ? "Avgift per år" : "Avgift per månad"
+                  }
+                  value={`${kr(
+                    (overview.interval === "year"
+                      ? (overview.yearlyAmount ?? 0)
+                      : overview.monthlyAmount) + overview.moduleAmount
+                  )} kr`}
+                />
+              )
             )}
 
             {paying && overview.moduleAmount > 0 && (
@@ -289,6 +306,46 @@ function statusText(status: string): string {
   if (status === "TRIALING") return "Provperiod";
   if (status === "PAST_DUE") return "Betalning saknas";
   return "Avslutad";
+}
+
+/**
+ * En rad med avtalat pris: listpriset överstruket, det avtalade, och rabatten.
+ *
+ * Rabatten står i grönt eftersom den är något kunden fått, och grönt betyder
+ * just det i panelen. Saknas en rabatt att visa skrivs bara beloppen — ett
+ * avtalat pris behöver inte vara lägre.
+ */
+function AgreedRow({
+  label,
+  list,
+  agreed,
+  discountPercent,
+}: {
+  label: string;
+  list: number;
+  agreed: number;
+  discountPercent: number | null;
+}) {
+  return (
+    <div className="flex items-center justify-between gap-3 py-2.5">
+      <dt className="text-neutral-500">{label}</dt>
+      <dd className="flex flex-wrap items-baseline justify-end gap-2">
+        {list !== agreed && (
+          <span className="tabular-nums text-neutral-400 line-through">
+            {kr(list)} kr
+          </span>
+        )}
+        <span className="font-medium tabular-nums text-neutral-900">
+          {kr(agreed)} kr
+        </span>
+        {discountPercent !== null && (
+          <span className="rounded bg-emerald-50 px-1.5 py-0.5 text-xs font-semibold text-emerald-700">
+            {discountPercent} % rabatt
+          </span>
+        )}
+      </dd>
+    </div>
+  );
 }
 
 function Row({ label, value }: { label: string; value: string }) {

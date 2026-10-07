@@ -11,6 +11,15 @@ import {
 import { TRIAL_LICENSES } from "./licenses";
 import { isModuleKey, moduleName, type ModuleKey } from "./modules";
 import { moduleStates, setModuleManually } from "./company-modules";
+import {
+  agreedPrices,
+  agreedPricesByCompany,
+  hasAgreement,
+  priceFor,
+  setAgreedPrice,
+  type AgreedPrices,
+} from "./company-prices";
+import { SCREEN_ITEM, type PriceItem } from "./price-book";
 import { resetAdminMfa } from "./admin-mfa";
 
 /**
@@ -71,6 +80,8 @@ export interface CompanyOverview {
   licenses: number;
   /** Månadsintäkt i kronor. Årsbetalningar räknas om till per månad. */
   monthlyRevenue: number;
+  /** true när kunden har ett avtalat pris på minst en artikel. */
+  hasAgreedPrice: boolean;
   /** true när Stripe styr prenumerationen. */
   managedByStripe: boolean;
 }
@@ -87,6 +98,12 @@ export function monthlyRevenueFor(
     screenLicenses: number;
     subscriptionInterval: string | null;
     /**
+     * Har kunden ett kort hos Stripe gäller Stripes pris, punkt. Ett avtalat
+     * pris kan ligga kvar från tiden före prenumerationen, och det ska inte
+     * börja gälla igen bara för att raden finns.
+     */
+    stripeSubscriptionId?: string | null;
+    /**
      * Påslagna tillval, i den form Prisma lämnar dem. Utelämnad räknas som
      * inga — varje anropare måste alltså komma ihåg att välja fältet, och
      * den som glömmer får ett för lågt tal snarare än ett fel.
@@ -94,14 +111,22 @@ export function monthlyRevenueFor(
     modules?: { module: string }[];
   },
   pricing: ScreenPricing,
-  modulePricing: ModulePricing
+  modulePricing: ModulePricing,
+  /** Avtalade priser. Tomt betyder listpris, se company-prices.ts. */
+  agreed: AgreedPrices = {}
 ): number {
   if (company.subscriptionStatus !== "ACTIVE") return 0;
 
   const yearly = company.subscriptionInterval === "year";
 
-  const perScreen =
+  // Ett avtalat pris gäller bara den vi fakturerar själva. Se kommentaren på
+  // fältet ovan.
+  const deal: AgreedPrices = company.stripeSubscriptionId ? {} : agreed;
+
+  const listPerScreen =
     yearly && pricing.year !== null ? pricing.year / 12 : pricing.month;
+
+  const perScreen = priceFor(deal, SCREEN_ITEM, listPerScreen);
 
   // Tillvalen är fasta belopp per företag, inte per skärm. En kund med tre
   // skärmar och löneunderlaget betalar tre gånger skärmpriset plus EN
@@ -111,8 +136,9 @@ export function monthlyRevenueFor(
 
     const price = modulePricing[row.module];
     const perYear = price.year ?? price.month * 12;
+    const list = yearly ? perYear / 12 : price.month;
 
-    return sum + (yearly ? perYear / 12 : price.month);
+    return sum + priceFor(deal, row.module, list);
   }, 0);
 
   return Math.round(company.screenLicenses * perScreen + modules);
@@ -173,6 +199,10 @@ export async function listCompanies(): Promise<CompanyOverview[]> {
     }),
   ]);
 
+  // Avtalade priser i EN fråga för hela listan. En per rad hade blivit
+  // hundra anrop på en sida med hundra kunder.
+  const deals = await agreedPricesByCompany(companies.map((row) => row.id));
+
   const recentByCompany = new Map(
     recent.map((row) => [row.companyId, row._count._all])
   );
@@ -195,7 +225,13 @@ export async function listCompanies(): Promise<CompanyOverview[]> {
     entriesLast30Days: recentByCompany.get(company.id) ?? 0,
     lastActivityAt: latestByCompany.get(company.id) ?? null,
     licenses: company.screenLicenses,
-    monthlyRevenue: monthlyRevenueFor(company, pricing, modulePricing),
+    monthlyRevenue: monthlyRevenueFor(
+      company,
+      pricing,
+      modulePricing,
+      deals.get(company.id) ?? {}
+    ),
+    hasAgreedPrice: hasAgreement(deals.get(company.id) ?? {}),
     managedByStripe: Boolean(company.stripeSubscriptionId),
   }));
 }
@@ -284,6 +320,7 @@ export async function getCompanyDetail(companyId: string) {
     history,
     historyTotal,
     modules,
+    prices,
   ] = await Promise.all([
       unsafeGlobalPrisma.adminUser.findMany({
         where: { companyId },
@@ -345,6 +382,9 @@ export async function getCompanyDetail(companyId: string) {
       // Tillvalen. Ett driftfaktum, inte verksamhetsinnehåll: vad kunden
       // köpt hör till supportsamtalet på samma sätt som antalet licenser.
       moduleStates(companyId),
+      // Avtalade priser. Hör hit av samma skäl som tillvalen: det är vad
+      // kunden ska faktureras, inte vad hen registrerat i systemet.
+      agreedPrices(companyId),
     ]);
 
   const [employees, openOrders, moments, totalEntries, needsReview, openNow] =
@@ -358,6 +398,7 @@ export async function getCompanyDetail(companyId: string) {
     history,
     historyTotal,
     modules,
+    prices,
     stats: {
       employees,
       openOrders,
@@ -856,4 +897,60 @@ export async function deleteCompany(params: {
     }),
     unsafeGlobalPrisma.company.delete({ where: { id: params.companyId } }),
   ]);
+}
+
+/**
+ * SÄTTER ETT AVTALAT PRIS för en kund vi fakturerar själva.
+ *
+ * Listpriset står hos Stripe och gäller alla; det här är vad vi kommit
+ * överens om med just det här företaget. Tomt belopp tar bort
+ * överenskommelsen, och noll betyder gratis — se company-prices.ts om varför
+ * de två måste gå att skilja åt.
+ *
+ * VÄGRAR FÖR EN KUND MED PRENUMERATION, av samma skäl som setModule gör det:
+ * där är det Stripe som drar kortet, och ett annat tal på kundens sida vore
+ * en lögn. Vakten ligger här och inte bara i formuläret, eftersom ett
+ * formulär kan skickas av annat än sidan.
+ */
+export async function setAgreedPriceManually(params: {
+  actorEmail: string;
+  companyId: string;
+  item: PriceItem;
+  /** Kronor, eller null för att gå tillbaka till listpriset. */
+  amount: number | null;
+  reason: string;
+}) {
+  const company = await unsafeGlobalPrisma.company.findUnique({
+    where: { id: params.companyId },
+    select: { stripeSubscriptionId: true },
+  });
+
+  if (!company) return;
+
+  if (company.stripeSubscriptionId) {
+    throw new PlatformActionError(
+      "Kunden betalar med kort hos Stripe. Priset styrs av artikeln där, " +
+        "och ett annat belopp här hade bara visats på kundens sida utan att " +
+        "ändra vad som dras."
+    );
+  }
+
+  await setAgreedPrice({
+    companyId: params.companyId,
+    item: params.item,
+    amount: params.amount,
+    byEmail: params.actorEmail,
+  });
+
+  const what = params.item === SCREEN_ITEM ? "skärmlicensen" : moduleName(params.item);
+
+  await record({
+    actorEmail: params.actorEmail,
+    action: params.amount === null ? "Tog bort avtalat pris" : "Satte avtalat pris",
+    targetCompanyId: params.companyId,
+    detail:
+      params.amount === null
+        ? `${what}. ${params.reason}`.trim()
+        : `${what}: ${params.amount} kr/mån. ${params.reason}`.trim(),
+  });
 }

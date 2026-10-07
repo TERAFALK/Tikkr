@@ -65,6 +65,10 @@ export const TENANT_SCOPED_MODELS = [
   // Tillvalen. Se company-modules.ts — skrivningarna sker via
   // unsafeGlobalPrisma, men raderna hör till kunden och filtreras därför här.
   "CompanyModule",
+  // Avtalat pris per kund. Skrivs bara av plattformspanelen, men LÄSES av
+  // kundens egen prenumerationssida — och kund A ska aldrig kunna läsa vad
+  // kund B förhandlat fram.
+  "CompanyPrice",
   // Ändringsloggen. Kundens egen historik, och lika isolerad som resten.
   "AuditEvent",
 ] as const;

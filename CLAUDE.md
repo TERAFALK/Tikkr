@@ -191,6 +191,8 @@ planned_blocks   — id, company_id, station_id, order_id, moment_id,
 company_modules  — id, company_id, module, source, stripe_item_id,
                    enabled_by, enabled_at
 
+company_prices   — id, company_id, item, monthly_ore, updated_by_email
+
   — plattformens egna tabeller, aldrig kundens —
 stripe_prices    — item, month_price_id, year_price_id, updated_by_email
 ```
@@ -1286,6 +1288,42 @@ Numret kontrolleras mot Stripe när det sparas: att artikeln finns, att den är
 återkommande, och att intervallet stämmer med fältet. Ett årspris i
 månadsfältet ger en faktura tolv gånger för dyr, och det ska inte gå att
 spara.
+
+### Avtalat pris per kund (tillagt 2026-10-08)
+
+Listpriset ovan gäller alla. `company_prices` säger vad vi kommit överens om
+med ett ENSKILT företag: en pilotkund som får systemet gratis, en kund som
+förhandlat ner skärmlicensen till 299.
+
+En rad per prissatt artikel — `SCREEN` och varje modulnyckel, samma nycklar
+som `stripe_prices`. **Saknas raden gäller listpriset, och noll är ett pris
+som betyder gratis.** Det är hela skälet att beloppet ligger i en egen rad och
+inte som ett nollbart fält på företaget: går "ej satt" och "noll kronor" inte
+att skilja åt kan en gratiskund inte uttryckas.
+
+Per artikel och inte som en justerad totalsumma. Totalen räknas ur raderna och
+kan därmed aldrig säga emot dem — samma skäl som att orderns beräknade tid
+aldrig lagras (§ 3 regel 6). Allt på noll ger en gratiskund.
+
+**GÄLLER BARA FÖRETAG UTAN PRENUMERATION HOS STRIPE.** Dras kundens kort på
+399 vore det en lögn att visa 299 på deras sida. Vakten sitter i
+`setAgreedPriceManually` och i uppslaget: en kund med prenumeration får
+listpriset oavsett vad som ligger i tabellen, eftersom raden kan ligga kvar
+från tiden före kortet. Samma hållning som `setModule` redan har.
+
+**Kunden ser rabatten.** Prenumerationssidan visar listpriset överstruket,
+det avtalade beloppet och rabatten i procent. En gratiskund ser 0 kr och
+100 %. Kunden ska förstå vad hen fått, inte bara se ett tal som avviker från
+säljsidan.
+
+Bara månadsbelopp, och årsbeloppen faller bort när en överenskommelse finns.
+En plattformsstyrd kund har inget intervall hos Stripe, fakturan skrivs för
+hand vid sidan om, och ett årsbelopp räknat på listpriset bredvid ett avtalat
+månadspris vore ett tal kunden inte kan betala.
+
+Dashboardens månadsintäkt räknar med de avtalade priserna. En gratiskund står
+alltså kvar som ett betalande företag med noll i intäkt — hen ÄR en kund, och
+att dölja raden vore att dölja en kund.
 
 Under provperioden slår kunden på och av modulerna fritt. Vid köp blir de
 påslagna modulerna rader på prenumerationen. En kund som redan betalar slår

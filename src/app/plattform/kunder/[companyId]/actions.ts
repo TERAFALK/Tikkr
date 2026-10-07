@@ -15,11 +15,13 @@ import {
   requirePlatformAdmin,
   resetAdminTwoStep,
   saveNote,
+  setAgreedPriceManually,
   setLicensesManually,
   setModule,
   setSubscriptionStatus,
   type SubscriptionStatus,
 } from "@/lib/platform-admin";
+import { SCREEN_ITEM, type PriceItem } from "@/lib/price-book";
 import { isModuleKey, moduleName } from "@/lib/modules";
 
 const STATUSES: SubscriptionStatus[] = [
@@ -305,4 +307,72 @@ export async function endSupport(formData: FormData) {
 
   await endSupportSession();
   redirect(back);
+}
+
+export interface PriceFormState {
+  error?: string;
+  ok?: string;
+}
+
+/**
+ * Sätter eller tar bort ett avtalat pris för en artikel.
+ *
+ * Samma krav på dokumenterad anledning som licenserna och tillvalen: det
+ * ändrar vad kunden ska faktureras, och ett pris som ändrats utan spår går
+ * inte att förklara ett halvår senare.
+ *
+ * TOMT FÄLT TAR BORT ÖVERENSKOMMELSEN och kunden går tillbaka till
+ * listpriset. Noll är ett pris och betyder gratis — de två är olika saker,
+ * se company-prices.ts.
+ */
+export async function changeAgreedPrice(
+  _previous: PriceFormState,
+  formData: FormData
+): Promise<PriceFormState> {
+  const { email } = await requirePlatformAdmin();
+
+  const companyId = String(formData.get("companyId") ?? "");
+  const item = String(formData.get("item") ?? "");
+  const raw = String(formData.get("amount") ?? "").trim().replace(",", ".");
+  const reason = String(formData.get("reason") ?? "").trim();
+
+  if (!companyId) return { error: "Okänt företag." };
+  if (item !== SCREEN_ITEM && !isModuleKey(item)) {
+    return { error: "Okänd artikel." };
+  }
+  if (!reason) return { error: "Ange en anledning till ändringen." };
+
+  let amount: number | null = null;
+
+  if (raw) {
+    amount = Number(raw);
+
+    if (!Number.isFinite(amount) || amount < 0) {
+      return { error: "Skriv priset som ett belopp i kronor, till exempel 299." };
+    }
+  }
+
+  try {
+    await setAgreedPriceManually({
+      actorEmail: email,
+      companyId,
+      item: item as PriceItem,
+      amount,
+      reason,
+    });
+  } catch (error) {
+    if (error instanceof PlatformActionError) return { error: error.message };
+    throw error;
+  }
+
+  revalidatePath(`/plattform/kunder/${companyId}`);
+  revalidatePath("/plattform");
+  revalidatePath("/plattform/kunder");
+
+  return {
+    ok:
+      amount === null
+        ? "Listpriset gäller igen."
+        : `Priset är satt till ${amount} kr/mån.`,
+  };
 }
