@@ -108,13 +108,8 @@ export default function TwoStepForm({
               name="remember"
               className="mt-0.5 h-3.5 w-3.5 rounded border-neutral-300 text-blue-600 focus:ring-blue-600"
             />
-            <span>
-              <span className="block font-medium text-neutral-900">
-                Kom ihåg den här datorn i {rememberDays} dagar
-              </span>
-              <span className="block text-neutral-500">
-                Inte på en dator som andra använder
-              </span>
+            <span className="font-medium text-neutral-900">
+              Kom ihåg den här datorn i {rememberDays} dagar
             </span>
           </label>
         )}

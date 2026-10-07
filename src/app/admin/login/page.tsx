@@ -147,8 +147,8 @@ export default async function LoginPage({
             )}
 
             <p className="pt-1 text-[13px] leading-relaxed text-neutral-500">
-              Tappad telefon: en ägare nollställer tvåstegsinloggningen under
-              Användare. Ägare kontaktar{" "}
+              Har du inte telefonen? Be en ägare i ert företag att nollställa
+              din tvåstegsinloggning. Är du själv ägare, kontakta{" "}
               <a href={`mailto:${CONTACT.email}`} className={linkClass}>
                 {CONTACT.email}
               </a>
