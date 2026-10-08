@@ -923,12 +923,27 @@ inställningarna.
    Se `app-url.ts` och `client-ip.ts`.
 
    **Sessionen gäller sju dagar** (ändrat 2026-10-06, var trettio dagar). Ett
-   lösenordsbyte eller "Logga ut på alla enheter" under Användare gör äldre
+   lösenordsbyte eller "Logga ut på alla enheter" under Ditt konto gör äldre
    sessioner ogiltiga. **E-postadressen bekräftas** med en länk vid
    registreringen; det spärrar ingenting, men panelen visar en remsa tills
    det är gjort, och en obekräftad adress går att rätta själv. Registreringen
    tar högst fem nya arbetsytor per kvart och IP-adress. Se `account.ts` och
    `email-verification.ts`.
+   **DET EGNA KONTOT LIGGER FÖR SIG** (ändrat 2026-10-08). Namn,
+   telefonnummer, e-postadress och lösenord ligger på `/admin/konto`, som nås
+   från adressen längst ner i menyn. De låg under Inställningar, Användare,
+   ovanför inbjudningarna och listan över vilka som har åtkomst.
+
+   Skälet är att det är två olika frågor. "Mina uppgifter" hör till den som är
+   inloggad; "vilka andra kommer in" är en inställning för arbetsytan. Den som
+   skulle bjuda in en kollega möttes först av sitt eget lösenordsfält, och den
+   som sökte sitt lösenord letade under en rubrik om användare.
+
+   Sidan vaktas som alla andra: varje åtgärd tar sitt id ur sessionen och
+   aldrig ur formuläret, så ingen administratör kan ändra någon annans
+   uppgifter den vägen. Nollställning av tvåsteg står kvar under Användare,
+   eftersom den gäller någon annan.
+
 4. **Anomali-varningar** (senare fas, ej MVP-kritiskt) — flagga t.ex. ett jobb
    som pågått orimligt länge, eller en person med fler parallella jobb än hen
    rimligen hinner sköta. Däremot INTE "instämplad på två ställen samtidigt" —

@@ -44,13 +44,9 @@ export default async function TimeSettingsPage() {
 
         <div className="space-y-5 p-5">
           <Alert tone="info">
-            Vid angivet klockslag stängs stämplingar som fortfarande är
-            öppna. Posten <strong>flaggas för granskning</strong> och visas
-            under Granskning. Den beräknade sluttiden är alltid markerad som
-            sådan.
-            <span className="mt-1.5 block">
-              Stämplingar som påbörjas efter klockslaget stängs först nästa dygn, vilket gör att kvälls- och nattskift inte avbryts.
-            </span>
+            Vid klockslaget stängs stämplingar som fortfarande är öppna. Posten
+            flaggas för granskning, och sluttiden är markerad som beräknad.
+            Stämplingar som påbörjas efter klockslaget stängs först nästa dygn.
           </Alert>
 
           <SaveForm action={saveTimeSettings} className="max-w-md space-y-4">
@@ -79,13 +75,13 @@ export default async function TimeSettingsPage() {
             </Field>
           </SaveForm>
         </div>
-      </Card>
 
-      <Card>
-        <CardHeader title="Läge just nu" />
-        <div className="p-5 text-[13px] text-neutral-600">
+        {/* LÄGET JUST NU STÅR I SAMMA RUTA som klockslaget det gäller. Det låg
+            i en egen ruta med egen rubrik, alltså en ram och en skärmhöjd för
+            en enda rad text. */}
+        <div className="border-t border-neutral-200 px-5 py-3.5 text-[13px] text-neutral-600">
           {openRightNow === 0 ? (
-            <p>Inga öppna stämplingar. Ingen berörs av inställningen just nu.</p>
+            <p>Inga öppna stämplingar just nu.</p>
           ) : (
             <p>
               <strong className="tabular-nums text-neutral-900">

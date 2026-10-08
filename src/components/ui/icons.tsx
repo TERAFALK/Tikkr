@@ -88,6 +88,14 @@ export const IconPeople = (props: IconProps) => (
   </Icon>
 );
 
+/** En person. Det egna kontot, till skillnad från IconPeople som är flera. */
+export const IconUser = (props: IconProps) => (
+  <Icon {...props}>
+    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+    <circle cx="12" cy="7" r="4" />
+  </Icon>
+);
+
 export const IconMoment = (props: IconProps) => (
   <Icon {...props}>
     <path d="M14.7 6.3a4 4 0 0 0 5 5l-9.4 9.4a2.8 2.8 0 0 1-4-4Z" />
@@ -196,6 +204,14 @@ export const IconTag = (props: IconProps) => (
 );
 
 /** Åtgärdsloggen. Klocka med pil bakåt. */
+/** Almanackan. Frånvaro, som registreras per datum. */
+export const IconCalendar = (props: IconProps) => (
+  <Icon {...props}>
+    <rect x="3" y="5" width="18" height="16" rx="2" />
+    <path d="M3 10h18M8 3v4M16 3v4" />
+  </Icon>
+);
+
 export const IconHistory = (props: IconProps) => (
   <Icon {...props}>
     <path d="M3 12a9 9 0 1 0 2.6-6.4" />

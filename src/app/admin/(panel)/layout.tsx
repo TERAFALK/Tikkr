@@ -17,7 +17,7 @@ import ReadOnlyToast from "@/components/admin/ReadOnlyToast";
 import ReloadOnDeploy from "@/components/ui/ReloadOnDeploy";
 import SubscriptionLocked from "@/components/admin/SubscriptionLocked";
 import Link from "next/link";
-import { resendVerification } from "./installningar/anvandare/actions";
+import { resendVerification } from "./konto/actions";
 
 /**
  * Skalet runt de inloggade adminsidorna.
@@ -114,6 +114,9 @@ export default async function PanelLayout({
         showOnboarding={!onboarding.ready}
         hasLogo={Boolean(company?.logoSquareMimeType)}
         modules={modules}
+        // Supportläget har inget eget konto: cookien bär plattformskontot,
+        // inte ett av kundens. Se admin-session.ts.
+        showAccount={!session.support}
       />
 
       <div className="min-w-0 flex-1">
@@ -135,7 +138,7 @@ export default async function PanelLayout({
                 </button>
               </form>
               <Link
-                href="/admin/installningar/anvandare"
+                href="/admin/konto"
                 className="font-medium underline"
               >
                 Ändra adress

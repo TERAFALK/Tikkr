@@ -53,28 +53,36 @@ export default async function CompanySettingsPage() {
         <MarkupForm action={saveMarkup} markupPercent={company.markupPercent} />
       </Card>
 
+      {/* EN RUTA FÖR BÅDA BILDERNA, i två spalter. De låg i två rutor med en
+          rubrik var, och varje ruta rymde ett filfält. Det blev två skärmhöjder
+          för två bilder man byter en gång, och de hör ihop: samma logotyp i två
+          format. */}
       <Card>
-        <CardHeader
-          title="Märke"
-          description="Kvadratisk. Panel och stämplingsskärm."
-        />
-        <LogoUpload
-          variant="square"
-          hasLogo={Boolean(company.logoSquareMimeType)}
-          updatedAt={company.logoUpdatedAt?.getTime().toString() ?? null}
-        />
-      </Card>
-
-      <Card>
-        <CardHeader
-          title="Logotyp för utskrifter"
-          description="Bred. Överst på kundernas underlag."
-        />
-        <LogoUpload
-          variant="wide"
-          hasLogo={Boolean(company.logoWideMimeType)}
-          updatedAt={company.logoUpdatedAt?.getTime().toString() ?? null}
-        />
+        <CardHeader title="Logotyper" />
+        <div className="grid divide-y divide-neutral-200 sm:grid-cols-2 sm:divide-x sm:divide-y-0">
+          <div>
+            <LogoTitle
+              title="Märke"
+              hint="Kvadratisk. Panel och stämplingsskärm."
+            />
+            <LogoUpload
+              variant="square"
+              hasLogo={Boolean(company.logoSquareMimeType)}
+              updatedAt={company.logoUpdatedAt?.getTime().toString() ?? null}
+            />
+          </div>
+          <div>
+            <LogoTitle
+              title="Utskrifter"
+              hint="Bred. Överst på kundernas underlag."
+            />
+            <LogoUpload
+              variant="wide"
+              hasLogo={Boolean(company.logoWideMimeType)}
+              updatedAt={company.logoUpdatedAt?.getTime().toString() ?? null}
+            />
+          </div>
+        </div>
       </Card>
 
       <Card>
@@ -103,6 +111,15 @@ export default async function CompanySettingsPage() {
           />
         </dl>
       </Card>
+    </div>
+  );
+}
+
+function LogoTitle({ title, hint }: { title: string; hint: string }) {
+  return (
+    <div className="px-5 pt-4">
+      <h3 className="text-[13px] font-medium text-neutral-900">{title}</h3>
+      <p className="mt-0.5 text-[13px] text-neutral-500">{hint}</p>
     </div>
   );
 }

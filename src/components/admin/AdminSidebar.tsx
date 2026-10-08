@@ -19,6 +19,7 @@ import {
   IconSettings,
   IconStation,
   IconTimeline,
+  IconUser,
 } from "@/components/ui/icons";
 import type { ModuleKey } from "@/lib/modules";
 import CompanyBadge from "@/components/ui/CompanyBadge";
@@ -119,6 +120,7 @@ export default function AdminSidebar({
   showOnboarding,
   hasLogo,
   modules,
+  showAccount,
 }: {
   companyName: string;
   email: string;
@@ -128,6 +130,8 @@ export default function AdminSidebar({
   hasLogo: boolean;
   /** Företagets påslagna tillval. Länkar till avstängda moduler utelämnas. */
   modules: ModuleKey[];
+  /** Falskt i supportläget, där ingen är inloggad som kunden. */
+  showAccount: boolean;
 }) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
@@ -227,6 +231,39 @@ export default function AdminSidebar({
       </div>
 
       <div className="shrink-0 space-y-0.5 border-t border-neutral-200 pt-3">
+        {/* DET EGNA KONTOT ligger här och inte under Inställningar. Namn,
+            telefonnummer och lösenord är den inloggades egna uppgifter, inte
+            inställningar för arbetsytan, och de låg länge på sidan som
+            handlar om vilka ANDRA som har åtkomst. Adressen stod redan här
+            som en rad text; nu är den vägen in. */}
+        {showAccount && (
+          <Link
+            href="/admin/konto"
+            onClick={() => setOpen(false)}
+            className={`flex items-center gap-2.5 rounded-md px-2 py-1.5 transition-colors ${
+              pathname.startsWith("/admin/konto")
+                ? "bg-neutral-100 text-neutral-900"
+                : "text-neutral-600 hover:bg-neutral-50 hover:text-neutral-900"
+            }`}
+          >
+            <IconUser
+              className={
+                pathname.startsWith("/admin/konto")
+                  ? "shrink-0 text-tick-deep"
+                  : "shrink-0 text-neutral-400"
+              }
+            />
+            <span className="min-w-0">
+              <span className="block text-[13px] font-medium leading-tight">
+                Ditt konto
+              </span>
+              <span className="block truncate text-[11px] leading-tight text-neutral-400">
+                {email}
+              </span>
+            </span>
+          </Link>
+        )}
+
         <Link
           href="/admin/installningar"
           onClick={() => setOpen(false)}
@@ -255,8 +292,6 @@ export default function AdminSidebar({
             Logga ut
           </button>
         </form>
-
-        <p className="truncate px-2 pt-2 text-[11px] text-neutral-400">{email}</p>
 
         {/* Tikkr-märket nedtonat. Panelen tillhör kunden — deras logotyp står
             överst, vår står i marginalen. */}
