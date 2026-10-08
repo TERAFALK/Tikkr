@@ -144,10 +144,18 @@ export async function GET(request: NextRequest) {
       ? `tidrapport-${slugify(periods[0].employee.name)}-${toDateInput(from, timeZone)}`
       : `tidrapporter-${slugify(companyName)}-${toDateInput(from, timeZone)}`;
 
+  // VISNING ELLER NEDLADDNING.
+  //
+  // Utskriftsknappen laddar dokumentet i en dold ram och ber webbläsaren
+  // skriva ut det. En fil som kommer som `attachment` hamnar då i
+  // nedladdningsmappen i stället för i skrivardialogen. Samma mönster som
+  // orderexporten, se CLAUDE.md § 3.2.
+  const inline = params.get("visa") === "1";
+
   return new NextResponse(new Uint8Array(pdf), {
     headers: {
       "content-type": "application/pdf",
-      "content-disposition": `attachment; filename="${base}.pdf"`,
+      "content-disposition": `${inline ? "inline" : "attachment"}; filename="${base}.pdf"`,
       "cache-control": "no-store",
     },
   });

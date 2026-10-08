@@ -5,6 +5,8 @@ import { unsafeGlobalPrisma } from "@/lib/db";
 import FilterForm from "@/components/admin/FilterForm";
 import TimesheetView from "@/components/admin/TimesheetView";
 import WeekStepper from "@/components/admin/WeekStepper";
+import PrintButton from "@/components/admin/PrintButton";
+import { datePresets } from "@/lib/date-presets";
 import { weekStep } from "@/lib/week-nav";
 import type { TimesheetDayRow } from "@/components/admin/TimesheetTable";
 import {
@@ -204,6 +206,25 @@ export default async function TimesheetPage({
     `/api/admin/export/timesheet?anstalld=${employeeId}` +
     `&from=${toDateInput(from, timeZone)}&to=${toDateInput(to, timeZone)}`;
 
+  /*
+   * FÖRRA VECKAN FÖR HELA PERSONALEN, en person per sida.
+   *
+   * Utan `anstalld` tar rutten med alla aktiva, se timesheet/route.ts. Varje
+   * papper bär personens dagrader OCH summeringen med planerad tid, flex och
+   * komp — det är den summeringen som gör utskriften värd att dela ut.
+   *
+   * Den hämtar alltså tidrapporten och inte rapportexporten. Knappen gjorde
+   * det förut, och kunde då inte få med summeringen: de siffrorna är
+   * löneunderlagets, och `report-pdf.ts` får aldrig läsa det. Se
+   * avgränsningen i CLAUDE.md.
+   *
+   * Konsekvensen är att knappen hör till lönemodulen, vilket den här sidan
+   * redan gör.
+   */
+  const lastWeek = datePresets(timeZone).lastWeek;
+  const lastWeekHref =
+    `/api/admin/export/timesheet?from=${lastWeek.from}&to=${lastWeek.to}`;
+
   return (
     <>
       <PageHeader
@@ -243,6 +264,14 @@ export default async function TimesheetPage({
               </Field>
             </ActionDialog>
             )}
+
+            {/* Skriver ut direkt i stället för att ladda ner. Utskriften är
+                det den finns för, och den som ändå vill ha en fil väljer
+                "Spara som PDF" i skrivardialogen. */}
+            <PrintButton
+              href={lastWeekHref}
+              label="Förra veckan per anställd"
+            />
 
             <ButtonLink href={exportHref} tone="secondary">
               PDF

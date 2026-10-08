@@ -1156,11 +1156,18 @@ async function assertNoOverlap(
   const label = describeEntry(clash);
   const pending = clash.clockOutAt ? "" : " som fortfarande pågår";
 
+  // SÄGER ATT DET ÄR PERSONENS EGEN STÄMPLING som krockar.
+  //
+  // Stod "Samma arbetsmoment kan inte köra två jobb samtidigt", vilket läses
+  // som en regel om maskinen: att ingen alls får köra två jobb på en fräs.
+  // Så är det inte. Kontrollen gäller EN person, och två personer får
+  // mycket väl stå på samma moment samtidigt. Kunden hörde av sig om just
+  // den meningen.
   throw new ClockError(
-    `Tiden krockar med en annan stämpling på ${label.text}${pending}. ` +
+    `Tiden överlappar personens egen stämpling på ${label.text}${pending}. ` +
       (label.billable
-        ? "Samma arbetsmoment kan inte köra två jobb samtidigt."
-        : "Samma improduktiva moment kan inte pågå två gånger samtidigt.")
+        ? "Samma person kan inte ha två jobb på samma arbetsmoment samtidigt."
+        : "Samma person kan inte ha två pass på samma improduktiva moment samtidigt.")
   );
 }
 

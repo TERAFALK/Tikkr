@@ -163,43 +163,56 @@ export default function OrdersTable({
         }
         action={
           selecting ? (
-            <div className="flex flex-wrap items-center justify-end gap-2">
-              <span className="text-[13px] tabular-nums text-neutral-500">
+            <div className="flex flex-wrap items-end justify-end gap-2">
+              <span className="pb-1.5 text-[13px] tabular-nums text-neutral-500">
                 {count} {count === 1 ? "vald" : "valda"}
               </span>
 
-              {/* Utskriften först: det är den som gör att kalkylen kan tas ut
-                  för en hel vecka utan att en enda fil sparas. Båda vägarna
-                  leder till samma fråga efteråt, se AskDialog nedan. */}
-              <PrintButton
-                href={exportUrl("kalkyl")}
-                label="Skriv ut efterkalkyl"
-                disabled={count === 0}
-                onPrint={askToClose}
-              />
-              <ExportLink
-                href={exportUrl("kalkyl")}
-                disabled={count === 0}
-                onPick={askToClose}
-              >
-                Efterkalkyl
-              </ExportLink>
+              {/* TVÅ DOKUMENT, TVÅ VÄGAR VAR.
+                  
+                  Knapparna hette "Skriv ut efterkalkyl", "Efterkalkyl" och
+                  "Underlag", och det gick inte att se att de två sista var
+                  nedladdningar eller att underlaget också gick att skriva ut.
+                  Nu står dokumentets namn som etikett och verben under det.
+                  
+                  Efterkalkylen är INTERN och underlaget är kundens. Därför
+                  skiljelinjen mellan grupperna: två knappar bredvid varandra
+                  ska inte se ut som två varianter av samma sak. */}
+              <ExportGroup label="Efterkalkyl">
+                <PrintButton
+                  href={exportUrl("kalkyl")}
+                  label="Skriv ut"
+                  disabled={count === 0}
+                  onPrint={askToClose}
+                />
+                <ExportLink
+                  href={exportUrl("kalkyl")}
+                  disabled={count === 0}
+                  onPick={askToClose}
+                >
+                  Ladda ner
+                </ExportLink>
+              </ExportGroup>
 
-              {/* Skiljer det interna från det kunden får se. Kalkylen bär
-                  sitt svarta band på varje sida, men två knappar bredvid
-                  varandra ska inte se ut som två varianter av samma sak. */}
               <span
                 aria-hidden="true"
-                className="mx-1 h-4 w-px bg-neutral-200"
+                className="mx-1 h-8 w-px bg-neutral-200"
               />
 
-              <ExportLink
-                href={exportUrl("pdf")}
-                disabled={count === 0}
-                primary
-              >
-                Underlag
-              </ExportLink>
+              <ExportGroup label="Underlag">
+                <PrintButton
+                  href={exportUrl("pdf")}
+                  label="Skriv ut"
+                  disabled={count === 0}
+                />
+                <ExportLink
+                  href={exportUrl("pdf")}
+                  disabled={count === 0}
+                  primary
+                >
+                  Ladda ner
+                </ExportLink>
+              </ExportGroup>
               <Button type="button" tone="ghost" onClick={stopSelecting}>
                 Avbryt
               </Button>
@@ -334,6 +347,22 @@ export default function OrdersTable({
  * i en ny flik som vilken annan. Utan markerade ordrar leder den ingenstans,
  * och ser ut därefter.
  */
+/** Ett dokument och vägarna till det: namnet över, knapparna under. */
+function ExportGroup({
+  label,
+  children,
+}: {
+  label: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div>
+      <p className="mb-1 text-xs font-medium text-neutral-500">{label}</p>
+      <div className="flex items-center gap-2">{children}</div>
+    </div>
+  );
+}
+
 function ExportLink({
   href,
   disabled,

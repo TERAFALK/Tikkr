@@ -811,6 +811,14 @@ för VISNING (`visa=1`) och inte som nedladdning — en fil som kommer som
 Reservvägen är en ny flik, eftersom en knapp som inte gör någonting alls är
 det enda utfall som inte får inträffa.
 
+**Båda dokumenten går att både skriva ut och ladda ner** (ändrat
+2026-10-08). Knapparna hette "Skriv ut efterkalkyl", "Efterkalkyl" och
+"Underlag", och det gick varken att se att de två sista var nedladdningar
+eller att underlaget också gick att skriva ut. Nu står dokumentets namn som
+etikett med verben under: Efterkalkyl → Skriv ut · Ladda ner, Underlag →
+Skriv ut · Ladda ner. Skiljelinjen mellan grupperna står kvar, eftersom
+efterkalkylen är intern och underlaget är kundens.
+
 **Flera markerade ordrar ger EN FIL PER ORDER**, i ett zip-arkiv. Tidigare gavs
 ett dokument med en sida per order, med skälet att tio filer blir tio bilagor
 att hålla reda på. Det var fel håll: underlagen bifogas tio OLIKA fakturor
@@ -837,11 +845,20 @@ läsa någon annans rader. Därför finns heller ingen slutsumma sist — den sk
 hamna på den sista personens papper och påstå att raden ovanför gäller hen.
 Periodens totaler står på förstasidan.
 
-**Snabbknappen till den är borttagen** (ändrat 2026-10-07, beslutat av
-produktägaren efter att pilotkunden bett om det). Den låg både under Rapporter
-och på Tidrapport, och kunden ville inte ha den på någondera. Vyn finns kvar:
-`visning=persondetalj` i rapportexporten ger samma dokument, och den väljs i
-rapportvyn som vilken annan vy som helst.
+**Knappen är tillbaka, och hämtar nu TIDRAPPORTEN** (ändrat 2026-10-08).
+Den togs bort dagen innan på kundens begäran, och kunden ändrade sig: utskriften
+behövdes, men med summeringen per person — planerad tid, närvarotid, flex och
+komp.
+
+Den summeringen är löneunderlagets, och `report-pdf.ts` får aldrig läsa
+löneunderlaget. Utskriften kan alltså inte vara stämplingslistan med en
+summering påklistrad; den måste VARA tidrapporten. Rutten
+`/api/admin/export/timesheet` tog redan hela personalen när ingen anställd
+pekas ut, en per sida, så bytet var en adress och inte en ny PDF.
+
+Konsekvensen är att knappen hör till lönemodulen. Den sitter på Tidrapport,
+som redan är grindad, och inte på Rapporter. En kund utan löneunderlaget har
+ingen summering att skriva ut.
 
 **Underlaget och efterkalkylen finns BARA som PDF** (ändrat 2026-10-01). Båda
 fanns också som Excel-ark, och kunden använde dem inte: det ena bifogas en
