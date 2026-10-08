@@ -52,8 +52,26 @@ export default function AbsenceDialog({
     if (!date && dialog.current?.open) dialog.current?.close();
   }, [date]);
 
+  /**
+   * Stänger när frånvaron sparats, EN gång per sparning.
+   *
+   * Reffen är inte en försiktighetsåtgärd utan en rättelse. `onClose` är en
+   * pil som skapas om vid varje rendering av TimesheetView, så effekten kördes
+   * om varje gång sidan renderade — och `state.savedAt` stod kvar satt. Den
+   * som lagt in frånvaro på måndagen och sedan tryckte på tisdagen fick rutan
+   * stängd i samma andetag som den öppnades, och måste byta anställd och
+   * tillbaka för att komma åt den igen.
+   *
+   * `savedAt` är ett Date.now() och alltså nytt för varje sparning, vilket gör
+   * den till en duglig nyckel.
+   */
+  const handled = useRef<number | undefined>(undefined);
+
   useEffect(() => {
-    if (state.savedAt) onClose();
+    if (!state.savedAt || state.savedAt === handled.current) return;
+
+    handled.current = state.savedAt;
+    onClose();
   }, [state.savedAt, onClose]);
 
   return (

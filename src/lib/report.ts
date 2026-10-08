@@ -166,6 +166,18 @@ export async function buildReport(
     };
   });
 
+  // PÅGÅENDE ÖVERST. Ett jobb som fortfarande löper är det man vill se först:
+  // antingen står någon instämplad som inte borde, eller så är tiden ännu
+  // inte färdig att fakturera. Resten behåller sin ordning, senaste först.
+  //
+  // Sorteringen sker på raderna och inte i frågan: "pågående" är inget fält,
+  // utan att clock_out_at saknas, och ett sådant villkor går inte att sortera
+  // på i Prisma. Listan är redan hämtad och är inte lång nog att det märks.
+  rows.sort((a, b) => {
+    if (a.ongoing !== b.ongoing) return a.ongoing ? -1 : 1;
+    return b.clockInAt.getTime() - a.clockInAt.getTime();
+  });
+
   // Grupperingarna per order och per arbetsmoment får ALDRIG se improduktiv
   // tid. Utan den här uppdelningen hade en Map-nyckel blivit undefined och
   // gett en tyst skräpgrupp mitt i ett fakturaunderlag.

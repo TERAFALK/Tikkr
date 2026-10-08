@@ -86,7 +86,50 @@ export default async function EntriesPage({
   const { presets } = datePresets(timeZone);
   const week = weekStep("/admin/stamplingar", params, timeZone);
 
-  const [employees, orders, moments, indirectMoments, entries] =
+  /**
+   * Filtret, som BÅDA stämplingsfrågorna delar.
+   *
+   * Pågående och avslutade hämtas var för sig, se nedan. Stod villkoret på
+   * två ställen skulle de hinna glida isär, och då hade en filtrerad lista
+   * visat pågående poster som inte hörde till urvalet.
+   */
+  const entryFilter = {
+    employeeId: params.employeeId || undefined,
+    // Utelämnas helt när inget datum valts. Ett tomt villkorsobjekt hade gett
+    // samma svar, men den här formen säger rakt ut att ingen gräns finns.
+    ...(fromDayStart || toDayEnd
+      ? {
+          clockInAt: {
+            ...(fromDayStart ? { gte: fromDayStart } : {}),
+            ...(toDayEnd ? { lte: toDayEnd } : {}),
+          },
+        }
+      : {}),
+  };
+
+  const entrySelect = {
+    id: true,
+    clockInAt: true,
+    clockOutAt: true,
+    source: true,
+    needsReview: true,
+    employeeId: true,
+    orderId: true,
+    momentId: true,
+    indirectMomentId: true,
+    employee: { select: { name: true } },
+    kind: true,
+    order: {
+      select: {
+        orderNumber: true,
+        customer: { select: { name: true } },
+      },
+    },
+    moment: { select: { name: true } },
+    indirectMoment: { select: { name: true } },
+  } as const;
+
+  const [employees, orders, moments, indirectMoments, ongoing, finished] =
     await Promise.all([
       db.employee.findMany({
         orderBy: { name: "asc" },
@@ -108,46 +151,28 @@ export default async function EntriesPage({
         orderBy: [{ active: "desc" }, { name: "asc" }],
         select: { id: true, name: true, active: true },
       }),
+      // PÅGÅENDE FÖRST, och utan tak.
+      //
+      // De är det man letar efter: någon som står instämplad och inte borde
+      // göra det. Låg de i samma fråga som resten kunde de trilla utanför de
+      // 200 senaste så fort en dag varit full av stämplingar, och då syns
+      // just det man kom för att leta efter inte alls.
       db.timeEntry.findMany({
-        where: {
-          employeeId: params.employeeId || undefined,
-          // Utelämnas helt när inget datum valts. Ett tomt villkorsobjekt hade
-          // gett samma svar, men den här formen säger rakt ut att ingen gräns
-          // finns.
-          ...(fromDayStart || toDayEnd
-            ? {
-                clockInAt: {
-                  ...(fromDayStart ? { gte: fromDayStart } : {}),
-                  ...(toDayEnd ? { lte: toDayEnd } : {}),
-                },
-              }
-            : {}),
-        },
-        orderBy: { clockInAt: "desc" },
+        where: { ...entryFilter, clockOutAt: null },
+        orderBy: [{ clockInAt: "desc" }, { id: "asc" }],
+        select: entrySelect,
+      }),
+      db.timeEntry.findMany({
+        where: { ...entryFilter, clockOutAt: { not: null } },
+        orderBy: [{ clockInAt: "desc" }, { id: "asc" }],
         take: PAGE_SIZE,
-        select: {
-          id: true,
-          clockInAt: true,
-          clockOutAt: true,
-          source: true,
-          needsReview: true,
-          employeeId: true,
-          orderId: true,
-          momentId: true,
-          indirectMomentId: true,
-          employee: { select: { name: true } },
-          kind: true,
-          order: {
-            select: {
-              orderNumber: true,
-              customer: { select: { name: true } },
-            },
-          },
-          moment: { select: { name: true } },
-          indirectMoment: { select: { name: true } },
-        },
+        select: entrySelect,
       }),
     ]);
+
+  // Pågående överst, resten under. Båda listorna är redan sorterade med
+  // senaste först.
+  const entries = [...ongoing, ...finished];
 
   // Vilka av raderna som har ändrats. De får en länk till sin historik; en
   // länk på varje rad vore brus, eftersom de flesta aldrig rörts.
@@ -290,8 +315,8 @@ export default async function EntriesPage({
           <CardHeader
             title={`${entries.length} ${entries.length === 1 ? "post" : "poster"}`}
             description={
-              entries.length === PAGE_SIZE
-                ? `Listan visar de ${PAGE_SIZE} senaste. Välj datum för äldre.`
+              finished.length === PAGE_SIZE
+                ? `Listan visar de ${PAGE_SIZE} senaste avslutade. Välj datum för äldre.`
                 : undefined
             }
           />
