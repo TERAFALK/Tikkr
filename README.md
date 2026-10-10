@@ -159,11 +159,14 @@ curl -s localhost:3000/api/health
 Ska svara `{"status":"ok","database":"ok"}`. Svarar den `unreachable` når appen
 inte databasen — kolla `docker compose logs db`.
 
-**6. Lägg in testdata**
+**6. Lägg in testdata — bara i labbet**
 
 ```bash
 docker compose run --rm migrate node prisma/seed.mjs
 ```
+
+Aldrig i produktion: testdatan har ett känt lösenord och en skärm med fast
+kopplingskod.
 
 `migrate`-containern innehåller alla utvecklingsverktyg och används för
 engångskommandon. Appcontainern är medvetet avskalad och har dem inte.
@@ -199,7 +202,7 @@ När domänen fungerar: sätt `APP_BIND=127.0.0.1` i `.env` och kör
 längre nås okrypterad på `IP:3000`.
 
 **Kioskens cookie är knuten till adressen.** Byter en kund adress måste varje
-skärm öppna sin kopplingslänk på nytt.
+skärm kopplas om med en ny kod.
 
 ---
 
@@ -289,15 +292,21 @@ testerna på något annat sätt är det skyddet borta.
 
 ---
 
-## Lockfilen
+## Låsfilen
 
 `package-lock.json` låser fast exakta versioner av alla beroenden, så att
-bygget blir identiskt varje gång. Den skapas vid första bygget. Hämta ut den
-och checka in den en gång:
+bygget blir identiskt varje gång (`npm ci`). Ett beroende läggs till på
+laptopen med `npm install <paket>`, och låsfilen följer med i samma commit.
+Se [docs/drift.md](docs/drift.md) punkt 9.
 
-```bash
-docker compose exec app cat package-lock.json > package-lock.json && git add package-lock.json && git commit -m "Lås beroendeversioner"
-```
+---
+
+## CI
+
+Varje pull request och push till `main` kör typkontroll, alla tester mot en
+egen Postgres och ett bygge av Docker-imagen, se
+[.github/workflows/ci.yml](.github/workflows/ci.yml). Ett rött kryss betyder
+att PR:en inte ska slås ihop. CI driftsätter ingenting.
 
 ---
 
@@ -315,7 +324,6 @@ Se läget just nu:
 | Dokument | Innehåll |
 |---|---|
 | [docs/drift.md](docs/drift.md) | Spärrar innan skarp drift, backup, autoutstämpling |
-| [docs/lage.md](docs/lage.md) | Läget mot originalplanen, fas för fas |
 | [docs/kiosk-lage.md](docs/kiosk-lage.md) | Chrome Kiosk och Android — låsa ner en skärm |
 | [docs/kioskskarm.md](docs/kioskskarm.md) | Hårdvara: skärm, stativ, strömmatning |
 
@@ -349,5 +357,5 @@ materialet byts.
 ---
 
 <p align="center">
-  <sub>Privat repo. Teknisk projektkontext: <a href="CLAUDE.md">CLAUDE.md</a> · Språket: <a href="TONE-OF-VOICE.md">TONE-OF-VOICE.md</a></sub>
+  <sub>Teknisk projektkontext: <a href="CLAUDE.md">CLAUDE.md</a> · Språket: <a href="TONE-OF-VOICE.md">TONE-OF-VOICE.md</a></sub>
 </p>

@@ -1058,6 +1058,10 @@ Caddy 0 kr, Stripe 0 kr fast (bara procent per transaktion), domän ca
 
 ## 6. Faser
 
+Originalplanen från 2026-08-10, kvar som historik. Fas 0–3 är byggda, delvis
+på andra sätt än här (ingen auto-deploy, två containrar och inte tre). Läget
+står i § 5 och § 9.
+
 | Fas | Vecka | Innehåll | Resultat |
 |---|---|---|---|
 | **0 — Grundstruktur** | 1 | VPS + Docker, Next.js-projekt containerisat, Postgres + Prisma-migration, Caddy/HTTPS, multi-tenant-lagret, GitHub Actions (bygg → staging → SSH-deploy), backup-skript + uptime-monitor, `CLAUDE.md` + README | Tomt skal, tre containrar, driftsatt med auto-deploy, offsite-backup, övervakning |
@@ -1395,7 +1399,8 @@ Laptop (skriva kod)  →  GitHub  →  Server: git pull + docker compose up -d
 
 ### Utvecklingsdator
 
-Windows 11 Pro, projektrot `C:\Projekt\Tikkr`, PowerShell.
+Windows 11, projektrot `C:\Projekt\Tikkr`, PowerShell. GitHub CLI (`gh`) är
+installerat och inloggat, så Claude kan öppna PR:er och läsa CI.
 
 | Verktyg | Status per 2026-10-10 |
 |---|---|
@@ -1423,25 +1428,39 @@ separat server som sätts upp senare, mot tikkr.se.
 |---|---|
 | Port 80/443 | 🔴 upptagna av **Nginx Proxy Manager** — rör dem inte |
 | Port 3000 | ✅ Tikkr, men bara `127.0.0.1` — all trafik går via proxyn |
-| Adress | ✅ `https://www.tikkr.se` med Let's Encrypt-certifikat. **Det är adressen som gäller** — `tikkr.terafalk.com` var det tillfälliga labbnamnet |
+| Adress | ✅ `https://www.tikkr.se` och `portal.tikkr.se` via NPM, tills produktionen tar över dem |
+| Gren | `main`. En gren under arbete kan provas här före sammanslagning |
 | Övrigt på servern | kör andra tjänster — kontrollera alltid innan portar tas |
 
-Systemet flyttar till `portal.tikkr.se` i produktion, medan `www.tikkr.se`
-förblir säljsidan. Ingenting i koden är knutet till en
-adress — kopplingslänkar och omdirigeringar byggs ur inkommande anrop — så ett
-byte är ett nytt proxy host plus omkopplade kioskskärmar, ingen kodändring.
+### Miljöerna (beslutat 2026-10-10)
 
-**Kioskens cookie är knuten till adressen.** Byter en kund adress måste varje
-skärm öppna sin kopplingslänk på nytt.
+| Miljö | Adress | Innehåll |
+|---|---|---|
+| Produktion | `www.tikkr.se`, `tikkr.se` (säljsida), `portal.tikkr.se` (systemet) | Alla kunder, även pilotkunden |
+| Labbet = staging | `test.tikkr.se` | Bara testdata. Får slås sönder |
+
+Ingen tredje miljö. **Pilotkunden Vänertekno AB kör i produktionen** och
+börjar om med tom arbetsyta vid lanseringen; testdatan i labbet flyttas inte.
+De får nya versioner först genom att vara först, inte genom en egen instans —
+alla kunder delar samma version. Funktionskontrollen efter en driftsättning
+görs på en intern kontrollkund i produktionen, aldrig i Vänerteknos
+arbetsyta: ett provtryck där blir en stämpling i deras faktura- och
+löneunderlag.
+
+Adresserna byts samma kväll som produktionen tar över dem. Länkarna i mejl
+byggs ur `APP_URL`, så den ska ändras i labbets `.env` vid bytet.
+
+**Kioskens cookie är knuten till adressen och servern.** Vid bytet måste
+varje skärm kopplas om med en ny kod.
 
 ### Ej på plats än
 
 | Sak | Status |
 |---|---|
-| GitHub-repo | ⏸ ska skapas av användaren (privat, namn `tikkr`) |
-| Produktionsserver | ⏸ separat från testservern, senare |
-| Offsite-backup (rclone-mål) | ⏸ **medvetet uppskjutet** — labbmiljö utan kunddata. Skripten finns; `BACKUP_REMOTE` sätts före lansering. |
-| Uptime-övervakning | ⏸ kräver publik URL först |
+| GitHub-repo | ⚠ `TERAFALK/Tikkr` finns men är **publikt**. Ska bli privat; gratisplanen kan då inte skydda `main` |
+| Produktionsserver | ⏸ Glesys-VPS, senare. Föreslaget: 2 vCPU, 4 GB RAM, 50 GB, Ubuntu 24.04 |
+| Offsite-backup (rclone-mål) | ⏸ Glesys Object Storage, köps till. `BACKUP_REMOTE` sätts före lansering |
+| Uptime-övervakning | ⏸ sätts upp mot produktionens adress |
 
 ### Databasen byggs ur schemat, inte ur migrationer (beslutat 2026-08-11)
 
