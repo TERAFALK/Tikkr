@@ -92,10 +92,10 @@ skyddar mot råkade raderingar, men inte mot att servern dör, blir hackad eller
 krypteras — och det är just då man behöver den.
 
 Installera rclone och koppla en objektlagring. Integritetspolicyn anger att
-data lagras i Sverige — välj ett mål inom EU, helst svenskt (t.ex. Glesys
-Object Storage eller Hetzner Storage Box), så att även kopiorna stämmer med
-det som utlovats. Leverantören blir ett underbiträde och ska stå i
-förteckningen.
+data lagras i Sverige, så målet är **Glesys Object Storage** (beslutat
+2026-10-10), helst i det andra datacentret än servern. Leverantören är
+redan underbiträde. Samma Glesys-konto når då både servern och kopiorna, och
+därför ska kontot ha tvåstegsinloggning.
 
 ```bash
 sudo apt update && sudo apt install -y rclone && rclone config
@@ -124,8 +124,9 @@ Integritetspolicyn ska ange samma siffra.
 
 ### Larm när jobben tystnar
 
-Skapa två gratiskontroller hos Healthchecks.io: en för backupen (förväntad
-en gång per dygn) och en för den automatiska utstämplingen (var 15:e minut).
+Skapa två gratiskontroller hos Healthchecks.io: en för backupen (typen
+*Cron*, med samma schema som crontab-raden nedan) och en för den automatiska
+utstämplingen (var 15:e minut).
 Koppla larm till din telefon. Skriv in adresserna:
 
 ```bash
@@ -158,20 +159,38 @@ sudo install -o "$USER" -g "$USER" -m 644 /dev/null /var/log/tikkr-backup.log
 crontab -e
 ```
 
+Tre gånger per dygn: natten, lunch och strax efter arbetsdagens slut. Med en
+enda nattlig kopia kunde en hel arbetsdags stämplingar gå förlorade; nu som
+mest en halv. Databasen är liten, och kopiorna kostar i praktiken ingenting.
+
 ```
-0 3 * * * /home/administrator/Tikkr/scripts/backup.sh >> /var/log/tikkr-backup.log 2>&1
+0 3,12 * * * /home/administrator/Tikkr/scripts/backup.sh >> /var/log/tikkr-backup.log 2>&1
+30 16 * * * /home/administrator/Tikkr/scripts/backup.sh >> /var/log/tikkr-backup.log 2>&1
 ```
 
-> **Öva återläsning då och då.** En backup ingen provat att läsa tillbaka är
-> bara en förhoppning. `./scripts/restore.sh <fil>` gör det — men den skriver
-> över databasen, så gör det i en testmiljö. Skriptet skriver ut hur lång tid
-> det tog; anteckna siffran, den är svaret på "hur länge står vi still".
->
-> Hämta en kopia från det krypterade målet till labbet och läs tillbaka den:
->
-> ```bash
-> rclone copy tikkr-krypterad: ./backups --include 'tikkr_*.sql.gz' --max-age 2d
-> ```
+Före en driftsättning tas dessutom en kopia av `release.sh`.
+
+### Öva återläsning — före lansering, sedan varje kvartal
+
+En backup ingen provat att läsa tillbaka är bara en förhoppning. Övningen görs
+**på produktionsservern**, i en tillfällig databas som tas bort efteråt.
+Kunddata lämnar aldrig servern, och den skarpa databasen rörs inte:
+
+```bash
+./scripts/restore-test.sh
+```
+
+Skriptet visar hur många företag, anställda och stämplingar kopian innehöll
+och hur lång tid inläsningen tog. Anteckna tiden; den är svaret på "hur länge
+står vi still". Öva minst en gång på en kopia ur det krypterade målet, så att
+du vet att lösenorden i lösenordshanteraren fungerar:
+
+```bash
+rclone copy tikkr-krypterad: ./backups --include 'tikkr_*.sql.gz' --max-age 2d
+```
+
+`./scripts/restore.sh` är skarp återläsning och **skriver över** databasen.
+Den används bara på riktigt, se [release.md](release.md).
 
 ---
 
@@ -283,10 +302,14 @@ SPF, DKIM och DMARC måste vara satta för `tikkr.se`, annars hamnar
 - [ ] Rättsliga sidorna lästa och godkända av jurist
 - [ ] Adresserna till villkor och integritetspolicy inlagda i betaltjänstens
       kundportal
-- [ ] Repot satt till **privat** på GitHub
-- [ ] Adminlösenordet från testdatan (`tikkr123`) borttaget eller bytt
-- [ ] Testskärmen från seed-datan (fast kopplingskod `123456`) raderad under Skärmar
-- [ ] Produktionsservern med Caddy (punkt 8)
+- [ ] Repot satt till **privat** på GitHub, och servrarna hämtar med en token
+      som bara får läsa
+- [ ] Seed har **aldrig** körts i produktionen — testdatan har lösenordet
+      `tikkr123` och en skärm med fast kopplingskod `123456`
+- [ ] Produktionsservern uppsatt och härdad (punkt 8)
+- [ ] En hel release övad i labbet: `release.sh`, en migration och att backa
+      ([release.md](release.md))
+- [ ] Kontrollkunden upplagd i produktionen, med en egen skärm
 - [ ] Tvåstegsinloggning uppsatt för varje plattformskonto (punkt 10)
 - [ ] `./scripts/status.sh` utan röda punkter
 
@@ -294,11 +317,37 @@ SPF, DKIM och DMARC måste vara satta för `tikkr.se`, annars hamnar
 
 ## 8. Produktionsservern
 
-Produktionen kör Caddy framför appen, på en egen Ubuntu-server. Hela
+Produktionen kör Caddy framför appen, på en egen Glesys-VPS. Hela
 konfigurationen ligger i `deploy/Caddyfile` och `docker-compose.prod.yml`.
 
+**Storlek:** 2 vCPU, 4 GB RAM, 50 GB disk, Ubuntu 24.04 LTS. Bygget sker på
+servern och tar ungefär 2 GB minne medan den gamla versionen kör vidare;
+resten är Postgres, appen och marginal. Glesys låter servern växa senare.
+
+### Grundskydd, före allt annat
+
+- **SSH bara med nyckel**, inte som root. Port 22 öppen bara där det behövs,
+  helst i Glesys brandvägg.
+- **Brandvägg:** bara 22, 80 och 443 (tcp och udp). Docker öppnar publicerade
+  portar förbi `ufw` — därför låser `docker-compose.prod.yml` appens port till
+  `127.0.0.1` oavsett vad `.env` säger, och CI kontrollerar att den gör det.
+- **Säkerhetsuppdateringar** med `unattended-upgrades`, och omstart nattetid
+  efter backupen. Containrarna startar själva (`restart: unless-stopped`).
+- **Klockan:** `timedatectl` ska visa *System clock synchronized: yes*. För ett
+  stämplingssystem är serverns klocka sanningen som skärmarna mäts mot.
+- **Tvåstegsinloggning** på GitHub, Glesys, Stripe och övervakningstjänsterna.
+- **Glesys helbackup** påslagen. Den ersätter inte databasdumparna (punkt 3) —
+  en kopia av en Postgres som kör är inte garanterat hel — men den tar med
+  `.env` och certifikaten.
+- **`.env` i lösenordshanteraren.** `AUTH_SECRET` krypterar allas
+  tvåstegsnycklar; går den förlorad måste varje användare sätta upp appen på
+  nytt.
+
+### Uppsättning
+
 1. Peka DNS för `www.tikkr.se`, `tikkr.se` och `portal.tikkr.se` mot servern
-2. Installera Docker och klona repot
+2. Installera Docker och klona repot. Docker Compose behöver vara 2.24 eller
+   nyare (`docker compose version`) för `!override` i produktionsfilen
 3. Skapa nätet appen och Caddy delar:
 
 ```bash
@@ -306,16 +355,17 @@ docker network create npm_proxy
 ```
 
 4. Fyll i `.env` utifrån `.env.example`. Utöver labbets värden krävs
-   `ACME_EMAIL`, `APP_URL=https://portal.tikkr.se`,
-   `MARKETING_HOST=www.tikkr.se,tikkr.se`, `PORTAL_HOST=portal.tikkr.se` och
-   `APP_BIND=127.0.0.1`
-5. Starta:
+   `TIKKR_ENV=production`,
+   `COMPOSE_FILE=docker-compose.yml:docker-compose.prod.yml`, `ACME_EMAIL`,
+   `APP_URL=https://portal.tikkr.se`, `MARKETING_HOST=www.tikkr.se,tikkr.se`
+   och `PORTAL_HOST=portal.tikkr.se`
+5. Driftsätt den första versionen, se [release.md](release.md):
 
 ```bash
-docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+./scripts/release.sh v1.0.0
 ```
 
-Caddy hämtar certifikaten själv första gången.
+Caddy hämtar certifikaten själv första gången. **Kör aldrig seed här.**
 
 ---
 
@@ -360,11 +410,13 @@ Ett nytt fynd som inte står här ska bedömas innan nästa release.
 | Vad | Kommando |
 |---|---|
 | Driftkontroll | `./scripts/status.sh` |
-| Uppdatera till senaste | `git pull && docker compose up -d --build` |
+| Driftsätta en version | `./scripts/release.sh v1.2.0` — se [release.md](release.md) |
+| Labbet till senaste main | `./scripts/release.sh main` |
 | Loggar | `docker compose logs -f app` |
 | Kör testerna | `./scripts/test.sh` |
 | Ny migration | `./scripts/create-migration.sh <namn>` |
 | Säkerhetskopia nu | `./scripts/backup.sh` |
+| Öva återläsning | `./scripts/restore-test.sh` |
 
 ---
 

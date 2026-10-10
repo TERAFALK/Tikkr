@@ -1,8 +1,13 @@
 # Tillägg för produktionsservern: Caddy framför appen.
 #
-# Används TILLSAMMANS med docker-compose.yml, aldrig ensam:
+# Används TILLSAMMANS med docker-compose.yml, aldrig ensam. Produktionens .env
+# säger det en gång för alla:
 #
-#   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+#   COMPOSE_FILE=docker-compose.yml:docker-compose.prod.yml
+#
+# Då tar varje "docker compose" med båda filerna — release.sh, backup.sh,
+# status.sh och ett handskrivet kommando lika. En flagga som måste skrivas
+# varje gång glöms förr eller senare, och då startar appen utan Caddy.
 #
 # Labbet kör bara docker-compose.yml, bakom Nginx Proxy Manager.
 #
@@ -13,6 +18,14 @@
 #   docker network create npm_proxy
 
 services:
+  # PORTEN NÅS BARA FRÅN SERVERN SJÄLV, oavsett vad .env säger. Docker
+  # öppnar publicerade portar förbi brandväggen (ufw), så ett glömt
+  # APP_BIND=127.0.0.1 hade gjort appen nåbar okrypterat från internet.
+  # release.sh och status.sh når den här; alla andra går via Caddy.
+  app:
+    ports: !override
+      - "127.0.0.1:${APP_PORT:-3000}:3000"
+
   caddy:
     image: caddy:2-alpine
     container_name: tikkr-caddy
