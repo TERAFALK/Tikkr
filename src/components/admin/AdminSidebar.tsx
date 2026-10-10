@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { logout } from "@/app/admin/actions";
 import {
   IconBroom,
@@ -17,6 +17,7 @@ import {
   IconReport,
   IconReview,
   IconSettings,
+  IconSparkle,
   IconStation,
   IconTimeline,
   IconUser,
@@ -121,6 +122,8 @@ export default function AdminSidebar({
   hasLogo,
   modules,
   showAccount,
+  unreadNews,
+  version,
 }: {
   companyName: string;
   email: string;
@@ -132,9 +135,24 @@ export default function AdminSidebar({
   modules: ModuleKey[];
   /** Falskt i supportläget, där ingen är inloggad som kunden. */
   showAccount: boolean;
+  /** Pricken vid Nyheter: en nyare version än den personen sett. */
+  unreadNews: boolean;
+  /** Versionen som kör, från bygget. */
+  version: string;
 }) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
+
+  // PRICKEN SLÄCKS NÄR SIDAN ÖPPNAS, även här. Layouten renderas inte om när
+  // man går mellan sidorna i panelen, så värdet den skickade står kvar tills
+  // nästa omladdning. Utan det här tändes pricken igen så fort man lämnade
+  // sidan som just markerat allt som läst.
+  const onNews = pathname.startsWith("/admin/nyheter");
+  const [newsOpened, setNewsOpened] = useState(false);
+  useEffect(() => {
+    if (onNews) setNewsOpened(true);
+  }, [onNews]);
+  const showNewsDot = unreadNews && !newsOpened && !onNews;
 
   // Typen skrivs ut, annars slår TypeScript ihop avsnitten till en union där
   // fält som bara finns på vissa länkar (badge, exact) försvinner.
@@ -231,6 +249,26 @@ export default function AdminSidebar({
       </div>
 
       <div className="shrink-0 space-y-0.5 border-t border-neutral-200 pt-3">
+        {/* NYHETERNA ligger här nere och inte bland arbetet. De handlar om
+            Tikkr, inte om verkstaden, och öppnas en gång per version. */}
+        <Link
+          href="/admin/nyheter"
+          onClick={() => setOpen(false)}
+          className={`flex items-center gap-2.5 rounded-md px-2 py-1.5 text-[13px] font-medium transition-colors ${
+            onNews
+              ? "bg-neutral-100 text-neutral-900"
+              : "text-neutral-600 hover:bg-neutral-50 hover:text-neutral-900"
+          }`}
+        >
+          <IconSparkle className={onNews ? "text-tick-deep" : "text-neutral-400"} />
+          <span className="flex-1">Nyheter</span>
+          {showNewsDot && (
+            <span className="size-2 rounded-full bg-tick-deep">
+              <span className="sr-only">Nya</span>
+            </span>
+          )}
+        </Link>
+
         {/* DET EGNA KONTOT ligger här och inte under Inställningar. Namn,
             telefonnummer och lösenord är den inloggades egna uppgifter, inte
             inställningar för arbetsytan, och de låg länge på sidan som
@@ -298,6 +336,9 @@ export default function AdminSidebar({
         <div className="flex items-center gap-2 px-2 pt-2.5 text-neutral-400">
           <LogoMark size={22} />
           <WordmarkOnly height={10} tone="current" />
+          <span className="ml-auto truncate text-[11px] tabular-nums">
+            {version}
+          </span>
         </div>
       </div>
     </nav>

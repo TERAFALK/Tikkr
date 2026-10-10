@@ -60,6 +60,9 @@ eller vilken migration som helst. MAJOR = kunden måste göra något.
 Ett beslut om hur systemet ska bete sig skrivs in i denna fil med datum. Det
 som bara gäller en version hör hemma i releaseanteckningen.
 
+Det kunden ska veta om en version skrivs i `src/lib/release-notes.ts`, i en
+egen PR före taggningen. Se § 5 och `docs/release.md` steg 1.
+
 ## 1. Vad Tikkr är
 
 Ett molnbaserat **stämplingssystem för touchskärm** som svenska verkstads- och
@@ -216,7 +219,8 @@ time_entries   — id, company_id, employee_id, kind,
                  moment_cost_rate_ore, employee_cost_rate_ore,
                  needs_review, review_note, kiosk_device_id, source_ip
 admin_users    — id, company_id, email, name?, phone?, password_hash, role,
-                 password_changed_at?, sessions_revoked_at?, email_verified_at?
+                 password_changed_at?, sessions_revoked_at?, email_verified_at?,
+                 news_seen_version?
 email_verifications — id, user_id, token_hash, email, expires_at, used_at
 audit_events   — id, company_id, actor_email, entity, entity_id, action,
                  before, after, subject_employee_id
@@ -1118,6 +1122,19 @@ gren → PR → CI → main → labbet (release.sh main) → tagg vX.Y.Z → pro
 Rutinen står i `docs/release.md`, servern i `docs/drift.md` punkt 8. Bygget
 sker på servern; appen startar om som en enda container, vilket är ett avbrott
 på några sekunder som skärmarnas offline-kö täcker.
+
+**Nyheterna följer med koden** (beslutat 2026-10-10, issue #6). Under
+Nyheter i panelen står vad som ändrats i varje version, och texten ligger i
+`src/lib/release-notes.ts`, inte i databasen. Den granskas därmed som koden,
+och syns när versionen installeras utan att någon trycker på något.
+`news.ts` gömmer dessutom poster för versioner som är nyare än den som kör,
+eftersom en rättelse kan taggas på en `main` där nästa versions text redan
+ligger. Punkter som bara rör ett tillval visas bara för kunder som har det.
+
+Pricken vid Nyheter är per administratör: `admin_users.news_seen_version`
+håller den senaste versionen personen sett, och sidan skriver den när den
+öppnas. Den skrivs bara framåt, så att en backad version inte tänder pricken
+igen. Versionen som kör står i menyn, bredvid Tikkr-märket.
 
 Produktionsservern kör Caddy framför appen (`deploy/Caddyfile`,
 `docker-compose.prod.yml`), och dess `.env` sätter `COMPOSE_FILE` så att
