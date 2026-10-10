@@ -218,9 +218,8 @@ migrationerna och väntar tills `/api/health` svarar med den nya versionen. Att
 backa är samma kommando med den förra versionen. Hela rutinen, och vad som
 gäller när något går fel, står i [docs/release.md](docs/release.md).
 
-`migrate`-containern sätter upp databasen innan appen startar. Finns
-`prisma/migrations/` kör den migrationerna i tur och ordning, annars byggs
-tabellerna direkt ur `prisma/schema.prisma` — det senare bara i labbet.
+`migrate`-containern kör migrationerna innan appen startar. Faller en
+migration startar inte den nya appen, och den gamla står kvar.
 
 ---
 
@@ -246,37 +245,23 @@ tabellerna direkt ur `prisma/schema.prisma` — det senare bara i labbet.
 
 ## Databasen
 
-Under utvecklingen finns **inga migrationsfiler**. Databasen byggs direkt ur
-`prisma/schema.prisma` vid varje start. Skälet: servern behöver då aldrig
-skriva till GitHub — organisationen blockerar deploy keys, och flödet
-laptop → GitHub → server går bara åt ett håll.
+Databasen ändras **bara med migrationer**, som ligger i `prisma/migrations/`
+och körs i tur och ordning vid varje start. Den första, `0_init`, är
+baslinjen. Byggs databasen någonsin ur schemat i stället raderas det som
+ändrats, och därför finns den vägen inte längre.
 
-Konsekvens: **ändras schemat töms det som ändrats.** Lägg tillbaka testdatan
-efteråt.
+En schemaändring får sin migration på laptopen, i samma gren och före commit:
 
-```bash
-docker compose run --rm migrate node prisma/seed.mjs
+```powershell
+node scripts/new-migration.mjs lagg-till-foto-pa-anstalld
 ```
 
-Före produktion skapas en baslinjemigration med `./scripts/create-migration.sh`,
-raden tas bort ur `.gitignore`, och `scripts/migrate.sh` byter gren automatiskt
-så fort mappen finns. Se [docs/drift.md](docs/drift.md) punkt 1.
+CI kör alla migrationer mot en tom databas och fäller PR:en om de inte ger
+samma databas som schemat. Se [docs/drift.md](docs/drift.md) punkt 1.
 
-### När behöver jag bygga om?
-
-Koden kopieras in i imagen när den byggs. Ändrar du en fil efteråt kör
-containern den gamla kopian tills du bygger om.
-
-| Vad du ändrat | Bygga om? |
-|---|---|
-| `src/` eller `tests/`, och kör `./scripts/test.sh` | Nej — mapparna monteras in |
-| `src/`, och vill se det i webbläsaren | Ja |
-| `prisma/schema.prisma` | Ja |
-| `package.json` | Ja |
-
-```bash
-docker compose up -d --build
-```
+`./scripts/test.sh` i labbet monterar in `src/`, `tests/` och `prisma/`, så
+testerna ser koden i mappen utan nytt bygge. Allt annat når labbet genom
+`./scripts/release.sh`.
 
 ---
 
