@@ -3,6 +3,63 @@
 > Denna fil läses automatiskt i varje ny session. Den är den enda källan till
 > projektkontext — uppdatera den när beslut ändras.
 
+## 0. Arbetsflödet — gäller varje session (beslutat 2026-10-10)
+
+Kod går gren → PR → CI → `main` → labbet → tagg → produktionen. Rutinen står
+i `docs/release.md`, skälen i § 5.
+
+### Före arbetet
+1. Kör `git status` och `git branch --show-current`. Finns ändringar jag inte
+   gjort: fråga innan något rörs.
+2. Arbeta aldrig på `main`. Skapa en gren från senaste `origin/main`:
+   `feat/<namn>`, `fix/<namn>` eller `chore/<namn>`. En gren är en avgränsad
+   ändring.
+3. Läs koden, testerna och avsnittet i denna fil som rör ändringen innan något
+   ändras. Är nuvarande beteende oklart: fråga, anta inte.
+
+### Under arbetet
+4. Ändra bara det uppgiften kräver. Orelaterad städning, omdöpning eller
+   formatering föreslås separat.
+5. Logik som rör tid, pengar, lön, behörighet eller `company_id` får ett test
+   som fäller felet. Vid buggrättning skrivs testet som visar buggen först.
+6. Gränstesterna (`payroll-boundary`, `planning-boundary`, `tenant-*`,
+   `module-coverage`, `support-coverage`) försvagas aldrig för att något ska
+   gå igenom. Faller ett är det koden som är fel.
+7. Ändring i `prisma/schema.prisma` kräver en migration i samma gren, som
+   fungerar med FÖREGÅENDE version av appen: lägg till, ta inte bort.
+   Borttagning och namnbyte sker i en senare release. Migrationer som raderar
+   eller skriver om data anges i PR-beskrivningen med hur man backar. (Gäller
+   från baslinjemigrationen; till dess byggs databasen ur schemat, se § 9.)
+8. Ny miljövariabel läggs i `.env.example` och `docker-compose.yml` och anges
+   i PR-beskrivningen under "Driftändringar".
+
+### Före commit
+9. Kör lokalt: `npm run typecheck`, och `npm run build` när ändringen rör
+   bygget. Testerna med databas körs av CI på PR:en — läs resultatet innan
+   något kallas klart. Skriv vad som är verifierat och vad som inte är det.
+10. Läs hela diffen. Inga hemligheter, felsökningsrader eller orelaterade filer.
+11. Commit och push till grenen. Öppna PR mot `main` med `gh pr create`: vad,
+    hur det testats, migrationer, driftändringar. **Aldrig push eller
+    force-push till `main`**, aldrig `--no-verify`.
+
+### Det som bara användaren beslutar
+12. Sammanslagning till `main`, en tagg `v*`, en GitHub Release och varje
+    driftsättning kräver användarens uttryckliga ja i samma session.
+13. Claude har ingen åtkomst till servrarna och ska inte ha det. Claude ger
+    kommandon, ett i taget; användaren kör dem.
+14. Ett kommando som raderar eller skriver över data (`restore.sh`,
+    `docker compose down -v`, `prisma db push` eller `migrate reset` mot
+    produktionen, SQL som ändrar rader) föreslås bara med en tydlig varning om
+    vad som går förlorat, och efter en backup. Seed körs aldrig i produktionen.
+15. Produktionen används aldrig för att prova något. Allt provas i labbet först.
+
+### Versioner och beslut
+`vMAJOR.MINOR.PATCH`. PATCH = rättelse utan migration. MINOR = ny funktion
+eller vilken migration som helst. MAJOR = kunden måste göra något.
+
+Ett beslut om hur systemet ska bete sig skrivs in i denna fil med datum. Det
+som bara gäller en version hör hemma i releaseanteckningen.
+
 ## 1. Vad Tikkr är
 
 Ett molnbaserat **stämplingssystem för touchskärm** som svenska verkstads- och
@@ -1023,31 +1080,39 @@ inställningarna.
 
 ## 5. Drift
 
-Alla kunder delar samma server → **en** deploy-pipeline:
+Alla kunder delar samma server, och en trasig driftsättning slår mot alla på
+en gång. Därför (beslutat 2026-10-10):
 
-**Målbilden** (inte byggd än, se nedan):
+```
+gren → PR → CI → main → labbet (release.sh main) → tagg vX.Y.Z → produktionen (release.sh vX.Y.Z)
+```
 
-1. Kodändring pushas till Git
-2. GitHub Actions kör testerna och bygger Docker-image automatiskt
-3. Deploy till liten **staging-miljö** för snabb kontroll — viktigt, en trasig
-   deploy slår annars mot *alla* kunder samtidigt
-4. Efter godkänd staging: SSH till produktion, `docker compose pull && docker compose up -d`
+- **CI** (`.github/workflows/ci.yml`) kör typkontroll, alla tester mot en egen
+  Postgres, ett bygge av Docker-imagen och en kontroll av compose-filerna på
+  varje PR och push till `main`. Den driftsätter ingenting.
+- **Labbet är staging.** Ingen tredje miljö, se § 9.
+- **Produktionen kör bara taggar**, och taggen sätts när labbet kört samma
+  commit. Driftsättningen är ett kommando som användaren själv kör på
+  servern; det är godkännandet. Ingen automatisk driftsättning, och inga
+  SSH-nycklar hos GitHub.
+- **Imagen bär versionen** (`tikkr-app:v1.2.0`), som visas i `/api/health`.
+  Den förra ligger kvar, så att backa koden är att starta den igen.
+- **Databasen backas inte med koden.** Migrationer lägger till och tar inte
+  bort, så att den förra versionen fungerar mot den nya databasen.
 
-**Så går det till i dag** (konstaterat 2026-10-05): ingen staging utöver
-labbet. **CI finns sedan 2026-10-10** (`.github/workflows/ci.yml`): varje PR
-och push till `main` kör typkontroll, alla tester mot en egen Postgres och ett
-bygge av Docker-imagen. Den driftsätter ingenting. Koden byggs på servern med `git pull && docker compose up -d
---build`, och appen startar om som en enda container — ett kort avbrott, inte
-en rullande omstart. Labbet är staging tills vidare: en gren provas där innan
-den slås ihop med `main`.
+Rutinen står i `docs/release.md`, servern i `docs/drift.md` punkt 8. Bygget
+sker på servern; appen startar om som en enda container, vilket är ett avbrott
+på några sekunder som skärmarnas offline-kö täcker.
 
 Produktionsservern kör Caddy framför appen (`deploy/Caddyfile`,
-`docker-compose.prod.yml`).
+`docker-compose.prod.yml`), och dess `.env` sätter `COMPOSE_FILE` så att
+varje `docker compose` tar med båda filerna.
 
 Måste finnas stöd för:
 
-- **Backuper** — daglig automatisk säkerhetskopia av databasen till **separat
-  plats, inte samma server** (objektlagring). Kritiskt: det är kundernas tidsdata.
+- **Backuper** — säkerhetskopia av databasen tre gånger per dygn och före
+  varje driftsättning, krypterad till **separat plats, inte samma server**
+  (Glesys Object Storage). Kritiskt: det är kundernas tidsdata.
 - **Säkerhetsuppdateringar** — OS och Docker-images uppdateras regelbundet
   (`unattended-upgrades`).
 - **Uptime-övervakning** — enkel gratis monitor (t.ex. UptimeRobot) pingar tjänsten.
@@ -1394,7 +1459,7 @@ servern — Claude har **ingen** SSH-åtkomst och ska alltid leverera kommandon 
 färdiga kodblock, ett i taget, med förklaring av vad de gör.
 
 ```
-Laptop (skriva kod)  →  GitHub  →  Server: git pull + docker compose up -d
+Laptop (gren, commit)  →  GitHub (PR, CI, main, tagg)  →  Server: ./scripts/release.sh <version>
 ```
 
 ### Utvecklingsdator

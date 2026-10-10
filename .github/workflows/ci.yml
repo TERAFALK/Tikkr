@@ -95,4 +95,30 @@ jobs:
       # filer som inte följer med till standalone-katalogen, PDF-bibliotekets
       # teckensnitt.
       - name: Bygg Docker-imagen
-        run: docker build --target runner --tag tikkr-app:ci .
+        run: >-
+          docker build --target runner --tag tikkr-app:ci
+          --build-arg TIKKR_VERSION=ci-${{ github.sha }} .
+
+      # Compose-filerna läses som produktionen läser dem. Ett skrivfel i
+      # docker-compose.prod.yml syns annars först på lanseringskvällen.
+      #
+      # Kontrollen av porten: APP_BIND sätts med flit till 0.0.0.0, och
+      # produktionsfilen ska ändå låsa appen till 127.0.0.1. Docker öppnar
+      # publicerade portar förbi brandväggen.
+      - name: Kontrollera compose-filerna
+        env:
+          POSTGRES_PASSWORD: ci
+          AUTH_SECRET: ci
+          ACME_EMAIL: ci@example.com
+          APP_BIND: 0.0.0.0
+        run: |
+          docker compose -f docker-compose.yml config --quiet
+          docker compose -f docker-compose.yml -f docker-compose.prod.yml config --quiet
+
+          BIND="$(docker compose -f docker-compose.yml -f docker-compose.prod.yml \
+            config --format json | jq -r '[.services.app.ports[].host_ip] | join(",")')"
+          echo "Produktionens app-port binder till: $BIND"
+          [ "$BIND" = "127.0.0.1" ]
+
+      - name: Kontrollera skripten
+        run: bash -n scripts/*.sh

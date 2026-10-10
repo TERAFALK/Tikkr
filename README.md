@@ -114,8 +114,8 @@ Resonemanget bakom besluten står i [CLAUDE.md](CLAUDE.md), språket i
 databasen — plus en `migrate`-container som kör och avslutas.
 
 ```
-Din laptop  →  GitHub  →  Servern: git pull + docker compose up -d
- (skriva kod)   (kodens hem)        (här kör det på riktigt)
+Laptop      →  GitHub (PR + CI)  →  Labbet          →  Produktionen
+gren, commit   main                 release.sh main    release.sh vX.Y.Z
 ```
 
 ---
@@ -206,15 +206,21 @@ skärm kopplas om med en ny kod.
 
 ---
 
-## Uppdatera till senaste versionen
+## Driftsätta en version
 
 ```bash
-git pull && docker compose up -d --build
+./scripts/release.sh main      # labbet: senaste main
+./scripts/release.sh v1.2.0    # produktionen: bara släppta versioner
 ```
 
-`migrate`-containern sätter upp databasen innan appen startar — inget extra
-steg. Finns `prisma/migrations/` kör den migrationerna i tur och ordning,
-annars byggs tabellerna direkt ur `prisma/schema.prisma`.
+Skriptet tar en backup, bygger medan den gamla versionen kör vidare, kör
+migrationerna och väntar tills `/api/health` svarar med den nya versionen. Att
+backa är samma kommando med den förra versionen. Hela rutinen, och vad som
+gäller när något går fel, står i [docs/release.md](docs/release.md).
+
+`migrate`-containern sätter upp databasen innan appen startar. Finns
+`prisma/migrations/` kör den migrationerna i tur och ordning, annars byggs
+tabellerna direkt ur `prisma/schema.prisma` — det senare bara i labbet.
 
 ---
 
@@ -229,7 +235,9 @@ annars byggs tabellerna direkt ur `prisma/schema.prisma`.
 | Köra testerna | `./scripts/test.sh` |
 | Köra vissa tester | `./scripts/test.sh payroll` |
 | Driftkontroll | `./scripts/status.sh` |
-| Lägga in testdata | `docker compose run --rm migrate node prisma/seed.mjs` |
+| Driftsätta | `./scripts/release.sh <version>` |
+| Öva återläsning | `./scripts/restore-test.sh` |
+| Lägga in testdata (bara labbet) | `docker compose run --rm migrate node prisma/seed.mjs` |
 | Lägga upp ett plattformskonto | `./scripts/platform-user.sh` |
 | Stänga glömda stämplingar | `./scripts/auto-close.sh` |
 | Säkerhetskopiera | `./scripts/backup.sh` |
@@ -323,7 +331,8 @@ Se läget just nu:
 
 | Dokument | Innehåll |
 |---|---|
-| [docs/drift.md](docs/drift.md) | Spärrar innan skarp drift, backup, autoutstämpling |
+| [docs/release.md](docs/release.md) | Från main till produktion, och tillbaka |
+| [docs/drift.md](docs/drift.md) | Spärrar innan skarp drift, server, backup, autoutstämpling |
 | [docs/kiosk-lage.md](docs/kiosk-lage.md) | Chrome Kiosk och Android — låsa ner en skärm |
 | [docs/kioskskarm.md](docs/kioskskarm.md) | Hårdvara: skärm, stativ, strömmatning |
 

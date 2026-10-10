@@ -46,6 +46,27 @@ else
   bad "hälsokollen svarar inte som väntat: ${HEALTH:-inget svar}"
 fi
 
+# --- Version ----------------------------------------------------------------
+head_ "Version"
+
+RUNNING="$(echo "$HEALTH" | sed -n 's/.*"version":"\([^"]*\)".*/\1/p')"
+echo "      miljö: ${TIKKR_ENV:-lab} · kör: ${RUNNING:-okänd}"
+
+if [ "${TIKKR_ENV:-lab}" = "production" ]; then
+  if echo "${RUNNING:-}" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+$'; then
+    ok "produktionen kör en släppt version"
+  else
+    bad "produktionen kör \"${RUNNING:-okänd}\", inte en släppt version — driftsätt med ./scripts/release.sh vX.Y.Z"
+  fi
+
+  if echo "${COMPOSE_FILE:-}" | grep -q 'docker-compose.prod.yml'; then
+    ok "COMPOSE_FILE tar med Caddy"
+  else
+    bad "COMPOSE_FILE saknas i .env — docker compose startar då utan Caddy"
+    echo "      echo 'COMPOSE_FILE=docker-compose.yml:docker-compose.prod.yml' >> .env"
+  fi
+fi
+
 # --- Hur databasen byggs ----------------------------------------------------
 head_ "Databasens uppbyggnad"
 
