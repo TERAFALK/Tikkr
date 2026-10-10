@@ -28,8 +28,8 @@ i `docs/release.md`, skälen i § 5.
 7. Ändring i `prisma/schema.prisma` kräver en migration i samma gren, som
    fungerar med FÖREGÅENDE version av appen: lägg till, ta inte bort.
    Borttagning och namnbyte sker i en senare release. Migrationer som raderar
-   eller skriver om data anges i PR-beskrivningen med hur man backar. (Gäller
-   från baslinjemigrationen; till dess byggs databasen ur schemat, se § 9.)
+   eller skriver om data anges i PR-beskrivningen med hur man backar.
+   Migrationen skapas med `node scripts/new-migration.mjs <namn>`, se § 9.
 8. Ny miljövariabel läggs i `.env.example` och `docker-compose.yml` och anges
    i PR-beskrivningen under "Driftändringar".
 
@@ -1527,21 +1527,30 @@ varje skärm kopplas om med en ny kod.
 | Offsite-backup (rclone-mål) | ⏸ Glesys Object Storage, köps till. `BACKUP_REMOTE` sätts före lansering |
 | Uptime-övervakning | ⏸ sätts upp mot produktionens adress |
 
-### Databasen byggs ur schemat, inte ur migrationer (beslutat 2026-08-11)
+### Databasen ändras bara med migrationer (beslutat 2026-10-10)
 
-Under utvecklingen finns **inga migrationsfiler**. Databasen byggs direkt ur
-`prisma/schema.prisma` vid varje start (`prisma db push`). Skälet: servern
-behöver då aldrig skriva till GitHub — organisationen blockerar deploy keys,
-och flödet laptop → GitHub → server går bara åt ett håll.
+Till 2026-10-10 byggdes databasen direkt ur `prisma/schema.prisma` vid varje
+start (`prisma db push --accept-data-loss`). Det gick så länge allt var
+testdata, men raderar det som ändrats — med kunddata vore det ett fel som inte
+går att ångra.
 
-Konsekvens: ändras schemat töms det som ändrats. Kör seed igen efteråt.
-`prisma/migrations/` ligger i `.gitignore`.
+Nu ligger migrationerna i `prisma/migrations/`, med baslinjen `0_init`, och
+`scripts/migrate.sh` kör bara `prisma migrate deploy`. **Vägen med `db push` är
+borttagen ur migrate.sh, inte avstängd**, och saknas mappen stoppar den.
+`release.sh` vägrar dessutom en produktionsversion utan migrationer.
 
-Före produktion skapas en baslinjemigration, raden tas bort ur `.gitignore`,
-och därefter krävs en migration vid varje schemaändring. `scripts/migrate.sh`
-byter gren automatiskt så fort mappen finns. Se `docs/drift.md` punkt 1.
+Migrationer skapas på LAPTOPEN med `node scripts/new-migration.mjs <namn>`,
+som jämför schemat mot senaste commit utan att behöva en databas. Servern
+skriver fortfarande aldrig till GitHub. CI kör alla migrationer mot en tom
+databas och fäller en PR där de inte ger samma databas som schemat.
 
-**Spärrar innan skarp drift** (se `docs/drift.md` punkt 7): baslinjemigration
-incheckad, offsite-backup satt, repot privat, demolösenordet `tikkr123`
-borttaget, testskärmens fasta token återkallad, och `./scripts/status.sh` utan
-röda punkter.
+`.gitignore` ignorerar `*.sql` (databasdumpar) men gör ett undantag för
+`prisma/migrations/**/migration.sql`. Utan undantaget hade migrationerna tyst
+hamnat utanför git.
+
+Undantag: `scripts/test.sh` bygger labbets testdatabas med `db push`. Den
+databasen raderas av testerna själva och innehåller aldrig något att förlora.
+
+**Spärrar innan skarp drift** (se `docs/drift.md` punkt 7): offsite-backup
+satt, repot privat, seed aldrig körd i produktionen, en release övad i labbet,
+och `./scripts/status.sh` utan röda punkter.

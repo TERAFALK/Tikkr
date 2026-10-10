@@ -12,42 +12,44 @@ Nedan står hur varje punkt åtgärdas, i den ordning de spelar roll.
 
 ## 1. Hur databasen byggs
 
-Under utvecklingen byggs databasen **direkt ur `prisma/schema.prisma`**, som
-ligger i repot och skrivs på laptopen. Servern behöver därför aldrig skriva
-något till GitHub — flödet går bara åt ena hållet, och en komprometterad
-labbserver kan inte ändra i koden.
+**Med migrationer, och bara med migrationer** (sedan 2026-10-10).
 
-Priset: ändras schemat försvinner det som ändrats i databasen. Det gör inget så
-länge datan är testdata — kör `seed` igen:
+`schema.prisma` beskriver hur databasen **ska** se ut. En migration beskriver
+**vägen dit**, och skillnaden får betydelse så fort det finns data att förlora.
+Byter vi namn på en kolumn ser ett verktyg som bara jämför nuläge mot önskat
+läge att den gamla kolumnen är borta och en ny tillkommit, och raderar den ena
+för att skapa den andra. En migration säger vad som faktiskt ska hända.
+
+Migrationerna ligger i `prisma/migrations/` och körs i tur och ordning av
+`migrate`-containern vid varje start. Den första, `0_init`, är baslinjen: hela
+databasen som den såg ut när migrationerna infördes.
+
+`scripts/migrate.sh` bygger aldrig databasen ur schemat. Saknas
+migrationerna stoppar den, och appen startar inte.
+
+### En schemaändring
+
+På laptopen, i samma gren och före commit:
+
+```powershell
+node scripts/new-migration.mjs lagg-till-foto-pa-anstalld
+```
+
+Skriptet jämför schemat mot senaste commit och skriver skillnaden som SQL. Det
+varnar för satser som tar bort, döper om eller skärper något — en migration ska
+fungera med föregående version av appen, se [release.md](release.md). CI kör
+sedan alla migrationer mot en tom databas och fäller PR:en om de inte ger samma
+databas som schemat.
+
+### Labbets databas
+
+Labbet byggdes med `db push` fram till baslinjen och fick den markerad som
+redan körd, en gång (se PR:en som införde den). Därefter går labbet samma väg
+som produktionen. Testdata läggs in med seed, bara här:
 
 ```bash
 docker compose run --rm migrate node prisma/seed.mjs
 ```
-
-### Före produktion: lås fast med en migration
-
-`schema.prisma` beskriver hur databasen **ska** se ut. En migration beskriver
-**vägen dit**, och skillnaden får betydelse först när det finns data att
-förlora.
-
-Byter vi namn på en kolumn ser ett verktyg som bara jämför nuläge mot önskat
-läge att den gamla kolumnen är borta och en ny tillkommit. Slutsatsen blir:
-radera den ena, skapa den andra — och innehållet försvinner. En migration säger
-uttryckligen "döp om", och datan följer med.
-
-Så här går övergången till, en gång, innan första riktiga kunden:
-
-1. Ta bort raden `prisma/migrations/` ur `.gitignore`
-2. Skapa baslinjen: `./scripts/create-migration.sh init`
-3. Checka in `prisma/migrations/` — den måste ligga i repot härifrån och framåt
-4. Därefter: en migration vid varje schemaändring, annars tappas data
-
-Från och med då kör systemet migrationerna i tur och ordning vid varje start,
-helt av sig självt. Ingen inställning behöver ändras — `scripts/migrate.sh`
-byter gren så fort mappen finns.
-
-> Ligger migrationerna bara på servern går databasen inte att återskapa någon
-> annanstans. `./scripts/status.sh` säger ifrån om det blir så.
 
 ---
 
@@ -292,7 +294,7 @@ SPF, DKIM och DMARC måste vara satta för `tikkr.se`, annars hamnar
 
 ## 7. Innan riktig kunddata
 
-- [ ] Baslinjemigration skapad och incheckad (punkt 1)
+- [x] Baslinjemigration skapad och incheckad (punkt 1)
 - [x] Lockfilen incheckad och `npm audit` genomgången (punkt 9)
 - [ ] Offsite-backup satt upp, krypterad, och en återläsning övad (punkt 3)
 - [ ] Larm för backup och automatisk utstämpling kopplade (punkt 3)
@@ -414,7 +416,7 @@ Ett nytt fynd som inte står här ska bedömas innan nästa release.
 | Labbet till senaste main | `./scripts/release.sh main` |
 | Loggar | `docker compose logs -f app` |
 | Kör testerna | `./scripts/test.sh` |
-| Ny migration | `./scripts/create-migration.sh <namn>` |
+| Ny migration (laptopen) | `node scripts/new-migration.mjs <namn>` |
 | Säkerhetskopia nu | `./scripts/backup.sh` |
 | Öva återläsning | `./scripts/restore-test.sh` |
 

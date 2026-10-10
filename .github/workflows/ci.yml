@@ -70,13 +70,28 @@ jobs:
       - name: Typkontroll
         run: npm run typecheck
 
-      # Tabellerna byggs direkt ur schemat, som scripts/test.sh gör i labbet.
-      #
-      # När baslinjemigrationen finns byts raden mot "npx prisma migrate
-      # deploy", så att migrationerna själva prövas här innan de körs mot
-      # kunddata, plus en kontroll som fäller en schemaändring utan migration.
-      - name: Bygg testdatabasen
-        run: npx prisma db push --skip-generate
+      # Testdatabasen byggs med MIGRATIONERNA, i tur och ordning från en tom
+      # databas — precis som en ny produktionsserver. En migration som inte
+      # går att köra faller här, inte mot kunddata.
+      - name: Kör migrationerna
+        run: npx prisma migrate deploy
+
+      # Fäller en ändring i schema.prisma som saknar migration. Databasen är
+      # nu byggd av migrationerna; skiljer den sig från schemat har någon
+      # ändrat schemat utan att skriva vägen dit, och produktionen hade fått
+      # en annan databas än koden förväntar sig.
+      - name: Schemat och migrationerna stämmer
+        run: |
+          if ! npx prisma migrate diff \
+            --from-url "$DATABASE_URL" \
+            --to-schema-datamodel prisma/schema.prisma \
+            --exit-code > drift.sql; then
+            echo "schema.prisma och migrationerna säger olika saker. Skillnaden:"
+            cat drift.sql
+            echo
+            echo "Skapa migrationen med: node scripts/new-migration.mjs <namn>"
+            exit 1
+          fi
 
       # Inte "npm test": det skriptet stoppar med flit, se
       # scripts/no-npm-test.mjs.
