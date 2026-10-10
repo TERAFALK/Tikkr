@@ -773,6 +773,81 @@ describe("överlappande tider på samma arbetsmoment avvisas", () => {
   });
 });
 
+describe("sekunder som ändra-rutan inte visar", () => {
+  // Ändra-rutan visar och skickar hela minuter. Stämplingarna bär sekunder.
+  // Pilotkunden kunde inte spara en rättad sluttid 2026-10-10, eftersom den
+  // avkapade starten hamnade några sekunder in i passet före.
+  const manual = (from: string, to: string) => ({
+    kind: "ORDER" as const,
+    employeeId: anna,
+    orderId: orderA,
+    momentId: svetsning,
+    clockInAt: new Date(from),
+    clockOutAt: new Date(to),
+    byEmail: "admin@demo.se",
+  });
+
+  let later: string;
+
+  beforeEach(async () => {
+    // Byte av jobb på samma moment: det förra slutar i exakt samma sekund
+    // som nästa börjar.
+    await createManualEntry(
+      companyId,
+      manual("2026-10-07T10:45:12Z", "2026-10-07T11:23:45Z")
+    );
+    later = (
+      await createManualEntry(
+        companyId,
+        manual("2026-10-07T11:23:45Z", "2026-10-07T19:41:10Z")
+      )
+    ).id;
+  });
+
+  it("en rättad sluttid går att spara, och starten står kvar", async () => {
+    const updated = await updateEntryManually(
+      companyId,
+      later,
+      manual("2026-10-07T11:23:00Z", "2026-10-07T14:41:00Z")
+    );
+
+    expect(updated.clockInAt.toISOString()).toBe("2026-10-07T11:23:45.000Z");
+    expect(updated.clockOutAt?.toISOString()).toBe("2026-10-07T14:41:00.000Z");
+  });
+
+  it("spara utan ändring rör ingenting", async () => {
+    const updated = await updateEntryManually(
+      companyId,
+      later,
+      manual("2026-10-07T11:23:00Z", "2026-10-07T19:41:00Z")
+    );
+
+    expect(updated.clockInAt.toISOString()).toBe("2026-10-07T11:23:45.000Z");
+    expect(updated.clockOutAt?.toISOString()).toBe("2026-10-07T19:41:10.000Z");
+  });
+
+  it("ett nytt pass i samma minut som det förra slutade läggs kant i kant", async () => {
+    await unsafeGlobalPrisma.timeEntry.delete({ where: { id: later } });
+
+    const entry = await createManualEntry(
+      companyId,
+      manual("2026-10-07T11:23:00Z", "2026-10-07T12:00:00Z")
+    );
+
+    expect(entry.clockInAt.toISOString()).toBe("2026-10-07T11:23:45.000Z");
+  });
+
+  it("ett överlapp på en hel minut avvisas som förut", async () => {
+    await expect(
+      updateEntryManually(
+        companyId,
+        later,
+        manual("2026-10-07T11:22:00Z", "2026-10-07T14:41:00Z")
+      )
+    ).rejects.toThrow(ClockError);
+  });
+});
+
 describe("glömd utstämpling stängs vid klockslaget och flaggas", () => {
   it("stänger gårdagens öppna stämpling på 18:00 lokal tid", async () => {
     await clockIn(companyId, {

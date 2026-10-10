@@ -989,7 +989,9 @@ export async function createManualEntry(
     historical: true,
   });
   assertSaneInterval(input.clockInAt, input.clockOutAt);
-  await assertNoOverlap(db, input, input.clockInAt, input.clockOutAt);
+  const clockInAt = await snapStartToPreviousEnd(db, input, input.clockInAt);
+  assertSaneInterval(clockInAt, input.clockOutAt);
+  await assertNoOverlap(db, input, clockInAt, input.clockOutAt);
 
   return db.$transaction(async (tx) => {
     const created = await tx.timeEntry.create({
@@ -997,7 +999,7 @@ export async function createManualEntry(
         companyId,
         employeeId: input.employeeId,
         ...jobFields(input),
-        clockInAt: input.clockInAt,
+        clockInAt,
         clockOutAt: input.clockOutAt,
         // Satserna som de är NU. En tid som skrivs in i efterhand saknar egen
         // historia — det enda systemet vet är vad personen och momentet
@@ -1043,8 +1045,15 @@ export async function updateEntryManually(
   const rates = await assertBelongsToCompany(db, input, {
     historical: true,
   });
-  assertSaneInterval(input.clockInAt, input.clockOutAt);
-  await assertNoOverlap(db, input, input.clockInAt, input.clockOutAt, entryId);
+
+  // Ett klockslag som står kvar som det stod behåller sina sekunder. Se
+  // keepSecondsIfSameMinute.
+  const clockOutAt = keepSecondsIfSameMinute(before.clockOutAt, input.clockOutAt);
+  let clockInAt = keepSecondsIfSameMinute(before.clockInAt, input.clockInAt);
+  assertSaneInterval(clockInAt, clockOutAt);
+  clockInAt = await snapStartToPreviousEnd(db, input, clockInAt, entryId);
+  assertSaneInterval(clockInAt, clockOutAt);
+  await assertNoOverlap(db, input, clockInAt, clockOutAt, entryId);
 
   // SATSERNA RÄKNAS OM BARA NÄR PERSONEN ELLER JOBBET BYTS.
   //
@@ -1067,8 +1076,8 @@ export async function updateEntryManually(
       data: {
         employeeId: input.employeeId,
         ...jobFields(input),
-        clockInAt: input.clockInAt,
-        clockOutAt: input.clockOutAt,
+        clockInAt,
+        clockOutAt,
         ...(sameWork ? {} : rates),
         source: "ADMIN_MANUAL",
         needsReview: false,
@@ -1107,6 +1116,69 @@ function assertSaneInterval(from: Date, to: Date) {
       "Stämplingen är längre än ett dygn. Dela upp den på flera poster."
     );
   }
+}
+
+const MINUTE_MS = 60_000;
+
+function startOfMinute(value: Date): Date {
+  return new Date(Math.floor(value.getTime() / MINUTE_MS) * MINUTE_MS);
+}
+
+/*
+ * FORMULÄRET VISAR HELA MINUTER, STÄMPLINGEN BÄR SEKUNDER.
+ *
+ * En stämpling sätts när någon trycker, alltså 13:23:45. Ändra-rutan visar
+ * 13:23 och skickar tillbaka 13:23:00. Byter man jobb på samma moment stängs
+ * det förra passet i exakt samma ögonblick som nästa börjar, så den som öppnade
+ * det senare passet och rättade sluttiden flyttade samtidigt starten 45
+ * sekunder bakåt — in i det förra passet. Kontrollen nedan sa "överlappar",
+ * om två pass som på skärmen slutar och börjar 13:23. Pilotkunden fastnade
+ * på exakt det 2026-10-10, och kunde inte spara alls.
+ *
+ * Två regler löser det, och båda gäller bara inom en och samma minut, alltså
+ * det administratören inte kan se:
+ */
+
+/**
+ * Ett klockslag som står kvar som det stod behåller sina sekunder. Annars
+ * ändrade varje sparning tiden lite, även för den som bara rättade sluttiden,
+ * och ändringsloggen påstod att starten flyttats.
+ */
+function keepSecondsIfSameMinute(stored: Date | null, submitted: Date): Date {
+  if (stored && startOfMinute(stored).getTime() === submitted.getTime()) {
+    return stored;
+  }
+  return submitted;
+}
+
+/**
+ * En start i samma minut som personens förra pass på momentet slutade, men
+ * före sekunden, flyttas fram till den sekunden. 13:23 efter ett pass som
+ * slutade 13:23:45 blir 13:23:45 — kant i kant, som det står på skärmen.
+ *
+ * Ett överlapp på en hel minut eller mer är synligt och avvisas som förut.
+ */
+async function snapStartToPreviousEnd(
+  db: CompanyDb,
+  job: { employeeId: string } & JobRef,
+  from: Date,
+  ignoreEntryId?: string
+): Promise<Date> {
+  const minuteEnd = new Date(startOfMinute(from).getTime() + MINUTE_MS);
+
+  const previous = await db.timeEntry.findFirst({
+    where: {
+      employeeId: job.employeeId,
+      ...jobKey(job),
+      id: ignoreEntryId ? { not: ignoreEntryId } : undefined,
+      clockInAt: { lt: from },
+      clockOutAt: { gt: from, lt: minuteEnd },
+    },
+    orderBy: { clockOutAt: "desc" },
+    select: { clockOutAt: true },
+  });
+
+  return previous?.clockOutAt ?? from;
 }
 
 /**
