@@ -240,34 +240,29 @@ Browser sköter det själv.
 
 ## 8. Adress per skärm
 
-**Start URL är en parameter per enhet, aldrig en konstant i koden.** Inget i
-Tikkr är knutet till en adress — kopplingslänkar och omdirigeringar byggs ur
-inkommande anrop. En skärm pekas om genom att ändra Start URL och koppla om
-skärmen, inte genom en ny version av appen.
-
-Det är också det som gör att pilotkunden kan ligga kvar på testservern när
-riktiga kunder finns i produktion.
+**Start URL är en parameter per enhet, aldrig en konstant i koden.** En skärm
+pekas om genom att ändra Start URL och koppla om skärmen, inte genom en ny
+version av appen.
 
 | Värd | Vad | Var |
 |---|---|---|
-| `www.tikkr.se` | säljsida | senare |
-| `portal.tikkr.se` | produktion | produktionsservern |
-| `pilot.tikkr.se` | pilotkunden | testservern |
-| `staging.tikkr.se` | kontroll före deploy | staging |
+| `www.tikkr.se`, `tikkr.se` | säljsida | produktionsservern |
+| `portal.tikkr.se` | systemet, för alla kunder — även pilotkunden | produktionsservern |
+| `test.tikkr.se` | labbet, som också är staging | testservern |
 
-`pilot` och `staging` hålls åtskilda med avsikt. Staging är en miljö vi själva
-slår sönder före en deploy. Pilotkunden är en riktig kund med riktig arbetstid
-och får inte ligga i samma miljö.
+**Pilotkunden kör i produktionen** (beslutat 2026-10-10). Vänertekno börjar om
+med tom arbetsyta vid lanseringen; testdatan i labbet flyttas inte. De får
+varje ny version först genom att vara först, inte genom en egen miljö. Labbet
+har aldrig riktig kunddata, och det är därför det får slås sönder före en
+release.
 
 ### Ordningen spelar roll
 
-Testservern svarar idag på `www.tikkr.se`, och samma namn är vikt för säljsidan i
-produktion. **Flytta pilotkunden till `pilot.tikkr.se` innan lanseringen, inte
-efter.** Görs det efter pekar pilotens skärm på en säljsida på lanseringsdagen.
-
-Flytten är: nytt proxy host i Nginx Proxy Manager, ändrad Start URL på skärmen,
-och **koppla om skärmen** — kiosk-cookien är bunden till adressen och följer inte
-med till ett nytt värdnamn.
+Testservern svarar idag på `www.tikkr.se` och `portal.tikkr.se`, och de namnen
+tas över av produktionen. Bytet görs samma kväll: produktionen tar över
+adresserna, labbet byter till `test.tikkr.se`, och **varje skärm kopplas om** —
+kiosk-cookien är bunden till adressen och följer inte med till ett nytt
+värdnamn eller en ny server.
 
 ---
 
@@ -357,7 +352,6 @@ ingen extra container, inget abonnement.
       raderingsinställningarna avstängda
 - [x] Fjärrstyrning bakom `fully`-detektering — ljusstyrka och omstart från
       adminpanelen. Otestat på hårdvara
-- [ ] `pilot.tikkr.se` uppsatt och pilotkunden flyttad dit — före lansering
 - [ ] Skriv om [kiosk-lage.md](kiosk-lage.md) punkt 2 när hårdvaran är vald. Den
       rekommenderar idag Chrome plus skärmfästning, vilket är svagare än device
       owner, och nämner Fully bara i förbigående

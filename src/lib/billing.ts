@@ -49,18 +49,6 @@ export class BillingChangeError extends Error {
 }
 
 /**
- * Vad kunden betalar för: antalet licenser de valt.
- *
- * Inte antalet skapade skärmar. Kostnaden ska aldrig växa av sig själv för att
- * någon lagt upp en skärm till — kunden bestämmer antalet, och skapar sedan
- * skärmar inom det.
- */
-export async function billedScreens(companyId: string): Promise<number> {
-  const state = await getLicenseState(companyId);
-  return state.total;
-}
-
-/**
  * Startar kassan där kunden fyller i sitt kort.
  *
  * Vi skapar aldrig prenumerationen själva. Stripe gör det när betalningen
