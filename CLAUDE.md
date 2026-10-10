@@ -1033,8 +1033,10 @@ Alla kunder delar samma server → **en** deploy-pipeline:
    deploy slår annars mot *alla* kunder samtidigt
 4. Efter godkänd staging: SSH till produktion, `docker compose pull && docker compose up -d`
 
-**Så går det till i dag** (konstaterat 2026-10-05): ingen CI, ingen staging
-utöver labbet. Koden byggs på servern med `git pull && docker compose up -d
+**Så går det till i dag** (konstaterat 2026-10-05): ingen staging utöver
+labbet. **CI finns sedan 2026-10-10** (`.github/workflows/ci.yml`): varje PR
+och push till `main` kör typkontroll, alla tester mot en egen Postgres och ett
+bygge av Docker-imagen. Den driftsätter ingenting. Koden byggs på servern med `git pull && docker compose up -d
 --build`, och appen startar om som en enda container — ett kort avbrott, inte
 en rullande omstart. Labbet är staging tills vidare: en gren provas där innan
 den slås ihop med `main`.
