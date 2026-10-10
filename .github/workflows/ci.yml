@@ -1,0 +1,98 @@
+# Kontrollen som körs innan något når main.
+#
+# Varje pull request och varje push till main går igenom två jobb, som körs
+# samtidigt:
+#
+#   test   typkontroll och alla tester, mot en riktig Postgres
+#   image  bygger samma Docker-image som servern bygger
+#
+# Ett rött kryss på en PR betyder att den inte ska slås ihop. Det här
+# arbetsflödet driftsätter ingenting — produktionen uppdateras bara när någon
+# kör release-rutinen på servern.
+
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+# En ny push till samma gren avbryter körningen som redan pågår. Den gamla
+# koden är ändå inaktuell.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    # En tom databas per körning. Namnet slutar på _test, annars vägrar
+    # tests/setup.ts att starta — samma spärr som skyddar den skarpa
+    # databasen på servern.
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: tikkr
+          POSTGRES_PASSWORD: tikkr
+          POSTGRES_DB: tikkr_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U tikkr -d tikkr_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      DATABASE_URL: postgresql://tikkr:tikkr@localhost:5432/tikkr_test?schema=public
+
+    steps:
+      - uses: actions/checkout@v5
+
+      # Node 22, samma som Docker-imagen. Inte laptopens version.
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Installera beroenden
+        run: npm ci
+
+      - name: Generera Prisma-klienten
+        run: npx prisma generate
+
+      - name: Typkontroll
+        run: npm run typecheck
+
+      # Tabellerna byggs direkt ur schemat, som scripts/test.sh gör i labbet.
+      #
+      # När baslinjemigrationen finns byts raden mot "npx prisma migrate
+      # deploy", så att migrationerna själva prövas här innan de körs mot
+      # kunddata, plus en kontroll som fäller en schemaändring utan migration.
+      - name: Bygg testdatabasen
+        run: npx prisma db push --skip-generate
+
+      # Inte "npm test": det skriptet stoppar med flit, se
+      # scripts/no-npm-test.mjs.
+      - name: Tester
+        run: npx vitest run
+
+  image:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - uses: actions/checkout@v5
+
+      # Hela Dockerfilen, med next build inuti. Fångar det som bara går sönder
+      # i imagen och inte vid en vanlig build: Alpine i stället för Ubuntu,
+      # filer som inte följer med till standalone-katalogen, PDF-bibliotekets
+      # teckensnitt.
+      - name: Bygg Docker-imagen
+        run: docker build --target runner --tag tikkr-app:ci .
