@@ -120,6 +120,16 @@ echo "  Kör nu:    ${RUNNING:-okänt (svarar inte)}"
 echo "  Ny:        $VERSION  (commit $(git rev-parse --short "$COMMIT"))"
 
 if [ "$ENVIRONMENT" = "production" ]; then
+  # Nyheterna skrivs före taggningen, se docs/release.md steg 1. Saknas de
+  # stoppas ingenting: en PATCH som kunden inte märker behöver ingen post.
+  # Filen läses in i en variabel först. `git show | grep -q` kan med pipefail
+  # rapportera fel just när grep hittat raden och slutat läsa.
+  NOTES="$(git show "$COMMIT:src/lib/release-notes.ts" 2>/dev/null || true)"
+  case "$NOTES" in
+    *"version: \"$VERSION\""*) echo "  Nyheter:   finns för $VERSION" ;;
+    *) echo "  Nyheter:   SAKNAS för $VERSION. Kunden ser ingen post om den här versionen." ;;
+  esac
+
   echo
   read -r -p "Skriv versionen ($VERSION) för att driftsätta i PRODUKTION: " CONFIRM
   [ "$CONFIRM" = "$VERSION" ] || fail "Avbrutet. Ingenting har ändrats."

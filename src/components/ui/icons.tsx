@@ -195,6 +195,14 @@ export const IconMegaphone = (props: IconProps) => (
   </Icon>
 );
 
+/** Nyheter. En gnista, och en mindre bredvid. */
+export const IconSparkle = (props: IconProps) => (
+  <Icon {...props}>
+    <path d="M10 4l1.6 4.4L16 10l-4.4 1.6L10 16l-1.6-4.4L4 10l4.4-1.6Z" />
+    <path d="M18 15l.7 1.8 1.8.7-1.8.7L18 20l-.7-1.8-1.8-.7 1.8-.7Z" />
+  </Icon>
+);
+
 /** Artiklar hos betaltjänsten. Prislapp. */
 export const IconTag = (props: IconProps) => (
   <Icon {...props}>

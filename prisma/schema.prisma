@@ -749,6 +749,14 @@ model AdminUser {
   loginCodeExpiresAt DateTime? @map("login_code_expires_at")
   loginCodeSentAt    DateTime? @map("login_code_sent_at")
 
+  /// NYHETERNA (tillagt 2026-10-10, issue #6). Den senaste versionen personen
+  /// sett på sidan Nyheter, t.ex. "v1.2.0". Tomt betyder att sidan aldrig
+  /// öppnats. Pricken i menyn står när en nyare version finns. Se news.ts.
+  ///
+  /// En version och inte en tidpunkt: nyheterna följer med koden och blir
+  /// synliga när versionen installeras, inte på ett datum.
+  newsSeenVersion String? @map("news_seen_version")
+
   company             Company             @relation(fields: [companyId], references: [id], onDelete: Cascade)
   passwordResets      PasswordReset[]
   emailVerifications  EmailVerification[]
