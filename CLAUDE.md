@@ -517,6 +517,21 @@ stripe_prices    — item, month_price_id, year_price_id, updated_by_email
    till dess att en människa beslutat att den är övertid. Uttagen komp är en
    frånvaroorsak som också drar på komptidssaldot.
 
+   **Beslutet fattas på tidrapporten, per dag** (tillagt 2026-10-10). Varje
+   dag har en knapp Komptid bredvid Frånvaro, och raden dateras på dagen
+   övertiden gjordes, eftersom det är den dagens flex som ska minska.
+   Åtgärderna fanns från 2026-09-26 men hade ingen knapp, och saldot kunde
+   därför aldrig öka. Frånvaro och komptid tas bort i den utfällda dagen. Ett
+   uttag som en frånvaro skrivit har ingen egen knapp: det tas bort med
+   frånvaron, annars stod ledigheten kvar utan att komptiden minskat.
+
+   **Ingående komptid och startdatumet för saldot sätts inte i panelen**
+   (beslutat 2026-10-10). `saveOpeningBalances` skrev alla tre ingående
+   värdena rakt av och hade aldrig en knapp; den togs bort. Ingående flex
+   sätts med Justera flexsaldo, och ett tomt startdatum betyder första
+   stämplingen, vilket är rätt för den som flyttar in. Fälten finns kvar i
+   databasen.
+
    **Frånvaroorsakerna är kundens egna rader** (ändrat 2026-10-01), i
    `absence_reasons`, och läggs upp under Inställningar. Var en enum i koden,
    vilket betydde att en kund som behövde "arbetsskada" fick vänta på en

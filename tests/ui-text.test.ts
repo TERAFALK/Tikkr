@@ -229,6 +229,8 @@ const PROSE_FILES = [
   "src/lib/clock.ts",
   "src/lib/breaks.ts",
   "src/lib/break-close.ts",
+  // Felen i frånvaro- och komptidsrutan.
+  "src/lib/absence.ts",
   "src/lib/notices.ts",
   "src/lib/platform-admin.ts",
   "src/lib/emails.ts",

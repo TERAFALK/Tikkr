@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Badge, Button, Card, CardHeader, Table, Td, Th, Tr } from "@/components/ui";
 import { formatDuration, formatSignedDuration } from "@/lib/format";
+import ConfirmButton from "./ConfirmButton";
 
 /**
  * TIDRAPPORTEN, DAG FÖR DAG.
@@ -34,7 +35,14 @@ export interface TimesheetDayRow {
     reason: string;
     minutes: number;
     note: string | null;
+    /** Orsaken drar på komptiden, och uttaget tas bort med frånvaron. */
+    withdrawsComp: boolean;
   }[];
+  /**
+   * Komptid som registrerats för hand. Uttag som en frånvaro skrivit står
+   * inte här: de hör till frånvaron och tas bort med den.
+   */
+  comp: { id: string; minutes: number; note: string | null }[];
   entries: {
     id: string;
     from: string;
@@ -51,10 +59,17 @@ export interface TimesheetDayRow {
 export default function TimesheetTable({
   days,
   onMarkAbsence,
+  onAddComp,
+  deleteAbsenceAction,
+  deleteCompAction,
 }: {
   days: TimesheetDayRow[];
   /** Öppnar frånvarorutan för en dag. */
   onMarkAbsence: (date: string) => void;
+  /** Öppnar komptidsrutan för en dag. Saknas för en timanställd. */
+  onAddComp?: (date: string) => void;
+  deleteAbsenceAction: (formData: FormData) => Promise<void>;
+  deleteCompAction: (formData: FormData) => Promise<void>;
 }) {
   const [open, setOpen] = useState<Set<string>>(new Set());
 
@@ -88,7 +103,13 @@ export default function TimesheetTable({
           {days.map((day) => {
             const expanded = open.has(day.date);
             const restDay = day.plannedMinutes === 0;
-            const hasDetail = day.entries.length > 0 || day.breaks.length > 0;
+            // Frånvaron och komptiden räknas som detaljer, eftersom det är i
+            // den utfällda raden de går att ta bort.
+            const hasDetail =
+              day.entries.length > 0 ||
+              day.breaks.length > 0 ||
+              day.absences.length > 0 ||
+              day.comp.length > 0;
 
             return [
               <Tr key={day.date} dimmed={restDay && day.workedMinutes === 0}>
@@ -109,6 +130,11 @@ export default function TimesheetTable({
                       <Badge tone="warning">{absence.reason}</Badge>
                     </span>
                   ))}
+                  {day.comp.length > 0 && (
+                    <span className="ml-2">
+                      <Badge tone="active">Komptid</Badge>
+                    </span>
+                  )}
                 </Td>
                 <Td numeric muted>
                   {day.plannedMinutes === 0 ? "—" : formatDuration(day.plannedMinutes)}
@@ -126,13 +152,24 @@ export default function TimesheetTable({
                   <Flex minutes={day.flexMinutes} />
                 </Td>
                 <Td>
-                  <Button
-                    type="button"
-                    tone="ghost"
-                    onClick={() => onMarkAbsence(day.date)}
-                  >
-                    Frånvaro
-                  </Button>
+                  <div className="flex justify-end gap-1">
+                    <Button
+                      type="button"
+                      tone="ghost"
+                      onClick={() => onMarkAbsence(day.date)}
+                    >
+                      Frånvaro
+                    </Button>
+                    {onAddComp && (
+                      <Button
+                        type="button"
+                        tone="ghost"
+                        onClick={() => onAddComp(day.date)}
+                      >
+                        Komptid
+                      </Button>
+                    )}
+                  </div>
                 </Td>
               </Tr>,
 
@@ -182,6 +219,37 @@ export default function TimesheetTable({
                           </span>
                         </li>
                       ))}
+
+                      {day.absences.map((absence) => (
+                        <DetailRow
+                          key={absence.id}
+                          id={absence.id}
+                          label={absence.reason}
+                          note={absence.note}
+                          value={formatDuration(absence.minutes)}
+                          action={deleteAbsenceAction}
+                          question={
+                            `Ta bort frånvaron ${absence.reason} ${day.dayLabel}?` +
+                            (absence.withdrawsComp
+                              ? " Uttaget ur komptiden tas också bort."
+                              : "")
+                          }
+                        />
+                      ))}
+
+                      {day.comp.map((row) => (
+                        <DetailRow
+                          key={row.id}
+                          id={row.id}
+                          label="Komptid"
+                          note={row.note}
+                          value={formatSignedDuration(row.minutes)}
+                          action={deleteCompAction}
+                          question={`Ta bort komptiden ${formatSignedDuration(
+                            row.minutes
+                          )} ${day.dayLabel}?`}
+                        />
+                      ))}
                     </ul>
                   </td>
                 </tr>
@@ -191,6 +259,45 @@ export default function TimesheetTable({
         </tbody>
       </Table>
     </Card>
+  );
+}
+
+/**
+ * En frånvaropost eller komprad i den utfällda dagen, med knappen som tar
+ * bort den.
+ *
+ * Rättelse sker genom att ta bort och lägga in på nytt. Frånvaron skriver
+ * dessutom över sig själv: samma dag och orsak två gånger är en rättelse, se
+ * markAbsence.
+ */
+function DetailRow({
+  id,
+  label,
+  note,
+  value,
+  action,
+  question,
+}: {
+  id: string;
+  label: string;
+  note: string | null;
+  value: string;
+  action: (formData: FormData) => Promise<void>;
+  question: string;
+}) {
+  return (
+    <li className="flex flex-wrap items-center gap-x-3 text-[13px]">
+      <span className="w-28 shrink-0" />
+      <span className="font-medium text-neutral-900">{label}</span>
+      {note && <span className="text-neutral-500">{note}</span>}
+      <span className="ml-auto tabular-nums text-neutral-600">{value}</span>
+      <form action={action}>
+        <input type="hidden" name="id" value={id} />
+        <ConfirmButton type="submit" tone="ghost" question={question}>
+          Ta bort
+        </ConfirmButton>
+      </form>
+    </li>
   );
 }
 

@@ -140,15 +140,8 @@ export async function saveCompEarned(
   if (!date) return { error: "Ange ett datum." };
 
   // TIMANSTÄLLD HAR INGEN KOMPTID. Knappen göms i panelen, men en
-  // serveråtgärd ska inte lita på att gränssnittet gömde den.
-  const person = await db.employee.findFirst({
-    where: { id: employeeId },
-    select: { hourly: true },
-  });
-
-  if (person?.hourly) {
-    return { error: "Personen är timanställd och har ingen komptid." };
-  }
+  // serveråtgärd ska inte lita på att gränssnittet gömde den. Vakten sitter i
+  // addCompEarned, som är enda vägen in, och svarar med ett AbsenceError.
 
   // Samma tolkning som frånvaron: godkänd komptid skrivs av från ett saldo
   // som står i tim:min.
@@ -269,53 +262,6 @@ export async function adjustFlexBalance(
 
   revalidatePath(PATH);
   return { ok: "Flexsaldot är ändrat." };
-}
-
-/** Ingående saldon, för en kund som flyttar in med befintliga timmar. */
-export async function saveOpeningBalances(
-  _previous: TimesheetState,
-  formData: FormData
-): Promise<TimesheetState> {
-  const session = await requireAdmin();
-  await assertWritable(session);
-  await requireModule(session, "PAYROLL");
-  const { db, companyId } = session;
-
-  const employeeId = String(formData.get("employeeId") ?? "");
-  if (!employeeId) return { error: "Ingen anställd vald." };
-
-  const timeZone = await timeZoneOf(companyId);
-
-  // Saldon får vara negativa — ett minussaldo är ett helt normalt läge.
-  const flex = hoursInputToMinutes(formData.get("flex"));
-  const comp = hoursInputToMinutes(formData.get("comp"));
-
-  if (flex === "error" || comp === "error") {
-    return { error: "Skriv saldona som timmar, till exempel 12,5 eller −3." };
-  }
-
-  const rawDate = String(formData.get("since") ?? "").trim();
-  const since = rawDate ? parseLocalDate(rawDate, timeZone) : null;
-
-  if (rawDate && !since) return { error: "Datumet går inte att läsa." };
-
-  const before = await employeeBefore(db, employeeId);
-
-  await db.employee.updateMany({
-    where: { id: employeeId },
-    data: {
-      flexOpeningMinutes: flex ?? 0,
-      compOpeningMinutes: comp ?? 0,
-      balanceOpeningDate: since,
-    },
-  });
-
-  if (before) {
-    await auditEmployeeChange(db, { employeeId, actorEmail: session.email, before });
-  }
-
-  revalidatePath(PATH);
-  return { savedAt: Date.now() };
 }
 
 /**
