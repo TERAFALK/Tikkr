@@ -114,7 +114,7 @@ export default async function NewsPage() {
                   <div className="mt-3 space-y-4">
                     <Group label="Nytt" items={release.added} />
                     <Group label="Förbättringar" items={release.improved} />
-                    <Group label="Rättade fel" items={release.fixed} />
+                    <Group label="Buggfixar" items={release.fixed} />
                   </div>
                 </div>
               </li>
