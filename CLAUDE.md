@@ -1395,14 +1395,20 @@ Laptop (skriva kod)  →  GitHub  →  Server: git pull + docker compose up -d
 
 Windows 11 Pro, projektrot `C:\Projekt\Tikkr`, PowerShell.
 
-| Verktyg | Status per 2026-08-10 |
+| Verktyg | Status per 2026-10-10 |
 |---|---|
 | git | ✅ 2.50.1 |
-| Node.js | ❌ ej installerat — appen körs på servern istället |
+| Node.js | ✅ 24 (npm 11). Docker-imagen och CI kör Node 22 |
 | Docker Desktop | ❌ ej installerat |
 
-Konsekvens: Claude kan **inte köra tester, bygga eller typkolla lokalt**. All
-verifiering sker på servern. Påstå aldrig att något fungerar innan det körts där.
+Konsekvens: Claude kan **typkolla och bygga lokalt** (`npm ci`,
+`npx prisma generate`, `npm run typecheck`, `npm run build`), men **inte köra
+testerna** — de behöver Postgres, och den finns bara på servern och i CI.
+Påstå aldrig att något fungerar innan det körts där.
+
+npm 11 kör inte paketens installationsskript utan godkännande och varnar för
+det vid `npm ci`. Det är ofarligt här: `npx prisma generate` hämtar det som
+behövs, och imagen byggs med Node 22, där skripten körs som vanligt.
 
 ### Testserver (labbmiljö — INTE produktion)
 

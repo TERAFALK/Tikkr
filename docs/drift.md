@@ -274,7 +274,7 @@ SPF, DKIM och DMARC måste vara satta för `tikkr.se`, annars hamnar
 ## 7. Innan riktig kunddata
 
 - [ ] Baslinjemigration skapad och incheckad (punkt 1)
-- [ ] Lockfilen incheckad och `npm audit` utan allvarliga fynd (punkt 9)
+- [x] Lockfilen incheckad och `npm audit` genomgången (punkt 9)
 - [ ] Offsite-backup satt upp, krypterad, och en återläsning övad (punkt 3)
 - [ ] Larm för backup och automatisk utstämpling kopplade (punkt 3)
 - [ ] E-post kopplad och åtkomstpolicyn kontrollerad (punkt 6)
@@ -325,23 +325,33 @@ Utan `package-lock.json` i repot löser varje bygge versionerna på nytt. En
 trasig eller komprometterad version av ett beroende går då rakt ut till alla
 kunder, och det finns inget fast att granska med `npm audit`.
 
-Skapa den på servern, där Node finns, och hämta hem den till laptopen:
+Den är incheckad sedan 2026-10-10, och Dockerfilen använder då `npm ci`:
+varje bygge får exakt de versioner som står i filen.
 
-```bash
-docker compose run --rm --no-deps --user "$(id -u):$(id -g)" -e npm_config_cache=/tmp/.npm -v "$PWD:/work" -w /work migrate npm install --package-lock-only
-```
-
-```bash
-docker compose run --rm --no-deps --user "$(id -u):$(id -g)" -e npm_config_cache=/tmp/.npm -v "$PWD:/work" -w /work migrate npm audit --omit=dev
-```
-
-Från laptopen, i projektmappen. Byt användare och servernamn om de skiljer sig:
+Ett beroende läggs till eller uppdateras på laptopen, och låsfilen följer med
+i samma commit:
 
 ```powershell
-scp administrator@tf-docker01-test:Tikkr/package-lock.json .
+npm install <paket>
 ```
 
-Checka sedan in filen. Dockerfilen använder `npm ci` så fort den finns.
+Kör **aldrig `npm audit fix` utan att läsa vad den gör.** Första gången
+"rättade" den Prisma genom att nedgradera kommandoverktyget till 6.12 medan
+klienten låg kvar på 6.19, och två versioner av Prisma i samma bygge är ett
+fel som syns först när databasen ska ändras.
+
+### Kända fynd i `npm audit --omit=dev`, bedömda 2026-10-10
+
+Alla tre kräver en ny huvudversion för att rättas, och ingen av dem går att nå
+med något en kund eller besökare skickar in.
+
+| Paket | Via | Varför det får ligga kvar |
+|---|---|---|
+| postcss | next | Bearbetar bara vår egen stilmall, vid bygget. Rättas av Next 16 |
+| deepmerge-ts | prisma | Bara i kommandoverktyget som kör migrationerna, och slår ihop vår egen konfiguration |
+| uuid | exceljs | Felet kräver ett anrop med egen buffert. "Rättningen" vore att nedgradera exceljs till 3.4 |
+
+Ett nytt fynd som inte står här ska bedömas innan nästa release.
 
 ---
 
