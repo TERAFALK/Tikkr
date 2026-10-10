@@ -100,6 +100,19 @@ export interface PayrollDay {
   }[];
   compEarnedMinutes: number;
   compTakenMinutes: number;
+  /**
+   * Dagens rader i komptidsboken, med tecken: plus är intjänat, minus uttaget.
+   *
+   * `absenceId` är satt på ett uttag som skrivits av en frånvaro märkt
+   * `countsAsComp`. Den raden tas bort med frånvaron och inte för sig, se
+   * removeCompAdjustment.
+   */
+  comp: {
+    id: string;
+    minutes: number;
+    note: string | null;
+    absenceId: string | null;
+  }[];
   flexMinutes: number;
   entries: PayrollEntryRow[];
   breaks: PayrollBreakRow[];
@@ -239,8 +252,8 @@ export async function buildPayrollPeriod(
     }),
     db.compAdjustment.findMany({
       where: { employeeId, date: { gte: periodStart, lt: periodEnd } },
-      orderBy: { date: "asc" },
-      select: { id: true, date: true, minutes: true },
+      orderBy: [{ date: "asc" }, { id: "asc" }],
+      select: { id: true, date: true, minutes: true, note: true, absenceId: true },
     }),
     schedulesForEmployees(db, [employeeId]),
   ]);
@@ -383,6 +396,12 @@ export async function buildPayrollPeriod(
       })),
       compEarnedMinutes,
       compTakenMinutes,
+      comp: dayComp.map((row) => ({
+        id: row.id,
+        minutes: row.minutes,
+        note: row.note,
+        absenceId: row.absenceId,
+      })),
       // TIMANSTÄLLD HAR INGEN FLEX. Utan schema är planerad tid noll, och
       // formeln hade då gjort varje arbetad timme till ett plus — ett saldo
       // som växer för den som inte har något att ta igen. Se Employee.hourly.

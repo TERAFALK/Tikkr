@@ -30,7 +30,14 @@ import {
 } from "@/lib/format";
 import { startOfWeekIn, addDaysInZone, parseLocalDate, toDateInput } from "@/lib/time-zone";
 import ActionDialog from "@/components/ui/ActionDialog";
-import { adjustFlexBalance, saveAbsence, type BalanceState } from "./actions";
+import {
+  adjustFlexBalance,
+  deleteAbsence,
+  deleteCompEarned,
+  saveAbsence,
+  saveCompEarned,
+  type BalanceState,
+} from "./actions";
 
 /**
  * TIDRAPPORT PER ANSTÄLLD — LÖNEUNDERLAGET.
@@ -182,7 +189,15 @@ export default async function TimesheetPage({
     breakMinutes: day.breakMinutes,
     absenceMinutes: day.absenceMinutes,
     flexMinutes: day.flexMinutes,
-    absences: day.absences,
+    absences: day.absences.map((absence) => ({
+      ...absence,
+      withdrawsComp: day.comp.some((row) => row.absenceId === absence.id),
+    })),
+    // Bara det som skrivits för hand. Ett uttag som en frånvaro skrivit tas
+    // bort med frånvaron, och removeCompAdjustment vägrar ta det ensamt.
+    comp: day.comp
+      .filter((row) => row.absenceId === null)
+      .map(({ id, minutes, note }) => ({ id, minutes, note })),
     entries: day.entries.map((entry) => ({
       id: entry.id,
       from: formatTime(entry.clockInAt, timeZone),
@@ -351,8 +366,12 @@ export default async function TimesheetPage({
           days={days}
           employeeId={employeeId}
           employeeName={period.employee.name}
+          hourly={period.employee.hourly}
           reasons={reasons}
           absenceAction={saveAbsence}
+          compAction={saveCompEarned}
+          deleteAbsenceAction={deleteAbsence}
+          deleteCompAction={deleteCompEarned}
         />
       </div>
 
