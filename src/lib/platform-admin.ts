@@ -331,7 +331,8 @@ export async function getCompanyDetail(companyId: string) {
         select: {
           id: true,
           email: true,
-          name: true,
+          firstName: true,
+          lastName: true,
           phone: true,
           role: true,
           createdAt: true,

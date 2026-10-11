@@ -3,6 +3,7 @@ import { DEFAULT_ABSENCE_REASONS } from "./absence";
 import { unsafeGlobalPrisma } from "./db";
 import { trialEndDate } from "./subscription";
 import { normalizePhone } from "./phone";
+import { nameProblem, storedName } from "./person-name";
 
 /**
  * REGISTRERING AV NYTT FÖRETAG.
@@ -15,10 +16,37 @@ import { normalizePhone } from "./phone";
  * vid inloggning. Efter det här steget går all åtkomst via forCompany().
  */
 
+/**
+ * FORMULÄRETS TRE STEG (infört 2026-10-11, issue #16).
+ *
+ * 1 är personen, 2 är lösenordet, 3 är arbetsytan. Varje fel vet vilket steg
+ * det hör till, så att formuläret kan gå TILLBAKA till fältet det handlar om.
+ *
+ * Utan det kunde den som stod på sista steget få "Det finns redan ett konto
+ * med den e-postadressen" över ett företagsnamn, alltså ett besked om ett fält
+ * som inte syns. Steget hör till felet och inte till formuläret: servern vet
+ * vilket fält som brast, webbläsaren vet det inte.
+ *
+ * ORDNINGEN ÄR PRODUKTÄGARENS VAL. Lösenordet låg först tillsammans med
+ * företagets namn, och "Företagets namn" följt av "Lösenord" lästes som ett
+ * lösenord FÖR FÖRETAGET. Allt som är personen står nu före arbetsytan, och
+ * det sista steget slutar på företagsnamnet med knappen direkt under.
+ */
+export type SignupStep = 1 | 2 | 3;
+
+/** Ett fel med stegets nummer, så att formuläret kan visa rätt fält. */
+export interface SignupProblem {
+  message: string;
+  step: SignupStep;
+}
+
 export class SignupError extends Error {
-  constructor(message: string) {
+  readonly step: SignupStep;
+
+  constructor(message: string, step: SignupStep = 1) {
     super(message);
     this.name = "SignupError";
+    this.step = step;
   }
 }
 
@@ -27,8 +55,12 @@ const MIN_PASSWORD_LENGTH = 10;
 
 export interface SignupInput {
   companyName: string;
-  /** Den som registrerar, och därmed blir ägare. */
-  ownerName: string;
+  /**
+   * Den som registrerar, och därmed blir ägare. Två fält och inte ett
+   * sedan 2026-10-11, se person-name.ts.
+   */
+  firstName: string;
+  lastName: string;
   email: string;
   /**
    * Ägarens telefonnummer, i vilken form som helst. Sparas normaliserat.
@@ -48,32 +80,38 @@ export function normalizeEmail(value: string): string {
 /**
  * Kontrollerar uppgifterna innan något skapas.
  *
- * Returnerar ett meddelande skrivet för att läsas av en människa, eller null
- * om allt är i sin ordning.
+ * Returnerar ett meddelande skrivet för att läsas av en människa, med numret
+ * på det steg fältet står på, eller null om allt är i sin ordning.
+ *
+ * ORDNINGEN FÖLJER STEGEN och inte fältens ordning i databasen. Den som fyllt
+ * i alla tre stegen och har fel i flera ska skickas tillbaka till det FÖRSTA
+ * felet; rättar man bakifrån hoppar formuläret fram och tillbaka.
  */
-export function validateSignup(input: SignupInput): string | null {
-  if (input.companyName.trim().length < 2) {
-    return "Ange företagets namn.";
-  }
-
-  if (input.ownerName.trim().length < 2) {
-    return "Ange ditt namn.";
-  }
+export function validateSignup(input: SignupInput): SignupProblem | null {
+  const name = nameProblem(input);
+  if (name) return { message: name, step: 1 };
 
   const email = normalizeEmail(input.email);
   // Avsiktligt enkel kontroll. Den enda som med säkerhet avgör om en adress
   // fungerar är ett utskickat mejl — resten är gissningar som mest råkar
   // stänga ute ovanliga men giltiga adresser.
   if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) {
-    return "Kontrollera e-postadressen.";
+    return { message: "Kontrollera e-postadressen.", step: 1 };
   }
 
   if (!normalizePhone(input.phone)) {
-    return "Kontrollera telefonnumret.";
+    return { message: "Kontrollera telefonnumret.", step: 1 };
   }
 
   if (input.password.length < MIN_PASSWORD_LENGTH) {
-    return `Lösenordet måste vara minst ${MIN_PASSWORD_LENGTH} tecken.`;
+    return {
+      message: `Lösenordet måste vara minst ${MIN_PASSWORD_LENGTH} tecken.`,
+      step: 2,
+    };
+  }
+
+  if (input.companyName.trim().length < 2) {
+    return { message: "Ange företagets namn.", step: 3 };
   }
 
   return null;
@@ -81,7 +119,7 @@ export function validateSignup(input: SignupInput): string | null {
 
 export async function createCompanyWithOwner(input: SignupInput) {
   const problem = validateSignup(input);
-  if (problem) throw new SignupError(problem);
+  if (problem) throw new SignupError(problem.message, problem.step);
 
   const email = normalizeEmail(input.email);
 
@@ -91,8 +129,10 @@ export async function createCompanyWithOwner(input: SignupInput) {
   });
 
   if (existing) {
+    // Steg 1: adressen står där, och det är den som ska rättas.
     throw new SignupError(
-      "Det finns redan ett konto med den e-postadressen. Logga in i stället."
+      "Det finns redan ett konto med den e-postadressen. Logga in i stället.",
+      1
     );
   }
 
@@ -112,7 +152,7 @@ export async function createCompanyWithOwner(input: SignupInput) {
       data: {
         companyId: company.id,
         email,
-        name: input.ownerName.trim(),
+        ...storedName(input),
         // Kontrollerat av validateSignup ovan, så null förekommer inte här.
         phone: normalizePhone(input.phone),
         passwordHash: await bcrypt.hash(input.password, 12),

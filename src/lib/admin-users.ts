@@ -5,6 +5,7 @@ import { forCompany, type CompanyDb } from "./tenant";
 import { normalizeEmail } from "./signup";
 import { recordAudit } from "./audit";
 import { normalizePhone } from "./phone";
+import { storedName } from "./person-name";
 import { resetAdminMfa } from "./admin-mfa";
 
 /**
@@ -135,7 +136,7 @@ export async function findInvite(token: string): Promise<PendingInvite | null> {
 export async function acceptInvite(
   token: string,
   password: string,
-  profile: { name?: string; phone?: string } = {}
+  profile: { firstName?: string; lastName?: string; phone?: string } = {}
 ) {
   if (password.length < MIN_PASSWORD_LENGTH) {
     throw new AdminUserError(
@@ -146,7 +147,11 @@ export async function acceptInvite(
   // Namn och telefon är frivilliga för den som bjuds in. Ägaren som
   // registrerade arbetsytan har redan lämnat sina, och det är dem vi ringer.
   // Skrivs ett nummer ändå ska det gå att använda.
-  const name = profile.name?.trim() || null;
+  //
+  // Förnamn och efternamn i varsitt fält sedan 2026-10-11, se person-name.ts.
+  // Frivilliga var för sig: den som bara skriver sitt förnamn ska komma in,
+  // till skillnad från ägaren vid registreringen.
+  const name = storedName(profile);
   const rawPhone = profile.phone?.trim() ?? "";
   const phone = rawPhone ? normalizePhone(rawPhone) : null;
 
@@ -181,7 +186,7 @@ export async function acceptInvite(
       data: {
         companyId: invite.companyId,
         email: invite.email,
-        name,
+        ...name,
         phone,
         passwordHash,
         role: invite.role,
@@ -346,7 +351,8 @@ export async function listAdmins(db: CompanyDb) {
       select: {
         id: true,
         email: true,
-        name: true,
+        firstName: true,
+        lastName: true,
         role: true,
         createdAt: true,
         totpEnabledAt: true,

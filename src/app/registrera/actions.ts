@@ -2,13 +2,48 @@
 
 import { redirect } from "next/navigation";
 import { issueTicket } from "@/lib/login-ticket";
-import { createCompanyWithOwner, SignupError } from "@/lib/signup";
+import {
+  createCompanyWithOwner,
+  SignupError,
+  type SignupStep,
+} from "@/lib/signup";
 import { sendEmailVerification } from "@/lib/email-verification";
 import { requestIp } from "@/lib/client-ip";
 import { isLockedOut, noteFailedLogin } from "@/lib/login-throttle";
 
+/**
+ * Det användaren skrev, tillbaka till formuläret efter ett fel.
+ *
+ * LÖSENORDEN ÄR INTE MED. De skulle då stå som ett `value` i sidans HTML, och
+ * ett lösenord i klartext i en DOM är ett lösenord som ligger i
+ * webbläsarens minne längre än det behöver. Den som fått ett fel skriver om
+ * dem; allt annat står kvar.
+ */
+export interface SignupValues {
+  firstName: string;
+  lastName: string;
+  email: string;
+  phone: string;
+  companyName: string;
+}
+
 export interface SignupState {
   error?: string;
+  /**
+   * REACT NOLLSTÄLLER FORMULÄRET EFTER EN ÅTGÄRD, och det är därför de här
+   * finns. Ett formulär som skickats med `action` återställs till fältens
+   * `defaultValue` när åtgärden är klar; utan ekot vore ett felstavat
+   * telefonnummer detsamma som att skriva om alla fem fälten.
+   */
+  values?: SignupValues;
+  /**
+   * Steget felet hör till, så att formuläret kan gå tillbaka till fältet det
+   * handlar om. Se SignupStep i signup.ts.
+   *
+   * Tomt betyder att felet inte hör till ett fält — spärren mot för många
+   * registreringar och fällan för skript. De står kvar där man är.
+   */
+  step?: SignupStep;
 }
 
 /**
@@ -37,38 +72,41 @@ export async function register(
   }
 
   const ip = await requestIp();
+  const values: SignupValues = {
+    firstName: String(formData.get("firstName") ?? ""),
+    lastName: String(formData.get("lastName") ?? ""),
+    email: String(formData.get("email") ?? ""),
+    phone: String(formData.get("phone") ?? ""),
+    companyName: String(formData.get("companyName") ?? ""),
+  };
+
   if (ip && isLockedOut(SIGNUP_SCOPE, ip, SIGNUP_MAX_PER_WINDOW)) {
     return {
       error:
         "För många nya arbetsytor från den här adressen. Försök igen om en kvart.",
+      values,
     };
   }
 
-  const companyName = String(formData.get("companyName") ?? "");
-  const ownerName = String(formData.get("ownerName") ?? "");
-  const email = String(formData.get("email") ?? "");
-  const phone = String(formData.get("phone") ?? "");
   const password = String(formData.get("password") ?? "");
   const repeat = String(formData.get("repeat") ?? "");
 
   if (password !== repeat) {
-    return { error: "Lösenorden är inte lika." };
+    // Steg 2 är lösenordets eget, se SignupStep.
+    return { error: "Lösenorden är inte lika.", step: 2, values };
   }
 
   let ownerId: string;
 
   try {
-    const { owner } = await createCompanyWithOwner({
-      companyName,
-      ownerName,
-      email,
-      phone,
-      password,
-    });
+    const { owner } = await createCompanyWithOwner({ ...values, password });
     ownerId = owner.id;
   } catch (error) {
-    // SignupError bär ett meddelande skrivet för att läsas av en människa.
-    if (error instanceof SignupError) return { error: error.message };
+    // SignupError bär ett meddelande skrivet för att läsas av en människa,
+    // och numret på steget där fältet står.
+    if (error instanceof SignupError) {
+      return { error: error.message, step: error.step, values };
+    }
     throw error;
   }
 

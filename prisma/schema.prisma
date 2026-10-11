@@ -692,8 +692,29 @@ model AdminUser {
   createdAt    DateTime  @default(now()) @map("created_at")
   updatedAt    DateTime  @updatedAt @map("updated_at")
 
-  /// Personens namn. Krävs av den som registrerar en arbetsyta, frivilligt för
-  /// den som bjuds in.
+  /// FÖRNAMN OCH EFTERNAMN I VARSITT FÄLT (ändrat 2026-10-11, issue #16).
+  ///
+  /// Var ett enda `name`. Kunderna skrev då bara förnamnet, och en arbetsyta
+  /// med tre administratörer som heter Anna, Johan och Anna går inte att
+  /// skilja åt — varken på kundkortet i plattformspanelen eller av den som
+  /// ringer supporten.
+  ///
+  /// Krävs båda av den som registrerar en arbetsyta, frivilliga för den som
+  /// bjuds in. Visningsnamnet slås ihop av `fullName()` i person-name.ts och
+  /// lagras ingenstans: ett sammanslaget fält bredvid de två hinner alltid
+  /// sluta säga samma sak, samma skäl som att orderns beräknade tid aldrig
+  /// lagras (CLAUDE.md § 3 regel 6).
+  firstName String? @map("first_name")
+  lastName  String? @map("last_name")
+
+  /// DÖD KOLUMN. Bar personens hela namn fram till 2026-10-11, och
+  /// migrationen delade värdet i de två fälten ovan. Ingenting läser eller
+  /// skriver den längre.
+  ///
+  /// Ligger kvar eftersom en migration lägger till och inte tar bort, så att
+  /// den föregående versionen av appen fungerar mot den nya databasen
+  /// (CLAUDE.md § 0 punkt 7). Tas bort i en senare release, som fälten för
+  /// ingående komptid.
   name String?
 
   /// Telefonnummer, normaliserat till E.164 ("+46701234567"). Se phone.ts.

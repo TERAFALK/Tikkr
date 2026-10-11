@@ -15,6 +15,7 @@ import {
 } from "@/components/ui";
 import { formatDate } from "@/lib/format";
 import { formatPhone } from "@/lib/phone";
+import { fullName } from "@/lib/person-name";
 import type { SaveState } from "@/lib/save-state";
 import { changeEmail, changePassword, logoutEverywhere, saveOwnProfile } from "./actions";
 
@@ -67,7 +68,8 @@ export default async function AccountPage({
     : await session.db.adminUser.findFirst({
         where: { id: session.userId },
         select: {
-          name: true,
+          firstName: true,
+          lastName: true,
           phone: true,
           email: true,
           emailVerifiedAt: true,
@@ -76,6 +78,11 @@ export default async function AccountPage({
           createdAt: true,
         },
       });
+
+  // Namnet slås ihop ur de två fälten och lagras ingenstans, se
+  // person-name.ts. Saknas det står adressen i stället: ett konto utan namn
+  // ska synas som ett konto, inte som ett hål.
+  const name = me ? fullName(me) : null;
 
   if (!me) {
     return (
@@ -99,15 +106,15 @@ export default async function AccountPage({
               aria-hidden="true"
               className="flex size-14 shrink-0 items-center justify-center rounded-full bg-fjord text-lg font-semibold text-white"
             >
-              {initialsOf(me.name || me.email)}
+              {initialsOf(name ?? me.email)}
             </span>
 
             <div className="min-w-0 flex-1">
               <p className="truncate text-base font-semibold text-neutral-900">
-                {me.name || me.email}
+                {name ?? me.email}
               </p>
               <div className="mt-1 flex flex-wrap items-center gap-2 text-[13px] text-neutral-500">
-                {me.name && <span className="truncate">{me.email}</span>}
+                {name && <span className="truncate">{me.email}</span>}
                 <Badge>{isOwner ? "Ägare" : "Administratör"}</Badge>
                 {me.emailVerifiedAt ? (
                   <Badge tone="active">Bekräftad adress</Badge>
@@ -149,14 +156,27 @@ export default async function AccountPage({
           <Card>
             <CardHeader title="Uppgifter" />
             <SaveForm action={saveOwnProfile} className="space-y-4 p-5">
-              <Field label="Namn">
-                <Input
-                  name="name"
-                  autoComplete="name"
-                  defaultValue={me.name ?? ""}
-                  required={isOwner}
-                />
-              </Field>
+              {/* FÖRNAMN OCH EFTERNAMN I VARSITT FÄLT (2026-10-11, issue
+                  #16). Var ett enda fält, och då skrev folk förnamnet och
+                  ingenting mer. Se person-name.ts. */}
+              <div className="grid gap-4 sm:grid-cols-2">
+                <Field label="Förnamn">
+                  <Input
+                    name="firstName"
+                    autoComplete="given-name"
+                    defaultValue={me.firstName ?? ""}
+                    required={isOwner}
+                  />
+                </Field>
+                <Field label="Efternamn">
+                  <Input
+                    name="lastName"
+                    autoComplete="family-name"
+                    defaultValue={me.lastName ?? ""}
+                    required={isOwner}
+                  />
+                </Field>
+              </div>
               <Field
                 label="Telefonnummer"
                 hint={isOwner ? "T.ex. 070-123 45 67" : "Valfritt. T.ex. 070-123 45 67"}

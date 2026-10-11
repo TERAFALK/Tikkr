@@ -220,9 +220,10 @@ time_entries   — id, company_id, employee_id, kind,
                  clock_in_at, clock_out_at, source,
                  moment_cost_rate_ore, employee_cost_rate_ore,
                  needs_review, review_note, kiosk_device_id, source_ip
-admin_users    — id, company_id, email, name?, phone?, password_hash, role,
+admin_users    — id, company_id, email, first_name?, last_name?, phone?,
+                 password_hash, role,
                  password_changed_at?, sessions_revoked_at?, email_verified_at?,
-                 news_seen_version?
+                 news_seen_version?, name? (död, se § 4 punkt 3)
 email_verifications — id, user_id, token_hash, email, expires_at, used_at
 audit_events   — id, company_id, actor_email, entity, entity_id, action,
                  before, after, subject_employee_id
@@ -1099,6 +1100,51 @@ ligger i `src/lib/feedback.ts`, och `tests/feedback.test.ts` fäller den.
    uppgifter den vägen. Nollställning av tvåsteg står kvar under Användare,
    eftersom den gäller någon annan.
 
+   **FÖRNAMN OCH EFTERNAMN I VARSITT FÄLT** (ändrat 2026-10-11, issue #16).
+   Var ett enda `name`, och kunderna skrev då förnamnet och ingenting mer. En
+   arbetsyta med två administratörer som båda heter Anna går inte att skilja
+   åt, varken på kundkortet i plattformspanelen eller av den som ringer
+   supporten.
+
+   Båda krävs av den som registrerar en arbetsyta, båda är frivilliga för den
+   som bjuds in. Visningsnamnet slås ihop av `fullName()` i
+   `src/lib/person-name.ts` och **lagras aldrig** — ett sammanslaget fält
+   bredvid de två hinner alltid sluta säga samma sak, samma skäl som att
+   orderns beräknade tid aldrig lagras (§ 3 regel 6).
+
+   `name` ligger kvar i databasen som en **död kolumn**, oläst och oskriven.
+   Migrationen delade de befintliga namnen vid sista mellanslaget och lämnade
+   `name` orörd, så att den föregående versionen av appen fungerar mot den nya
+   databasen (§ 0 punkt 7). Kolumnen tas bort i en senare release, som fälten
+   för ingående komptid.
+
+   **REGISTRERINGEN GÅR I TRE STEG** (ändrat 2026-10-11, issue #16): personen,
+   lösenordet, arbetsytan, med en stegmätare överst. Sju fält under varandra
+   betydde att den som skapade en arbetsyta på en telefon mötte ett formulär
+   som fortsatte nedanför skärmkanten.
+
+   **Ordningen är vald och inte given.** Lösenordet låg först på samma steg som
+   företagets namn, och "Företagets namn" följt av "Lösenord" lästes som ett
+   lösenord FÖR FÖRETAGET. Allt som är personen står därför före arbetsytan.
+   Att företagsnamnet blev ett eget steg med ett enda fält är inte en förlust:
+   det är sista steget, knappen står direkt under, och "vad heter företaget" är
+   en fråga man svarar på utan att läsa.
+
+   **Det är ETT formulär**, och alla stegens fält ligger kvar i DOM:en hela
+   tiden. Tre formulär efter varandra hade krävt att de tidigare stegen
+   lagrades någonstans mellan dem, och det någonstans är antingen en server som
+   får halva uppgifter eller en lagring i webbläsaren med personuppgifter i.
+
+   Ett fel vet vilket steg det hör till och skickar formuläret dit, eftersom
+   servern vet vilket fält som brast och webbläsaren inte gör det. Fälten får
+   sina värden tillbaka, utom lösenorden: React nollställer ett formulär som
+   skickats med `action`, och utan ekot vore ett felstavat telefonnummer
+   detsamma som att skriva om allting.
+
+   Utan JavaScript finns inga steg, och ingenting går förlorat: en stil i
+   `noscript` visar alla stegen och gömmer mätaren. Kvar står formuläret som
+   fanns före ändringen.
+
 4. **Anomali-varningar** (senare fas, ej MVP-kritiskt) — flagga t.ex. ett jobb
    som pågått orimligt länge, eller en person med fler parallella jobb än hen
    rimligen hinner sköta. Däremot INTE "instämplad på två ställen samtidigt" —
@@ -1440,6 +1486,23 @@ rundning är 24 % av sidan och symbolen 60 % av bredden, det vågräta märkets
 ordmärke 86 % av symbolens höjd med 34 % mellanrum. En handplockad siffra ger
 en logotyp som nästan stämmer, vilket är svårare att upptäcka än en som är
 uppenbart fel.
+
+**INLOGGNING OCH REGISTRERING LIGGER PÅ SÄLJSIDANS YTA** (ändrat 2026-10-11,
+issue #16). De sju sidorna som delar `AuthShell` låg på en platt ljusgrå yta,
+och den som kom från säljsidans hero rakt in i registreringen bytte produkt
+mitt i ett steg. Nu bär Fjord sidan: ljuset som driver, ritningsrutnätet,
+symbolen och två produktbilder som svävar i kanterna. Se `AuthBackdrop`.
+
+Lagren är säljsidans egna, ur `marketing/`, och det är hela skälet att filen
+är kort. En andra uppsättning gradienter som är "ungefär likadana" är precis
+vad `Atmosphere.tsx` finns för att slippa — mappen heter `marketing` efter var
+de först användes, inte efter vem som får använda dem.
+
+Rutan man skriver i är kvar vit. Ett fält på en mörk yta med ett ljus bakom är
+ett fält man inte ser kanten på, och guiden säger att Fjord och Snö bär
+ytorna. Produktbilderna syns först från `xl`, eftersom avståndet mellan rutan
+och fönsterkanten under den bredden är mindre än en produktbild; en telefon
+får ljuset och rutnätet, som bär ytan ändå.
 
 Bevisas av **`tests/brand.test.ts`**: den fäller en färg utanför paletten, ett
 token som glidit från guidens hexkod, och ett ordmärke som satts som text.

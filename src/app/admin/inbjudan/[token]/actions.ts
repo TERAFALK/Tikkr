@@ -24,7 +24,8 @@ export async function acceptInvitation(
 
   try {
     const user = await acceptInvite(token, password, {
-      name: String(formData.get("name") ?? ""),
+      firstName: String(formData.get("firstName") ?? ""),
+      lastName: String(formData.get("lastName") ?? ""),
       phone: String(formData.get("phone") ?? ""),
     });
     userId = user.id;

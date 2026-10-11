@@ -11,6 +11,7 @@ import {
   sendEmailVerification,
 } from "@/lib/email-verification";
 import { normalizePhone } from "@/lib/phone";
+import { nameProblem, storedName } from "@/lib/person-name";
 import { saved, type SaveState } from "@/lib/save-state";
 import { assertWritable, requireAdmin } from "@/lib/admin-session";
 
@@ -31,6 +32,10 @@ const PATH = "/admin/konto";
 /**
  * Ändrar namn och telefonnummer på det EGNA kontot.
  *
+ * Förnamn och efternamn i varsina fält sedan 2026-10-11, se person-name.ts.
+ * Den som redan hade ett namn fick det delat av migrationen, vid sista
+ * mellanslaget, och rättar det här om delningen blev fel.
+ *
  * Bara det egna: uppgifterna är personens, och ingen annan administratör ska
  * kunna skriva in ett nummer åt någon. Id:t tas därför ur sessionen och aldrig
  * ur formuläret.
@@ -45,20 +50,26 @@ export async function saveOwnProfile(
   const session = await requireAdmin();
   await assertWritable(session);
 
-  const name = String(formData.get("name") ?? "").trim();
+  const name = storedName({
+    firstName: String(formData.get("firstName") ?? ""),
+    lastName: String(formData.get("lastName") ?? ""),
+  });
   const rawPhone = String(formData.get("phone") ?? "").trim();
   const phone = rawPhone ? normalizePhone(rawPhone) : null;
 
   if (rawPhone && !phone) return { error: "Kontrollera telefonnumret." };
 
+  // Ägaren är den vi ringer, och ett halvt namn räcker inte. Den som bjudits
+  // in som administratör får lämna fälten tomma, precis som förut.
   if (session.role === "OWNER") {
-    if (name.length < 2) return { error: "Ange ditt namn." };
+    const problem = nameProblem(name);
+    if (problem) return { error: problem };
     if (!phone) return { error: "Ange ett telefonnummer." };
   }
 
   await session.db.adminUser.updateMany({
     where: { id: session.userId },
-    data: { name: name || null, phone },
+    data: { ...name, phone },
   });
 
   revalidatePath(PATH);
