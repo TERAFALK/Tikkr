@@ -214,7 +214,7 @@ Delar av det här går att mäta, och mäts:
 
 | Test | Fäller |
 |---|---|
-| `tests/ui-text.test.ts` | Tankstreck i texten användaren ser — i panelen, kiosken, de fyra PDF-filerna, exportrutterna, granskningsnoterna och mejlen |
+| `tests/ui-text.test.ts` | Tankstreck i texten användaren ser — i panelen, kiosken, hjälpcentret, de fyra PDF-filerna, exportrutterna, granskningsnoterna och mejlen |
 | `tests/format.test.ts` | En ny sida som visar decimaltimmar |
 | `tests/brand.test.ts` | En färg utanför paletten, och ordmärket satt som text |
 

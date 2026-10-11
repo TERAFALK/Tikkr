@@ -28,6 +28,15 @@ www.tikkr.se, tikkr.se {
 	reverse_proxy tikkr-app:3000
 }
 
+# Hjälpcentret. Avkommenteras när DNS för support.tikkr.se pekar hit, samtidigt
+# som SUPPORT_HOST=support.tikkr.se sätts i .env. Utan raden i .env visar
+# adressen säljsidan, och utan DNS får Caddy inget certifikat.
+#
+# support.tikkr.se {
+# 	encode zstd gzip
+# 	reverse_proxy tikkr-app:3000
+# }
+
 portal.tikkr.se {
 	encode zstd gzip
 

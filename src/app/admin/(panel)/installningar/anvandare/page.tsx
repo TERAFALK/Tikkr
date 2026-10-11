@@ -39,6 +39,7 @@ export default async function AdminUsersPage() {
         <Card>
           <CardHeader
             title="Bjud in en administratör"
+            help="bjud-in"
           />
           <InviteAdminForm baseUrl={baseUrl} />
         </Card>

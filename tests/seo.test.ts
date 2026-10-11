@@ -75,12 +75,14 @@ describe("sidornas metadata byggs på ett ställe", () => {
   });
 
   it("varje publik sida går genom pageMetadata", () => {
-    // De fyra sidor som är publika och ligger i sitemap.
+    // Sidorna som är publika och ligger i sitemap.
     const pages = [
       "page.tsx",
       "villkor/page.tsx",
       "integritetspolicy/page.tsx",
       "personuppgiftsbitradesavtal/page.tsx",
+      "hjalp/page.tsx",
+      "hjalp/[slug]/page.tsx",
     ];
 
     const missing = pages.filter(

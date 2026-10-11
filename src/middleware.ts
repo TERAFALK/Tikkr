@@ -38,6 +38,58 @@ function isAppPath(pathname: string): boolean {
   );
 }
 
+/** Hjälpcentret. Har en egen adress när SUPPORT_HOST är satt. */
+const HELP_PATH = "/hjalp";
+
+function isHelpPath(pathname: string): boolean {
+  return pathname === HELP_PATH || pathname.startsWith(`${HELP_PATH}/`);
+}
+
+/**
+ * HJÄLPCENTRET PÅ EN EGEN ADRESS.
+ *
+ * Sätts på med en rad i .env, och kräver en omstart med bygge av samma skäl
+ * som raderna nedan:
+ *   SUPPORT_HOST=support.tikkr.se
+ *
+ * Sidorna ligger kvar under /hjalp även där, så att samma adress fungerar på
+ * alla värdar: support.tikkr.se/hjalp/koppla-skarm. Annars hade varje länk i
+ * panelen behövt veta om adressen finns, och panelens länkar är skrivna som
+ * /hjalp/<guide> just för att slippa det.
+ *
+ *   support.tikkr.se/          → /hjalp på samma adress
+ *   support.tikkr.se/admin     → portalen, som alla systemsidor
+ *   support.tikkr.se/<annat>   → säljsidan, t.ex. menyns /#pris
+ *   <annan adress>/hjalp/...   → support.tikkr.se, så att varje guide har en
+ *                                adress och inte tre
+ *
+ * Utan SUPPORT_HOST händer ingenting av det här, och hjälpcentret ligger på
+ * /hjalp vid säljsidan. Det är läget i labbet.
+ */
+function supportRedirect(
+  request: NextRequest,
+  host: string,
+  supportHost: string,
+  marketingHost: string | undefined,
+  portalHost: string | undefined
+): NextResponse | null {
+  const { pathname, search } = request.nextUrl;
+  const target = (base: string, path = pathname) =>
+    NextResponse.redirect(new URL(`${path}${search}`, `https://${base}`));
+
+  if (host === supportHost) {
+    if (pathname === "/") return target(supportHost, HELP_PATH);
+    if (isHelpPath(pathname)) return null;
+    if (isAppPath(pathname) && portalHost) return target(portalHost);
+    if (marketingHost) return target(marketingHost);
+    return null;
+  }
+
+  if (isHelpPath(pathname)) return target(supportHost);
+
+  return null;
+}
+
 export function middleware(request: NextRequest) {
   // Flera säljadresser tillåts, kommaseparerat. Praktiskt när både tikkr.se
   // och www.tikkr.se ska fungera: även om proxyn skickar den ena till den
@@ -49,9 +101,7 @@ export function middleware(request: NextRequest) {
     .filter(Boolean);
 
   const portalHost = process.env.PORTAL_HOST?.toLowerCase();
-
-  // Inte konfigurerat — allt ligger på samma adress, som i labbet.
-  if (marketingHosts.length === 0 || !portalHost) return NextResponse.next();
+  const supportHost = process.env.SUPPORT_HOST?.trim().toLowerCase();
 
   // Bakom en reverse proxy står den riktiga adressen i x-forwarded-host.
   const host = (
@@ -61,6 +111,22 @@ export function middleware(request: NextRequest) {
   )
     .split(":")[0]
     .toLowerCase();
+
+  // Hjälpcentret först. Det gäller oavsett om säljsidan och portalen har
+  // fått var sin adress, eftersom de två raderna nedan är oberoende av den.
+  if (supportHost) {
+    const redirect = supportRedirect(
+      request,
+      host,
+      supportHost,
+      marketingHosts[0],
+      portalHost
+    );
+    if (redirect) return redirect;
+  }
+
+  // Inte konfigurerat — allt ligger på samma adress, som i labbet.
+  if (marketingHosts.length === 0 || !portalHost) return NextResponse.next();
 
   const path = request.nextUrl.pathname;
 

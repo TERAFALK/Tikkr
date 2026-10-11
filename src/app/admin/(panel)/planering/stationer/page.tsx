@@ -96,6 +96,7 @@ export default async function StationsPage() {
     <>
       <PageHeader
         title="Stationer"
+        help="planering"
         action={
           <div className="flex gap-2">
             <ButtonLink href="/admin/planering" tone="secondary">

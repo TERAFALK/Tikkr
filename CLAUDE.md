@@ -896,6 +896,45 @@ tiden är både faktura- och löneunderlag, en ändrad post bär spår av vem so
 efterhand. Ska en persons tid bort helt finns GDPR-raderingen i
 inställningarna.
 
+### 3.3 Hjälpcentret (beslutat 2026-10-11, issue #8)
+
+Ett publikt hjälpcenter på `/hjalp`, med säljsidans meny, fot och mörka band.
+Steg-för-steg-guider per område, sökning, vanliga frågor och vägen till
+support. Nås från **Hjälp** i panelens meny och från en **Hjälp**-länk vid
+rubriken på sidorna den gäller. Båda öppnar en ny flik.
+
+**Guiderna ligger i koden**, i `src/lib/help/guides.ts`, och inte i
+databasen. En guide beskriver produkten och ska ändras i samma commit som
+knappen den nämner. Låg texten i en tabell kunde guiden och knappen säga olika
+saker utan att någon granskning såg det. Priset är att en textändring kräver
+en driftsättning. Knappnamn skrivs exakt som på skärmen.
+
+**En länk till en guide som inte finns ska inte gå att bygga.** `PageHeader`
+och `CardHeader` tar `help="<guide>"`, typat som `GuideSlug`, och
+`tests/help.test.ts` letar dessutom upp varje `/hjalp/...` i källkoden. Det är
+samma sorts skydd som `GuideSlug`, för det som skrivits som en vanlig sträng.
+
+`HelpLink` importerar bara TYPEN, aldrig guiderna. Den dras in via
+designsystemet, som även stämplingsskärmen använder, och all guidetext hade
+annars följt med till varje skärm i verkstaden.
+
+**Sökningen körs i webbläsaren** (`src/lib/help/search.ts`), utan beroende och
+utan server. Å, ä och ö jämförs som a och o, eftersom en surfplatta utan
+svenskt tangentbord annars aldrig hittar "stämpla". Varje sökord måste träffa
+början av ett ord i guiden.
+
+**Länkarna i panelen är relativa**, `/hjalp/<guide>`. Sätts
+`SUPPORT_HOST=support.tikkr.se` skickar `middleware.ts` dit, och då har varje
+guide EN adress: `support.tikkr.se/hjalp/<guide>`. Sidorna ligger under
+`/hjalp` även där, så att länkarna inte behöver veta om adressen finns. Utan
+variabeln ligger hjälpcentret vid säljsidan, vilket är läget i labbet.
+
+`src/lib/help/areas.ts` är listan över områden, och den är avsedd att bära
+även formuläret för fel och förslag i steg 2 av issuen: ett meddelande märkt
+"Planering" ska betyda samma sak i hjälpcentret och i plattformens inkorg.
+
+Inga öppettider för support står utskrivna. Inga är bestämda.
+
 ## 4. Kritiska säkerhetskrav
 
 1. **Multi-tenant-isolering** — all databasåtkomst via det gemensamma
@@ -1398,11 +1437,22 @@ Windows 11 Pro, projektrot `C:\Projekt\Tikkr`, PowerShell.
 | Verktyg | Status per 2026-08-10 |
 |---|---|
 | git | ✅ 2.50.1 |
-| Node.js | ❌ ej installerat — appen körs på servern istället |
+| Node.js | ✅ v24 (konstaterat 2026-10-11), med `node_modules` på plats |
 | Docker Desktop | ❌ ej installerat |
 
-Konsekvens: Claude kan **inte köra tester, bygga eller typkolla lokalt**. All
-verifiering sker på servern. Påstå aldrig att något fungerar innan det körts där.
+Konsekvens (ändrat 2026-10-11): Claude kan **typkolla** (`npx tsc --noEmit`),
+köra `next dev` och köra **testerna som inte behöver databas** lokalt. Det
+finns ingen Postgres här, så testerna körs mot en adress som inte svarar men
+vars namn slutar på `_test`, så att spärren i `tests/setup.ts` släpper igenom
+dem:
+
+```
+DATABASE_URL="postgresql://ingen:ingen@127.0.0.1:1/finns_inte_test" npx vitest run tests/<fil>
+```
+
+Databastesterna, bygget av imagen och allt mot riktig data körs fortfarande
+bara på servern. Påstå aldrig att något fungerar på servern innan det körts
+där.
 
 ### Testserver (labbmiljö — INTE produktion)
 

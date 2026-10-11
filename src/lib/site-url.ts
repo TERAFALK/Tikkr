@@ -17,3 +17,15 @@ export function siteUrl(): string | null {
 
   return first ? `https://${first}` : null;
 }
+
+/**
+ * Hjälpcentrets riktiga adress.
+ *
+ * support.tikkr.se när SUPPORT_HOST är satt, annars säljsidans adress, där
+ * hjälpcentret då ligger under /hjalp. Används för den kanoniska länken och
+ * sitemap, så att en guide som nås på två adresser räknas som en sida.
+ */
+export function helpSiteUrl(): string | null {
+  const host = process.env.SUPPORT_HOST?.trim();
+  return host ? `https://${host}` : siteUrl();
+}

@@ -89,6 +89,7 @@ export default async function ReviewPage() {
     <>
       <PageHeader
         title="Granskning"
+        help="granskning"
         description={`Snabbjobb att komplettera, och poster utan utstämpling som stängts ${company?.autoCloseAt ?? "18:00"} med beräknad sluttid.`}
       />
 

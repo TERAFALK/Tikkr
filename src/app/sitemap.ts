@@ -1,11 +1,15 @@
 import type { MetadataRoute } from "next";
-import { siteUrl } from "@/lib/site-url";
+import { helpSiteUrl, siteUrl } from "@/lib/site-url";
 import { LEGAL_UPDATED_AT } from "@/lib/legal";
+import { GUIDES, guideHref } from "@/lib/help/guides";
 
-// Bara säljsidan. Resten kräver inloggning och hör inte hemma i ett index.
+// Säljsidan och hjälpcentret. Resten kräver inloggning och hör inte hemma i
+// ett index.
 export default function sitemap(): MetadataRoute.Sitemap {
   const base = siteUrl();
   if (!base) return [];
+
+  const help = helpSiteUrl();
 
   return [
     {
@@ -34,5 +38,17 @@ export default function sitemap(): MetadataRoute.Sitemap {
         priority: 0.3,
       })
     ),
+    // Hjälpcentret. Ligger på support.tikkr.se när SUPPORT_HOST är satt, och
+    // adresserna står då med den värden. Båda adresserna behöver vara
+    // verifierade hos sökmotorn för att den ska godta listan.
+    ...helpPaths().map((path) => ({
+      url: `${help ?? base}${path}`,
+      changeFrequency: "monthly" as const,
+      priority: 0.5,
+    })),
   ];
+}
+
+function helpPaths(): string[] {
+  return ["/hjalp", ...GUIDES.map((guide) => guideHref(guide.slug))];
 }

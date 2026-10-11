@@ -86,6 +86,7 @@ export default async function SubscriptionPage({
       <Card>
         <CardHeader
           title="Prenumeration"
+          help="prenumeration"
           description={
             overview.agreement
               ? `${kr(overview.agreement.perScreen)} kr per licens och månad, exkl. moms. Ert avtalade pris.`

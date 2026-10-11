@@ -317,6 +317,19 @@ docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
 
 Caddy hämtar certifikaten själv första gången.
 
+**Hjälpcentret på support.tikkr.se** är valfritt. Utan det ligger
+hjälpcentret på `www.tikkr.se/hjalp`. För att ge det en egen adress:
+
+1. Peka DNS för `support.tikkr.se` mot servern
+2. Avkommentera blocket `support.tikkr.se` i `deploy/Caddyfile`. I labbet
+   skapas i stället ett proxy host i Nginx Proxy Manager, likadant som för
+   `www.tikkr.se`
+3. Lägg till `SUPPORT_HOST=support.tikkr.se` i `.env` och bygg om:
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+```
+
 ---
 
 ## 9. Lockfilen

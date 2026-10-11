@@ -57,6 +57,7 @@ export default async function MomentsPage() {
     <>
       <PageHeader
         title="Arbetsmoment"
+        help="arbetsmoment"
         action={newMoment}
       />
 

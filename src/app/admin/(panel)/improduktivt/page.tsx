@@ -55,6 +55,7 @@ export default async function IndirectMomentsPage() {
     <>
       <PageHeader
         title="Improduktiv tid"
+        help="improduktiv-tid"
         description="Tid som inte hör till en kundorder."
         action={newMoment}
       />

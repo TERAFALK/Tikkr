@@ -75,6 +75,7 @@ export default async function DevicesPage() {
     <>
       <PageHeader
         title="Stämplingsskärmar"
+        help="koppla-skarm"
         description={`${devices.length} av ${licenses.total} licenser används.`}
         action={newDevice}
       />
