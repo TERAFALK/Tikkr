@@ -221,8 +221,21 @@ export function KioskCard({
       : "border-neutral-200 bg-white";
 
   return (
+    /*
+      `h-full` SÅ ATT KNAPPARNA I EN RAD BLIR LIKA HÖGA.
+
+      Rutnätet sträcker sina celler till radens höjd, men kortet inuti cellen
+      är en vanlig blockruta och tar bara den höjd innehållet kräver. En rad
+      med Anna, som kör två maskiner, och Carina, som kör en, fick därför ett
+      högt kort bredvid ett lågt med en lucka under — och på en riktig
+      stämplingsskärm är knapparna lika stora. Bilden ska visa skärmen och
+      inte en hopplockad rad rutor.
+
+      `min-h` står kvar: den gäller en rad där ingen har mer än ett jobb, och
+      sätter då golvet för hur liten en knapp får bli.
+    */
     <div
-      className={`flex flex-col justify-between rounded-lg border p-2.5 ${
+      className={`flex h-full flex-col justify-between rounded-lg border p-2.5 ${
         big ? "min-h-[86px]" : "min-h-[64px]"
       } ${fill}`}
     >

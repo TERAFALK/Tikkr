@@ -1264,16 +1264,27 @@ export function Faq({ modules }: { modules: ModulePricing }) {
  * felet på hela sidan. Motivet står kvar på de mörka ytorna, där det ligger
  * på fyra procent och läses som djup.
  *
- * GLANSEN ÖVER BLOCKET ÄR BORTTAGEN (2026-10-11). Ett vitt band på trettio
- * procent och en fjärdedels bredd vandrade över ytan var nionde sekund. Det
- * som syntes var inte ett ljus utan en ljusare rektangel mitt på det gröna,
- * med en kant i vardera änden — alltså samma sorts utsmetade övergång som
- * togs bort mellan avsnitten. Ytan bär sig själv: den är sidans ljusaste och
- * behöver inget ljus ovanpå.
+ * GLANSEN GÅR ÖVER HELA BLOCKET och inte över knappen. Knappen i det här
+ * avsnittet är Fjord, inte Tick, och en glans över en mörk knapp blir ett grått
+ * streck. Ytan bakom den är däremot sidans ljusaste, och den tål ljus: bandet
+ * vandrar över den en gång var nionde sekund och står still resten av tiden.
+ * Resten av varvet står det utanför kanten, eftersom en glans som rör sig
+ * oavbrutet drar blicken från det man ska läsa.
+ *
+ * Den togs bort en kort stund 2026-10-11, i samma omgång som skarvarna
+ * mellan avsnitten, och lades tillbaka samma dag på produktägarens begäran.
+ * Skillnaden mot skarvarna är att den RÖR SIG: en skarv stod still och lästes
+ * därför som en suddig remsa, medan ett band som drar förbi läses som ljus
+ * över en yta.
  */
 export function FinalCta({ pricing }: { pricing: ScreenPricing }) {
   return (
     <section className="relative overflow-hidden bg-tick">
+      <span
+        aria-hidden="true"
+        className="animate-sheen pointer-events-none absolute inset-y-0 left-0 w-1/4 bg-linear-to-r from-transparent via-white/30 to-transparent"
+      />
+
       <div className={`relative ${SHELL}`}>
         <div className="grid items-end gap-12 lg:grid-cols-2">
           <div>
