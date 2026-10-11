@@ -974,10 +974,10 @@ inställningarna.
 
 ### 3.3 Hjälpcentret (beslutat 2026-10-11, issue #8)
 
-Ett publikt hjälpcenter på `/hjalp`, med säljsidans meny, fot och mörka band.
-Steg-för-steg-guider per område, sökning, vanliga frågor och vägen till
-support. Nås från **Hjälp** i panelens meny och från en **Hjälp**-länk vid
-rubriken på sidorna den gäller. Båda öppnar en ny flik.
+Ett publikt hjälpcenter på `tikkr.se/support`, med säljsidans meny, fot och
+mörka band. Steg-för-steg-guider per område, sökning, vanliga frågor och
+vägen till support. Nås från **Hjälp** i panelens meny och från en
+**Hjälp**-länk vid rubriken på sidorna den gäller. Båda öppnar en ny flik.
 
 **Guiderna ligger i koden**, i `src/lib/help/guides.ts`, och inte i
 databasen. En guide beskriver produkten och ska ändras i samma commit som
@@ -987,7 +987,7 @@ en driftsättning. Knappnamn skrivs exakt som på skärmen.
 
 **En länk till en guide som inte finns ska inte gå att bygga.** `PageHeader`
 och `CardHeader` tar `help="<guide>"`, typat som `GuideSlug`, och
-`tests/help.test.ts` letar dessutom upp varje `/hjalp/...` i källkoden. Det är
+`tests/help.test.ts` letar dessutom upp varje `/support/...` i källkoden. Det är
 samma sorts skydd som `GuideSlug`, för det som skrivits som en vanlig sträng.
 
 `HelpLink` importerar bara TYPEN, aldrig guiderna. Den dras in via
@@ -999,11 +999,13 @@ utan server. Å, ä och ö jämförs som a och o, eftersom en surfplatta utan
 svenskt tangentbord annars aldrig hittar "stämpla". Varje sökord måste träffa
 början av ett ord i guiden.
 
-**Länkarna i panelen är relativa**, `/hjalp/<guide>`. Sätts
-`SUPPORT_HOST=support.tikkr.se` skickar `middleware.ts` dit, och då har varje
-guide EN adress: `support.tikkr.se/hjalp/<guide>`. Sidorna ligger under
-`/hjalp` även där, så att länkarna inte behöver veta om adressen finns. Utan
-variabeln ligger hjälpcentret vid säljsidan, vilket är läget i labbet.
+**Hjälpcentret hör till säljsidan, inte till portalen** (ändrat 2026-10-11).
+Länkarna i panelen är relativa, `/support/<guide>`, och på portaladressen
+skickar `middleware.ts` vidare till samma guide på säljsidan. Visades guiden
+på portal.tikkr.se ledde Tikkr-märket i säljsidans meny till `/`, och därmed
+tillbaka in i panelen i stället för till startsidan. En egen adress,
+support.tikkr.se, byggdes och valdes bort samma dag: den krävde DNS, proxy
+och en miljövariabel för något som säljsidan redan bär.
 
 `src/lib/help/areas.ts` är listan över områden, och den är avsedd att bära
 även formuläret för fel och förslag i steg 2 av issuen: ett meddelande märkt

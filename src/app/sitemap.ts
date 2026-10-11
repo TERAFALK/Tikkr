@@ -1,5 +1,5 @@
 import type { MetadataRoute } from "next";
-import { helpSiteUrl, siteUrl } from "@/lib/site-url";
+import { siteUrl } from "@/lib/site-url";
 import { LEGAL_UPDATED_AT } from "@/lib/legal";
 import { GUIDES, guideHref } from "@/lib/help/guides";
 
@@ -8,8 +8,6 @@ import { GUIDES, guideHref } from "@/lib/help/guides";
 export default function sitemap(): MetadataRoute.Sitemap {
   const base = siteUrl();
   if (!base) return [];
-
-  const help = helpSiteUrl();
 
   return [
     {
@@ -38,11 +36,9 @@ export default function sitemap(): MetadataRoute.Sitemap {
         priority: 0.3,
       })
     ),
-    // Hjälpcentret. Ligger på support.tikkr.se när SUPPORT_HOST är satt, och
-    // adresserna står då med den värden. Båda adresserna behöver vara
-    // verifierade hos sökmotorn för att den ska godta listan.
+    // Hjälpcentret. Publikt, och det kunden söker på när något inte går.
     ...helpPaths().map((path) => ({
-      url: `${help ?? base}${path}`,
+      url: `${base}${path}`,
       changeFrequency: "monthly" as const,
       priority: 0.5,
     })),
@@ -50,5 +46,5 @@ export default function sitemap(): MetadataRoute.Sitemap {
 }
 
 function helpPaths(): string[] {
-  return ["/hjalp", ...GUIDES.map((guide) => guideHref(guide.slug))];
+  return ["/support", ...GUIDES.map((guide) => guideHref(guide.slug))];
 }

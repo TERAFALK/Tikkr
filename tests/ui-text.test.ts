@@ -34,7 +34,7 @@ const UI_DIRS = [
   "src/components/kiosk",
   // Hjälpcentret. Guiderna är löptext i en datafil och läses därför i sin
   // helhet, precis som sidorna.
-  "src/app/hjalp",
+  "src/app/support",
   "src/components/help",
   "src/lib/help",
 ];

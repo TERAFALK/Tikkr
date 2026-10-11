@@ -49,7 +49,7 @@ export default function HelpSearch() {
             {hits.map((hit) => (
               <li key={hit.slug}>
                 <Link
-                  href={`/hjalp/${hit.slug}`}
+                  href={`/support/${hit.slug}`}
                   className="block px-4 py-3 transition-colors hover:bg-neutral-50"
                 >
                   <span className="block text-[11px] font-medium uppercase tracking-wider text-neutral-400">

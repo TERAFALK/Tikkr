@@ -50,12 +50,6 @@ export interface PageMeta {
    * raden klipps efter ett par rader ändå.
    */
   shareDescription?: string;
-  /**
-   * Adressen sidan egentligen bor på, när den inte är säljsidans. Hjälpcentret
-   * har en egen värd när SUPPORT_HOST är satt, och dess kanoniska länk ska
-   * peka dit och inte till en adress som bara skickar vidare.
-   */
-  base?: string | null;
 }
 
 export function pageMetadata({
@@ -63,9 +57,8 @@ export function pageMetadata({
   description,
   path,
   shareDescription,
-  base: baseOverride,
 }: PageMeta): Metadata {
-  const base = baseOverride === undefined ? siteUrl() : baseOverride;
+  const base = siteUrl();
   const share = shareDescription ?? description;
 
   return {
@@ -80,9 +73,7 @@ export function pageMetadata({
       Utelämnas när MARKETING_HOST saknas: då finns ingen publik adress att peka
       ut, och en gissning vore sämre än tystnad.
     */
-    ...(base && {
-      alternates: { canonical: baseOverride ? `${base}${path}` : path },
-    }),
+    ...(base && { alternates: { canonical: path } }),
 
     openGraph: {
       type: "website",

@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { pageMetadata } from "@/lib/seo";
-import { helpSiteUrl } from "@/lib/site-url";
 import { HELP_AREAS, HELP_AREA_KEYS } from "@/lib/help/areas";
 import { GUIDES, guideBySlug, guideHref, type Guide } from "@/lib/help/guides";
 import { HELP_FAQ } from "@/lib/help/faq";
@@ -16,8 +15,7 @@ import HelpSearch from "@/components/help/HelpSearch";
 export const revalidate = 60;
 
 export const metadata: Metadata = pageMetadata({
-  path: "/hjalp",
-  base: helpSiteUrl(),
+  path: "/support",
   title: "Hjälpcenter · Tikkr",
   description:
     "Guider för stämplingsskärmen, ordrar, underlag, löneunderlag och " +

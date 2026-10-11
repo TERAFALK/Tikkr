@@ -81,8 +81,8 @@ describe("sidornas metadata byggs på ett ställe", () => {
       "villkor/page.tsx",
       "integritetspolicy/page.tsx",
       "personuppgiftsbitradesavtal/page.tsx",
-      "hjalp/page.tsx",
-      "hjalp/[slug]/page.tsx",
+      "support/page.tsx",
+      "support/[slug]/page.tsx",
     ];
 
     const missing = pages.filter(

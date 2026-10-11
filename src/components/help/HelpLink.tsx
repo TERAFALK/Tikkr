@@ -12,9 +12,9 @@ import type { GuideSlug } from "@/lib/help/guides";
  * svarar 404 när kunden väl trycker. tests/help.test.ts fångar samma sak i
  * källkoden, för säkerhets skull.
  *
- * ADRESSEN ÄR RELATIV, /hjalp/<guide>. Med SUPPORT_HOST satt skickar
- * middleware.ts vidare till support.tikkr.se. Länken behöver därmed inte veta
- * vilken adress hjälpcentret har, och fungerar likadant i labbet, där allt
+ * ADRESSEN ÄR RELATIV, /support/<guide>. På portaladressen skickar
+ * middleware.ts vidare till säljsidan, där hjälpcentret bor. Länken behöver
+ * därmed inte veta vilken adress säljsidan har, och fungerar likadant där allt
  * ligger på samma adress.
  *
  * BARA TYPEN IMPORTERAS, inte guiderna. Komponenten dras in via PageHeader i
@@ -30,7 +30,7 @@ export default function HelpLink({
 }) {
   return (
     <a
-      href={`/hjalp/${guide}`}
+      href={`/support/${guide}`}
       target="_blank"
       rel="noopener"
       aria-label="Hjälp, öppnas i en ny flik"

@@ -2,7 +2,6 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { pageMetadata } from "@/lib/seo";
-import { helpSiteUrl } from "@/lib/site-url";
 import { HELP_AREAS } from "@/lib/help/areas";
 import { GUIDES, guideBySlug, guideHref } from "@/lib/help/guides";
 import { MODULES } from "@/lib/modules";
@@ -11,7 +10,7 @@ import HelpShell from "@/components/help/HelpShell";
 /** Se startsidan: driftmeddelanderemsan i SiteHeader. */
 export const revalidate = 60;
 
-/** Bara guiderna som finns. Allt annat under /hjalp svarar 404. */
+/** Bara guiderna som finns. Allt annat under /support svarar 404. */
 export const dynamicParams = false;
 
 export function generateStaticParams() {
@@ -28,7 +27,6 @@ export async function generateMetadata({
 
   return pageMetadata({
     path: guideHref(guide.slug),
-    base: helpSiteUrl(),
     title: `${guide.title} · Tikkr hjälpcenter`,
     description: guide.summary,
   });
@@ -61,7 +59,7 @@ export default async function GuidePage({
     <HelpShell
       eyebrow={
         <>
-          <Link href="/hjalp" className="hover:text-white">
+          <Link href="/support" className="hover:text-white">
             Hjälpcenter
           </Link>
           <span aria-hidden="true" className="mx-2 text-neutral-500">

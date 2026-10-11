@@ -105,8 +105,6 @@ services:
       PLATFORM_ADMIN_EMAILS: ${PLATFORM_ADMIN_EMAILS:-}
       MARKETING_HOST: ${MARKETING_HOST:-}
       PORTAL_HOST: ${PORTAL_HOST:-}
-      # Hjälpcentrets egen adress, t.ex. support.tikkr.se. Se .env.example.
-      SUPPORT_HOST: ${SUPPORT_HOST:-}
       STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-}
       # Artikelnumren sätts normalt i plattformspanelen och ligger i
       # databasen. Variablerna är en reserv, se .env.example. De gamla namnen

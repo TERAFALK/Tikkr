@@ -308,7 +308,7 @@ export default function AdminSidebar({
             letar hjälp letar längst ner, där kontot och utloggningen står.
             Adressen är relativ av samma skäl som i HelpLink. */}
         <a
-          href="/hjalp"
+          href="/support"
           target="_blank"
           rel="noopener"
           className="flex items-center gap-2.5 rounded-md px-2 py-1.5 text-[13px] font-medium text-neutral-600 transition-colors hover:bg-neutral-50 hover:text-neutral-900"

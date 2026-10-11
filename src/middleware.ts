@@ -38,71 +38,16 @@ function isAppPath(pathname: string): boolean {
   );
 }
 
-/** Hjälpcentret. Har en egen adress när SUPPORT_HOST är satt. */
-const HELP_PATH = "/hjalp";
+/**
+ * Hjälpcentret. Hör till säljsidan och inte till systemet: panelens
+ * hjälplänkar är relativa, och på portaladressen hade guiden visats med
+ * säljsidans meny, där Tikkr-märket leder till "/" och därmed tillbaka in i
+ * panelen i stället för till startsidan.
+ */
+const HELP_PATH = "/support";
 
 function isHelpPath(pathname: string): boolean {
   return pathname === HELP_PATH || pathname.startsWith(`${HELP_PATH}/`);
-}
-
-/** Värden ur en adress, eller undefined om adressen saknas eller är trasig. */
-function hostOf(url: string | undefined): string | undefined {
-  if (!url?.trim()) return undefined;
-  try {
-    return new URL(url.trim()).hostname.toLowerCase();
-  } catch {
-    return undefined;
-  }
-}
-
-/**
- * HJÄLPCENTRET PÅ EN EGEN ADRESS.
- *
- * Sätts på med en rad i .env, och kräver en omstart med bygge av samma skäl
- * som raderna nedan:
- *   SUPPORT_HOST=support.tikkr.se
- *
- * Sidorna ligger kvar under /hjalp även där, så att samma adress fungerar på
- * alla värdar: support.tikkr.se/hjalp/koppla-skarm. Annars hade varje länk i
- * panelen behövt veta om adressen finns, och panelens länkar är skrivna som
- * /hjalp/<guide> just för att slippa det.
- *
- *   support.tikkr.se/          → /hjalp på samma adress
- *   support.tikkr.se/admin     → portalen, som alla systemsidor
- *   support.tikkr.se/<annat>   → säljsidan, t.ex. menyns /#pris
- *   <annan adress>/hjalp/...   → support.tikkr.se, så att varje guide har en
- *                                adress och inte tre
- *
- * Saknas MARKETING_HOST och PORTAL_HOST, som i labbet, är systemets adress
- * ur APP_URL både säljsida och portal. Utan den reserven visade
- * support.tikkr.se hela systemet, och "Logga in" i hjälpcentrets meny gav en
- * inloggning på hjälpadressen i stället för där kontona hör hemma.
- *
- * Utan SUPPORT_HOST händer ingenting av det här, och hjälpcentret ligger på
- * /hjalp vid säljsidan.
- */
-function supportRedirect(
-  request: NextRequest,
-  host: string,
-  supportHost: string,
-  marketingHost: string | undefined,
-  portalHost: string | undefined
-): NextResponse | null {
-  const { pathname, search } = request.nextUrl;
-  const target = (base: string, path = pathname) =>
-    NextResponse.redirect(new URL(`${path}${search}`, `https://${base}`));
-
-  if (host === supportHost) {
-    if (pathname === "/") return target(supportHost, HELP_PATH);
-    if (isHelpPath(pathname)) return null;
-    if (isAppPath(pathname) && portalHost) return target(portalHost);
-    if (marketingHost) return target(marketingHost);
-    return null;
-  }
-
-  if (isHelpPath(pathname)) return target(supportHost);
-
-  return null;
 }
 
 export function middleware(request: NextRequest) {
@@ -116,13 +61,9 @@ export function middleware(request: NextRequest) {
     .filter(Boolean);
 
   const portalHost = process.env.PORTAL_HOST?.toLowerCase();
-  const supportHost = process.env.SUPPORT_HOST?.trim().toLowerCase();
 
-  // Systemets adress ur APP_URL, reserv för hjälpcentrets omdirigeringar när
-  // säljsidan och portalen inte har egna. Aldrig hjälpadressen själv: det
-  // hade gett en omdirigering till samma sida i en evig rundgång.
-  const appHost = hostOf(process.env.APP_URL);
-  const fallbackHost = appHost && appHost !== supportHost ? appHost : undefined;
+  // Inte konfigurerat — allt ligger på samma adress, som i labbet.
+  if (marketingHosts.length === 0 || !portalHost) return NextResponse.next();
 
   // Bakom en reverse proxy står den riktiga adressen i x-forwarded-host.
   const host = (
@@ -133,28 +74,19 @@ export function middleware(request: NextRequest) {
     .split(":")[0]
     .toLowerCase();
 
-  // Hjälpcentret först. Det gäller oavsett om säljsidan och portalen har
-  // fått var sin adress, eftersom de två raderna nedan är oberoende av den.
-  if (supportHost) {
-    const redirect = supportRedirect(
-      request,
-      host,
-      supportHost,
-      marketingHosts[0] ?? fallbackHost,
-      portalHost ?? fallbackHost
-    );
-    if (redirect) return redirect;
-  }
-
-  // Inte konfigurerat — allt ligger på samma adress, som i labbet.
-  if (marketingHosts.length === 0 || !portalHost) return NextResponse.next();
-
   const path = request.nextUrl.pathname;
 
   // Systemets sidor på säljadressen → skicka till portalen.
   if (marketingHosts.includes(host) && isAppPath(path)) {
     return NextResponse.redirect(
       new URL(`${request.nextUrl.pathname}${request.nextUrl.search}`, `https://${portalHost}`)
+    );
+  }
+
+  // Hjälpcentret på portaladressen → samma guide på säljsidan.
+  if (host === portalHost && isHelpPath(path)) {
+    return NextResponse.redirect(
+      new URL(`${request.nextUrl.pathname}${request.nextUrl.search}`, `https://${marketingHosts[0]}`)
     );
   }
 

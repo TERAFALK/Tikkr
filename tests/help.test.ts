@@ -14,12 +14,12 @@ import { middleware } from "@/middleware";
  * Tre saker som annars går sönder i tysthet:
  *
  * 1. **En länk till en guide som inte finns.** Panelens hjälplänkar är
- *    typade, men en adress skriven som "/hjalp/..." i en vanlig sträng är det
+ *    typade, men en adress skriven som "/support/..." i en vanlig sträng är det
  *    inte. Kunden trycker, får en 404 och slutar trycka.
  * 2. **Sökningen.** Den som skriver "stampla" på en surfplatta utan å ska
  *    hitta samma sak som den som skriver "stämpla".
- * 3. **Adressen.** Med SUPPORT_HOST satt ska varje guide ha en adress och
- *    inte tre, och systemets sidor ska aldrig hamna på hjälpadressen.
+ * 3. **Adressen.** En hjälplänk i portalen ska landa på samma guide på
+ *    säljsidan, där Tikkr-märket leder till startsidan och inte till panelen.
  *
  * Behöver ingen databas.
  */
@@ -73,7 +73,7 @@ describe("guiderna", () => {
 
 describe("länkarna till hjälpcentret", () => {
   // Varje ställe i koden som nämner en guide: help="…", guide="…" och
-  // adresser skrivna som "/hjalp/…". Kommentarer räknas inte.
+  // adresser skrivna som "/support/…". Kommentarer räknas inte.
   const references = sourceFiles("src").flatMap((file) => {
     const source = readFileSync(file, "utf8")
       .replace(/\/\*[\s\S]*?\*\//g, "")
@@ -82,7 +82,7 @@ describe("länkarna till hjälpcentret", () => {
     const found: { file: string; slug: string }[] = [];
     const patterns = [
       /\b(?:help|guide)="([a-z0-9-]+)"/g,
-      /["'`]\/hjalp\/([a-z0-9-]+)["'`]/g,
+      /["'`]\/support\/([a-z0-9-]+)["'`]/g,
     ];
     for (const pattern of patterns) {
       for (const match of source.matchAll(pattern)) {
@@ -155,9 +155,8 @@ describe("hjälpcentrets adress", () => {
   });
 
   function configure() {
-    process.env.MARKETING_HOST = "www.tikkr.se";
+    process.env.MARKETING_HOST = "www.tikkr.se,tikkr.se";
     process.env.PORTAL_HOST = "portal.tikkr.se";
-    process.env.SUPPORT_HOST = "support.tikkr.se";
   }
 
   // Host-huvudet sätts för hand. En webbläsare skickar det alltid, men en
@@ -170,77 +169,30 @@ describe("hjälpcentrets adress", () => {
     return response.headers.get("location");
   }
 
-  it("startsidan på hjälpadressen leder till /hjalp", () => {
+  it("en hjälplänk i portalen leder till samma guide på säljsidan", () => {
     configure();
-    expect(visit("https://support.tikkr.se/")).toBe(
-      "https://support.tikkr.se/hjalp"
+    expect(visit("https://portal.tikkr.se/support/koppla-skarm")).toBe(
+      "https://www.tikkr.se/support/koppla-skarm"
+    );
+    expect(visit("https://portal.tikkr.se/support")).toBe(
+      "https://www.tikkr.se/support"
     );
   });
 
-  it("en guide på hjälpadressen visas där den är", () => {
+  it("hjälpcentret på säljsidan visas där det är", () => {
     configure();
-    expect(visit("https://support.tikkr.se/hjalp/koppla-skarm")).toBeNull();
+    expect(visit("https://www.tikkr.se/support")).toBeNull();
+    expect(visit("https://tikkr.se/support/koppla-skarm")).toBeNull();
   });
 
-  it("en guide på säljsidan eller portalen leder till hjälpadressen", () => {
+  it("bara /support och inget som börjar likadant", () => {
     configure();
-    expect(visit("https://www.tikkr.se/hjalp/koppla-skarm")).toBe(
-      "https://support.tikkr.se/hjalp/koppla-skarm"
-    );
-    expect(visit("https://portal.tikkr.se/hjalp")).toBe(
-      "https://support.tikkr.se/hjalp"
-    );
+    expect(visit("https://portal.tikkr.se/supportsida")).toBeNull();
   });
 
-  it("systemets sidor på hjälpadressen leder till portalen", () => {
-    configure();
-    expect(visit("https://support.tikkr.se/admin/login")).toBe(
-      "https://portal.tikkr.se/admin/login"
-    );
-  });
-
-  it("säljsidans sidor på hjälpadressen leder till säljsidan", () => {
-    configure();
-    expect(visit("https://support.tikkr.se/villkor")).toBe(
-      "https://www.tikkr.se/villkor"
-    );
-  });
-
-  // Labbet: bara APP_URL och SUPPORT_HOST, ingen egen säljsida eller portal.
-  function configureLab() {
+  it("utan egna adresser ligger allt kvar där det är", () => {
     delete process.env.MARKETING_HOST;
     delete process.env.PORTAL_HOST;
-    process.env.APP_URL = "https://www.tikkr.se";
-    process.env.SUPPORT_HOST = "support.tikkr.se";
-  }
-
-  it("i labbet leder inloggningen på hjälpadressen till systemets adress", () => {
-    configureLab();
-    expect(visit("https://support.tikkr.se/admin/login")).toBe(
-      "https://www.tikkr.se/admin/login"
-    );
-    expect(visit("https://support.tikkr.se/registrera")).toBe(
-      "https://www.tikkr.se/registrera"
-    );
-  });
-
-  it("i labbet leder /hjalp på systemets adress till hjälpadressen", () => {
-    configureLab();
-    expect(visit("https://www.tikkr.se/hjalp")).toBe(
-      "https://support.tikkr.se/hjalp"
-    );
-    expect(visit("https://support.tikkr.se/hjalp/rast")).toBeNull();
-  });
-
-  it("APP_URL på hjälpadressen ger ingen rundgång", () => {
-    configureLab();
-    process.env.APP_URL = "https://support.tikkr.se";
-    expect(visit("https://support.tikkr.se/admin/login")).toBeNull();
-  });
-
-  it("utan SUPPORT_HOST ligger hjälpcentret kvar där det är", () => {
-    configure();
-    delete process.env.SUPPORT_HOST;
-    expect(visit("https://www.tikkr.se/hjalp/koppla-skarm")).toBeNull();
+    expect(visit("https://www.tikkr.se/support/koppla-skarm")).toBeNull();
   });
 });

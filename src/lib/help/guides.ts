@@ -18,7 +18,7 @@ import type { HelpAreaKey } from "./areas";
  * Tid skrivs som tim:min, och tankstreck i löptext fälls av
  * tests/ui-text.test.ts. Se TONE-OF-VOICE.md.
  *
- * `slug` är adressen, /hjalp/<slug>, och det namn panelens hjälplänkar pekar
+ * `slug` är adressen, /support/<slug>, och det namn panelens hjälplänkar pekar
  * ut. Typen `GuideSlug` härleds ur listan, så att en länk till en guide som
  * inte finns blir ett typfel och inte en sida som svarar 404.
  *
@@ -789,5 +789,5 @@ export function guideBySlug(slug: string): Guide | undefined {
 
 /** Adressen till en guide. Relativ, se HelpLink. */
 export function guideHref(slug: string): string {
-  return `/hjalp/${slug}`;
+  return `/support/${slug}`;
 }

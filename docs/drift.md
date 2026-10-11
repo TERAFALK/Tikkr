@@ -369,19 +369,6 @@ docker network create npm_proxy
 
 Caddy hämtar certifikaten själv första gången. **Kör aldrig seed här.**
 
-**Hjälpcentret på support.tikkr.se** är valfritt. Utan det ligger
-hjälpcentret på `www.tikkr.se/hjalp`. För att ge det en egen adress:
-
-1. Peka DNS för `support.tikkr.se` mot servern
-2. Avkommentera blocket `support.tikkr.se` i `deploy/Caddyfile`. I labbet
-   skapas i stället ett proxy host i Nginx Proxy Manager, likadant som för
-   `www.tikkr.se`
-3. Lägg till `SUPPORT_HOST=support.tikkr.se` i `.env` och driftsätt på nytt
-   med `./scripts/release.sh <version>`, som bygger om appen.
-
-I labbet, där säljsidan och portalen inte har egna adresser, skickas
-systemets sidor på support.tikkr.se till adressen i `APP_URL`.
-
 ---
 
 ## 9. Lockfilen

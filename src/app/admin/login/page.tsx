@@ -177,7 +177,7 @@ export default async function LoginPage({
         // kvar. Lappen från steg ett gäller bara i tio minuter.
         note={
           <a
-            href="/hjalp/tvastegsinloggning"
+            href="/support/tvastegsinloggning"
             target="_blank"
             rel="noopener"
             className={linkClass}
