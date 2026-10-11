@@ -74,6 +74,7 @@ export default async function SchedulePage() {
       <Card>
         <CardHeader
           title="Raster"
+          help="arbetstider"
           action={
             <FormDialog
               trigger="Ny rast"

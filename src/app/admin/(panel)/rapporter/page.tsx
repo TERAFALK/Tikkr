@@ -140,6 +140,7 @@ export default async function ReportsPage({
     <>
       <PageHeader
         title="Rapporter"
+        help="rapporter"
         action={
           <div className="flex flex-wrap gap-2">
             {report.rows.length > 0 && (

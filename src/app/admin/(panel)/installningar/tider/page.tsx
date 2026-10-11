@@ -40,6 +40,7 @@ export default async function TimeSettingsPage() {
       <Card>
         <CardHeader
           title="Automatisk utstämpling"
+          help="granskning"
         />
 
         <div className="space-y-5 p-5">

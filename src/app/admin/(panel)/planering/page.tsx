@@ -90,6 +90,7 @@ export default async function PlanningPage({
     <>
       <PageHeader
         title="Planering"
+        help="planering"
         action={
           <div className="flex items-center gap-2">
             <Link

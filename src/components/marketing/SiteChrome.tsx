@@ -144,6 +144,7 @@ export function SiteFooter() {
       links: [
         { href: "/registrera", label: "Skapa arbetsyta" },
         { href: "/admin/login", label: "Logga in" },
+        { href: "/support", label: "Hjälpcenter" },
       ],
     },
     { title: "Villkor", links: LEGAL },

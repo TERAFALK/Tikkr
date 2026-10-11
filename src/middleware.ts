@@ -38,6 +38,18 @@ function isAppPath(pathname: string): boolean {
   );
 }
 
+/**
+ * Hjälpcentret. Hör till säljsidan och inte till systemet: panelens
+ * hjälplänkar är relativa, och på portaladressen hade guiden visats med
+ * säljsidans meny, där Tikkr-märket leder till "/" och därmed tillbaka in i
+ * panelen i stället för till startsidan.
+ */
+const HELP_PATH = "/support";
+
+function isHelpPath(pathname: string): boolean {
+  return pathname === HELP_PATH || pathname.startsWith(`${HELP_PATH}/`);
+}
+
 export function middleware(request: NextRequest) {
   // Flera säljadresser tillåts, kommaseparerat. Praktiskt när både tikkr.se
   // och www.tikkr.se ska fungera: även om proxyn skickar den ena till den
@@ -68,6 +80,13 @@ export function middleware(request: NextRequest) {
   if (marketingHosts.includes(host) && isAppPath(path)) {
     return NextResponse.redirect(
       new URL(`${request.nextUrl.pathname}${request.nextUrl.search}`, `https://${portalHost}`)
+    );
+  }
+
+  // Hjälpcentret på portaladressen → samma guide på säljsidan.
+  if (host === portalHost && isHelpPath(path)) {
+    return NextResponse.redirect(
+      new URL(`${request.nextUrl.pathname}${request.nextUrl.search}`, `https://${marketingHosts[0]}`)
     );
   }
 

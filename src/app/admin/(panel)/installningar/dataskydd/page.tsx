@@ -33,6 +33,7 @@ export default async function DataProtectionPage() {
       <Card>
         <CardHeader
           title="Lämna ut en persons uppgifter"
+          help="gdpr"
           description="Allt som registrerats om en anställd."
         />
         {/* Ett vanligt formulär med GET, utan skript: valet hamnar i

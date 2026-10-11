@@ -43,6 +43,7 @@ export default async function OrdersPage() {
     <>
       <PageHeader
         title="Ordrar"
+        help="ordrar"
         action={newOrder}
       />
 

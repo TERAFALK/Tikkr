@@ -1,8 +1,10 @@
 import type { MetadataRoute } from "next";
 import { siteUrl } from "@/lib/site-url";
 import { LEGAL_UPDATED_AT } from "@/lib/legal";
+import { GUIDES, guideHref } from "@/lib/help/guides";
 
-// Bara säljsidan. Resten kräver inloggning och hör inte hemma i ett index.
+// Säljsidan och hjälpcentret. Resten kräver inloggning och hör inte hemma i
+// ett index.
 export default function sitemap(): MetadataRoute.Sitemap {
   const base = siteUrl();
   if (!base) return [];
@@ -34,5 +36,15 @@ export default function sitemap(): MetadataRoute.Sitemap {
         priority: 0.3,
       })
     ),
+    // Hjälpcentret. Publikt, och det kunden söker på när något inte går.
+    ...helpPaths().map((path) => ({
+      url: `${base}${path}`,
+      changeFrequency: "monthly" as const,
+      priority: 0.5,
+    })),
   ];
+}
+
+function helpPaths(): string[] {
+  return ["/support", ...GUIDES.map((guide) => guideHref(guide.slug))];
 }

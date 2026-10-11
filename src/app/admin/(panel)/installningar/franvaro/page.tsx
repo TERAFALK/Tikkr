@@ -91,7 +91,7 @@ export default async function AbsenceReasonsPage() {
 
   return (
     <Card>
-      <CardHeader title="Frånvaroorsaker" action={newReason} />
+      <CardHeader title="Frånvaroorsaker" help="franvaro" action={newReason} />
 
       {reasons.length === 0 ? (
         <div className="p-5">

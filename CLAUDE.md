@@ -972,6 +972,47 @@ tiden är både faktura- och löneunderlag, en ändrad post bär spår av vem so
 efterhand. Ska en persons tid bort helt finns GDPR-raderingen i
 inställningarna.
 
+### 3.3 Hjälpcentret (beslutat 2026-10-11, issue #8)
+
+Ett publikt hjälpcenter på `tikkr.se/support`, med säljsidans meny, fot och
+mörka band. Steg-för-steg-guider per område, sökning, vanliga frågor och
+vägen till support. Nås från **Hjälp** i panelens meny och från en
+**Hjälp**-länk vid rubriken på sidorna den gäller. Båda öppnar en ny flik.
+
+**Guiderna ligger i koden**, i `src/lib/help/guides.ts`, och inte i
+databasen. En guide beskriver produkten och ska ändras i samma commit som
+knappen den nämner. Låg texten i en tabell kunde guiden och knappen säga olika
+saker utan att någon granskning såg det. Priset är att en textändring kräver
+en driftsättning. Knappnamn skrivs exakt som på skärmen.
+
+**En länk till en guide som inte finns ska inte gå att bygga.** `PageHeader`
+och `CardHeader` tar `help="<guide>"`, typat som `GuideSlug`, och
+`tests/help.test.ts` letar dessutom upp varje `/support/...` i källkoden. Det är
+samma sorts skydd som `GuideSlug`, för det som skrivits som en vanlig sträng.
+
+`HelpLink` importerar bara TYPEN, aldrig guiderna. Den dras in via
+designsystemet, som även stämplingsskärmen använder, och all guidetext hade
+annars följt med till varje skärm i verkstaden.
+
+**Sökningen körs i webbläsaren** (`src/lib/help/search.ts`), utan beroende och
+utan server. Å, ä och ö jämförs som a och o, eftersom en surfplatta utan
+svenskt tangentbord annars aldrig hittar "stämpla". Varje sökord måste träffa
+början av ett ord i guiden.
+
+**Hjälpcentret hör till säljsidan, inte till portalen** (ändrat 2026-10-11).
+Länkarna i panelen är relativa, `/support/<guide>`, och på portaladressen
+skickar `middleware.ts` vidare till samma guide på säljsidan. Visades guiden
+på portal.tikkr.se ledde Tikkr-märket i säljsidans meny till `/`, och därmed
+tillbaka in i panelen i stället för till startsidan. En egen adress,
+support.tikkr.se, byggdes och valdes bort samma dag: den krävde DNS, proxy
+och en miljövariabel för något som säljsidan redan bär.
+
+`src/lib/help/areas.ts` är listan över områden, och den är avsedd att bära
+även formuläret för fel och förslag i steg 2 av issuen: ett meddelande märkt
+"Planering" ska betyda samma sak i hjälpcentret och i plattformens inkorg.
+
+Inga öppettider för support står utskrivna. Inga är bestämda.
+
 ## 4. Kritiska säkerhetskrav
 
 1. **Multi-tenant-isolering** — all databasåtkomst via det gemensamma
@@ -1507,8 +1548,18 @@ installerat och inloggat, så Claude kan öppna PR:er och läsa CI.
 
 Konsekvens: Claude kan **typkolla och bygga lokalt** (`npm ci`,
 `npx prisma generate`, `npm run typecheck`, `npm run build`), men **inte köra
-testerna** — de behöver Postgres, och den finns bara på servern och i CI.
-Påstå aldrig att något fungerar innan det körts där.
+databastesterna** — de behöver Postgres, och den finns bara på servern och i
+CI. Påstå aldrig att något fungerar innan det körts där.
+
+**Testerna som inte behöver databas går att köra lokalt** (konstaterat
+2026-10-11): `help`, `ui-text`, `seo`, `brand`, `format`, `module-coverage`
+med flera, som bara läser källkoden. De körs mot en adress som inte svarar men
+vars namn slutar på `_test`, så att spärren i `tests/setup.ts` släpper igenom
+dem:
+
+```
+DATABASE_URL="postgresql://ingen:ingen@127.0.0.1:1/finns_inte_test" npx vitest run tests/<fil>
+```
 
 npm 11 kör inte paketens installationsskript utan godkännande och varnar för
 det vid `npm ci`. Det är ofarligt här: `npx prisma generate` hämtar det som

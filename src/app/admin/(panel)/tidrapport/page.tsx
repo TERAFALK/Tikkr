@@ -160,7 +160,7 @@ export default async function TimesheetPage({
   if (employees.length === 0) {
     return (
       <>
-        <PageHeader title="Tidrapport" />
+        <PageHeader title="Tidrapport" help="tidrapport" />
         <EmptyState
           title="Inga anställda upplagda"
         />
@@ -171,7 +171,7 @@ export default async function TimesheetPage({
   if (!period) {
     return (
       <>
-        <PageHeader title="Tidrapport" />
+        <PageHeader title="Tidrapport" help="tidrapport" />
         {filters}
         <EmptyState title="Välj en anställd" />
       </>
@@ -244,6 +244,7 @@ export default async function TimesheetPage({
     <>
       <PageHeader
         title="Tidrapport"
+        help="tidrapport"
         description={`${period.employee.name} · ${formatDate(
           from,
           timeZone

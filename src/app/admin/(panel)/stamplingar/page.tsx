@@ -231,6 +231,7 @@ export default async function EntriesPage({
     <>
       <PageHeader
         title="Stämplingar"
+        help="andra-stampling"
         action={
           <NewEntryDialog
             employees={employeeOptions}

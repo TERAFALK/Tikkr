@@ -85,6 +85,7 @@ export default async function EmployeesPage() {
     <>
       <PageHeader
         title="Anställda"
+        help="anstallda"
         action={newEmployee}
       />
 

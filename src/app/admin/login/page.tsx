@@ -169,7 +169,23 @@ export default async function LoginPage({
     }
 
     return (
-      <AuthShell title="Ange koden" subtitle={step.email}>
+      <AuthShell
+        title="Ange koden"
+        subtitle={step.email}
+        // Steget där folk kör fast: ny telefon, appen borttagen, koden
+        // godtas inte. Guiden öppnas i en ny flik så att inloggningen står
+        // kvar. Lappen från steg ett gäller bara i tio minuter.
+        note={
+          <a
+            href="/support/tvastegsinloggning"
+            target="_blank"
+            rel="noopener"
+            className={linkClass}
+          >
+            Hjälp med tvåstegsverifiering
+          </a>
+        }
+      >
         <TwoStepForm
           action={confirmCode}
           cancel={cancelLogin}

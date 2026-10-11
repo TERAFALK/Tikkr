@@ -75,6 +75,7 @@ export default async function OnboardingPage() {
           nu fram, och den som gjort tre av fyra ska se att det är ett kvar. */}
       <PageHeader
         title={state.ready ? "Klart att använda" : "Kom igång"}
+        help="kom-igang"
         description={
           state.ready
             ? `${companyName} är redo att registrera tid.`

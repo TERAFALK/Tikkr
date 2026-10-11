@@ -1,6 +1,8 @@
 import Link from "next/link";
 import type { ComponentProps, ReactNode } from "react";
 import { TimeInput } from "./TimeInput";
+import HelpLink from "@/components/help/HelpLink";
+import type { GuideSlug } from "@/lib/help/guides";
 
 /**
  * DESIGNSYSTEMET.
@@ -74,17 +76,26 @@ export function PageHeader({
   title,
   description,
   action,
+  help,
 }: {
   title: string;
   description?: string;
   action?: ReactNode;
+  /**
+   * Guiden i hjälpcentret som handlar om sidan. Står som en länk bredvid
+   * rubriken och öppnas i en ny flik, se HelpLink.
+   */
+  help?: GuideSlug;
 }) {
   return (
     <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
       <div className="min-w-0">
-        <h1 className="text-xl font-semibold tracking-tight text-neutral-900">
-          {title}
-        </h1>
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+          <h1 className="text-xl font-semibold tracking-tight text-neutral-900">
+            {title}
+          </h1>
+          {help && <HelpLink guide={help} />}
+        </div>
         {description && (
           <p className="mt-1 max-w-2xl text-[13px] leading-relaxed text-neutral-500">
             {description}
@@ -178,15 +189,21 @@ export function CardHeader({
   title,
   description,
   action,
+  help,
 }: {
   title: string;
   description?: string;
   action?: ReactNode;
+  /** Som i PageHeader. För sidor vars översta rubrik är ett kort. */
+  help?: GuideSlug;
 }) {
   return (
     <div className="flex flex-wrap items-start justify-between gap-3 border-b border-neutral-200 px-5 py-3.5">
       <div className="min-w-0">
-        <h2 className="text-sm font-semibold text-neutral-900">{title}</h2>
+        <div className="flex flex-wrap items-center gap-x-2">
+          <h2 className="text-sm font-semibold text-neutral-900">{title}</h2>
+          {help && <HelpLink guide={help} className="-my-1" />}
+        </div>
         {description && (
           <p className="mt-0.5 text-[13px] text-neutral-500">{description}</p>
         )}

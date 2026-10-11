@@ -54,6 +54,7 @@ export default async function CustomersPage({
     <>
       <PageHeader
         title="Kunder"
+        help="kunder"
         action={
           <CustomerDialog
             trigger="Ny kund"
