@@ -12,42 +12,44 @@ Nedan står hur varje punkt åtgärdas, i den ordning de spelar roll.
 
 ## 1. Hur databasen byggs
 
-Under utvecklingen byggs databasen **direkt ur `prisma/schema.prisma`**, som
-ligger i repot och skrivs på laptopen. Servern behöver därför aldrig skriva
-något till GitHub — flödet går bara åt ena hållet, och en komprometterad
-labbserver kan inte ändra i koden.
+**Med migrationer, och bara med migrationer** (sedan 2026-10-10).
 
-Priset: ändras schemat försvinner det som ändrats i databasen. Det gör inget så
-länge datan är testdata — kör `seed` igen:
+`schema.prisma` beskriver hur databasen **ska** se ut. En migration beskriver
+**vägen dit**, och skillnaden får betydelse så fort det finns data att förlora.
+Byter vi namn på en kolumn ser ett verktyg som bara jämför nuläge mot önskat
+läge att den gamla kolumnen är borta och en ny tillkommit, och raderar den ena
+för att skapa den andra. En migration säger vad som faktiskt ska hända.
+
+Migrationerna ligger i `prisma/migrations/` och körs i tur och ordning av
+`migrate`-containern vid varje start. Den första, `0_init`, är baslinjen: hela
+databasen som den såg ut när migrationerna infördes.
+
+`scripts/migrate.sh` bygger aldrig databasen ur schemat. Saknas
+migrationerna stoppar den, och appen startar inte.
+
+### En schemaändring
+
+På laptopen, i samma gren och före commit:
+
+```powershell
+node scripts/new-migration.mjs lagg-till-foto-pa-anstalld
+```
+
+Skriptet jämför schemat mot senaste commit och skriver skillnaden som SQL. Det
+varnar för satser som tar bort, döper om eller skärper något — en migration ska
+fungera med föregående version av appen, se [release.md](release.md). CI kör
+sedan alla migrationer mot en tom databas och fäller PR:en om de inte ger samma
+databas som schemat.
+
+### Labbets databas
+
+Labbet byggdes med `db push` fram till baslinjen och fick den markerad som
+redan körd, en gång (se PR:en som införde den). Därefter går labbet samma väg
+som produktionen. Testdata läggs in med seed, bara här:
 
 ```bash
 docker compose run --rm migrate node prisma/seed.mjs
 ```
-
-### Före produktion: lås fast med en migration
-
-`schema.prisma` beskriver hur databasen **ska** se ut. En migration beskriver
-**vägen dit**, och skillnaden får betydelse först när det finns data att
-förlora.
-
-Byter vi namn på en kolumn ser ett verktyg som bara jämför nuläge mot önskat
-läge att den gamla kolumnen är borta och en ny tillkommit. Slutsatsen blir:
-radera den ena, skapa den andra — och innehållet försvinner. En migration säger
-uttryckligen "döp om", och datan följer med.
-
-Så här går övergången till, en gång, innan första riktiga kunden:
-
-1. Ta bort raden `prisma/migrations/` ur `.gitignore`
-2. Skapa baslinjen: `./scripts/create-migration.sh init`
-3. Checka in `prisma/migrations/` — den måste ligga i repot härifrån och framåt
-4. Därefter: en migration vid varje schemaändring, annars tappas data
-
-Från och med då kör systemet migrationerna i tur och ordning vid varje start,
-helt av sig självt. Ingen inställning behöver ändras — `scripts/migrate.sh`
-byter gren så fort mappen finns.
-
-> Ligger migrationerna bara på servern går databasen inte att återskapa någon
-> annanstans. `./scripts/status.sh` säger ifrån om det blir så.
 
 ---
 
@@ -92,10 +94,10 @@ skyddar mot råkade raderingar, men inte mot att servern dör, blir hackad eller
 krypteras — och det är just då man behöver den.
 
 Installera rclone och koppla en objektlagring. Integritetspolicyn anger att
-data lagras i Sverige — välj ett mål inom EU, helst svenskt (t.ex. Glesys
-Object Storage eller Hetzner Storage Box), så att även kopiorna stämmer med
-det som utlovats. Leverantören blir ett underbiträde och ska stå i
-förteckningen.
+data lagras i Sverige, så målet är **Glesys Object Storage** (beslutat
+2026-10-10), helst i det andra datacentret än servern. Leverantören är
+redan underbiträde. Samma Glesys-konto når då både servern och kopiorna, och
+därför ska kontot ha tvåstegsinloggning.
 
 ```bash
 sudo apt update && sudo apt install -y rclone && rclone config
@@ -124,8 +126,9 @@ Integritetspolicyn ska ange samma siffra.
 
 ### Larm när jobben tystnar
 
-Skapa två gratiskontroller hos Healthchecks.io: en för backupen (förväntad
-en gång per dygn) och en för den automatiska utstämplingen (var 15:e minut).
+Skapa två gratiskontroller hos Healthchecks.io: en för backupen (typen
+*Cron*, med samma schema som crontab-raden nedan) och en för den automatiska
+utstämplingen (var 15:e minut).
 Koppla larm till din telefon. Skriv in adresserna:
 
 ```bash
@@ -158,20 +161,38 @@ sudo install -o "$USER" -g "$USER" -m 644 /dev/null /var/log/tikkr-backup.log
 crontab -e
 ```
 
+Tre gånger per dygn: natten, lunch och strax efter arbetsdagens slut. Med en
+enda nattlig kopia kunde en hel arbetsdags stämplingar gå förlorade; nu som
+mest en halv. Databasen är liten, och kopiorna kostar i praktiken ingenting.
+
 ```
-0 3 * * * /home/administrator/Tikkr/scripts/backup.sh >> /var/log/tikkr-backup.log 2>&1
+0 3,12 * * * /home/administrator/Tikkr/scripts/backup.sh >> /var/log/tikkr-backup.log 2>&1
+30 16 * * * /home/administrator/Tikkr/scripts/backup.sh >> /var/log/tikkr-backup.log 2>&1
 ```
 
-> **Öva återläsning då och då.** En backup ingen provat att läsa tillbaka är
-> bara en förhoppning. `./scripts/restore.sh <fil>` gör det — men den skriver
-> över databasen, så gör det i en testmiljö. Skriptet skriver ut hur lång tid
-> det tog; anteckna siffran, den är svaret på "hur länge står vi still".
->
-> Hämta en kopia från det krypterade målet till labbet och läs tillbaka den:
->
-> ```bash
-> rclone copy tikkr-krypterad: ./backups --include 'tikkr_*.sql.gz' --max-age 2d
-> ```
+Före en driftsättning tas dessutom en kopia av `release.sh`.
+
+### Öva återläsning — före lansering, sedan varje kvartal
+
+En backup ingen provat att läsa tillbaka är bara en förhoppning. Övningen görs
+**på produktionsservern**, i en tillfällig databas som tas bort efteråt.
+Kunddata lämnar aldrig servern, och den skarpa databasen rörs inte:
+
+```bash
+./scripts/restore-test.sh
+```
+
+Skriptet visar hur många företag, anställda och stämplingar kopian innehöll
+och hur lång tid inläsningen tog. Anteckna tiden; den är svaret på "hur länge
+står vi still". Öva minst en gång på en kopia ur det krypterade målet, så att
+du vet att lösenorden i lösenordshanteraren fungerar:
+
+```bash
+rclone copy tikkr-krypterad: ./backups --include 'tikkr_*.sql.gz' --max-age 2d
+```
+
+`./scripts/restore.sh` är skarp återläsning och **skriver över** databasen.
+Den används bara på riktigt, se [release.md](release.md).
 
 ---
 
@@ -273,8 +294,8 @@ SPF, DKIM och DMARC måste vara satta för `tikkr.se`, annars hamnar
 
 ## 7. Innan riktig kunddata
 
-- [ ] Baslinjemigration skapad och incheckad (punkt 1)
-- [ ] Lockfilen incheckad och `npm audit` utan allvarliga fynd (punkt 9)
+- [x] Baslinjemigration skapad och incheckad (punkt 1)
+- [x] Lockfilen incheckad och `npm audit` genomgången (punkt 9)
 - [ ] Offsite-backup satt upp, krypterad, och en återläsning övad (punkt 3)
 - [ ] Larm för backup och automatisk utstämpling kopplade (punkt 3)
 - [ ] E-post kopplad och åtkomstpolicyn kontrollerad (punkt 6)
@@ -283,10 +304,14 @@ SPF, DKIM och DMARC måste vara satta för `tikkr.se`, annars hamnar
 - [ ] Rättsliga sidorna lästa och godkända av jurist
 - [ ] Adresserna till villkor och integritetspolicy inlagda i betaltjänstens
       kundportal
-- [ ] Repot satt till **privat** på GitHub
-- [ ] Adminlösenordet från testdatan (`tikkr123`) borttaget eller bytt
-- [ ] Testskärmen från seed-datan (fast kopplingskod `123456`) raderad under Skärmar
-- [ ] Produktionsservern med Caddy (punkt 8)
+- [ ] Repot satt till **privat** på GitHub, och servrarna hämtar med en token
+      som bara får läsa
+- [ ] Seed har **aldrig** körts i produktionen — testdatan har lösenordet
+      `tikkr123` och en skärm med fast kopplingskod `123456`
+- [ ] Produktionsservern uppsatt och härdad (punkt 8)
+- [ ] En hel release övad i labbet: `release.sh`, en migration och att backa
+      ([release.md](release.md))
+- [ ] Kontrollkunden upplagd i produktionen, med en egen skärm
 - [ ] Tvåstegsinloggning uppsatt för varje plattformskonto (punkt 10)
 - [ ] `./scripts/status.sh` utan röda punkter
 
@@ -294,11 +319,37 @@ SPF, DKIM och DMARC måste vara satta för `tikkr.se`, annars hamnar
 
 ## 8. Produktionsservern
 
-Produktionen kör Caddy framför appen, på en egen Ubuntu-server. Hela
+Produktionen kör Caddy framför appen, på en egen Glesys-VPS. Hela
 konfigurationen ligger i `deploy/Caddyfile` och `docker-compose.prod.yml`.
 
+**Storlek:** 2 vCPU, 4 GB RAM, 50 GB disk, Ubuntu 24.04 LTS. Bygget sker på
+servern och tar ungefär 2 GB minne medan den gamla versionen kör vidare;
+resten är Postgres, appen och marginal. Glesys låter servern växa senare.
+
+### Grundskydd, före allt annat
+
+- **SSH bara med nyckel**, inte som root. Port 22 öppen bara där det behövs,
+  helst i Glesys brandvägg.
+- **Brandvägg:** bara 22, 80 och 443 (tcp och udp). Docker öppnar publicerade
+  portar förbi `ufw` — därför låser `docker-compose.prod.yml` appens port till
+  `127.0.0.1` oavsett vad `.env` säger, och CI kontrollerar att den gör det.
+- **Säkerhetsuppdateringar** med `unattended-upgrades`, och omstart nattetid
+  efter backupen. Containrarna startar själva (`restart: unless-stopped`).
+- **Klockan:** `timedatectl` ska visa *System clock synchronized: yes*. För ett
+  stämplingssystem är serverns klocka sanningen som skärmarna mäts mot.
+- **Tvåstegsinloggning** på GitHub, Glesys, Stripe och övervakningstjänsterna.
+- **Glesys helbackup** påslagen. Den ersätter inte databasdumparna (punkt 3) —
+  en kopia av en Postgres som kör är inte garanterat hel — men den tar med
+  `.env` och certifikaten.
+- **`.env` i lösenordshanteraren.** `AUTH_SECRET` krypterar allas
+  tvåstegsnycklar; går den förlorad måste varje användare sätta upp appen på
+  nytt.
+
+### Uppsättning
+
 1. Peka DNS för `www.tikkr.se`, `tikkr.se` och `portal.tikkr.se` mot servern
-2. Installera Docker och klona repot
+2. Installera Docker och klona repot. Docker Compose behöver vara 2.24 eller
+   nyare (`docker compose version`) för `!override` i produktionsfilen
 3. Skapa nätet appen och Caddy delar:
 
 ```bash
@@ -306,16 +357,17 @@ docker network create npm_proxy
 ```
 
 4. Fyll i `.env` utifrån `.env.example`. Utöver labbets värden krävs
-   `ACME_EMAIL`, `APP_URL=https://portal.tikkr.se`,
-   `MARKETING_HOST=www.tikkr.se,tikkr.se`, `PORTAL_HOST=portal.tikkr.se` och
-   `APP_BIND=127.0.0.1`
-5. Starta:
+   `TIKKR_ENV=production`,
+   `COMPOSE_FILE=docker-compose.yml:docker-compose.prod.yml`, `ACME_EMAIL`,
+   `APP_URL=https://portal.tikkr.se`, `MARKETING_HOST=www.tikkr.se,tikkr.se`
+   och `PORTAL_HOST=portal.tikkr.se`
+5. Driftsätt den första versionen, se [release.md](release.md):
 
 ```bash
-docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+./scripts/release.sh v1.0.0
 ```
 
-Caddy hämtar certifikaten själv första gången.
+Caddy hämtar certifikaten själv första gången. **Kör aldrig seed här.**
 
 **Hjälpcentret på support.tikkr.se** är valfritt. Utan det ligger
 hjälpcentret på `www.tikkr.se/hjalp`. För att ge det en egen adress:
@@ -338,23 +390,33 @@ Utan `package-lock.json` i repot löser varje bygge versionerna på nytt. En
 trasig eller komprometterad version av ett beroende går då rakt ut till alla
 kunder, och det finns inget fast att granska med `npm audit`.
 
-Skapa den på servern, där Node finns, och hämta hem den till laptopen:
+Den är incheckad sedan 2026-10-10, och Dockerfilen använder då `npm ci`:
+varje bygge får exakt de versioner som står i filen.
 
-```bash
-docker compose run --rm --no-deps --user "$(id -u):$(id -g)" -e npm_config_cache=/tmp/.npm -v "$PWD:/work" -w /work migrate npm install --package-lock-only
-```
-
-```bash
-docker compose run --rm --no-deps --user "$(id -u):$(id -g)" -e npm_config_cache=/tmp/.npm -v "$PWD:/work" -w /work migrate npm audit --omit=dev
-```
-
-Från laptopen, i projektmappen. Byt användare och servernamn om de skiljer sig:
+Ett beroende läggs till eller uppdateras på laptopen, och låsfilen följer med
+i samma commit:
 
 ```powershell
-scp administrator@tf-docker01-test:Tikkr/package-lock.json .
+npm install <paket>
 ```
 
-Checka sedan in filen. Dockerfilen använder `npm ci` så fort den finns.
+Kör **aldrig `npm audit fix` utan att läsa vad den gör.** Första gången
+"rättade" den Prisma genom att nedgradera kommandoverktyget till 6.12 medan
+klienten låg kvar på 6.19, och två versioner av Prisma i samma bygge är ett
+fel som syns först när databasen ska ändras.
+
+### Kända fynd i `npm audit --omit=dev`, bedömda 2026-10-10
+
+Alla tre kräver en ny huvudversion för att rättas, och ingen av dem går att nå
+med något en kund eller besökare skickar in.
+
+| Paket | Via | Varför det får ligga kvar |
+|---|---|---|
+| postcss | next | Bearbetar bara vår egen stilmall, vid bygget. Rättas av Next 16 |
+| deepmerge-ts | prisma | Bara i kommandoverktyget som kör migrationerna, och slår ihop vår egen konfiguration |
+| uuid | exceljs | Felet kräver ett anrop med egen buffert. "Rättningen" vore att nedgradera exceljs till 3.4 |
+
+Ett nytt fynd som inte står här ska bedömas innan nästa release.
 
 ---
 
@@ -363,11 +425,13 @@ Checka sedan in filen. Dockerfilen använder `npm ci` så fort den finns.
 | Vad | Kommando |
 |---|---|
 | Driftkontroll | `./scripts/status.sh` |
-| Uppdatera till senaste | `git pull && docker compose up -d --build` |
+| Driftsätta en version | `./scripts/release.sh v1.2.0` — se [release.md](release.md) |
+| Labbet till senaste main | `./scripts/release.sh main` |
 | Loggar | `docker compose logs -f app` |
 | Kör testerna | `./scripts/test.sh` |
-| Ny migration | `./scripts/create-migration.sh <namn>` |
+| Ny migration (laptopen) | `node scripts/new-migration.mjs <namn>` |
 | Säkerhetskopia nu | `./scripts/backup.sh` |
+| Öva återläsning | `./scripts/restore-test.sh` |
 
 ---
 

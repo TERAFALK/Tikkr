@@ -222,15 +222,3 @@ function toJson(
   if (!value) return undefined;
   return JSON.parse(JSON.stringify(value)) as Prisma.InputJsonValue;
 }
-
-/** Historiken för en post, senast först. */
-export async function auditTrail(
-  db: CompanyDb,
-  entity: AuditEntity,
-  entityId: string
-) {
-  return db.auditEvent.findMany({
-    where: { entity, entityId },
-    orderBy: { createdAt: "desc" },
-  });
-}

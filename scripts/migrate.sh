@@ -6,22 +6,22 @@
 # beroenden. Att pressa in dem i den avskalade appimagen gjorde den både
 # större och skör. Här körs de i byggmiljön där allt redan finns, och appen
 # får förbli liten.
+#
+# BARA MIGRATIONER (sedan 2026-10-10). Tidigare byggdes tabellerna direkt ur
+# schemat med "prisma db push --accept-data-loss" när prisma/migrations
+# saknades. Den vägen är borttagen, inte avstängd: med kunddata i databasen
+# raderar den det som ändrats, och en version utan migrationer som råkade
+# startas hade gjort det utan att fråga. Saknas mappen stoppar skriptet, och
+# appen startar inte — den gamla versionen står kvar.
 set -e
 
-if [ -d "prisma/migrations" ]; then
-  # Produktionsläget: kör migrationsfilerna i tur och ordning. Det är enda
-  # sättet att ändra en databas med riktig data utan att tappa något.
-  echo "==> Kör databasmigrationer..."
-  npx prisma migrate deploy
-else
-  # Utvecklingsläget: bygg tabellerna direkt ur schemat.
-  #
-  # Går bra så länge det inte finns data värd att behålla. Ändras schemat
-  # försvinner det som ändrats — i labbet är det bara att köra seed igen.
-  # Före produktion skapas en baslinjemigration med scripts/create-migration.sh,
-  # och då går systemet över till grenen ovan av sig självt.
-  echo "==> Bygger tabellerna ur schemat (inga migrationer)..."
-  npx prisma db push --skip-generate --accept-data-loss
+if [ ! -d "prisma/migrations" ]; then
+  echo "STOPP: prisma/migrations saknas i den här versionen."
+  echo "Databasen ändras bara med migrationer. Se docs/drift.md punkt 1."
+  exit 1
 fi
+
+echo "==> Kör databasmigrationer..."
+npx prisma migrate deploy
 
 echo "==> Databasen är klar."

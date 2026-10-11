@@ -49,6 +49,8 @@ services:
   # kommandoverktyg och alla beroenden finns — appimagen slipper dem och
   # förblir liten.
   migrate:
+    # Imagen får versionen i namnet, se app nedan.
+    image: tikkr-migrate:${TIKKR_VERSION:-dev}
     build:
       context: .
       dockerfile: Dockerfile
@@ -64,9 +66,16 @@ services:
     command: ["sh", "./scripts/migrate.sh"]
 
   app:
+    # VERSIONEN I NAMNET. TIKKR_VERSION skrivs i .env av scripts/release.sh.
+    # Varje version blir då en egen image, och den förra ligger kvar på
+    # servern: att backa är att starta den igen, inte att bygga om den.
+    # Utan variabeln heter imagen tikkr-app:dev, som förut.
+    image: tikkr-app:${TIKKR_VERSION:-dev}
     build:
       context: .
       dockerfile: Dockerfile
+      args:
+        TIKKR_VERSION: ${TIKKR_VERSION:-dev}
     # Fast namn så att Nginx Proxy Manager kan peka på "tikkr-app" istället för
     # en IP-adress som ändrar sig varje gång containern startas om.
     container_name: tikkr-app

@@ -10,6 +10,7 @@ import {
   yearlyAvailable,
 } from "@/lib/stripe";
 import { activeNotices } from "@/lib/notices";
+import { hasUnreadNews, runningVersion, visibleReleases } from "@/lib/news";
 import AdminSidebar from "@/components/admin/AdminSidebar";
 import NoticeBanner from "@/components/ui/NoticeBanner";
 import SupportBanner from "@/components/admin/SupportBanner";
@@ -70,20 +71,21 @@ export default async function PanelLayout({
 
   const reviewCount = reviewEntries + quickJobs;
 
+  // Den inloggades egna uppgifter, för remsan och för pricken vid Nyheter.
+  //
+  // Inte i supportläget: där är ingen inloggad som kunden, och både remsan och
+  // pricken gäller den som sitter vid skärmen.
+  const me = session.support
+    ? null
+    : await session.db.adminUser.findFirst({
+        where: { id: session.userId },
+        select: { email: true, emailVerifiedAt: true, newsSeenVersion: true },
+      });
+
   // OBEKRÄFTAD E-POSTADRESS. Remsan står tills länken använts, så att ett
   // stavfel vid registreringen syns första dagen och inte den dag lösenordet
   // glömts. Den spärrar ingenting. Se email-verification.ts.
-  //
-  // Inte i supportläget: där är ingen inloggad som kunden, och remsan gäller
-  // den som sitter vid skärmen.
-  const unverifiedEmail = session.support
-    ? null
-    : (
-        await session.db.adminUser.findFirst({
-          where: { id: session.userId, emailVerifiedAt: null },
-          select: { email: true },
-        })
-      )?.email ?? null;
+  const unverifiedEmail = me && !me.emailVerifiedAt ? me.email : null;
 
   // Vilka menypunkter som ska synas. ATT DÖLJA DEM ÄR BARA KOSMETIK —
   // sidorna bakom vaktas var för sig av requireModule() och svarar 404
@@ -92,6 +94,13 @@ export default async function PanelLayout({
   const modules: ModuleKey[] = (company?.modules ?? [])
     .map((row) => row.module)
     .filter(isModuleKey);
+
+  // Pricken vid Nyheter. Samma urval som sidan visar, så att en punkt om ett
+  // tillval kunden inte har aldrig tänder den. Se news.ts.
+  const version = runningVersion();
+  const unreadNews =
+    me !== null &&
+    hasUnreadNews(visibleReleases(version, modules), me.newsSeenVersion);
 
   const access = evaluateAccess({
     status: company?.subscriptionStatus ?? "TRIALING",
@@ -117,6 +126,8 @@ export default async function PanelLayout({
         // Supportläget har inget eget konto: cookien bär plattformskontot,
         // inte ett av kundens. Se admin-session.ts.
         showAccount={!session.support}
+        unreadNews={unreadNews}
+        version={version}
       />
 
       <div className="min-w-0 flex-1">

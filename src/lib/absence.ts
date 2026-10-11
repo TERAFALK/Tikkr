@@ -278,6 +278,12 @@ export interface CompEntryInput {
  * beslutat att den är övertid, och det beslutet fattas av en människa och inte
  * av en stämplingsklocka. Den timmen flyttas då ur flexsaldot och in i
  * komptidsboken; se flexformeln i payroll.ts.
+ *
+ * TIMANSTÄLLD HAR INGEN KOMPTID, och avvisas HÄR och inte bara i
+ * serveråtgärden. Knappen göms i panelen, men det här är enda vägen in i
+ * komptidsboken för hand, och en rad som skrivs för en timanställd syns
+ * ingenstans: buildPayrollPeriod nollar hens saldon. Den ligger då kvar och
+ * dyker upp om personen en dag går över till fast anställning.
  */
 export async function addCompEarned(
   db: CompanyDb,
@@ -290,10 +296,14 @@ export async function addCompEarned(
 
   const employee = await db.employee.findFirst({
     where: { id: input.employeeId },
-    select: { id: true },
+    select: { id: true, hourly: true },
   });
 
   if (!employee) throw new AbsenceError("Okänd anställd.");
+
+  if (employee.hourly) {
+    throw new AbsenceError("Personen är timanställd och har ingen komptid.");
+  }
 
   const created = await db.compAdjustment.create({
     data: {

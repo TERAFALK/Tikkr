@@ -24,12 +24,6 @@ import { broadcastEmail } from "./emails";
 
 export type BroadcastAudience = "all" | "paying" | "trialing";
 
-export const AUDIENCES: { value: BroadcastAudience; label: string }[] = [
-  { value: "all", label: "Alla kunder" },
-  { value: "paying", label: "Endast betalande" },
-  { value: "trialing", label: "Endast provperioder" },
-];
-
 function statusFilter(audience: BroadcastAudience) {
   if (audience === "paying") return { subscriptionStatus: "ACTIVE" as const };
   if (audience === "trialing") {

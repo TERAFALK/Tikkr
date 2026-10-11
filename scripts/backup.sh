@@ -9,9 +9,10 @@
 #   2. Återläsning ska testas då och då. En backup ingen provat att läsa
 #      tillbaka är bara en förhoppning.
 #
-# Sätts upp som schemalagt jobb, t.ex. varje natt kl 03:
+# Sätts upp som schemalagt jobb, tre gånger per dygn (docs/drift.md punkt 3):
 #   crontab -e
-#   0 3 * * * /sokvag/till/tikkr/scripts/backup.sh >> /var/log/tikkr-backup.log 2>&1
+#   0 3,12 * * * /sokvag/till/tikkr/scripts/backup.sh >> /var/log/tikkr-backup.log 2>&1
+#   30 16 * * * /sokvag/till/tikkr/scripts/backup.sh >> /var/log/tikkr-backup.log 2>&1
 #
 # Loggfilen måste finnas och vara skrivbar FÖR DIG först. /var/log ägs av root,
 # så cron-raden misslyckas annars med "Permission denied" — och då finns ingen

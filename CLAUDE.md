@@ -3,6 +3,66 @@
 > Denna fil läses automatiskt i varje ny session. Den är den enda källan till
 > projektkontext — uppdatera den när beslut ändras.
 
+## 0. Arbetsflödet — gäller varje session (beslutat 2026-10-10)
+
+Kod går gren → PR → CI → `main` → labbet → tagg → produktionen. Rutinen står
+i `docs/release.md`, skälen i § 5.
+
+### Före arbetet
+1. Kör `git status` och `git branch --show-current`. Finns ändringar jag inte
+   gjort: fråga innan något rörs.
+2. Arbeta aldrig på `main`. Skapa en gren från senaste `origin/main`:
+   `feat/<namn>`, `fix/<namn>` eller `chore/<namn>`. En gren är en avgränsad
+   ändring.
+3. Läs koden, testerna och avsnittet i denna fil som rör ändringen innan något
+   ändras. Är nuvarande beteende oklart: fråga, anta inte.
+
+### Under arbetet
+4. Ändra bara det uppgiften kräver. Orelaterad städning, omdöpning eller
+   formatering föreslås separat.
+5. Logik som rör tid, pengar, lön, behörighet eller `company_id` får ett test
+   som fäller felet. Vid buggrättning skrivs testet som visar buggen först.
+6. Gränstesterna (`payroll-boundary`, `planning-boundary`, `tenant-*`,
+   `module-coverage`, `support-coverage`) försvagas aldrig för att något ska
+   gå igenom. Faller ett är det koden som är fel.
+7. Ändring i `prisma/schema.prisma` kräver en migration i samma gren, som
+   fungerar med FÖREGÅENDE version av appen: lägg till, ta inte bort.
+   Borttagning och namnbyte sker i en senare release. Migrationer som raderar
+   eller skriver om data anges i PR-beskrivningen med hur man backar.
+   Migrationen skapas med `node scripts/new-migration.mjs <namn>`, se § 9.
+8. Ny miljövariabel läggs i `.env.example` och `docker-compose.yml` och anges
+   i PR-beskrivningen under "Driftändringar".
+
+### Före commit
+9. Kör lokalt: `npm run typecheck`, och `npm run build` när ändringen rör
+   bygget. Testerna med databas körs av CI på PR:en — läs resultatet innan
+   något kallas klart. Skriv vad som är verifierat och vad som inte är det.
+10. Läs hela diffen. Inga hemligheter, felsökningsrader eller orelaterade filer.
+11. Commit och push till grenen. Öppna PR mot `main` med `gh pr create`: vad,
+    hur det testats, migrationer, driftändringar. **Aldrig push eller
+    force-push till `main`**, aldrig `--no-verify`.
+
+### Det som bara användaren beslutar
+12. Sammanslagning till `main`, en tagg `v*`, en GitHub Release och varje
+    driftsättning kräver användarens uttryckliga ja i samma session.
+13. Claude har ingen åtkomst till servrarna och ska inte ha det. Claude ger
+    kommandon, ett i taget; användaren kör dem.
+14. Ett kommando som raderar eller skriver över data (`restore.sh`,
+    `docker compose down -v`, `prisma db push` eller `migrate reset` mot
+    produktionen, SQL som ändrar rader) föreslås bara med en tydlig varning om
+    vad som går förlorat, och efter en backup. Seed körs aldrig i produktionen.
+15. Produktionen används aldrig för att prova något. Allt provas i labbet först.
+
+### Versioner och beslut
+`vMAJOR.MINOR.PATCH`. PATCH = rättelse utan migration. MINOR = ny funktion
+eller vilken migration som helst. MAJOR = kunden måste göra något.
+
+Ett beslut om hur systemet ska bete sig skrivs in i denna fil med datum. Det
+som bara gäller en version hör hemma i releaseanteckningen.
+
+Det kunden ska veta om en version skrivs i `src/lib/release-notes.ts`, i en
+egen PR före taggningen. Se § 5 och `docs/release.md` steg 1.
+
 ## 1. Vad Tikkr är
 
 Ett molnbaserat **stämplingssystem för touchskärm** som svenska verkstads- och
@@ -159,7 +219,8 @@ time_entries   — id, company_id, employee_id, kind,
                  moment_cost_rate_ore, employee_cost_rate_ore,
                  needs_review, review_note, kiosk_device_id, source_ip
 admin_users    — id, company_id, email, name?, phone?, password_hash, role,
-                 password_changed_at?, sessions_revoked_at?, email_verified_at?
+                 password_changed_at?, sessions_revoked_at?, email_verified_at?,
+                 news_seen_version?
 email_verifications — id, user_id, token_hash, email, expires_at, used_at
 audit_events   — id, company_id, actor_email, entity, entity_id, action,
                  before, after, subject_employee_id
@@ -459,6 +520,21 @@ stripe_prices    — item, month_price_id, year_price_id, updated_by_email
    **Intjänad komp uppstår aldrig av sig själv.** Tid utöver schemat är flex
    till dess att en människa beslutat att den är övertid. Uttagen komp är en
    frånvaroorsak som också drar på komptidssaldot.
+
+   **Beslutet fattas på tidrapporten, per dag** (tillagt 2026-10-10). Varje
+   dag har en knapp Komptid bredvid Frånvaro, och raden dateras på dagen
+   övertiden gjordes, eftersom det är den dagens flex som ska minska.
+   Åtgärderna fanns från 2026-09-26 men hade ingen knapp, och saldot kunde
+   därför aldrig öka. Frånvaro och komptid tas bort i den utfällda dagen. Ett
+   uttag som en frånvaro skrivit har ingen egen knapp: det tas bort med
+   frånvaron, annars stod ledigheten kvar utan att komptiden minskat.
+
+   **Ingående komptid och startdatumet för saldot sätts inte i panelen**
+   (beslutat 2026-10-10). `saveOpeningBalances` skrev alla tre ingående
+   värdena rakt av och hade aldrig en knapp; den togs bort. Ingående flex
+   sätts med Justera flexsaldo, och ett tomt startdatum betyder första
+   stämplingen, vilket är rätt för den som flyttar in. Fälten finns kvar i
+   databasen.
 
    **Frånvaroorsakerna är kundens egna rader** (ändrat 2026-10-01), i
    `absence_reasons`, och läggs upp under Inställningar. Var en enum i koden,
@@ -1062,29 +1138,52 @@ Inga öppettider för support står utskrivna. Inga är bestämda.
 
 ## 5. Drift
 
-Alla kunder delar samma server → **en** deploy-pipeline:
+Alla kunder delar samma server, och en trasig driftsättning slår mot alla på
+en gång. Därför (beslutat 2026-10-10):
 
-**Målbilden** (inte byggd än, se nedan):
+```
+gren → PR → CI → main → labbet (release.sh main) → tagg vX.Y.Z → produktionen (release.sh vX.Y.Z)
+```
 
-1. Kodändring pushas till Git
-2. GitHub Actions kör testerna och bygger Docker-image automatiskt
-3. Deploy till liten **staging-miljö** för snabb kontroll — viktigt, en trasig
-   deploy slår annars mot *alla* kunder samtidigt
-4. Efter godkänd staging: SSH till produktion, `docker compose pull && docker compose up -d`
+- **CI** (`.github/workflows/ci.yml`) kör typkontroll, alla tester mot en egen
+  Postgres, ett bygge av Docker-imagen och en kontroll av compose-filerna på
+  varje PR och push till `main`. Den driftsätter ingenting.
+- **Labbet är staging.** Ingen tredje miljö, se § 9.
+- **Produktionen kör bara taggar**, och taggen sätts när labbet kört samma
+  commit. Driftsättningen är ett kommando som användaren själv kör på
+  servern; det är godkännandet. Ingen automatisk driftsättning, och inga
+  SSH-nycklar hos GitHub.
+- **Imagen bär versionen** (`tikkr-app:v1.2.0`), som visas i `/api/health`.
+  Den förra ligger kvar, så att backa koden är att starta den igen.
+- **Databasen backas inte med koden.** Migrationer lägger till och tar inte
+  bort, så att den förra versionen fungerar mot den nya databasen.
 
-**Så går det till i dag** (konstaterat 2026-10-05): ingen CI, ingen staging
-utöver labbet. Koden byggs på servern med `git pull && docker compose up -d
---build`, och appen startar om som en enda container — ett kort avbrott, inte
-en rullande omstart. Labbet är staging tills vidare: en gren provas där innan
-den slås ihop med `main`.
+Rutinen står i `docs/release.md`, servern i `docs/drift.md` punkt 8. Bygget
+sker på servern; appen startar om som en enda container, vilket är ett avbrott
+på några sekunder som skärmarnas offline-kö täcker.
+
+**Nyheterna följer med koden** (beslutat 2026-10-10, issue #6). Under
+Nyheter i panelen står vad som ändrats i varje version, och texten ligger i
+`src/lib/release-notes.ts`, inte i databasen. Den granskas därmed som koden,
+och syns när versionen installeras utan att någon trycker på något.
+`news.ts` gömmer dessutom poster för versioner som är nyare än den som kör,
+eftersom en rättelse kan taggas på en `main` där nästa versions text redan
+ligger. Punkter som bara rör ett tillval visas bara för kunder som har det.
+
+Pricken vid Nyheter är per administratör: `admin_users.news_seen_version`
+håller den senaste versionen personen sett, och sidan skriver den när den
+öppnas. Den skrivs bara framåt, så att en backad version inte tänder pricken
+igen. Versionen som kör står i menyn, bredvid Tikkr-märket.
 
 Produktionsservern kör Caddy framför appen (`deploy/Caddyfile`,
-`docker-compose.prod.yml`).
+`docker-compose.prod.yml`), och dess `.env` sätter `COMPOSE_FILE` så att
+varje `docker compose` tar med båda filerna.
 
 Måste finnas stöd för:
 
-- **Backuper** — daglig automatisk säkerhetskopia av databasen till **separat
-  plats, inte samma server** (objektlagring). Kritiskt: det är kundernas tidsdata.
+- **Backuper** — säkerhetskopia av databasen tre gånger per dygn och före
+  varje driftsättning, krypterad till **separat plats, inte samma server**
+  (Glesys Object Storage). Kritiskt: det är kundernas tidsdata.
 - **Säkerhetsuppdateringar** — OS och Docker-images uppdateras regelbundet
   (`unattended-upgrades`).
 - **Uptime-övervakning** — enkel gratis monitor (t.ex. UptimeRobot) pingar tjänsten.
@@ -1094,6 +1193,10 @@ Caddy 0 kr, Stripe 0 kr fast (bara procent per transaktion), domän ca
 100–150 kr/år.
 
 ## 6. Faser
+
+Originalplanen från 2026-08-10, kvar som historik. Fas 0–3 är byggda, delvis
+på andra sätt än här (ingen auto-deploy, två containrar och inte tre). Läget
+står i § 5 och § 9.
 
 | Fas | Vecka | Innehåll | Resultat |
 |---|---|---|---|
@@ -1427,22 +1530,28 @@ servern — Claude har **ingen** SSH-åtkomst och ska alltid leverera kommandon 
 färdiga kodblock, ett i taget, med förklaring av vad de gör.
 
 ```
-Laptop (skriva kod)  →  GitHub  →  Server: git pull + docker compose up -d
+Laptop (gren, commit)  →  GitHub (PR, CI, main, tagg)  →  Server: ./scripts/release.sh <version>
 ```
 
 ### Utvecklingsdator
 
-Windows 11 Pro, projektrot `C:\Projekt\Tikkr`, PowerShell.
+Windows 11, projektrot `C:\Projekt\Tikkr`, PowerShell. GitHub CLI (`gh`) är
+installerat och inloggat, så Claude kan öppna PR:er och läsa CI.
 
-| Verktyg | Status per 2026-08-10 |
+| Verktyg | Status per 2026-10-10 |
 |---|---|
 | git | ✅ 2.50.1 |
-| Node.js | ✅ v24 (konstaterat 2026-10-11), med `node_modules` på plats |
+| Node.js | ✅ 24 (npm 11). Docker-imagen och CI kör Node 22 |
 | Docker Desktop | ❌ ej installerat |
 
-Konsekvens (ändrat 2026-10-11): Claude kan **typkolla** (`npx tsc --noEmit`),
-köra `next dev` och köra **testerna som inte behöver databas** lokalt. Det
-finns ingen Postgres här, så testerna körs mot en adress som inte svarar men
+Konsekvens: Claude kan **typkolla och bygga lokalt** (`npm ci`,
+`npx prisma generate`, `npm run typecheck`, `npm run build`), men **inte köra
+databastesterna** — de behöver Postgres, och den finns bara på servern och i
+CI. Påstå aldrig att något fungerar innan det körts där.
+
+**Testerna som inte behöver databas går att köra lokalt** (konstaterat
+2026-10-11): `help`, `ui-text`, `seo`, `brand`, `format`, `module-coverage`
+med flera, som bara läser källkoden. De körs mot en adress som inte svarar men
 vars namn slutar på `_test`, så att spärren i `tests/setup.ts` släpper igenom
 dem:
 
@@ -1450,9 +1559,9 @@ dem:
 DATABASE_URL="postgresql://ingen:ingen@127.0.0.1:1/finns_inte_test" npx vitest run tests/<fil>
 ```
 
-Databastesterna, bygget av imagen och allt mot riktig data körs fortfarande
-bara på servern. Påstå aldrig att något fungerar på servern innan det körts
-där.
+npm 11 kör inte paketens installationsskript utan godkännande och varnar för
+det vid `npm ci`. Det är ofarligt här: `npx prisma generate` hämtar det som
+behövs, och imagen byggs med Node 22, där skripten körs som vanligt.
 
 ### Testserver (labbmiljö — INTE produktion)
 
@@ -1465,41 +1574,64 @@ separat server som sätts upp senare, mot tikkr.se.
 |---|---|
 | Port 80/443 | 🔴 upptagna av **Nginx Proxy Manager** — rör dem inte |
 | Port 3000 | ✅ Tikkr, men bara `127.0.0.1` — all trafik går via proxyn |
-| Adress | ✅ `https://www.tikkr.se` med Let's Encrypt-certifikat. **Det är adressen som gäller** — `tikkr.terafalk.com` var det tillfälliga labbnamnet |
+| Adress | ✅ `https://www.tikkr.se` och `portal.tikkr.se` via NPM, tills produktionen tar över dem |
+| Gren | `main`. En gren under arbete kan provas här före sammanslagning |
 | Övrigt på servern | kör andra tjänster — kontrollera alltid innan portar tas |
 
-Systemet flyttar till `portal.tikkr.se` i produktion, medan `www.tikkr.se`
-förblir säljsidan. Ingenting i koden är knutet till en
-adress — kopplingslänkar och omdirigeringar byggs ur inkommande anrop — så ett
-byte är ett nytt proxy host plus omkopplade kioskskärmar, ingen kodändring.
+### Miljöerna (beslutat 2026-10-10)
 
-**Kioskens cookie är knuten till adressen.** Byter en kund adress måste varje
-skärm öppna sin kopplingslänk på nytt.
+| Miljö | Adress | Innehåll |
+|---|---|---|
+| Produktion | `www.tikkr.se`, `tikkr.se` (säljsida), `portal.tikkr.se` (systemet) | Alla kunder, även pilotkunden |
+| Labbet = staging | `test.tikkr.se` | Bara testdata. Får slås sönder |
+
+Ingen tredje miljö. **Pilotkunden Vänertekno AB kör i produktionen** och
+börjar om med tom arbetsyta vid lanseringen; testdatan i labbet flyttas inte.
+De får nya versioner först genom att vara först, inte genom en egen instans —
+alla kunder delar samma version. Funktionskontrollen efter en driftsättning
+görs på en intern kontrollkund i produktionen, aldrig i Vänerteknos
+arbetsyta: ett provtryck där blir en stämpling i deras faktura- och
+löneunderlag.
+
+Adresserna byts samma kväll som produktionen tar över dem. Länkarna i mejl
+byggs ur `APP_URL`, så den ska ändras i labbets `.env` vid bytet.
+
+**Kioskens cookie är knuten till adressen och servern.** Vid bytet måste
+varje skärm kopplas om med en ny kod.
 
 ### Ej på plats än
 
 | Sak | Status |
 |---|---|
-| GitHub-repo | ⏸ ska skapas av användaren (privat, namn `tikkr`) |
-| Produktionsserver | ⏸ separat från testservern, senare |
-| Offsite-backup (rclone-mål) | ⏸ **medvetet uppskjutet** — labbmiljö utan kunddata. Skripten finns; `BACKUP_REMOTE` sätts före lansering. |
-| Uptime-övervakning | ⏸ kräver publik URL först |
+| GitHub-repo | ⚠ `TERAFALK/Tikkr` finns men är **publikt**. Ska bli privat; gratisplanen kan då inte skydda `main` |
+| Produktionsserver | ⏸ Glesys-VPS, senare. Föreslaget: 2 vCPU, 4 GB RAM, 50 GB, Ubuntu 24.04 |
+| Offsite-backup (rclone-mål) | ⏸ Glesys Object Storage, köps till. `BACKUP_REMOTE` sätts före lansering |
+| Uptime-övervakning | ⏸ sätts upp mot produktionens adress |
 
-### Databasen byggs ur schemat, inte ur migrationer (beslutat 2026-08-11)
+### Databasen ändras bara med migrationer (beslutat 2026-10-10)
 
-Under utvecklingen finns **inga migrationsfiler**. Databasen byggs direkt ur
-`prisma/schema.prisma` vid varje start (`prisma db push`). Skälet: servern
-behöver då aldrig skriva till GitHub — organisationen blockerar deploy keys,
-och flödet laptop → GitHub → server går bara åt ett håll.
+Till 2026-10-10 byggdes databasen direkt ur `prisma/schema.prisma` vid varje
+start (`prisma db push --accept-data-loss`). Det gick så länge allt var
+testdata, men raderar det som ändrats — med kunddata vore det ett fel som inte
+går att ångra.
 
-Konsekvens: ändras schemat töms det som ändrats. Kör seed igen efteråt.
-`prisma/migrations/` ligger i `.gitignore`.
+Nu ligger migrationerna i `prisma/migrations/`, med baslinjen `0_init`, och
+`scripts/migrate.sh` kör bara `prisma migrate deploy`. **Vägen med `db push` är
+borttagen ur migrate.sh, inte avstängd**, och saknas mappen stoppar den.
+`release.sh` vägrar dessutom en produktionsversion utan migrationer.
 
-Före produktion skapas en baslinjemigration, raden tas bort ur `.gitignore`,
-och därefter krävs en migration vid varje schemaändring. `scripts/migrate.sh`
-byter gren automatiskt så fort mappen finns. Se `docs/drift.md` punkt 1.
+Migrationer skapas på LAPTOPEN med `node scripts/new-migration.mjs <namn>`,
+som jämför schemat mot senaste commit utan att behöva en databas. Servern
+skriver fortfarande aldrig till GitHub. CI kör alla migrationer mot en tom
+databas och fäller en PR där de inte ger samma databas som schemat.
 
-**Spärrar innan skarp drift** (se `docs/drift.md` punkt 7): baslinjemigration
-incheckad, offsite-backup satt, repot privat, demolösenordet `tikkr123`
-borttaget, testskärmens fasta token återkallad, och `./scripts/status.sh` utan
-röda punkter.
+`.gitignore` ignorerar `*.sql` (databasdumpar) men gör ett undantag för
+`prisma/migrations/**/migration.sql`. Utan undantaget hade migrationerna tyst
+hamnat utanför git.
+
+Undantag: `scripts/test.sh` bygger labbets testdatabas med `db push`. Den
+databasen raderas av testerna själva och innehåller aldrig något att förlora.
+
+**Spärrar innan skarp drift** (se `docs/drift.md` punkt 7): offsite-backup
+satt, repot privat, seed aldrig körd i produktionen, en release övad i labbet,
+och `./scripts/status.sh` utan röda punkter.

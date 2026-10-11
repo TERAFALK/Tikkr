@@ -46,22 +46,39 @@ else
   bad "hälsokollen svarar inte som väntat: ${HEALTH:-inget svar}"
 fi
 
+# --- Version ----------------------------------------------------------------
+head_ "Version"
+
+RUNNING="$(echo "$HEALTH" | sed -n 's/.*"version":"\([^"]*\)".*/\1/p')"
+echo "      miljö: ${TIKKR_ENV:-lab} · kör: ${RUNNING:-okänd}"
+
+if [ "${TIKKR_ENV:-lab}" = "production" ]; then
+  if echo "${RUNNING:-}" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+$'; then
+    ok "produktionen kör en släppt version"
+  else
+    bad "produktionen kör \"${RUNNING:-okänd}\", inte en släppt version — driftsätt med ./scripts/release.sh vX.Y.Z"
+  fi
+
+  if echo "${COMPOSE_FILE:-}" | grep -q 'docker-compose.prod.yml'; then
+    ok "COMPOSE_FILE tar med Caddy"
+  else
+    bad "COMPOSE_FILE saknas i .env — docker compose startar då utan Caddy"
+    echo "      echo 'COMPOSE_FILE=docker-compose.yml:docker-compose.prod.yml' >> .env"
+  fi
+fi
+
 # --- Hur databasen byggs ----------------------------------------------------
 head_ "Databasens uppbyggnad"
 
 if [ ! -d prisma/migrations ]; then
-  ok "byggs direkt ur prisma/schema.prisma (utvecklingsläge)"
-  echo "      Rätt läge tills det finns data värd att behålla. Ändras schemat"
-  echo "      försvinner det som ändrats — kör seed igen efteråt."
-  echo "      Före produktion: ./scripts/create-migration.sh init"
+  bad "prisma/migrations saknas — migrate.sh vägrar starta, och appen med den"
 else
   COUNT="$(find prisma/migrations -mindepth 1 -maxdepth 1 -type d | wc -l)"
-  ok "$COUNT migration(er) styr databasen (produktionsläge)"
+  ok "$COUNT migration(er) styr databasen"
 
-  if git check-ignore -q prisma/migrations 2>/dev/null; then
+  if git check-ignore -q prisma/migrations/0_init/migration.sql 2>/dev/null; then
     bad "migrationerna ignoreras av git och finns alltså bara här"
-    echo "      Ta bort raden prisma/migrations/ ur .gitignore och checka in dem,"
-    echo "      annars går databasen inte att återskapa på en annan server."
+    echo "      Se undantaget för migration.sql i .gitignore."
   elif [ -n "$(git status --porcelain prisma/migrations 2>/dev/null)" ]; then
     bad "migrationer är INTE incheckade i git"
   else

@@ -176,31 +176,6 @@ export async function schedulesForEmployees(
   return result;
 }
 
-/** Företagets standardschema, eller null när inget lagts upp. */
-export async function defaultSchedule(db: CompanyDb): Promise<Schedule | null> {
-  const found = await db.workSchedule.findFirst({
-    where: { isDefault: true },
-    select: {
-      id: true,
-      name: true,
-      days: {
-        orderBy: { weekday: "asc" },
-        select: {
-          weekday: true,
-          startMinute: true,
-          endMinute: true,
-          breaks: {
-            orderBy: { startMinute: "asc" },
-            select: { startMinute: true, endMinute: true, breakTypeId: true },
-          },
-        },
-      },
-    },
-  });
-
-  return found ? { id: found.id, name: found.name, days: found.days } : null;
-}
-
 /** Varje dag i en period, som dygnets början i företagets tidszon. */
 export function daysInPeriod(
   from: Date,
