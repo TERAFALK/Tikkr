@@ -1,14 +1,25 @@
-# Release — från main till produktion
+# Release — från dev till produktion
 
 Hur en version går ut, och hur den tas tillbaka. Samma skript gör jobbet i
 labbet och i produktionen: [`scripts/release.sh`](../scripts/release.sh).
 
 ```
-gren → PR → CI grön → main → nyheterna → labbet → tagg vX.Y.Z → produktionen
+gren → PR → CI grön → dev → labbet → nyheterna → PR dev → prod → tagg vX.Y.Z → produktionen
 ```
 
+**Två grenar, två miljöer** (beslutat 2026-10-11). `dev` är det labbet kör:
+nya funktioner och rättelser slås ihop där, en PR i taget, och provas i
+labbet. `prod` är det som är släppt eller på väg att släppas. Den får nya
+funktioner bara genom att `dev` slås ihop i den, och det är det som gör en
+version. Grenen hette `main` till 2026-10-11.
+
+**`dev` går till `prod` med en vanlig sammanslagning, aldrig squash**, och
+`prod` får inga egna commits vid sidan av, utom en akut rättelse (steg 7).
+Då har `prod` efter sammanslagningen exakt det innehåll labbet provat på
+`dev`, och taggen kan sättas utan en ny omgång i labbet.
+
 **Produktionen kör aldrig något annat än en tagg.** Taggen sätts först när
-labbet har kört samma commit, och det är den som är godkännandet.
+labbet har kört samma innehåll, och det är den som är godkännandet.
 
 ---
 
@@ -35,7 +46,8 @@ labbet, så att texten provläses där.
 
 1. Be Claude skriva utkastet: *"skriv nyheterna för v1.4.0"*. Claude läser
    PR:erna sedan förra taggen och lägger en post överst i
-   [`src/lib/release-notes.ts`](../src/lib/release-notes.ts), i en egen PR.
+   [`src/lib/release-notes.ts`](../src/lib/release-notes.ts), i en egen PR
+   mot `dev`.
 2. Läs PR:en. Stryk det kunden inte märker; ändra det som är oklart. När du
    slår ihop den har du godkänt texten.
 3. Datumet är dagen versionen planeras ut i produktionen.
@@ -51,31 +63,40 @@ I labbet syns alla poster, även för versioner som inte är taggade än.
 
 ## 2. Labbet först
 
-När PR:en är ihopslagen och CI grön på `main`, på labbservern:
+Labbet kör `dev`. När en PR är ihopslagen och CI grön på `dev`, på
+labbservern:
 
 ```bash
-./scripts/release.sh main
+./scripts/release.sh dev
 ```
 
 Prova det som ändrats, och kärnflödet: stämpla in, byt jobb, stämpla ut, ta ut
 ett underlag. Läs nyheterna under **Nyheter**. `/api/health` visar vilken commit som kör, t.ex.
-`main-3f2a1c9`.
+`dev-3f2a1c9`.
 
 > I labbet ersätter skriptet `git pull`. Mappen står efteråt på en bestämd
 > commit och inte på en gren, så `git pull` säger ifrån — det är meningen.
 
 ---
 
-## 3. Tagga
+## 3. Till prod, och tagga
 
-När labbet ser bra ut får commiten sitt versionsnummer. Antingen i GitHub:
-**Releases → Draft a new release → Choose a tag** (skriv `v1.4.0`, *Create new
-tag on publish*) → **Target: main** → **Generate release notes** → **Publish**.
-
-Eller från laptopen, med commiten labbet kör:
+När labbet ser bra ut och nyheterna ligger på `dev`, öppnas en PR från `dev`
+till `prod`:
 
 ```bash
-gh release create v1.4.0 --target <commit> --generate-notes
+gh pr create --base prod --head dev --title "Release v1.4.0"
+```
+
+Slå ihop den som en vanlig sammanslagning. Sammanslagningens commit på `prod`
+får sedan sitt versionsnummer. Antingen i GitHub:
+**Releases → Draft a new release → Choose a tag** (skriv `v1.4.0`, *Create new
+tag on publish*) → **Target: prod** → **Generate release notes** → **Publish**.
+
+Eller från laptopen:
+
+```bash
+gh release create v1.4.0 --target prod --generate-notes
 ```
 
 Releaseanteckningarna på GitHub byggs av PR-titlarna och är för oss. Lägg till
@@ -105,8 +126,8 @@ innan det gör något. Därefter, i ordning:
 4. **Kontroll** att `/api/health` svarar med den nya versionen.
 
 Skriptet vägrar i produktionen:
-- en gren eller `main` — bara `vX.Y.Z`
-- en tagg som inte ligger på `main`
+- en gren, `dev` eller `prod` — bara `vX.Y.Z`
+- en tagg som inte ligger på `prod`
 - en version utan `prisma/migrations` — den skulle bygga om databasen ur
   schemat, med dataförlust
 - ändrade filer i mappen på servern
@@ -169,12 +190,19 @@ Backa därefter koden till versionen som hörde till backupen.
 
 ## 7. Akut rättelse
 
-Samma väg, bara snabbare: gren `fix/...` → PR → CI → `main` → labbet →
-`vX.Y.Z+1` → produktionen. Hoppa aldrig över labbet; det tar fem minuter, och
-en rättelse som gör det värre slår mot alla kunder på en gång.
+När produktionen har ett fel och `dev` har funktioner som inte ska ut än,
+går rättelsen från `prod` och inte från `dev`:
 
-Ligger det osläppta funktioner på `main` som inte ska ut, säg till innan något
-taggas. Det är ovanligt nog att lösas när det händer.
+```
+fix/...-gren från prod → PR mot prod → CI → labbet (release.sh prod) → vX.Y.Z+1 → produktionen
+```
+
+Hoppa aldrig över labbet; det tar fem minuter, och en rättelse som gör det
+värre slår mot alla kunder på en gång. Labbet står därefter på `prod` tills
+nästa `./scripts/release.sh dev`.
+
+**Slå sedan ihop `prod` i `dev`**, med en PR från `prod` till `dev`. Annars
+försvinner rättelsen vid nästa release, när `dev` går till `prod`.
 
 ---
 

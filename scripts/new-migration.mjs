@@ -8,9 +8,9 @@
 // Ingen databas behövs. Skriptet jämför schemat som det såg ut vid senaste
 // commit med schemat som det ser ut nu, och skriver skillnaden som SQL i
 // prisma/migrations/<tid>_<namn>/migration.sql. Är schemaändringen redan
-// committad, jämför mot main i stället:
+// committad, jämför mot dev i stället:
 //
-//   node scripts/new-migration.mjs lagg-till-foto-pa-anstalld --fran origin/main
+//   node scripts/new-migration.mjs lagg-till-foto-pa-anstalld --fran origin/dev
 //
 // Varför inte "prisma migrate dev": den kräver en databas att prova mot, och
 // laptopen har ingen. Servern skulle kunna, men den skriver aldrig till

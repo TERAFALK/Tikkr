@@ -13,7 +13,7 @@ import { RELEASES, type Release } from "@/lib/release-notes";
  * Nyheterna (issue #6).
  *
  * Två fel ska inte gå att göra. Det ena är att en kund läser om en version
- * som inte är installerad, vilket händer om en rättelse taggas på en main
+ * som inte är installerad, vilket händer om en rättelse taggas på en prod
  * där nästa versions text redan ligger. Det andra är en prick som aldrig
  * släcks, eller aldrig tänds. Ingetdera syns i en kodgranskning.
  *
