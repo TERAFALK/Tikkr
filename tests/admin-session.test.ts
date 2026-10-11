@@ -27,10 +27,24 @@ let sessionUserId: string | null = null;
 /** När sessionen utfärdades, i sekunder. Som next-auth anger den. */
 let sessionIssuedAt: number | undefined;
 
+/**
+ * Märket som den första sessionen efter en registrering bär.
+ *
+ * Sätts bara av auth.ts, och är det enda som släpper in ett konto utan
+ * uppsatt app. Se currentAdmin.
+ */
+let sessionMfaDeferred = false;
+
 vi.mock("@/lib/auth", () => ({
   auth: async () =>
     sessionUserId
-      ? { user: { id: sessionUserId, issuedAt: sessionIssuedAt } }
+      ? {
+          user: {
+            id: sessionUserId,
+            issuedAt: sessionIssuedAt,
+            mfaDeferred: sessionMfaDeferred,
+          },
+        }
       : null,
 }));
 
@@ -108,6 +122,7 @@ beforeEach(async () => {
 afterEach(async () => {
   sessionUserId = null;
   sessionIssuedAt = undefined;
+  sessionMfaDeferred = false;
   // Städas på båda hållen. En kvarglömd supportcookie hade gjort nästa test
   // till ett supportbesök utan att testet nämnde något om det.
   supportCookie = null;
@@ -209,6 +224,47 @@ describe("tvåstegsinloggning är obligatorisk", () => {
       where: { id: ownerId },
       data: { totpEnabledAt: null },
     });
+
+    expect(await currentAdmin()).toBeNull();
+  });
+
+  /**
+   * UNDANTAGET ÄR DEN FÖRSTA SESSIONEN EFTER EN REGISTRERING (2026-10-11).
+   *
+   * Märket sätts bara av auth.ts, och bara mot en signerad lapp som
+   * registreringen just lämnat. Går det att komma in utan det är hela kravet
+   * på tvåsteg borta, så båda riktningarna står här.
+   */
+  it("den nyregistrerade släpps in utan app, och sessionen är märkt", async () => {
+    await unsafeGlobalPrisma.adminUser.update({
+      where: { id: ownerId },
+      data: { totpEnabledAt: null },
+    });
+
+    sessionMfaDeferred = true;
+
+    const admin = await currentAdmin();
+    expect(admin).not.toBeNull();
+    expect(admin?.mfaPending).toBe(true);
+  });
+
+  it("märket hjälper inte den som redan kopplat appen att slippa den", async () => {
+    // Appen ÄR kopplad. Märket ska då inte synas i sessionen alls, eftersom
+    // panelens remsa och spärr hänger på det.
+    sessionMfaDeferred = true;
+
+    const admin = await currentAdmin();
+    expect(admin).not.toBeNull();
+    expect(admin?.mfaPending).toBeUndefined();
+  });
+
+  it("en vanlig session utan märke nekas fortfarande", async () => {
+    await unsafeGlobalPrisma.adminUser.update({
+      where: { id: ownerId },
+      data: { totpEnabledAt: null },
+    });
+
+    sessionMfaDeferred = false;
 
     expect(await currentAdmin()).toBeNull();
   });

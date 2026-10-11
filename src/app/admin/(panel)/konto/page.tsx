@@ -17,7 +17,15 @@ import { formatDate } from "@/lib/format";
 import { formatPhone } from "@/lib/phone";
 import { fullName } from "@/lib/person-name";
 import type { SaveState } from "@/lib/save-state";
-import { changeEmail, changePassword, logoutEverywhere, saveOwnProfile } from "./actions";
+import TwoStepEnrollment from "@/components/ui/TwoStepEnrollment";
+import { adminTwoStep } from "@/lib/admin-mfa";
+import {
+  changeEmail,
+  changePassword,
+  enableTwoStep,
+  logoutEverywhere,
+  saveOwnProfile,
+} from "./actions";
 
 /**
  * DET EGNA KONTOT: namn, telefon, e-postadress och lösenord.
@@ -55,10 +63,12 @@ export const dynamic = "force-dynamic";
 export default async function AccountPage({
   searchParams,
 }: {
-  searchParams: Promise<{ bekraftelse?: string }>;
+  searchParams: Promise<{ bekraftelse?: string; tvasteg?: string }>;
 }) {
   const session = await requireAdmin();
-  const resend = RESEND_MESSAGES[(await searchParams).bekraftelse ?? ""];
+  const params = await searchParams;
+  const resend = RESEND_MESSAGES[params.bekraftelse ?? ""];
+  const openTwoStep = params.tvasteg === "1";
 
   const isOwner = session.role === "OWNER";
 
@@ -79,10 +89,30 @@ export default async function AccountPage({
         },
       });
 
+
   // Namnet slås ihop ur de två fälten och lagras ingenstans, se
   // person-name.ts. Saknas det står adressen i stället: ett konto utan namn
   // ska synas som ett konto, inte som ett hål.
   const name = me ? fullName(me) : null;
+
+  /**
+   * NYCKELN TILL APPEN, för den som inte kopplat någon.
+   *
+   * `adminTwoStep` SKRIVER när ingen nyckel finns: den skapar en och sparar
+   * den krypterad. En läsning som skriver går inte i supportläget, där allt
+   * skrivande avvisas (§ 4 punkt 5), och därför ligger `session.support`
+   * först i villkoret. Samma konstruktion som inloggningssidan har, och av
+   * samma skäl: QR-koden måste finnas på sidan innan någon trycker.
+   *
+   * Nyckeln blir inte giltig av att visas. Först när en kod ur appen godkänts
+   * räknas appen som kopplad, se enableTwoStep.
+   */
+  const twoStep =
+    !session.support && me && !me.totpEnabledAt
+      ? await adminTwoStep(session.userId)
+      : null;
+
+  const enrollment = twoStep?.mode === "enroll" ? twoStep.enrollment : undefined;
 
   if (!me) {
     return (
@@ -243,9 +273,13 @@ export default async function AccountPage({
                 </ActionDialog>
               </SecurityRow>
 
-              {/* Bara besked. Appen kopplas vid inloggningen och nollställs
-                  av en ägare eller av oss, aldrig här: den som kommit åt en
-                  inloggad session ska inte kunna koppla bort den. */}
+              {/* APPEN KOPPLAS HÄR NÄR DEN INTE ÄR KOPPLAD (2026-10-11), och
+                  bara då. Att KOPPLA BORT den går fortfarande inte: den som
+                  kommit åt en inloggad session ska inte kunna ta bort steget
+                  som skyddar den. Nollställning sker av en ägare eller av oss.
+
+                  Rutan öppnas direkt när man kommit hit från remsan högst
+                  upp, som länkar med ?tvasteg=1. */}
               <SecurityRow
                 title="Tvåstegsverifiering"
                 detail={
@@ -256,6 +290,31 @@ export default async function AccountPage({
               >
                 {me.totpEnabledAt ? (
                   <Badge tone="active">På</Badge>
+                ) : enrollment ? (
+                  <ActionDialog<SaveState>
+                    trigger="Koppla app"
+                    triggerTone="primary"
+                    title="Koppla autentiseringsapp"
+                    description="Nästa gång du loggar in behöver du en kod från appen."
+                    action={enableTwoStep}
+                    initial={{}}
+                    submitLabel="Koppla app"
+                    pendingLabel="Kontrollerar…"
+                    openOnMount={openTwoStep}
+                  >
+                    <TwoStepEnrollment enrollment={enrollment} />
+
+                    <Field label="Kod" hint="Sex siffror som appen visar efter skanningen">
+                      <Input
+                        name="code"
+                        inputMode="numeric"
+                        autoComplete="one-time-code"
+                        pattern="[0-9 ]{6,7}"
+                        maxLength={7}
+                        required
+                      />
+                    </Field>
+                  </ActionDialog>
                 ) : (
                   <Badge tone="warning">Av</Badge>
                 )}
