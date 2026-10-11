@@ -6,7 +6,7 @@
  * verkstaden, sedan det som händer på kontoret, och sist tillvalen och kontot.
  *
  * Ligger i en egen fil och inte bland guiderna, eftersom samma lista bär
- * formuläret på sidan Support: ett meddelande märkt "Planering" ska betyda
+ * rutan för fel och förslag: ett meddelande märkt "Planering" ska betyda
  * samma sak i hjälpcentret och i inkorgen.
  *
  * Inga importer, så att filen kan läsas från vilket håll som helst.
@@ -31,8 +31,8 @@ export function isHelpAreaKey(value: string): value is HelpAreaKey {
 }
 
 /**
- * Vilket område en sida i panelen hör till. Förväljer området i formuläret på
- * sidan Support, när någon kommer dit från Planering eller Tidrapport.
+ * Vilket område en sida i panelen hör till. Förväljer området i rutan för fel
+ * och förslag, när någon öppnar den på Planering eller Tidrapport.
  *
  * Inställningar delas mellan löneunderlaget och kontot och har därför bara
  * rader för sina undersidor. Översikten hör inte till något område.

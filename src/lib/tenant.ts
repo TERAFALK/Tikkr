@@ -71,12 +71,11 @@ export const TENANT_SCOPED_MODELS = [
   "CompanyPrice",
   // Ändringsloggen. Kundens egen historik, och lika isolerad som resten.
   "AuditEvent",
-  // Supporten. Kunden skriver och läser sina meddelanden här; plattformens
-  // inkorg läser och svarar via unsafeGlobalPrisma, som för CompanyPrice.
+  // Fel och förslag. Kunden skriver sina meddelanden här; plattformens
+  // inkorg läser och arkiverar via unsafeGlobalPrisma, som för CompanyPrice.
   // Ett meddelande om ett fel säger mycket om en kunds verksamhet, och kund A
   // ska aldrig se vad kund B skrivit till oss.
   "FeedbackMessage",
-  "FeedbackReply",
 ] as const;
 
 const TENANT_MODEL_SET: ReadonlySet<string> = new Set(TENANT_SCOPED_MODELS);

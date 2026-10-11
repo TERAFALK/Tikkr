@@ -1,34 +1,27 @@
 import Link from "next/link";
-import type { FeedbackKind, FeedbackStatus } from "@prisma/client";
+import type { FeedbackKind } from "@prisma/client";
 import { requirePlatformAdmin } from "@/lib/platform-admin";
 import { unsafeGlobalPrisma } from "@/lib/db";
 import {
   FEEDBACK_KIND_LABEL,
   INBOX_PAGE_SIZE,
   MAX_BODY_LENGTH,
-  OPEN_STATUSES,
   areaLabel,
   listInbox,
 } from "@/lib/feedback";
 import PlatformShell from "@/components/platform/PlatformShell";
 import Pager from "@/components/platform/Pager";
-import { FeedbackStatusBadge } from "@/components/platform/Pieces";
-import SaveForm from "@/components/admin/SaveForm";
-import { Button, Card, EmptyState, PageHeader, Textarea } from "@/components/ui";
+import ActionDialog from "@/components/ui/ActionDialog";
+import { Card, EmptyState, Field, PageHeader, Textarea } from "@/components/ui";
 import { formatDateTime } from "@/lib/format";
-import { replyAction, setStatusAction } from "./actions";
+import { markDoneAction, type DoneFormState } from "./actions";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Inkorg · Tikkr" };
 
-/** Statusfiltret i adressen. Utan värde: det som inte är klart. */
-const STATUS_FILTERS: Record<string, { label: string; statuses: FeedbackStatus[] }> = {
-  oppna: { label: "Öppna", statuses: OPEN_STATUSES },
-  ny: { label: "Ny", statuses: ["NEW"] },
-  pagar: { label: "Pågår", statuses: ["IN_PROGRESS"] },
-  klar: { label: "Klar", statuses: ["DONE"] },
-  alla: { label: "Alla", statuses: ["NEW", "IN_PROGRESS", "DONE"] },
-};
+/** Vyn i adressen. Utan värde: det som inte är klarmarkerat. */
+const VIEWS = { inkorg: "Inkorg", arkiv: "Arkiv" } as const;
+type View = keyof typeof VIEWS;
 
 /** Typfiltret i adressen, med gemener. */
 const KIND_FILTERS: Record<string, FeedbackKind> = {
@@ -38,24 +31,21 @@ const KIND_FILTERS: Record<string, FeedbackKind> = {
 };
 
 /**
- * INKORGEN: VAD KUNDERNA SKRIVIT TILL OSS (issue #8, steg 2).
+ * INKORGEN: FEL OCH FÖRSLAG FRÅN KUNDERNA (issue #8, steg 2).
  *
- * Fel, förslag och synpunkter från sidan Support i kundernas panel. Nyast
- * först, och bara det som inte är klart om inget annat väljs: Klar är arkivet.
- *
- * Varje meddelande går att besvara och flytta mellan Ny, Pågår och Klar.
- * Kunden ser både svaret och statusen, och får en prick i menyn. Ett svar på
- * ett nytt meddelande gör det till Pågår, se replyToFeedback.
+ * Skickade från rutan i kundernas meny. Ett meddelande klarmarkeras med en
+ * anteckning om vad som gjordes och ligger sedan i arkivet. Kunden ser inget
+ * av det, se feedback.ts.
  */
 export default async function InboxPage({
   searchParams,
 }: {
-  searchParams: Promise<{ status?: string; typ?: string; kund?: string; sida?: string }>;
+  searchParams: Promise<{ vy?: string; typ?: string; kund?: string; sida?: string }>;
 }) {
   const { email } = await requirePlatformAdmin();
   const params = await searchParams;
 
-  const statusKey = params.status && STATUS_FILTERS[params.status] ? params.status : "oppna";
+  const view: View = params.vy === "arkiv" ? "arkiv" : "inkorg";
   const kindKey = params.typ && KIND_FILTERS[params.typ] ? params.typ : undefined;
   const page = Math.max(1, Number(params.sida) || 1);
 
@@ -67,20 +57,25 @@ export default async function InboxPage({
     : null;
 
   const { rows, total } = await listInbox({
-    statuses: STATUS_FILTERS[statusKey].statuses,
+    archived: view === "arkiv",
     kind: kindKey ? KIND_FILTERS[kindKey] : undefined,
     companyId: company?.id,
     page,
   });
 
-  // Filtren bygger på varandra: ett byte av status behåller typ och kund.
-  const hrefWith = (change: { status?: string; typ?: string | null; sida?: number }) => {
+  // Filtren bygger på varandra: ett byte av vy behåller typ och kund.
+  const hrefWith = (change: {
+    vy?: View;
+    typ?: string | null;
+    kund?: null;
+    sida?: number;
+  }) => {
     const query = new URLSearchParams();
-    const status = change.status ?? statusKey;
-    if (status !== "oppna") query.set("status", status);
+    const vy = change.vy ?? view;
+    if (vy !== "inkorg") query.set("vy", vy);
     const typ = change.typ === null ? undefined : (change.typ ?? kindKey);
     if (typ) query.set("typ", typ);
-    if (company) query.set("kund", company.id);
+    if (company && change.kund !== null) query.set("kund", company.id);
     if (change.sida && change.sida > 1) query.set("sida", String(change.sida));
     const text = query.toString();
     return `/plattform/inkorg${text ? `?${text}` : ""}`;
@@ -92,10 +87,10 @@ export default async function InboxPage({
 
       <div className="mb-4 flex flex-wrap items-center gap-x-6 gap-y-3">
         <FilterLinks
-          items={Object.entries(STATUS_FILTERS).map(([key, filter]) => ({
-            href: hrefWith({ status: key }),
-            label: filter.label,
-            active: key === statusKey,
+          items={(Object.keys(VIEWS) as View[]).map((key) => ({
+            href: hrefWith({ vy: key }),
+            label: VIEWS[key],
+            active: key === view,
           }))}
         />
         <FilterLinks
@@ -113,14 +108,17 @@ export default async function InboxPage({
       {company && (
         <p className="mb-4 text-[13px] text-neutral-600">
           Bara {company.name} ·{" "}
-          <Link href="/plattform/inkorg" className="font-medium text-tick-deep hover:underline">
+          <Link
+            href={hrefWith({ kund: null })}
+            className="font-medium text-tick-deep hover:underline"
+          >
             Visa alla kunder
           </Link>
         </p>
       )}
 
       {rows.length === 0 ? (
-        <EmptyState title="Inga meddelanden" />
+        <EmptyState title={view === "arkiv" ? "Arkivet är tomt" : "Inga nya meddelanden"} />
       ) : (
         <div className="max-w-3xl space-y-4">
           {rows.map((message) => (
@@ -130,7 +128,6 @@ export default async function InboxPage({
                   <span className="font-semibold text-neutral-900">
                     {FEEDBACK_KIND_LABEL[message.kind]} · {areaLabel(message.area)}
                   </span>
-                  <FeedbackStatusBadge status={message.status} />
                   <span className="ml-auto text-neutral-500">
                     {formatDateTime(message.createdAt)}
                   </span>
@@ -157,53 +154,40 @@ export default async function InboxPage({
                   {message.body}
                 </p>
 
-                {message.replies.map((reply) => (
-                  <div
-                    key={reply.id}
-                    className="mt-3 rounded-md border-l-2 border-tick-deep bg-neutral-50 px-3 py-2"
-                  >
+                {message.doneAt && (
+                  <div className="mt-3 rounded-md border-l-2 border-neutral-300 bg-neutral-50 px-3 py-2">
                     <p className="text-xs font-medium text-neutral-500">
-                      {reply.authorEmail} · {formatDateTime(reply.createdAt)}
+                      Klar · {message.doneByEmail ?? "okänd"} ·{" "}
+                      {formatDateTime(message.doneAt)}
                     </p>
                     <p className="mt-1 whitespace-pre-wrap break-words text-[13px] leading-relaxed text-neutral-800">
-                      {reply.body}
+                      {message.doneNote}
                     </p>
                   </div>
-                ))}
-              </div>
-
-              <div className="border-t border-neutral-100">
-                <SaveForm
-                  action={replyAction}
-                  submitLabel="Svara"
-                  pendingLabel="Skickar…"
-                  tone="secondary"
-                  className="space-y-3 px-5 py-4"
-                >
-                  <input type="hidden" name="id" value={message.id} />
-                  <Textarea
-                    name="body"
-                    rows={3}
-                    maxLength={MAX_BODY_LENGTH}
-                    required
-                    aria-label="Svar till kunden"
-                    placeholder="Svar till kunden"
-                  />
-                </SaveForm>
-              </div>
-
-              <div className="flex flex-wrap gap-2 border-t border-neutral-100 px-5 py-3">
-                {message.status !== "IN_PROGRESS" && (
-                  <StatusButton id={message.id} status="IN_PROGRESS">
-                    {message.status === "DONE" ? "Öppna igen" : "Markera pågår"}
-                  </StatusButton>
-                )}
-                {message.status !== "DONE" && (
-                  <StatusButton id={message.id} status="DONE">
-                    Markera klar
-                  </StatusButton>
                 )}
               </div>
+
+              {!message.doneAt && (
+                <div className="flex justify-end border-t border-neutral-100 px-5 py-3">
+                  <ActionDialog<DoneFormState>
+                    trigger="Klarmarkera"
+                    title="Klarmarkera"
+                    action={markDoneAction}
+                    initial={{}}
+                    submitLabel="Klarmarkera"
+                  >
+                    <input type="hidden" name="id" value={message.id} />
+                    <Field label="Vad gjordes" hint="Syns bara i arkivet">
+                      <Textarea
+                        name="note"
+                        rows={4}
+                        maxLength={MAX_BODY_LENGTH}
+                        required
+                      />
+                    </Field>
+                  </ActionDialog>
+                </div>
+              )}
             </Card>
           ))}
 
@@ -221,26 +205,6 @@ export default async function InboxPage({
         </div>
       )}
     </PlatformShell>
-  );
-}
-
-function StatusButton({
-  id,
-  status,
-  children,
-}: {
-  id: string;
-  status: FeedbackStatus;
-  children: React.ReactNode;
-}) {
-  return (
-    <form action={setStatusAction}>
-      <input type="hidden" name="id" value={id} />
-      <input type="hidden" name="status" value={status} />
-      <Button type="submit" tone="ghost">
-        {children}
-      </Button>
-    </form>
   );
 }
 

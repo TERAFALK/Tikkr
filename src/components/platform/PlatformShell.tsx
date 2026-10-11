@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { newFeedbackCount } from "@/lib/feedback";
+import { openFeedbackCount } from "@/lib/feedback";
 import PlatformFrame from "./PlatformFrame";
 
 /**
@@ -16,7 +16,7 @@ export default async function PlatformShell({
   email: string;
   children: ReactNode;
 }) {
-  const inboxCount = await newFeedbackCount();
+  const inboxCount = await openFeedbackCount();
 
   return (
     <PlatformFrame email={email} inboxCount={inboxCount}>

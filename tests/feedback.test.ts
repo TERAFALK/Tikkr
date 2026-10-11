@@ -4,25 +4,21 @@ import { forCompany, ReadOnlyError } from "@/lib/tenant";
 import {
   cleanPage,
   FeedbackError,
-  hasUnseenSupportUpdates,
   HOURLY_LIMIT,
-  listCompanyFeedback,
-  markSupportSeen,
+  listInbox,
+  markFeedbackDone,
   MAX_BODY_LENGTH,
-  replyToFeedback,
   sendFeedback,
-  setFeedbackStatus,
   type FeedbackAuthor,
 } from "@/lib/feedback";
 
 /**
- * SUPPORTEN: MEDDELANDEN FRÅN KUNDEN, SVAR FRÅN OSS.
+ * FEL OCH FÖRSLAG: FRÅN KUNDENS RUTA TILL VÅR INKORG OCH VÅRT ARKIV.
  *
  * Det som måste hålla:
  *   företaget kommer ur kundens klient, och kund A ser aldrig kund B:s rader
  *   supportläget kan inte skicka något i kundens namn
- *   ett svar på ett nytt meddelande gör det till Pågår, och tänder pricken
- *   pricken gäller bara personens egna meddelanden
+ *   klarmarkering kräver en anteckning och flyttar meddelandet till arkivet
  *   meddelandet står kvar när avsändarens konto tas bort
  */
 
@@ -80,7 +76,7 @@ describe("att skicka", () => {
     expect(sent.companyId).toBe(companyA);
     expect(sent.authorUserId).toBe(userA);
     expect(sent.authorName).toBe("Anna Andersson");
-    expect(sent.status).toBe("NEW");
+    expect(sent.doneAt).toBeNull();
     expect(sent.area).toBe("PLANNING");
     expect(sent.page).toBe("/admin/planering");
   });
@@ -88,9 +84,8 @@ describe("att skicka", () => {
   it("kund A:s meddelanden syns aldrig för kund B", async () => {
     await sendFeedback(author(), message);
 
-    expect(await listCompanyFeedback(forCompany(companyA))).toHaveLength(1);
-    expect(await listCompanyFeedback(forCompany(companyB))).toEqual([]);
-    expect(await forCompany(companyB).feedbackMessage.count()).toBe(0);
+    expect(await forCompany(companyA).feedbackMessage.count()).toBe(1);
+    expect(await forCompany(companyB).feedbackMessage.findMany()).toEqual([]);
   });
 
   it("tomt område betyder Annat", async () => {
@@ -148,75 +143,59 @@ describe("att skicka", () => {
   });
 });
 
-describe("inkorgen", () => {
-  it("ett svar hamnar hos rätt företag och gör ett nytt meddelande till Pågår", async () => {
-    const sent = await sendFeedback(author(), message);
-    await replyToFeedback({ id: sent.id, body: "Vi tittar på det.", byEmail: PLATFORM });
+describe("inkorgen och arkivet", () => {
+  const inbox = (archived: boolean) =>
+    listInbox({ archived, companyId: companyA, page: 1 });
 
-    const [listed] = await listCompanyFeedback(forCompany(companyA));
-    expect(listed.status).toBe("IN_PROGRESS");
-    expect(listed.statusChangedByEmail).toBe(PLATFORM);
-    expect(listed.replies.map((reply) => reply.body)).toEqual(["Vi tittar på det."]);
-    expect(listed.replies[0].companyId).toBe(companyA);
+  it("klarmarkering flyttar till arkivet med anteckning, och loggas", async () => {
+    const sent = await sendFeedback(author(), message);
+    expect((await inbox(false)).rows.map((row) => row.id)).toEqual([sent.id]);
+    expect((await inbox(true)).total).toBe(0);
+
+    await markFeedbackDone({ id: sent.id, note: "Rättat i v1.4.1.", byEmail: PLATFORM });
+
+    expect((await inbox(false)).total).toBe(0);
+    const [archived] = (await inbox(true)).rows;
+    expect(archived.id).toBe(sent.id);
+    expect(archived.doneNote).toBe("Rättat i v1.4.1.");
+    expect(archived.doneByEmail).toBe(PLATFORM);
+    expect(archived.doneAt).not.toBeNull();
 
     const log = await unsafeGlobalPrisma.platformAuditLog.findMany({
       where: { targetCompanyId: companyA },
     });
-    expect(log.map((row) => row.action)).toEqual(["Svarade på supportmeddelande"]);
+    expect(log.map((row) => row.action)).toEqual(["Klarmarkerade fel eller förslag"]);
   });
 
-  it("ett svar öppnar inte ett meddelande som är klart", async () => {
-    const sent = await sendFeedback(author(), message);
-    await setFeedbackStatus({ id: sent.id, status: "DONE", byEmail: PLATFORM });
-    await replyToFeedback({ id: sent.id, body: "Ett tillägg.", byEmail: PLATFORM });
-
-    const row = await unsafeGlobalPrisma.feedbackMessage.findUniqueOrThrow({ where: { id: sent.id } });
-    expect(row.status).toBe("DONE");
-  });
-
-  it("tomt svar avvisas", async () => {
+  it("utan anteckning klarmarkeras ingenting", async () => {
     const sent = await sendFeedback(author(), message);
     await expect(
-      replyToFeedback({ id: sent.id, body: " ", byEmail: PLATFORM })
+      markFeedbackDone({ id: sent.id, note: "  ", byEmail: PLATFORM })
     ).rejects.toThrow(FeedbackError);
+
+    expect((await inbox(false)).total).toBe(1);
   });
 
-  it("statusbyte loggas, och samma status igen gör ingenting", async () => {
+  it("en andra klarmarkering skriver inte över den första", async () => {
     const sent = await sendFeedback(author(), message);
-    await setFeedbackStatus({ id: sent.id, status: "DONE", byEmail: PLATFORM });
-    await setFeedbackStatus({ id: sent.id, status: "DONE", byEmail: PLATFORM });
+    await markFeedbackDone({ id: sent.id, note: "Första.", byEmail: PLATFORM });
+    await expect(
+      markFeedbackDone({ id: sent.id, note: "Andra.", byEmail: "annan@tikkr.se" })
+    ).rejects.toThrow(FeedbackError);
 
-    const log = await unsafeGlobalPrisma.platformAuditLog.findMany({
-      where: { targetCompanyId: companyA },
+    const row = await unsafeGlobalPrisma.feedbackMessage.findUniqueOrThrow({
+      where: { id: sent.id },
     });
-    expect(log).toHaveLength(1);
-    expect(log[0].detail).toContain("Ny → Klar");
-  });
-});
-
-describe("pricken vid Support", () => {
-  it("tänds av ett svar och släcks när sidan öppnas", async () => {
-    const db = forCompany(companyA);
-    const sent = await sendFeedback(author(), message);
-    expect(await hasUnseenSupportUpdates(db, userA, null)).toBe(false);
-
-    const before = new Date(Date.now() - 1000);
-    await replyToFeedback({ id: sent.id, body: "Rättat.", byEmail: PLATFORM });
-    expect(await hasUnseenSupportUpdates(db, userA, before)).toBe(true);
-
-    await markSupportSeen(db, userA);
-    const { supportSeenAt } = await unsafeGlobalPrisma.adminUser.findUniqueOrThrow({
-      where: { id: userA },
-    });
-    expect(await hasUnseenSupportUpdates(db, userA, supportSeenAt)).toBe(false);
+    expect(row.doneNote).toBe("Första.");
+    expect(row.doneByEmail).toBe(PLATFORM);
   });
 
-  it("en kollegas svar tänder ingen prick", async () => {
-    const sent = await sendFeedback(author(colleagueA), message);
-    await replyToFeedback({ id: sent.id, body: "Rättat.", byEmail: PLATFORM });
+  it("kundfiltret visar bara den kundens meddelanden", async () => {
+    await sendFeedback(author(), message);
+    await sendFeedback(author(await createUser(companyB), companyB), message);
 
-    expect(await hasUnseenSupportUpdates(forCompany(companyA), userA, null)).toBe(false);
-    expect(await hasUnseenSupportUpdates(forCompany(companyA), colleagueA, null)).toBe(true);
+    const { rows } = await inbox(false);
+    expect(rows.map((row) => row.companyId)).toEqual([companyA]);
   });
 });
 

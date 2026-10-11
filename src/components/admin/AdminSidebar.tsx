@@ -11,7 +11,6 @@ import {
   IconDevice,
   IconHelp,
   IconLogout,
-  IconMessage,
   IconMoment,
   IconOrder,
   IconOverview,
@@ -26,6 +25,7 @@ import {
 } from "@/components/ui/icons";
 import type { ModuleKey } from "@/lib/modules";
 import CompanyBadge from "@/components/ui/CompanyBadge";
+import FeedbackButton from "@/components/admin/FeedbackButton";
 import { LogoMark, WordmarkOnly } from "@/components/ui/Logo";
 
 /**
@@ -125,8 +125,6 @@ export default function AdminSidebar({
   modules,
   showAccount,
   unreadNews,
-  supportUpdates,
-  version,
 }: {
   companyName: string;
   email: string;
@@ -136,14 +134,13 @@ export default function AdminSidebar({
   hasLogo: boolean;
   /** Företagets påslagna tillval. Länkar till avstängda moduler utelämnas. */
   modules: ModuleKey[];
-  /** Falskt i supportläget, där ingen är inloggad som kunden. */
+  /**
+   * Falskt i supportläget, där ingen är inloggad som kunden. Döljer både
+   * kontot och rutan för fel och förslag, som inte kan skicka därifrån.
+   */
   showAccount: boolean;
   /** Pricken vid Nyheter: en nyare version än den personen sett. */
   unreadNews: boolean;
-  /** Pricken vid Support: svar eller ny status på ett eget meddelande. */
-  supportUpdates: boolean;
-  /** Versionen som kör, från bygget. */
-  version: string;
 }) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
@@ -158,14 +155,6 @@ export default function AdminSidebar({
     if (onNews) setNewsOpened(true);
   }, [onNews]);
   const showNewsDot = unreadNews && !newsOpened && !onNews;
-
-  // Samma sak för Support.
-  const onSupport = pathname.startsWith("/admin/support");
-  const [supportOpened, setSupportOpened] = useState(false);
-  useEffect(() => {
-    if (onSupport) setSupportOpened(true);
-  }, [onSupport]);
-  const showSupportDot = supportUpdates && !supportOpened && !onSupport;
 
   // Typen skrivs ut, annars slår TypeScript ihop avsnitten till en union där
   // fält som bara finns på vissa länkar (badge, exact) försvinner.
@@ -315,46 +304,6 @@ export default function AdminSidebar({
           </Link>
         )}
 
-        {/* HJÄLPCENTRET, i en ny flik. Står ovanför Inställningar och inte
-            bland länkarna ovan: det är ingen del av arbetsytan, och den som
-            letar hjälp letar längst ner, där kontot och utloggningen står.
-            Adressen är relativ av samma skäl som i HelpLink. */}
-        <a
-          href="/support"
-          target="_blank"
-          rel="noopener"
-          className="flex items-center gap-2.5 rounded-md px-2 py-1.5 text-[13px] font-medium text-neutral-600 transition-colors hover:bg-neutral-50 hover:text-neutral-900"
-        >
-          <IconHelp className="text-neutral-400" />
-          Hjälp
-        </a>
-
-        {/* SUPPORTEN, bredvid hjälpcentret: den som inte hittade svaret där
-            är ett steg från att skriva till oss. Sidan man står på följer
-            med, så att formuläret kan förvälja området och vi ser var felet
-            uppstod. Se support/page.tsx. */}
-        <Link
-          href={
-            onSupport
-              ? "/admin/support"
-              : `/admin/support?sida=${encodeURIComponent(pathname)}`
-          }
-          onClick={() => setOpen(false)}
-          className={`flex items-center gap-2.5 rounded-md px-2 py-1.5 text-[13px] font-medium transition-colors ${
-            onSupport
-              ? "bg-neutral-100 text-neutral-900"
-              : "text-neutral-600 hover:bg-neutral-50 hover:text-neutral-900"
-          }`}
-        >
-          <IconMessage className={onSupport ? "text-tick-deep" : "text-neutral-400"} />
-          <span className="flex-1">Support</span>
-          {showSupportDot && (
-            <span className="size-2 rounded-full bg-tick-deep">
-              <span className="sr-only">Uppdaterat</span>
-            </span>
-          )}
-        </Link>
-
         <Link
           href="/admin/installningar"
           onClick={() => setOpen(false)}
@@ -385,12 +334,32 @@ export default function AdminSidebar({
         </form>
 
         {/* Tikkr-märket nedtonat. Panelen tillhör kunden — deras logotyp står
-            överst, vår står i marginalen. */}
-        <div className="flex items-center gap-2 px-2 pt-2.5 text-neutral-400">
+            överst, vår står i marginalen. Versionen står på sidan Nyheter
+            och inte här (ändrat 2026-10-11): den säger kunden något bara där
+            ändringarna i den står.
+
+            HJÄLPEN OCH RUTAN FÖR FEL OCH FÖRSLAG står här, som ikoner, och
+            inte som rader i listan ovanför (ändrat 2026-10-11). De handlar om
+            Tikkr och inte om arbetsytan, precis som märket, och listan växte
+            till en vägg. Hjälpen nås dessutom från rubriken på varje sida den
+            gäller. Adressen är relativ av samma skäl som i HelpLink. */}
+        <div className="relative flex items-center gap-2 px-2 pt-2.5 text-neutral-400">
           <LogoMark size={22} />
           <WordmarkOnly height={10} tone="current" />
-          <span className="ml-auto truncate text-[11px] tabular-nums">
-            {version}
+          <span className="ml-auto flex shrink-0 items-center">
+            <a
+              href="/support"
+              target="_blank"
+              rel="noopener"
+              aria-label="Hjälp"
+              title="Hjälp"
+              className={footerIcon}
+            >
+              <IconHelp />
+            </a>
+            {showAccount && (
+              <FeedbackButton pathname={pathname} className={footerIcon} />
+            )}
           </span>
         </div>
       </div>
@@ -429,6 +398,10 @@ export default function AdminSidebar({
     </>
   );
 }
+
+/** Ikonknapparna i menyns fot. Stora nog att träffa, tysta tills man pekar. */
+const footerIcon =
+  "rounded-md p-1.5 text-neutral-400 transition-colors hover:bg-neutral-100 hover:text-neutral-900";
 
 function CompanyHeader({
   companyName,
