@@ -4,8 +4,14 @@ import Motif from "./Motif";
  * SÄLJSIDANS YTOR.
  *
  * Varje avsnitt på sidan ligger på en av sex färger, och det är allt en platta
- * yta kan göra. Det här är lagren som läggs OVANPÅ färgen: ljuset, rutnätet,
- * hårlinjen och skarven mellan två avsnitt.
+ * yta kan göra. Det här är lagren som läggs OVANPÅ färgen: ljuset, rutnätet
+ * och glöden under en produktbild.
+ *
+ * SKARVEN MELLAN TVÅ AVSNITT LÅG HÄR OCH ÄR BORTTAGEN. Den tonade den ena
+ * ytans färg in i den andra över ett par centimeter, och resultatet lästes som
+ * ett grumligt band tvärs över sidan — nio gånger på vägen ned. Ytorna möts nu
+ * i en rak kant, och de två ljusa ytorna skiljs av en hårlinje. Se
+ * `src/app/page.tsx`, där hela ordningen står i en följd.
  *
  * VARFÖR DE LIGGER SAMLADE HÄR OCH INTE I VARJE AVSNITT. Sidan har nio
  * avsnitt. Skrevs ljuset på plats i varje skulle det bli nio uppsättningar
@@ -19,8 +25,8 @@ import Motif from "./Motif";
  * bakgrunden sju gånger, och den som försöker markera en rubrik ska inte träffa
  * en gradient.
  *
- * FÄRGERNA LIGGER I `globals.css`. Klasserna `brand-aurora`, `brand-grid` och
- * de andra är definierade där, av guidens sex hexkoder. Att de står som
+ * FÄRGERNA LIGGER I `globals.css`. Klasserna `brand-aurora` och `brand-grid`
+ * är definierade där, av guidens sex hexkoder. Att de står som
  * hexkoder och inte som tokens har ett skäl som står på plats i den filen.
  */
 
@@ -93,104 +99,6 @@ export function Grid({
         tone === "onDark" ? "brand-grid" : "brand-grid-light"
       }`}
     />
-  );
-}
-
-/* -------------------------------------------------------------------------- */
-/* Skarven mellan två avsnitt                                                  */
-/* -------------------------------------------------------------------------- */
-
-/**
- * ÖVERGÅNGEN MELLAN TVÅ YTOR.
- *
- * Sidan växlar mellan Fjord, Snö, vitt och grönt nio gånger på vägen ned.
- * Varje växling var tidigare en rak kant, och nio raka kanter läses som nio
- * sidor staplade på varandra i stället för som en sida med en rytm.
- *
- * Skarven gör två saker. Den tonar den föregående ytans färg in i den nya över
- * ett par centimeter, och den lägger en hårfin accentlinje i överkanten, där
- * ytan ovanför tar slut. Linjen är ljusast i mitten och försvinner mot sidorna,
- * så att den läses som ett ljus längs kanten och inte som en ram runt avsnittet.
- *
- * LIGGER SOM EN EGEN RAD MELLAN AVSNITTEN och inte som en pseudoelement på
- * dem. Två avsnitt som båda ritar sin egen halva av skarven måste hållas i
- * takt med varandra, och de hinner alltid sluta vara det — samma skäl som att
- * orderns beräknade tid aldrig lagras på två ställen.
- *
- * Färgerna är avsiktligt de två avsnittens FAKTISKA och inte en generisk grå.
- * En skarv som inte möter ytan den sitter mellan är en synlig remsa, alltså
- * precis det den ska dölja.
- */
-export type SeamTone =
-  | "darkToLight"
-  | "lightToDark"
-  | "lightToWhite"
-  | "whiteToLight"
-  | "whiteToDark"
-  | "darkToWhite"
-  | "lightToTick"
-  | "tickToDark";
-
-/**
- * Vilken av de åtta skarvarna, och var linjen sitter.
- *
- * SJÄLVA ÖVERGÅNGEN LIGGER I `globals.css`, som `.seam-*`. Skälet står där:
- * en rak gradient mellan Fjord och Snö går genom död gråska och ändrar sig
- * lika mycket hela vägen, vilket ger ett grått band med en kant mitt i. Åtta
- * skarvar delar därför EN kurva, och här står bara vilka två färger var och en
- * går mellan.
- *
- * LINJENS FÄRG STÅR KVAR HÄR, eftersom den är en accent och inte en yta. Den
- * väljs numera mot den ÖVRE ytan och inte mot mitten, eftersom linjen flyttat
- * dit: Tick på Fjord, Tick Deep på Snö och vitt, Fjord på Tick. Vitt på Snö,
- * som stod här förut, syntes inte alls när linjen hamnade där.
- */
-const SEAMS: Record<SeamTone, { surface: string; line: string }> = {
-  // Fjord ned i Snö. Hero in i problemavsnittet.
-  darkToLight: { surface: "seam-dark-light", line: "via-tick/30" },
-  lightToDark: { surface: "seam-light-dark", line: "via-tick-deep/25" },
-  lightToWhite: { surface: "seam-light-white", line: "via-tick-deep/20" },
-  whiteToLight: { surface: "seam-white-light", line: "via-tick-deep/20" },
-  whiteToDark: { surface: "seam-white-dark", line: "via-tick-deep/25" },
-  darkToWhite: { surface: "seam-dark-white", line: "via-tick/30" },
-  // Snö ned i Tick. Den enda skarven mot en grön yta, alltså den sista.
-  lightToTick: { surface: "seam-light-tick", line: "via-tick-deep/25" },
-  /*
-    Tick ned i Fjord, alltså det gröna blocket in i sidfoten.
-
-    Linjen är Fjord och inte vit eller grön. Mot en övergång som redan går
-    från ljust till mörkt skulle en ljus linje bli ett tredje ljus och en grön
-    försvinna i ytan ovanför.
-  */
-  tickToDark: { surface: "seam-tick-dark", line: "via-neutral-900/20" },
-};
-
-/**
- * LINJEN SITTER I ÖVERKANTEN OCH INTE PÅ MITTEN.
- *
- * På mitten låg den i den ljusaste delen av övergången, alltså i det som
- * tidigare var ett grått band, och lästes där som ett streck någon glömt. I
- * överkanten ligger den där ytan ovanför tar slut och läses som en kant som
- * fångar ljus — samma grepp som ljusningen överst på produktbildernas ram.
- *
- * HÖJDEN ÄR TILLTAGEN MED FLIT, och det är hälften av rättningen. Skarven var
- * 112 pixlar och är 176. En övergång från Fjord till Snö spelar ut åttiosex
- * punkter ljushet oavsett hur lång den är; på halva sträckan blir varje pixel
- * dubbelt så stort steg, och då syns stegen. Kurvan och höjden tillsammans gör
- * att även den brantaste punkten är flackare än den raka ramp som satt här.
- */
-export function Seam({ tone }: { tone: SeamTone }) {
-  const { surface, line } = SEAMS[tone];
-
-  return (
-    <div
-      aria-hidden="true"
-      className={`seam ${surface} relative h-28 sm:h-44`}
-    >
-      <div
-        className={`absolute inset-x-0 top-0 h-px bg-linear-to-r from-transparent to-transparent ${line}`}
-      />
-    </div>
   );
 }
 

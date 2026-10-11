@@ -1,16 +1,4 @@
 import { PlateGlow } from "./Atmosphere";
-import {
-  AdminMockup,
-  CalcMockup,
-  ExportMockup,
-  OrderNumberMockup,
-  OrderPickMockup,
-  ReportMockup,
-  ReviewMockup,
-  RunningMockup,
-  TimesheetMockup,
-} from "./Mockups";
-
 /**
  * HUR PRODUKTBILDERNA STÄLLS FRAM.
  *
@@ -192,81 +180,6 @@ export function SatelliteCard({
       {foot && (
         <p className="mt-2 text-[10px] leading-snug text-neutral-400">{foot}</p>
       )}
-    </div>
-  );
-}
-
-/* -------------------------------------------------------------------------- */
-/* Bandet med gränssnitten                                                     */
-/* -------------------------------------------------------------------------- */
-
-/**
- * ALLA YTOR PÅ EN GÅNG, SOM ETT BAND SOM DRAR FÖRBI.
- *
- * Sidan visar annars en yta i taget, vid den text som förklarar den. Det är
- * rätt för den som läser uppifrån och ned, men det svarar aldrig på frågan en
- * köpare faktiskt har efter tre avsnitt: hur mycket ÄR det här?
- *
- * Bandet svarar på den. Nio ytor ur produkten i en rad som drar förbi i jämn
- * takt — stämplingsskärmens tre vyer, panelen, rapporten, granskningen och de
- * tre dokumenten. Ingen text, inga rubriker. Den som tittar i fem sekunder har
- * förstått omfattningen.
- *
- * SPÅRET INNEHÅLLER SAMMA BILDER TVÅ GÅNGER. Animationen flyttar det exakt
- * halva bredden, vilket betyder att den andra uppsättningen står precis där
- * den första stod när varvet börjar om. Flyttades hela bredden syns ett hopp
- * vid varje varv, och ett hopp var sextionde sekund är värre än inget band.
- *
- * `aria-hidden` på den andra uppsättningen: den är en kopia, och den som
- * lyssnar på sidan ska inte höra nio produktbilder två gånger.
- *
- * BILDERNA ÄR INTE INTERAKTIVA, och det är avsiktligt. De är bilder av
- * produkten; vill man röra den finns provperioden. Draget pausas däremot när
- * pekaren vilar på bandet, så att den som vill se en bild närmare kan det.
- */
-const STRIP = [
-  { key: "kiosk", node: <RunningMockup /> },
-  { key: "pad", node: <OrderNumberMockup /> },
-  { key: "order", node: <OrderPickMockup /> },
-  { key: "admin", node: <AdminMockup /> },
-  { key: "report", node: <ReportMockup /> },
-  { key: "review", node: <ReviewMockup /> },
-  { key: "export", node: <ExportMockup /> },
-  { key: "calc", node: <CalcMockup /> },
-  { key: "timesheet", node: <TimesheetMockup /> },
-];
-
-export function SurfaceStrip() {
-  const lane = (copy: boolean) => (
-    <div
-      aria-hidden={copy || undefined}
-      className="flex shrink-0 items-start gap-5 pr-5 sm:gap-7 sm:pr-7"
-    >
-      {STRIP.map((item) => (
-        <div
-          key={`${item.key}-${copy ? "kopia" : "original"}`}
-          /* Bredden är fast och inte procentuell. Spåret ligger utanför varje
-             spalt, och en procentbredd mot ett element utan bredd blir noll.
-
-             RUNDNINGEN, TÄCKNINGEN OCH LYFTET LIGGER I `.surface-card`, se
-             globals.css. Kortet bar tidigare `plate-dark` utan radie, och en
-             box-shadow följer elementets egen rundning — bakom ett rundat kort
-             låg alltså en fyrkantig mörk gloria, som kom fram i samma stund
-             pekaren tog upp täckningen till hundra. */
-          className="plate-dark surface-card w-[19rem] shrink-0 sm:w-[23rem]"
-        >
-          {item.node}
-        </div>
-      ))}
-    </div>
-  );
-
-  return (
-    <div className="marquee-stage relative">
-      <div className="animate-marquee flex w-max">
-        {lane(false)}
-        {lane(true)}
-      </div>
     </div>
   );
 }

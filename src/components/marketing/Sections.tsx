@@ -16,7 +16,7 @@ import { SLOGAN } from "@/lib/brand";
 import ContactLine from "./ContactLine";
 import { Aurora, Grid, LiveBadge, Motif, PlateGlow } from "./Atmosphere";
 import Parallax from "./Parallax";
-import { Plate, SatelliteCard, SurfaceStrip } from "./Showcase";
+import { Plate, SatelliteCard } from "./Showcase";
 import PriceCalculator from "./PriceCalculator";
 import { faqQuestions } from "./faq-data";
 import type { ModulePricing, ScreenPricing } from "@/lib/stripe";
@@ -594,7 +594,7 @@ export function HowItWorks() {
   return (
     <section
       id="sa-funkar-det"
-      className="relative scroll-mt-16 overflow-hidden bg-white"
+      className="relative scroll-mt-16 overflow-hidden border-t border-neutral-200 bg-white"
     >
       <div className={SHELL}>
         <SectionHead
@@ -646,53 +646,6 @@ export function HowItWorks() {
 }
 
 /* -------------------------------------------------------------------------- */
-/* Bandet med samtliga ytor                                                    */
-/* -------------------------------------------------------------------------- */
-
-/**
- * GÅNGJÄRNET MELLAN VERKSTADEN OCH KONTORET.
- *
- * Avsnitten ovanför visar tre ytor, ett åt gången, vid texten som förklarar
- * dem. Det är rätt för den som läser uppifrån och ned. Det svarar bara inte på
- * frågan en köpare har efter två avsnitt: hur mycket är det här?
- *
- * Bandet svarar på den utan ett ord. Åtta ytor ur produkten drar förbi i jämn
- * takt, och den som tittar i fem sekunder har sett omfattningen. Rörelsen och
- * varför spåret innehåller samma bilder två gånger står i `Showcase.tsx`.
- *
- * INGET NUMMER OCH INGEN RUBRIK I AVSNITTSFORM. Numren är sidans
- * innehållsförteckning, och en bild av omfattningen är inte ett kapitel.
- * Rubriken står därför centrerad och liten, utan spalt, och avsnittet är
- * kortare än de andra: det är en övergång och inte ett stopp.
- *
- * FULLBREDD MED FLIT. Bandet är det enda på sidan som går utanför spalten, och
- * det är hela greppet — produkten fortsätter utanför det man ser.
- */
-export function Surfaces() {
-  return (
-    <section className="relative overflow-hidden bg-neutral-900 py-20 sm:py-24">
-      <Aurora tone="onDark" />
-      <Grid tone="onDark" />
-
-      <div className="relative">
-        <div className="mx-auto max-w-6xl px-6 text-center">
-          <p className="text-[11px] font-medium uppercase tracking-wider text-tick">
-            Samtliga ytor
-          </p>
-          <h2 className="sheen-text mx-auto mt-4 max-w-xl bg-linear-to-b from-white via-white to-neutral-200 text-[26px] font-semibold leading-tight tracking-tight sm:text-[34px]">
-            Stämplingsskärmen, panelen och underlagen
-          </h2>
-        </div>
-
-        <div className="mt-14">
-          <SurfaceStrip />
-        </div>
-      </div>
-    </section>
-  );
-}
-
-/* -------------------------------------------------------------------------- */
 /* 03 På kontoret                                                              */
 /* -------------------------------------------------------------------------- */
 
@@ -711,7 +664,7 @@ export function AdminSection() {
   return (
     <section
       id="panelen"
-      className="relative scroll-mt-16 overflow-hidden bg-neutral-50"
+      className="relative scroll-mt-16 overflow-hidden border-t border-neutral-200 bg-neutral-50"
     >
       <Aurora tone="onLight" />
 
@@ -808,7 +761,7 @@ export function Documents() {
   return (
     <section
       id="underlag"
-      className="relative scroll-mt-16 overflow-hidden bg-white"
+      className="relative scroll-mt-16 overflow-hidden border-t border-neutral-200 bg-white"
     >
       <div className={SHELL}>
         <SectionHead
@@ -1240,7 +1193,7 @@ export function Faq({ modules }: { modules: ModulePricing }) {
   return (
     <section
       id="fragor"
-      className="relative scroll-mt-16 overflow-hidden bg-neutral-50"
+      className="relative scroll-mt-16 overflow-hidden border-t border-neutral-200 bg-neutral-50"
     >
       <Motif tone="onLight" className="-bottom-96 -right-72 h-[48rem] w-[48rem]" />
 

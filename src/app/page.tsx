@@ -2,7 +2,6 @@ import type { Metadata } from "next";
 import { pageMetadata } from "@/lib/seo";
 import { getModulePricing, getScreenPricing } from "@/lib/stripe";
 import Reveal from "@/components/marketing/Reveal";
-import { Seam } from "@/components/marketing/Atmosphere";
 import { SiteFooter, SiteHeader } from "@/components/marketing/SiteChrome";
 import StructuredData from "@/components/marketing/StructuredData";
 import {
@@ -16,7 +15,6 @@ import {
   HowItWorks,
   Pricing,
   Problem,
-  Surfaces,
 } from "@/components/marketing/Sections";
 
 /**
@@ -45,20 +43,21 @@ export const metadata: Metadata = pageMetadata({
 });
 
 /**
- * SIDANS ORDNING OCH DESS SKARVAR.
+ * SIDANS ORDNING OCH DESS YTOR.
  *
  * Avsnitten ligger på var sin yta, och ordningen är satt i `Sections.tsx`:
- * Fjord, Snö, vit, Fjord, Snö, vit, Fjord, vit, Snö, Tick.
+ * Fjord, Snö, vit, Snö, vit, Fjord, vit, Snö, Tick.
  *
- * SKARVARNA SITTER HÄR OCH INTE I AVSNITTEN. En skarv går mellan TVÅ ytor och
- * måste känna dem båda; skrev varje avsnitt sin egen halva av övergången till
- * nästa skulle de två halvorna behöva hållas i takt med varandra, och de
- * hinner alltid sluta vara det. Här står hela ordningen i en följd, och en
- * felaktig skarv syns i samma blick som den skrivs. Samma skäl som att orderns
- * totala beräkning aldrig lagras på två ställen, se CLAUDE.md § 3 regel 6.
+ * YTORNA MÖTS I EN RAK KANT. Mellan avsnitten låg tidigare en tonad skarv som
+ * smetade ut den ena färgen i den andra över ett par centimeter. Den syntes
+ * som ett grumligt band tvärs över sidan, och nio sådana band gjorde att
+ * sidan såg suddig ut i stället för sammanhållen. En rak kant mellan två
+ * ytor är inget ögat snubblar på — det är så en sida med tryckta ytor ser ut.
  *
- * SKARVARNA LIGGER UTANFÖR `Reveal`. En övergång mellan två ytor som tonas in
- * när man skrollar dit är en remsa som blinkar till mitt i resan.
+ * DE TVÅ LJUSA YTORNA SKILJS AV EN HÅRLINJE. Snö och vitt ligger nära
+ * varandra, och utan linje läses kanten som ett misstag i stället för som ett
+ * byte. Linjen står på avsnittet som ligger UNDER, eftersom bara det vet vad
+ * som kom före. Mot en mörk eller grön yta behövs ingen: kontrasten är kanten.
  */
 export default async function Home() {
   // Hämtas parallellt. Båda ligger bakom samma korta minne i stripe.ts, så
@@ -78,55 +77,38 @@ export default async function Home() {
       <Hero />
       <Facts />
 
-      <Seam tone="darkToLight" />
       <Reveal>
         <Problem />
       </Reveal>
 
-      <Seam tone="lightToWhite" />
       <Reveal>
         <HowItWorks />
       </Reveal>
 
-      {/* Gångjärnet mellan verkstaden och kontoret. Står utanför `Reveal`:
-          bandet drar förbi av sig själv, och en intoning ovanpå ett pågående
-          drag läses som att bandet hakar upp sig vid ankomsten. */}
-      <Seam tone="whiteToDark" />
-      <Surfaces />
-
-      <Seam tone="darkToLight" />
       <Reveal>
         <AdminSection />
       </Reveal>
 
-      <Seam tone="lightToWhite" />
       <Reveal>
         <Documents />
       </Reveal>
 
-      <Seam tone="whiteToDark" />
       <Reveal>
         <Capabilities />
       </Reveal>
 
-      <Seam tone="darkToWhite" />
       <Reveal>
         <Pricing pricing={pricing} modules={modules} />
       </Reveal>
 
-      <Seam tone="whiteToLight" />
       <Reveal>
         <Faq modules={modules} />
       </Reveal>
 
-      <Seam tone="lightToTick" />
       <Reveal>
         <FinalCta pricing={pricing} />
       </Reveal>
 
-      {/* Den sista skarven ligger här och inte i foten. Foten står också på de
-          rättsliga sidorna och i hjälpcentret, där ytan ovanför är en annan. */}
-      <Seam tone="tickToDark" />
       <SiteFooter />
     </div>
   );

@@ -759,18 +759,26 @@ function Stat({
         : "text-neutral-900";
 
   return (
-    <div className="rounded-lg border border-neutral-200 bg-white px-2.5 py-2">
+    <div className="flex h-full flex-col rounded-lg border border-neutral-200 bg-white px-2.5 py-2">
       {/* Etiketten bryter rader i stället för att kapas. Fyra nyckeltal står
           bredvid varandra i en bild som är en halv spalt bred, och "Ogranska…"
-          är ett ord som inte betyder något. */}
-      <span className="block text-[9px] font-medium leading-tight text-neutral-500">
+          är ett ord som inte betyder något.
+
+          HÖJDEN ÄR RESERVERAD FÖR TVÅ RADER, och det är hela skälet att den
+          står här. "Att granska" ryms på en rad och "Arbetar just nu" på två,
+          och utan reserverad höjd hamnade de fyra talen under varandra på
+          fyra olika höjder. En rad nyckeltal med talen i otakt ser ut som ett
+          fel i bilden, inte som fyra olika långa etiketter. */}
+      <span className="block min-h-[2.1em] text-[9px] font-medium leading-tight text-neutral-500">
         {label}
       </span>
       <span className={`block text-sm font-semibold tabular-nums ${valueTone}`}>
         {value}
       </span>
+      {/* Tipsraden ligger sist och trycks nedåt, så att den inte flyttar
+          talet ovanför i de rutor som har en. */}
       {hint && (
-        <span className="block text-[8px] leading-tight text-neutral-400">
+        <span className="mt-auto block pt-0.5 text-[8px] leading-tight text-neutral-400">
           {hint}
         </span>
       )}

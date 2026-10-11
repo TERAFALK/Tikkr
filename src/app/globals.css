@@ -591,55 +591,6 @@ dialog {
 }
 
 /* --------------------------------------------------------------------------
-   Bandet med gränssnitten.
-
-   En rad produktbilder som drar förbi i jämn takt. Spåret innehåller samma
-   bilder två gånger och flyttas exakt halva sin bredd, vilket gör varvet
-   omärkligt. Flyttades det hela bredden syns ett hopp vid varje varv.
-
-   Draget pausas när pekaren vilar på bandet, så att den som vill se en bild
-   närmare kan göra det.
-   -------------------------------------------------------------------------- */
-@keyframes marquee {
-  from {
-    transform: translate3d(0, 0, 0);
-  }
-  to {
-    transform: translate3d(-50%, 0, 0);
-  }
-}
-
-.animate-marquee {
-  animation: marquee 68s linear infinite;
-  will-change: transform;
-}
-
-.marquee-stage:hover .animate-marquee {
-  animation-play-state: paused;
-}
-
-/*
-  Tonar ut spåret mot båda kanterna, så att bilderna glider in ur ytan i
-  stället för att dyka upp vid en kant.
-*/
-.marquee-stage {
-  -webkit-mask-image: linear-gradient(
-    to right,
-    transparent,
-    #000 8%,
-    #000 92%,
-    transparent
-  );
-  mask-image: linear-gradient(
-    to right,
-    transparent,
-    #000 8%,
-    #000 92%,
-    transparent
-  );
-}
-
-/* --------------------------------------------------------------------------
    Pulsen runt punkten som visar att något pågår just nu.
    -------------------------------------------------------------------------- */
 @keyframes ping-soft {
@@ -688,182 +639,6 @@ dialog {
     0 2px 6px -1px rgba(3, 7, 12, 0.5),
     0 32px 64px -24px rgba(3, 7, 12, 0.66),
     0 80px 120px -60px rgba(3, 7, 12, 0.78);
-}
-
-/* --------------------------------------------------------------------------
-   SKARVEN MELLAN TVÅ AVSNITT.
-
-   EN RAK GRADIENT MELLAN FJORD OCH SNÖ ÄR FUL, och det är inte en smaksak.
-   Två saker går fel samtidigt:
-
-   1. Vägen går genom död gråska. Fjord är mörkt och blått, Snö är ljust och
-      varmt. Räknar webbläsaren rakt mellan dem passerar den runt #828E8F —
-      en färg som inte finns i guiden och inte hör hemma någonstans på sidan.
-      Den syns som ett grått band mitt i övergången.
-
-   2. En rak ramp ändrar sig lika mycket hela vägen. Ögat läser det som en
-      kant som sitter mitt i ingenting, och på en åttabitarsskärm blir det
-      dessutom synliga ränder över de dryga hundra pixlarna.
-
-   DÄRFÖR RITAS SKARVEN SOM TVÅ LAGER OCH INTE SOM EN GRADIENT. Underfärgen
-   ligger som bakgrund, överfärgen som ett lager ovanpå den, och det lagret
-   tonas bort med en MASK. Masken bär hela kurvan.
-
-   Kurvan är smoothstep, alltså 3t² − 2t³. Den börjar och slutar vågrätt, vilket
-   är hela poängen: en rak ramp möter de två ytorna i en vinkel, och den vinkeln
-   är kanten ögat får syn på. Här finns ingen — överfärgen släpper taget
-   gradvis och den nya tar vid lika gradvis.
-
-   SMOOTHSTEP OCH INTE SMOOTHERSTEP. Den brantare syskonkurvan (6t⁵ − 15t⁴ +
-   10t³) ger mjukare ändar men flyttar hela rörelsen till mitten, där lutningen
-   då blir 1,875 gånger den raka rampens. Det byter ut en kant mot en annan.
-   Smoothstep ligger på 1,5, och tillsammans med höjden nedan är även kurvans
-   brantaste punkt flackare än den raka ramp den ersätter.
-
-   Sjutton steg i stället för två är också vad som tar bort ränderna: övergången
-   spelar ut åttiosex punkter ljushet, och på en åttabitarsskärm syns de som
-   ett trappsteg per pixel om det bara finns två stopp att interpolera mellan.
-
-   ATT MASKEN BÄR KURVAN och inte färgerna är hela poängen med upplägget: åtta
-   skarvar delar en enda kurva, och varje skarv behöver bara säga vilka två
-   färger den går mellan. Skrevs kurvan in i varje gradient skulle det bli åtta
-   uppsättningar stopp som ska hållas i takt, vilket är samma fel som
-   Atmosphere.tsx finns för att undvika.
-
-   Färgerna står som tokens och inte som hexkoder. Den som byter en färg i
-   guiden byter den på ett ställe.
-   -------------------------------------------------------------------------- */
-.seam {
-  position: relative;
-  background-color: var(--seam-bottom);
-}
-
-.seam::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  background-color: var(--seam-top);
-
-  --seam-ease: linear-gradient(
-    to bottom,
-    rgb(0 0 0 / 1) 0%,
-    rgb(0 0 0 / 0.989) 6.25%,
-    rgb(0 0 0 / 0.957) 12.5%,
-    rgb(0 0 0 / 0.908) 18.75%,
-    rgb(0 0 0 / 0.844) 25%,
-    rgb(0 0 0 / 0.768) 31.25%,
-    rgb(0 0 0 / 0.684) 37.5%,
-    rgb(0 0 0 / 0.593) 43.75%,
-    rgb(0 0 0 / 0.5) 50%,
-    rgb(0 0 0 / 0.407) 56.25%,
-    rgb(0 0 0 / 0.316) 62.5%,
-    rgb(0 0 0 / 0.232) 68.75%,
-    rgb(0 0 0 / 0.156) 75%,
-    rgb(0 0 0 / 0.092) 81.25%,
-    rgb(0 0 0 / 0.043) 87.5%,
-    rgb(0 0 0 / 0.011) 93.75%,
-    rgb(0 0 0 / 0) 100%
-  );
-
-  -webkit-mask-image: var(--seam-ease);
-  mask-image: var(--seam-ease);
-}
-
-/*
-  De åtta skarvarna. Två färger var, och ingenting mer.
-
-  Namnet säger vilken yta som ligger OVANFÖR och vilken som ligger under, i
-  den ordningen. Vilken skarv som sitter var bestäms i src/app/page.tsx, där
-  hela sidans ordning står i en följd.
-*/
-.seam-dark-light {
-  --seam-top: var(--color-fjord);
-  --seam-bottom: var(--color-sno);
-}
-
-.seam-light-dark {
-  --seam-top: var(--color-sno);
-  --seam-bottom: var(--color-fjord);
-}
-
-.seam-light-white {
-  --seam-top: var(--color-sno);
-  --seam-bottom: #ffffff;
-}
-
-.seam-white-light {
-  --seam-top: #ffffff;
-  --seam-bottom: var(--color-sno);
-}
-
-.seam-white-dark {
-  --seam-top: #ffffff;
-  --seam-bottom: var(--color-fjord);
-}
-
-.seam-dark-white {
-  --seam-top: var(--color-fjord);
-  --seam-bottom: #ffffff;
-}
-
-.seam-light-tick {
-  --seam-top: var(--color-sno);
-  --seam-bottom: var(--color-tick);
-}
-
-/*
-  Tick ned i Fjord, alltså det gröna blocket in i sidfoten.
-
-  De två färger som ligger längst från varandra i guiden, och den skarv som
-  tjänar mest på kurvan: en rak ramp mellan dem ger ett smutsgrönt band som
-  inte liknar någon av dem.
-*/
-.seam-tick-dark {
-  --seam-top: var(--color-tick);
-  --seam-bottom: var(--color-fjord);
-}
-
-/* --------------------------------------------------------------------------
-   KORTEN I BANDET.
-
-   Ett eget läge i stället för Tailwinds `hover:`-klasser, av två skäl.
-
-   RUNDNINGEN MÅSTE SITTA PÅ SAMMA ELEMENT SOM SKUGGAN. Korten bar `plate-dark`
-   utan någon radie, och en box-shadow följer elementets egen rundning. Bakom
-   ett rundat kort låg alltså en fyrkantig mörk gloria. Vid åttiofem procents
-   täckning syntes den knappt; när pekaren tog upp kortet till hundra kom
-   hörnen fram, och kortet såg fyrkantigt ut just i det ögonblick man tittade
-   på det.
-
-   ÖVERGÅNGEN MÅSTE OMFATTA TÄCKNINGEN. Kortet bar `.plate`, som lyder ut en
-   `transition` för transform och box-shadow. En Tailwind-klass som lägger till
-   opacity skriver över hela den raden i stället för att utöka den, och
-   täckningen hoppade därför i stället för att tonas. Här står alla tre i samma
-   regel, och `.plate` behövs inte längre på kortet.
-
-   Lyftet är tio pixlar och inte sex, och glöden är grön. Bandet rör sig, och
-   en effekt som ska gå att uppfatta på något som redan rör sig måste vara
-   tydligare än en på något som står still. Grönt är accent och aldrig
-   huvudfärg: det är en kant och ett sken, inte en fyllning.
-   -------------------------------------------------------------------------- */
-.surface-card {
-  border-radius: var(--radius-lg, 0.5rem);
-  opacity: 0.85;
-  transition:
-    transform 0.4s cubic-bezier(0.16, 1, 0.3, 1),
-    opacity 0.4s cubic-bezier(0.16, 1, 0.3, 1),
-    box-shadow 0.4s cubic-bezier(0.16, 1, 0.3, 1);
-}
-
-.surface-card:hover {
-  opacity: 1;
-  transform: translate3d(0, -10px, 0);
-  box-shadow:
-    0 2px 6px -1px rgba(3, 7, 12, 0.5),
-    0 36px 72px -24px rgba(3, 7, 12, 0.72),
-    0 90px 130px -60px rgba(3, 7, 12, 0.8),
-    0 0 0 1px rgba(46, 209, 150, 0.35),
-    0 20px 56px -26px rgba(46, 209, 150, 0.45);
 }
 
 /* --------------------------------------------------------------------------
@@ -960,15 +735,13 @@ dialog {
   .animate-sheen,
   .animate-float,
   .animate-float-slow,
-  .animate-marquee,
   .animate-ping-soft {
     animation: none;
   }
 
   .plate,
   .reveal,
-  .parallax-layer,
-  .surface-card {
+  .parallax-layer {
     transition: none;
   }
 
