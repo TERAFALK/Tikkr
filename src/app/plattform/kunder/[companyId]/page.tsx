@@ -56,6 +56,7 @@ import {
   areaLabel,
   recentCompanyFeedback,
 } from "@/lib/feedback";
+import { fullName } from "@/lib/person-name";
 
 export const dynamic = "force-dynamic";
 
@@ -227,7 +228,7 @@ export default async function CompanyPage({
             <Card>
               <div className="px-5 py-2">
                 <Facts>
-                  <Fact label="Ägare">{owner.name ?? "Saknas"}</Fact>
+                  <Fact label="Ägare">{fullName(owner) ?? "Saknas"}</Fact>
                   <Fact label="Telefon">
                     {owner.phone ? (
                       <a
@@ -407,8 +408,10 @@ export default async function CompanyPage({
                   {admins.map((admin) => (
                     <Tr key={admin.id}>
                       <Td>
-                        {admin.name && (
-                          <span className="block font-medium">{admin.name}</span>
+                        {fullName(admin) && (
+                          <span className="block font-medium">
+                            {fullName(admin)}
+                          </span>
                         )}
                         <a
                           href={`mailto:${admin.email}`}

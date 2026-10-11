@@ -6,6 +6,7 @@ import ConfirmButton from "@/components/admin/ConfirmButton";
 import { Alert, Badge, Card, CardHeader, Table, Td, Th, Tr } from "@/components/ui";
 import { formatDate, formatDateTime } from "@/lib/format";
 import { cancelInvite, deleteAdmin, resetTwoStep } from "./actions";
+import { fullName } from "@/lib/person-name";
 
 /**
  * VILKA ANDRA SOM HAR ÅTKOMST. Inte det egna kontot, se /admin/konto.
@@ -66,11 +67,13 @@ export default async function AdminUsersPage() {
             {users.map((user) => (
               <Tr key={user.id}>
                 <Td>
-                  <span className="font-medium">{user.name ?? user.email}</span>
+                  <span className="font-medium">
+                    {fullName(user) ?? user.email}
+                  </span>
                   {user.id === session.userId && (
                     <span className="ml-2 text-neutral-400">(du)</span>
                   )}
-                  {user.name && (
+                  {fullName(user) && (
                     <span className="mt-0.5 block text-xs text-neutral-400">
                       {user.email}
                     </span>

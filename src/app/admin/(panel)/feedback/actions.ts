@@ -2,6 +2,7 @@
 
 import { assertWritable, requireAdmin } from "@/lib/admin-session";
 import { FeedbackError, sendFeedback } from "@/lib/feedback";
+import { fullName } from "@/lib/person-name";
 
 export interface FeedbackFormState {
   error?: string;
@@ -25,7 +26,7 @@ export async function sendFeedbackAction(
 
   const me = await session.db.adminUser.findFirst({
     where: { id: session.userId },
-    select: { name: true },
+    select: { firstName: true, lastName: true },
   });
 
   try {
@@ -35,7 +36,7 @@ export async function sendFeedbackAction(
         companyId: session.companyId,
         userId: session.userId,
         email: session.email,
-        name: me?.name ?? null,
+        name: me ? fullName(me) : null,
       },
       {
         kind: String(formData.get("kind") ?? ""),

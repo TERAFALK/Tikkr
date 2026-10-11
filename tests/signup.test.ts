@@ -9,6 +9,7 @@ import {
   validateSignup,
   SignupError,
 } from "@/lib/signup";
+import { fullName } from "@/lib/person-name";
 
 /**
  * Registrering av nytt företag.
@@ -24,7 +25,8 @@ async function signup(overrides: Partial<Parameters<typeof createCompanyWithOwne
   const unique = Math.random().toString(36).slice(2, 10);
   const result = await createCompanyWithOwner({
     companyName: `Testbolag ${unique}`,
-    ownerName: "Agneta Ägare",
+    firstName: "Agneta",
+    lastName: "Ägare",
     email: `agare-${unique}@example.com`,
     phone: "070-123 45 67",
     password: "ett-langt-losenord",
@@ -44,18 +46,35 @@ afterEach(async () => {
 describe("kontroll av uppgifter", () => {
   const base = {
     companyName: "Mekaniska AB",
-    ownerName: "Agneta Ägare",
+    firstName: "Agneta",
+    lastName: "Ägare",
     email: "chef@mekaniska.se",
     phone: "070-123 45 67",
     password: "ett-langt-losenord",
   };
 
-  it("kräver ägarens namn", () => {
-    expect(validateSignup({ ...base, ownerName: " " })).toBeTruthy();
+  /**
+   * BÅDA NAMNEN KRÄVS, OCH DET ÄR HELA SKÄLET ATT DE ÄR TVÅ FÄLT.
+   *
+   * Var ett enda `name`, och en kund som skrev "Anna" kom igenom. Ett
+   * efternamn som saknas ska fella på steg 1, där fältet står.
+   */
+  it("kräver både förnamn och efternamn, på steg 1", () => {
+    expect(validateSignup({ ...base, firstName: " " })).toEqual({
+      message: "Ange ditt förnamn.",
+      step: 1,
+    });
+
+    expect(validateSignup({ ...base, lastName: "" })).toEqual({
+      message: "Ange ditt efternamn.",
+      step: 1,
+    });
+
+    expect(validateSignup({ ...base, lastName: "A" })).toBeTruthy();
   });
 
   it("kräver ett telefonnummer som går att tolka", () => {
-    expect(validateSignup({ ...base, phone: "" })).toBeTruthy();
+    expect(validateSignup({ ...base, phone: "" })?.step).toBe(1);
     expect(validateSignup({ ...base, phone: "070-12" })).toBeTruthy();
   });
 
@@ -63,8 +82,11 @@ describe("kontroll av uppgifter", () => {
     expect(validateSignup(base)).toBeNull();
   });
 
-  it("kräver ett företagsnamn", () => {
-    expect(validateSignup({ ...base, companyName: " " })).toBeTruthy();
+  it("kräver ett företagsnamn, på steg 2", () => {
+    expect(validateSignup({ ...base, companyName: " " })).toEqual({
+      message: "Ange företagets namn.",
+      step: 2,
+    });
   });
 
   it("kräver en e-postadress som ser ut som en adress", () => {
@@ -72,9 +94,22 @@ describe("kontroll av uppgifter", () => {
     expect(validateSignup({ ...base, email: "utan@punkt" })).toBeTruthy();
   });
 
-  it("kräver ett lösenord på minst tio tecken", () => {
-    expect(validateSignup({ ...base, password: "kort" })).toBeTruthy();
+  it("kräver ett lösenord på minst tio tecken, på steg 2", () => {
+    expect(validateSignup({ ...base, password: "kort" })?.step).toBe(2);
     expect(validateSignup({ ...base, password: "1234567890" })).toBeNull();
+  });
+
+  /**
+   * ETT FEL PÅ STEG 1 GÅR FÖRE ETT FEL PÅ STEG 2.
+   *
+   * Formuläret går till det steg felet pekar ut, och den som har fel i båda
+   * ska skickas till det första. Rättas det bakifrån hoppar formuläret fram
+   * och tillbaka mellan stegen.
+   */
+  it("det första steget rapporteras först", () => {
+    expect(
+      validateSignup({ ...base, lastName: "", companyName: "" })
+    ).toEqual({ message: "Ange ditt efternamn.", step: 1 });
   });
 
   it("e-post normaliseras", () => {
@@ -196,18 +231,40 @@ describe("den nya arbetsytan är tom och isolerad", () => {
 describe("ägarens kontaktuppgifter", () => {
   it("namn och telefon sparas på ägaren, telefonen normaliserad", async () => {
     const { owner } = await signup({
-      ownerName: "  Agneta Ägare ",
+      firstName: "  Agneta ",
+      lastName: " Ägare ",
       phone: "070-123 45 67",
     });
 
     const saved = await unsafeGlobalPrisma.adminUser.findUniqueOrThrow({
       where: { id: owner.id },
-      select: { name: true, phone: true, role: true },
+      select: { firstName: true, lastName: true, phone: true, role: true },
     });
 
-    expect(saved.name).toBe("Agneta Ägare");
+    expect(saved.firstName).toBe("Agneta");
+    expect(saved.lastName).toBe("Ägare");
+    expect(fullName(saved)).toBe("Agneta Ägare");
     expect(saved.phone).toBe("+46701234567");
     expect(saved.role).toBe("OWNER");
+  });
+
+  /**
+   * DEN DÖDA KOLUMNEN SKRIVS INTE.
+   *
+   * `name` bar hela namnet till 2026-10-11 och ligger kvar i databasen, så att
+   * den föregående versionen av appen fungerar mot den nya databasen (CLAUDE.md
+   * § 0 punkt 7). Skrevs den ändå vore det två ställen som säger samma sak, och
+   * de hinner alltid sluta göra det.
+   */
+  it("det gamla namnfältet lämnas tomt", async () => {
+    const { owner } = await signup();
+
+    const saved = await unsafeGlobalPrisma.adminUser.findUniqueOrThrow({
+      where: { id: owner.id },
+      select: { name: true },
+    });
+
+    expect(saved.name).toBeNull();
   });
 
   it("ett nummer som inte går att tolka stoppar registreringen", async () => {
