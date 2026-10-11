@@ -398,8 +398,14 @@ export function Hero() {
 
               Döljs under `sm`. En telefon är 375 pixlar bred, och tre lager
               på den bredden blir tre kort som ligger ovanpå varandra. */}
+          {/* KORTET HÄNGER UTANFÖR KANTEN och tar bara hörnet. Det låg
+              fjorton pixlar utanför skärmens vänsterkant, vilket på en bred
+              skärm betyder att det täckte en hel namnknapp i rutnätet — en
+              orange ruta med en halv bokstav kvar läses som ett fel i bilden
+              och inte som ett lager framför den. Nu går det 136 pixlar
+              utanför, och det som skyms är skärmens hörn. */}
           <div
-            className="parallax-layer animate-float absolute -bottom-6 -left-2 hidden sm:block lg:-left-14"
+            className="parallax-layer animate-float absolute -bottom-10 -left-4 hidden sm:block lg:-left-34"
             style={{ "--parallax-depth": 1.8 } as React.CSSProperties}
           >
             <SatelliteCard
@@ -1195,8 +1201,6 @@ export function Faq({ modules }: { modules: ModulePricing }) {
       id="fragor"
       className="relative scroll-mt-16 overflow-hidden border-t border-neutral-200 bg-neutral-50"
     >
-      <Motif tone="onLight" className="-bottom-96 -right-72 h-[48rem] w-[48rem]" />
-
       <div className={`relative ${SHELL}`}>
         <SectionHead index="07" eyebrow="Frågor" title="Vanliga frågor" />
 
@@ -1252,23 +1256,24 @@ export function Faq({ modules }: { modules: ModulePricing }) {
  * varumärkets egen delningsbild gör — och det blir sidans starkaste yta just
  * för att färgen inte förekommit som yta tidigare.
  *
- * GLANSEN GÅR ÖVER HELA BLOCKET och inte över knappen. Knappen i det här
- * avsnittet är Fjord, inte Tick, och en glans över en mörk knapp blir ett grått
- * streck. Ytan bakom den är däremot sidans ljusaste, och den tål ljus: bandet
- * vandrar över den en gång var nionde sekund och står still resten av tiden.
- * Resten av varvet står det utanför kanten, eftersom en glans som rör sig
- * oavbrutet drar blicken från det man ska läsa.
+ * MOTIVET ÄR BORTTAGET HÄR OCH I FRÅGORNA OVANFÖR (2026-10-11). Cirkeln är
+ * fyrtioåtta rem bred och låg med sin topp strax innanför kanten mellan de
+ * två avsnitten. Där är bågen nästan lodrät, och en flat ton med en nästan
+ * lodrät kant läses inte som en cirkel utan som en ljusare rektangel med en
+ * skarv i. Mot det gröna, som tål en starkare ton, blev det det tydligaste
+ * felet på hela sidan. Motivet står kvar på de mörka ytorna, där det ligger
+ * på fyra procent och läses som djup.
+ *
+ * GLANSEN ÖVER BLOCKET ÄR BORTTAGEN (2026-10-11). Ett vitt band på trettio
+ * procent och en fjärdedels bredd vandrade över ytan var nionde sekund. Det
+ * som syntes var inte ett ljus utan en ljusare rektangel mitt på det gröna,
+ * med en kant i vardera änden — alltså samma sorts utsmetade övergång som
+ * togs bort mellan avsnitten. Ytan bär sig själv: den är sidans ljusaste och
+ * behöver inget ljus ovanpå.
  */
 export function FinalCta({ pricing }: { pricing: ScreenPricing }) {
   return (
     <section className="relative overflow-hidden bg-tick">
-      <Motif tone="onTick" className="-right-48 -top-64 h-[48rem] w-[48rem]" />
-
-      <span
-        aria-hidden="true"
-        className="animate-sheen pointer-events-none absolute inset-y-0 left-0 w-1/4 bg-linear-to-r from-transparent via-white/30 to-transparent"
-      />
-
       <div className={`relative ${SHELL}`}>
         <div className="grid items-end gap-12 lg:grid-cols-2">
           <div>
