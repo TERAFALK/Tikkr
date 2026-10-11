@@ -1033,9 +1033,10 @@ meddelanden, våra svar, status och en prick i menyn. Den blev ett
 supportärende i stället för en brevlåda, och togs bort samma dag. Ingen
 mejlavisering åt något håll.
 
-**Hjälp och pratbubblan är ikoner i menyns fot**, bredvid Tikkr-märket, och
-inte rader i menyn. Versionen står inte där, utan på sidan Nyheter. De handlar om Tikkr och inte om arbetsytan, och den nedre
-delen av menyn ska bara bära Nyheter, kontot, Inställningar och Logga ut.
+**Nyheter, Hjälp och pratbubblan är ikoner i menyns fot**, bredvid
+Tikkr-märket, och inte rader i menyn. De handlar om Tikkr och inte om
+arbetsytan, och den nedre delen av menyn ska bara bära kontot, Inställningar
+och Logga ut. Versionen står inte i foten, utan på sidan Nyheter.
 
 **Vi hanterar dem i plattformens Inkorg** (`/plattform/inkorg`), med en
 siffra för det som inte är klarmarkerat. Att klarmarkera kräver en
@@ -1220,9 +1221,9 @@ och syns när versionen installeras utan att någon trycker på något.
 eftersom en rättelse kan taggas på en `prod` där nästa versions text redan
 ligger. Punkter som bara rör ett tillval visas bara för kunder som har det.
 
-Pricken vid Nyheter är per administratör: `admin_users.news_seen_version`
-håller den senaste versionen personen sett, och sidan skriver den när den
-öppnas. Den skrivs bara framåt, så att en backad version inte tänder pricken
+Pricken vid Nyheter, i hörnet på ikonen i menyns fot, är per
+administratör: `admin_users.news_seen_version` håller den senaste versionen
+personen sett, och sidan skriver den när den öppnas. Den skrivs bara framåt, så att en backad version inte tänder pricken
 igen. Versionen som kör står på sidan Nyheter, och inte i menyn (ändrat
 2026-10-11).
 

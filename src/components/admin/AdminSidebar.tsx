@@ -251,26 +251,6 @@ export default function AdminSidebar({
       </div>
 
       <div className="shrink-0 space-y-0.5 border-t border-neutral-200 pt-3">
-        {/* NYHETERNA ligger här nere och inte bland arbetet. De handlar om
-            Tikkr, inte om verkstaden, och öppnas en gång per version. */}
-        <Link
-          href="/admin/nyheter"
-          onClick={() => setOpen(false)}
-          className={`flex items-center gap-2.5 rounded-md px-2 py-1.5 text-[13px] font-medium transition-colors ${
-            onNews
-              ? "bg-neutral-100 text-neutral-900"
-              : "text-neutral-600 hover:bg-neutral-50 hover:text-neutral-900"
-          }`}
-        >
-          <IconSparkle className={onNews ? "text-tick-deep" : "text-neutral-400"} />
-          <span className="flex-1">Nyheter</span>
-          {showNewsDot && (
-            <span className="size-2 rounded-full bg-tick-deep">
-              <span className="sr-only">Nya</span>
-            </span>
-          )}
-        </Link>
-
         {/* DET EGNA KONTOT ligger här och inte under Inställningar. Namn,
             telefonnummer och lösenord är den inloggades egna uppgifter, inte
             inställningar för arbetsytan, och de låg länge på sidan som
@@ -338,15 +318,30 @@ export default function AdminSidebar({
             och inte här (ändrat 2026-10-11): den säger kunden något bara där
             ändringarna i den står.
 
-            HJÄLPEN OCH RUTAN FÖR FEL OCH FÖRSLAG står här, som ikoner, och
-            inte som rader i listan ovanför (ändrat 2026-10-11). De handlar om
-            Tikkr och inte om arbetsytan, precis som märket, och listan växte
-            till en vägg. Hjälpen nås dessutom från rubriken på varje sida den
-            gäller. Adressen är relativ av samma skäl som i HelpLink. */}
+            NYHETERNA, HJÄLPEN OCH RUTAN FÖR FEEDBACK står här, som ikoner,
+            och inte som rader i listan ovanför (ändrat 2026-10-11). De handlar
+            om Tikkr och inte om arbetsytan, precis som märket, och listan
+            växte till en vägg. Hjälpen nås dessutom från rubriken på varje
+            sida den gäller. Adressen är relativ av samma skäl som i HelpLink.
+
+            Pricken vid Nyheter sitter kvar, nu i ikonens hörn. */}
         <div className="relative flex items-center gap-2 px-2 pt-2.5 text-neutral-400">
           <LogoMark size={22} />
           <WordmarkOnly height={10} tone="current" />
           <span className="ml-auto flex shrink-0 items-center">
+            <Link
+              href="/admin/nyheter"
+              onClick={() => setOpen(false)}
+              aria-label={showNewsDot ? "Nyheter, nya" : "Nyheter"}
+              title="Nyheter"
+              aria-current={onNews ? "page" : undefined}
+              className={`relative ${onNews ? footerIconActive : footerIcon}`}
+            >
+              <IconSparkle />
+              {showNewsDot && (
+                <span className="absolute right-1 top-1 size-2 rounded-full bg-tick-deep ring-2 ring-white" />
+              )}
+            </Link>
             <a
               href="/support"
               target="_blank"
@@ -402,6 +397,9 @@ export default function AdminSidebar({
 /** Ikonknapparna i menyns fot. Stora nog att träffa, tysta tills man pekar. */
 const footerIcon =
   "rounded-md p-1.5 text-neutral-400 transition-colors hover:bg-neutral-100 hover:text-neutral-900";
+
+/** Samma ikon när man står på sidan den leder till. Grönt som i listan ovanför. */
+const footerIconActive = "rounded-md bg-neutral-100 p-1.5 text-tick-deep";
 
 function CompanyHeader({
   companyName,
