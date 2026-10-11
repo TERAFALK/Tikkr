@@ -246,8 +246,14 @@ export function SurfaceStrip() {
         <div
           key={`${item.key}-${copy ? "kopia" : "original"}`}
           /* Bredden är fast och inte procentuell. Spåret ligger utanför varje
-             spalt, och en procentbredd mot ett element utan bredd blir noll. */
-          className="plate plate-dark w-[19rem] shrink-0 opacity-85 transition-all duration-500 hover:-translate-y-1.5 hover:opacity-100 sm:w-[23rem]"
+             spalt, och en procentbredd mot ett element utan bredd blir noll.
+
+             RUNDNINGEN, TÄCKNINGEN OCH LYFTET LIGGER I `.surface-card`, se
+             globals.css. Kortet bar tidigare `plate-dark` utan radie, och en
+             box-shadow följer elementets egen rundning — bakom ett rundat kort
+             låg alltså en fyrkantig mörk gloria, som kom fram i samma stund
+             pekaren tog upp täckningen till hundra. */
+          className="plate-dark surface-card w-[19rem] shrink-0 sm:w-[23rem]"
         >
           {item.node}
         </div>

@@ -108,18 +108,18 @@ export function Grid({
  * sidor staplade på varandra i stället för som en sida med en rytm.
  *
  * Skarven gör två saker. Den tonar den föregående ytans färg in i den nya över
- * ett par centimeter, och den lägger en hårfin accentlinje i mitten där
- * övergången är. Linjen är ljusast i mitten och försvinner mot sidorna, så att
- * den läses som ett ljus längs kanten och inte som en ram runt avsnittet.
+ * ett par centimeter, och den lägger en hårfin accentlinje i överkanten, där
+ * ytan ovanför tar slut. Linjen är ljusast i mitten och försvinner mot sidorna,
+ * så att den läses som ett ljus längs kanten och inte som en ram runt avsnittet.
  *
  * LIGGER SOM EN EGEN RAD MELLAN AVSNITTEN och inte som en pseudoelement på
  * dem. Två avsnitt som båda ritar sin egen halva av skarven måste hållas i
  * takt med varandra, och de hinner alltid sluta vara det — samma skäl som att
  * orderns beräknade tid aldrig lagras på två ställen.
  *
- * `from`/`to` är avsiktligt de två avsnittens FAKTISKA färger och inte en
- * generisk grå. En skarv som inte möter ytan den sitter mellan är en synlig
- * remsa, alltså precis det den ska dölja.
+ * Färgerna är avsiktligt de två avsnittens FAKTISKA och inte en generisk grå.
+ * En skarv som inte möter ytan den sitter mellan är en synlig remsa, alltså
+ * precis det den ska dölja.
  */
 export type SeamTone =
   | "darkToLight"
@@ -131,62 +131,64 @@ export type SeamTone =
   | "lightToTick"
   | "tickToDark";
 
-const SEAMS: Record<SeamTone, { gradient: string; line: string }> = {
+/**
+ * Vilken av de åtta skarvarna, och var linjen sitter.
+ *
+ * SJÄLVA ÖVERGÅNGEN LIGGER I `globals.css`, som `.seam-*`. Skälet står där:
+ * en rak gradient mellan Fjord och Snö går genom död gråska och ändrar sig
+ * lika mycket hela vägen, vilket ger ett grått band med en kant mitt i. Åtta
+ * skarvar delar därför EN kurva, och här står bara vilka två färger var och en
+ * går mellan.
+ *
+ * LINJENS FÄRG STÅR KVAR HÄR, eftersom den är en accent och inte en yta. Den
+ * väljs numera mot den ÖVRE ytan och inte mot mitten, eftersom linjen flyttat
+ * dit: Tick på Fjord, Tick Deep på Snö och vitt, Fjord på Tick. Vitt på Snö,
+ * som stod här förut, syntes inte alls när linjen hamnade där.
+ */
+const SEAMS: Record<SeamTone, { surface: string; line: string }> = {
   // Fjord ned i Snö. Hero in i problemavsnittet.
-  darkToLight: {
-    gradient: "bg-linear-to-b from-neutral-900 to-neutral-50",
-    line: "via-tick/35",
-  },
-  lightToDark: {
-    gradient: "bg-linear-to-b from-neutral-50 to-neutral-900",
-    line: "via-tick/30",
-  },
-  lightToWhite: {
-    gradient: "bg-linear-to-b from-neutral-50 to-white",
-    line: "via-tick-deep/20",
-  },
-  whiteToLight: {
-    gradient: "bg-linear-to-b from-white to-neutral-50",
-    line: "via-tick-deep/20",
-  },
-  whiteToDark: {
-    gradient: "bg-linear-to-b from-white to-neutral-900",
-    line: "via-tick/30",
-  },
-  darkToWhite: {
-    gradient: "bg-linear-to-b from-neutral-900 to-white",
-    line: "via-tick/35",
-  },
+  darkToLight: { surface: "seam-dark-light", line: "via-tick/30" },
+  lightToDark: { surface: "seam-light-dark", line: "via-tick-deep/25" },
+  lightToWhite: { surface: "seam-light-white", line: "via-tick-deep/20" },
+  whiteToLight: { surface: "seam-white-light", line: "via-tick-deep/20" },
+  whiteToDark: { surface: "seam-white-dark", line: "via-tick-deep/25" },
+  darkToWhite: { surface: "seam-dark-white", line: "via-tick/30" },
   // Snö ned i Tick. Den enda skarven mot en grön yta, alltså den sista.
-  lightToTick: {
-    gradient: "bg-linear-to-b from-neutral-50 to-tick",
-    line: "via-white/40",
-  },
+  lightToTick: { surface: "seam-light-tick", line: "via-tick-deep/25" },
   /*
     Tick ned i Fjord, alltså det gröna blocket in i sidfoten.
 
-    Den skarpaste övergången på sidan, eftersom det är de två färger som ligger
-    längst från varandra i guiden. Att den ändå tonas har ett skäl: en rak kant
-    mellan Tick och Fjord läses som att sidan tar slut och en annan sida börjar,
-    och foten hör till sidan.
-
-    Linjen är Fjord och inte vit eller grön. Mot en övergång som redan går från
-    ljust till mörkt skulle en ljus linje bli ett tredje ljus och en grön skulle
+    Linjen är Fjord och inte vit eller grön. Mot en övergång som redan går
+    från ljust till mörkt skulle en ljus linje bli ett tredje ljus och en grön
     försvinna i ytan ovanför.
   */
-  tickToDark: {
-    gradient: "bg-linear-to-b from-tick to-neutral-900",
-    line: "via-neutral-900/25",
-  },
+  tickToDark: { surface: "seam-tick-dark", line: "via-neutral-900/20" },
 };
 
+/**
+ * LINJEN SITTER I ÖVERKANTEN OCH INTE PÅ MITTEN.
+ *
+ * På mitten låg den i den ljusaste delen av övergången, alltså i det som
+ * tidigare var ett grått band, och lästes där som ett streck någon glömt. I
+ * överkanten ligger den där ytan ovanför tar slut och läses som en kant som
+ * fångar ljus — samma grepp som ljusningen överst på produktbildernas ram.
+ *
+ * HÖJDEN ÄR TILLTAGEN MED FLIT, och det är hälften av rättningen. Skarven var
+ * 112 pixlar och är 176. En övergång från Fjord till Snö spelar ut åttiosex
+ * punkter ljushet oavsett hur lång den är; på halva sträckan blir varje pixel
+ * dubbelt så stort steg, och då syns stegen. Kurvan och höjden tillsammans gör
+ * att även den brantaste punkten är flackare än den raka ramp som satt här.
+ */
 export function Seam({ tone }: { tone: SeamTone }) {
-  const { gradient, line } = SEAMS[tone];
+  const { surface, line } = SEAMS[tone];
 
   return (
-    <div aria-hidden="true" className={`relative h-20 sm:h-28 ${gradient}`}>
+    <div
+      aria-hidden="true"
+      className={`seam ${surface} relative h-28 sm:h-44`}
+    >
       <div
-        className={`absolute inset-x-0 top-1/2 h-px bg-linear-to-r from-transparent to-transparent ${line}`}
+        className={`absolute inset-x-0 top-0 h-px bg-linear-to-r from-transparent to-transparent ${line}`}
       />
     </div>
   );
