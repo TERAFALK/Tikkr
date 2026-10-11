@@ -23,23 +23,52 @@
 
 import { WordmarkOnly } from "@/components/ui/Logo";
 
+/**
+ * HUR TUNGT RAMEN LIGGER.
+ *
+ * `flat` är ramens eget förval och den som gäller när bilden står i en spalt
+ * bland text: en hårfin skugga som bara skiljer pappret från ytan.
+ *
+ * `onDark` ligger i `globals.css` som `.plate-dark`, med skuggan i två lager.
+ * Skälet till två lager står där. Den gäller när bilden ligger mot Fjord, där
+ * en ljus skugga inte syns alls.
+ *
+ * MOT EN LJUS YTA SÄTTS DEN DJUPA SKUGGAN AV `Plate` och inte här. Skälet är
+ * att den bilden dessutom lutar och har en bakplatta bakom sig, och skuggan
+ * hör till den uppställningen och inte till ramen. Ramen behåller då sin egen
+ * hårfina skugga, som blir uppställningens innersta lager.
+ */
+export type FrameLift = "flat" | "onDark";
+
+const LIFTS: Record<FrameLift, string> = {
+  flat: "shadow-[0_1px_1px_rgba(14,26,43,0.04),0_24px_48px_-28px_rgba(14,26,43,0.35)]",
+  onDark: "plate plate-dark",
+};
+
 export function Frame({
   label,
   meta,
   children,
+  lift = "flat",
   className = "",
 }: {
   label: string;
   /** Höger sida av etikettraden, t.ex. ett filnamn eller en period. */
   meta?: string;
   children: React.ReactNode;
+  lift?: FrameLift;
   className?: string;
 }) {
   return (
     <div
-      className={`overflow-hidden rounded-lg border border-neutral-200 bg-white shadow-[0_1px_1px_rgba(14,26,43,0.04),0_24px_48px_-28px_rgba(14,26,43,0.35)] ${className}`}
+      className={`overflow-hidden rounded-lg border border-neutral-200 bg-white ${LIFTS[lift]} ${className}`}
     >
-      <div className="flex items-center justify-between gap-3 border-b border-neutral-200 bg-neutral-50 px-3 py-2">
+      {/* Etikettraden har en hårfin ljusning överst.
+
+          En ram utan den läses som ett utskuret fält; med den läses den som
+          ett föremål med en kant som fångar ljus. Det är samma greppet som
+          skuggans täta innerlager, bara från andra sidan. */}
+      <div className="flex items-center justify-between gap-3 border-b border-neutral-200 bg-linear-to-b from-white to-neutral-50 px-3 py-2">
         <span className="truncate text-[10px] font-semibold uppercase tracking-[0.12em] text-neutral-400">
           {label}
         </span>

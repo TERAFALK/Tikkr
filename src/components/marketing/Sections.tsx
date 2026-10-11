@@ -13,7 +13,9 @@ import {
 import LiveKiosk from "./LiveKiosk";
 import { SLOGAN } from "@/lib/brand";
 import ContactLine from "./ContactLine";
-import Motif from "./Motif";
+import { Aurora, Grid, LiveBadge, Motif, PlateGlow } from "./Atmosphere";
+import Parallax from "./Parallax";
+import { Plate, SatelliteCard, SurfaceStrip } from "./Showcase";
 import PriceCalculator from "./PriceCalculator";
 import { faqQuestions } from "./faq-data";
 import type { ModulePricing, ScreenPricing } from "@/lib/stripe";
@@ -30,10 +32,28 @@ import Reveal from "./Reveal";
  * `brand/03-social/`: stora staplade påståenden, Fjord och Snö som bärande
  * ytor, och symbolen uppförstorad som bakgrundsgeometri — se `Motif.tsx`.
  *
- * YTORNAS ORDNING ÄR MEDVETEN. Fjord, Snö, vit, Snö, vit, Fjord, vit, Snö,
- * Tick. Två mörka ytor med fem avsnitt emellan, och grönt som hel yta exakt en
- * gång, sist. Grönt är accent och aldrig huvudfärg; ett enda grönt block i
- * slutet är vad varumärkets egen delningsbild gör.
+ * YTORNA OCH LJUSET LIGGER I `Atmosphere.tsx`, presentationen av
+ * produktbilderna i `Showcase.tsx`, och rörelsen i `globals.css`. Den här
+ * filen avgör VAD som står var; den ritar inte längre sina egna gradienter.
+ * Skälet står i Atmosphere: nio avsnitt som var och en skriver sitt eget ljus
+ * blir efter tredje ändringen nio olika ljus.
+ *
+ * YTORNAS ORDNING ÄR MEDVETEN. Fjord, Snö, vit, Fjord, Snö, vit, Fjord, vit,
+ * Snö, Tick. Grönt som hel yta exakt en gång, sist: grönt är accent och aldrig
+ * huvudfärg, och ett enda grönt block i slutet är vad varumärkets egen
+ * delningsbild gör.
+ *
+ * DEN TREDJE MÖRKA YTAN ÄR BANDET, och den är kort med flit. Sidan är delad i
+ * två halvor — det som sker i verkstaden och det som sker på kontoret — och
+ * bandet är gångjärnet mellan dem. Ett fullbrett mörkt band som drar förbi med
+ * samtliga ytor svarar på frågan en köpare har efter två avsnitt och som ingen
+ * text svarar på: hur mycket är det här? Därför är det ett band och inte ett
+ * numrerat avsnitt. Numren är sidans innehållsförteckning, och en bild av
+ * omfattningen är inte ett kapitel.
+ *
+ * SKARVARNA MELLAN AVSNITTEN sätts i `src/app/page.tsx` och inte här. Ett
+ * avsnitt som ritar sin egen halva av övergången till nästa måste hållas i takt
+ * med det avsnittet, och de hinner alltid sluta vara det.
  *
  * SPRÅKET FÖLJER CLAUDE.md § 7.1, och det gäller här lika hårt som i panelen:
  *
@@ -65,8 +85,68 @@ const SHELL = "mx-auto max-w-6xl px-6 py-24 sm:py-32";
  *
  * Fjord på ljus yta, Tick på mörk. Det är guidens egen uppdelning: grönt är
  * accent på mörkt, och på en ljus yta bär primärfärgen knappen.
+ *
+ * TRE SAKER SKER NÄR PEKAREN VILAR PÅ DEN, och alla tre är samma besked från
+ * olika håll: knappen lyfter en pixel, skuggan under den växer, och pilen
+ * flyttar sig ett steg åt höger. En knapp som bara byter ton känns som en bild
+ * av en knapp.
+ *
+ * GLANSEN LIGGER BARA PÅ DEN MÖRKA VARIANTEN. Den gröna knappen är sidans
+ * starkaste yta och den enda som tål ett ljus som vandrar över den; samma band
+ * över Fjord blir ett grått streck.
  */
 function Cta({
+  href,
+  children,
+  onDark,
+  className = "",
+}: {
+  href: string;
+  children: string;
+  onDark?: boolean;
+  className?: string;
+}) {
+  return (
+    <Link
+      href={href}
+      className={`group relative inline-flex items-center gap-2 overflow-hidden rounded-lg px-6 py-3.5 text-[15px] font-semibold transition-all duration-300 hover:-translate-y-0.5 ${
+        onDark
+          ? "bg-tick text-neutral-900 shadow-[0_8px_24px_-8px_rgba(46,209,150,0.5)] hover:bg-emerald-300 hover:shadow-[0_14px_32px_-10px_rgba(46,209,150,0.65)]"
+          : "bg-neutral-900 text-white shadow-[0_8px_24px_-10px_rgba(14,26,43,0.5)] hover:bg-neutral-800 hover:shadow-[0_14px_32px_-12px_rgba(14,26,43,0.6)]"
+      } ${className}`}
+    >
+      {onDark && (
+        <span
+          aria-hidden="true"
+          className="animate-sheen pointer-events-none absolute inset-y-0 left-0 w-1/3 bg-linear-to-r from-transparent via-white/45 to-transparent"
+        />
+      )}
+
+      <span className="relative">{children}</span>
+
+      <svg
+        aria-hidden="true"
+        viewBox="0 0 16 16"
+        className="relative h-3.5 w-3.5 transition-transform duration-300 group-hover:translate-x-1"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth={2}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      >
+        <path d="M3 8h10M9 4l4 4-4 4" />
+      </svg>
+    </Link>
+  );
+}
+
+/**
+ * Den andra knappen, den som leder längre ned på sidan.
+ *
+ * Ram och ingen fyllning. Den ska finnas för den som inte är redo att
+ * registrera sig, och inte konkurrera med den som är det.
+ */
+function GhostCta({
   href,
   children,
   onDark,
@@ -76,16 +156,28 @@ function Cta({
   onDark?: boolean;
 }) {
   return (
-    <Link
+    <a
       href={href}
-      className={`rounded-lg px-6 py-3.5 text-[15px] font-semibold transition-colors ${
+      className={`group inline-flex items-center gap-2 rounded-lg border px-6 py-3.5 text-[15px] font-semibold transition-all duration-300 ${
         onDark
-          ? "bg-tick text-neutral-900 hover:bg-emerald-300"
-          : "bg-neutral-900 text-white hover:bg-neutral-800"
+          ? "border-white/15 bg-white/5 text-neutral-200 hover:border-white/30 hover:bg-white/10"
+          : "border-neutral-300 text-neutral-900 hover:border-neutral-900 hover:bg-neutral-50"
       }`}
     >
       {children}
-    </Link>
+      <svg
+        aria-hidden="true"
+        viewBox="0 0 16 16"
+        className="h-3.5 w-3.5 transition-transform duration-300 group-hover:translate-y-0.5"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth={2}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      >
+        <path d="M8 3v10M4 9l4 4 4-4" />
+      </svg>
+    </a>
   );
 }
 
@@ -99,6 +191,11 @@ function Cta({
  * Numret står i grönt. Det är sidans minsta accent och den enda färg som följer
  * med hela vägen ned — ögat hittar nästa avsnitt på färgen i stället för att
  * leta efter en linje.
+ *
+ * RUBRIKEN HAR EN GRADIENT I SIG, och den går från brödtextens färg till en
+ * ljusare ton av samma. Det är inte en färgeffekt utan ett djup: en rubrik i
+ * fyrtiofyra punkter på en platt färg ser tryckt ut, och samma rubrik med ett
+ * fall i tonen ser ut att ligga i ljus. Ingen ny färg kommer in.
  */
 function SectionHead({
   index,
@@ -106,20 +203,28 @@ function SectionHead({
   title,
   intro,
   onDark,
+  centered,
 }: {
   index: string;
   eyebrow: string;
   title: string;
   intro?: string;
   onDark?: boolean;
+  centered?: boolean;
 }) {
   return (
-    <div className="max-w-3xl">
-      <p className="flex items-center gap-3 text-[11px] font-medium uppercase tracking-wider">
+    <div className={centered ? "mx-auto max-w-3xl text-center" : "max-w-3xl"}>
+      <p
+        className={`flex items-center gap-3 text-[11px] font-medium uppercase tracking-wider ${
+          centered ? "justify-center" : ""
+        }`}
+      >
         <span className={onDark ? "text-tick" : "text-tick-deep"}>{index}</span>
         <span
           aria-hidden="true"
-          className={`h-px w-8 ${onDark ? "bg-neutral-700" : "bg-neutral-300"}`}
+          className={`h-px w-8 bg-linear-to-r to-transparent ${
+            onDark ? "from-neutral-600" : "from-neutral-300"
+          }`}
         />
         <span className={onDark ? "text-neutral-400" : "text-neutral-500"}>
           {eyebrow}
@@ -127,8 +232,10 @@ function SectionHead({
       </p>
 
       <h2
-        className={`mt-6 text-[32px] font-semibold leading-[1.08] tracking-tight sm:text-[44px] ${
-          onDark ? "text-white" : "text-neutral-900"
+        className={`sheen-text mt-6 text-[32px] font-semibold leading-[1.08] tracking-tight sm:text-[44px] ${
+          onDark
+            ? "bg-linear-to-b from-white via-white to-neutral-200"
+            : "bg-linear-to-b from-neutral-900 via-neutral-900 to-neutral-600"
         }`}
       >
         {title}
@@ -136,9 +243,9 @@ function SectionHead({
 
       {intro && (
         <p
-          className={`mt-5 max-w-xl text-[16px] leading-relaxed ${
-            onDark ? "text-neutral-400" : "text-neutral-600"
-          }`}
+          className={`mt-5 text-[16px] leading-relaxed ${
+            centered ? "mx-auto max-w-xl" : "max-w-xl"
+          } ${onDark ? "text-neutral-400" : "text-neutral-600"}`}
         >
           {intro}
         </p>
@@ -152,12 +259,20 @@ function SectionHead({
  *
  * En linje över varje rad i stället för en bock framför den. Bockar läses som
  * reklam; linjer läses som en specifikation.
+ *
+ * MARKÖREN VID VÄNSTERKANTEN VÄXER NÄR PEKAREN VILAR PÅ RADEN. Den är noll
+ * pixlar bred i vila, så raden ser ut precis som förut för den som bara läser.
+ * Hela listan läses som ett datablad, men den enskilda raden går att peka på.
  */
 function SpecRow({ term, children }: { term: string; children: string }) {
   return (
-    <div className="grid gap-1 border-t border-neutral-200 py-4 sm:grid-cols-[13rem_1fr] sm:gap-6">
+    <div className="group relative grid gap-1 border-t border-neutral-200 py-4 transition-colors duration-300 sm:grid-cols-[13rem_1fr] sm:gap-6">
+      <span
+        aria-hidden="true"
+        className="absolute -left-4 top-0 h-px w-0 bg-tick-deep transition-all duration-500 group-hover:w-4"
+      />
       <dt className="text-[14px] font-medium text-neutral-900">{term}</dt>
-      <dd className="text-[14px] leading-relaxed text-neutral-600">
+      <dd className="text-[14px] leading-relaxed text-neutral-600 transition-colors duration-300 group-hover:text-neutral-900">
         {children}
       </dd>
     </div>
@@ -174,21 +289,44 @@ function SpecRow({ term, children }: { term: string; children: string }) {
  * Rubriken säger vad produkten gör och inte vad varumärket heter: den som
  * landar här från en sökning har ännu inte hört talas om Tikkr, och "Rätt tid
  * på rätt order" är det enda som svarar på varför de ska läsa vidare.
- * Varumärkets egen rad står kvar som etikett ovanför.
+ * Varumärkets egen rad står kvar som etikett ovanför, numera i en ram med en
+ * punkt som pulserar — skärmen bredvid är levande, och etiketten säger det.
+ *
+ * YTAN HAR FYRA LAGER PÅ DJUPET. Bakifrån: ljuset, ritningsrutnätet, symbolen
+ * uppförstorad, och innehållet. Inget av de tre första bär information, och
+ * alla tre är `aria-hidden`.
+ *
+ * STAPELN TILL HÖGER ÄR SIDANS ENDA STÄLLE MED POINTERPARALLAX. Stämplings-
+ * skärmen ligger i mitten av djupet och de två korten framför den, med olika
+ * `--parallax-depth`. Rör man musen flyttar de sig olika mycket, och en platt
+ * skärm läses som ett rum. Skälen till att rörelsen saknas på en telefon, utan
+ * JavaScript och vid minskad rörelse står i `Parallax.tsx`.
+ *
+ * KORTEN ÄR PANELENS OCH INTE KIOSKENS. Det är hela produktens löfte i en
+ * bild: ett tryck på skärmen i verkstaden blir ett tal på kontoret. Korten bär
+ * därför talen ur panelens egen översikt och visar inga belopp, eftersom
+ * kiosken aldrig gör det.
  */
 export function Hero() {
   return (
     <section className="relative overflow-hidden bg-neutral-900">
+      <Aurora tone="onDark" />
+      <Grid tone="onDark" />
       <Motif tone="onDark" className="-right-56 -top-40 h-[52rem] w-[52rem]" />
 
-      <div className="relative mx-auto grid max-w-6xl items-center gap-16 px-6 pb-24 pt-20 sm:pb-28 sm:pt-24 lg:grid-cols-[0.95fr_1.05fr]">
+      <Parallax className="relative mx-auto grid max-w-6xl items-center gap-16 px-6 pb-24 pt-20 sm:pb-28 sm:pt-24 lg:grid-cols-[0.95fr_1.05fr]">
         <div>
-          <p className="animate-rise text-[11px] font-medium uppercase tracking-wider text-tick">
-            {SLOGAN}
-          </p>
+          <div className="animate-rise">
+            <LiveBadge>{SLOGAN}</LiveBadge>
+          </div>
 
+          {/* Gradienten faller från vitt till Snö i botten av bokstäverna.
+              En rubrik i sextioåtta punkter på en platt vit färg ser tryckt
+              ut; samma rubrik med ett fall i tonen ser ut att stå i ljus.
+              Ingen ny färg kommer in, och grönt rör den inte — guiden säger
+              uttryckligen att grönt är accent och aldrig huvudfärg. */}
           <h1
-            className="animate-rise mt-7 text-[46px] font-semibold leading-none tracking-tight text-white sm:text-[68px]"
+            className="animate-rise sheen-text mt-7 bg-linear-to-b from-white via-white to-neutral-200 text-[46px] font-semibold leading-none tracking-tight sm:text-[68px]"
             style={{ animationDelay: "60ms" }}
           >
             Rätt tid
@@ -212,12 +350,9 @@ export function Hero() {
             <Cta href="/registrera" onDark>
               Prova i 30 dagar
             </Cta>
-            <a
-              href="#sa-funkar-det"
-              className="rounded-lg border border-neutral-700 px-6 py-3.5 text-[15px] font-semibold text-neutral-200 transition-colors hover:bg-neutral-800"
-            >
+            <GhostCta href="#sa-funkar-det" onDark>
               Se hur det fungerar
-            </a>
+            </GhostCta>
           </div>
 
           <p
@@ -235,21 +370,57 @@ export function Hero() {
             ritad hårdvara blir en teckning av en skärm, och det är
             gränssnittet som ska synas.
 
-            Skuggan ligger på en ruta UTANFÖR kortet och inte på kortet
-            självt. Ett vitt kort mot Fjord behöver lyftas för att läsas som ett
-            föremål framför ytan i stället för som ett hål i den, men `Frame`
-            har redan en egen skugga: två `shadow-[...]` på samma element är två
-            lika starka regler, och vilken som vinner avgörs av i vilken ordning
-            Tailwind råkar skriva ut dem. */}
+            Lagret nedan sätter DJUP och inget annat. Skuggan sitter på
+            `Frame` via `lift="onDark"`, eftersom `Frame` redan äger sin egen
+            skugga: två `shadow-[...]` på samma element är två lika starka
+            regler, och vilken som vinner avgörs av i vilken ordning Tailwind
+            råkar skriva ut dem. */}
         <div
-          className="animate-rise-soft rounded-lg shadow-[0_40px_80px_-40px_rgba(0,0,0,0.65)]"
+          className="animate-rise-soft relative"
           style={{ animationDelay: "300ms" }}
         >
-          <Frame label="Stämplingsskärmen">
-            <LiveKiosk />
-          </Frame>
+          <PlateGlow className="-inset-x-16 -inset-y-12" />
+
+          <div
+            className="parallax-layer relative lg:[transform:perspective(2000px)_rotateY(-6deg)_rotateX(2deg)]"
+            style={{ "--parallax-depth": 0.6 } as React.CSSProperties}
+          >
+            <Frame label="Stämplingsskärmen" lift="onDark">
+              <LiveKiosk />
+            </Frame>
+          </div>
+
+          {/* KORTEN LIGGER UTANFÖR SKÄRMENS KANT med flit. Ett kort innanför
+              kanten läses som en del av gränssnittet, alltså som något
+              produkten visar; ett kort som sticker ut läses som ett lager
+              framför den. Det senare är sant: de kommer från panelen.
+
+              Döljs under `sm`. En telefon är 375 pixlar bred, och tre lager
+              på den bredden blir tre kort som ligger ovanpå varandra. */}
+          <div
+            className="parallax-layer animate-float absolute -bottom-6 -left-2 hidden sm:block lg:-left-14"
+            style={{ "--parallax-depth": 1.8 } as React.CSSProperties}
+          >
+            <SatelliteCard
+              label="Fakturerbar tid"
+              value="84:30"
+              foot="Vecka 16, samtliga ordrar"
+              tone="tick"
+            />
+          </div>
+
+          <div
+            className="parallax-layer animate-float-slow absolute -right-4 -top-8 hidden sm:block xl:-right-10"
+            style={{ "--parallax-depth": 2.4 } as React.CSSProperties}
+          >
+            <SatelliteCard
+              label="Arbetar just nu"
+              value="3"
+              foot="Av nio anställda"
+            />
+          </div>
         </div>
-      </div>
+      </Parallax>
     </section>
   );
 }
@@ -276,7 +447,7 @@ export function Facts() {
   ];
 
   return (
-    <section className="border-t border-neutral-800 bg-neutral-900">
+    <section className="relative border-t border-white/10 bg-neutral-900">
       {/* Rännilen och linjerna gäller från den smalaste skärmen och inte först
           vid lg. I 2x2-läget stod de fyra fakta kant i kant utan vare sig
           mellanrum eller avgränsare, och lästes som ett enda textblock.
@@ -288,16 +459,14 @@ export function Facts() {
         {facts.map((fact, index) => (
           <div
             key={fact.label}
-            className={`py-8 ${
-              index % 2 === 1 ? "border-l border-neutral-800 pl-6 sm:pl-10" : ""
-            } ${
-              index > 0 ? "lg:border-l lg:border-neutral-800 lg:pl-10" : ""
-            }`}
+            className={`group py-8 ${
+              index % 2 === 1 ? "border-l border-white/10 pl-6 sm:pl-10" : ""
+            } ${index > 0 ? "lg:border-l lg:border-white/10 lg:pl-10" : ""}`}
           >
             <dt className="text-[24px] font-semibold tracking-tight text-white">
               {fact.value}
             </dt>
-            <dd className="mt-1.5 text-[13px] leading-relaxed text-neutral-400">
+            <dd className="mt-1.5 text-[13px] leading-relaxed text-neutral-400 transition-colors duration-300 group-hover:text-neutral-300">
               {fact.label}
             </dd>
           </div>
@@ -318,6 +487,11 @@ export function Facts() {
  * ännu en mörk yta direkt efter hade läst som att sidan inte kommit igång.
  * Brytningen görs i stället med Snö och ett stort motiv, så att läsaren
  * registrerar att perspektivet bytts utan att ytan skriker om det.
+ *
+ * DE TRE PUNKTERNA ÄR KORT NU OCH INTE SPALTER. Skillnaden är att ett kort
+ * reagerar: det lyfter en pixel och får en grön linje överst när pekaren vilar
+ * på det. Linjen är noll pixlar bred i vila, så uppställningen ser ut som den
+ * specifikation den var — tills man pekar på en rad.
  */
 export function Problem() {
   const points = [
@@ -337,6 +511,7 @@ export function Problem() {
 
   return (
     <section className="relative overflow-hidden bg-neutral-50">
+      <Grid tone="onLight" />
       <Motif
         tone="onLight"
         className="-bottom-80 -left-64 h-[46rem] w-[46rem]"
@@ -349,14 +524,15 @@ export function Problem() {
           title="Tid som inte registreras när arbetet utförs blir en uppskattning"
         />
 
-        <div className="mt-16 grid border-t border-neutral-200 sm:grid-cols-3">
+        <div className="mt-16 grid gap-4 sm:grid-cols-3 sm:gap-5">
           {points.map((point, index) => (
             <Reveal key={point.title} delay={index * 90} className="h-full">
-              <div
-                className={`h-full py-8 sm:pr-8 ${
-                  index > 0 ? "sm:border-l sm:border-neutral-200 sm:pl-8" : ""
-                }`}
-              >
+              <div className="group relative h-full overflow-hidden rounded-xl border border-neutral-200 bg-white/70 p-7 transition-all duration-500 hover:-translate-y-1 hover:border-neutral-300 hover:bg-white hover:shadow-[0_18px_40px_-20px_rgba(14,26,43,0.22)]">
+                <span
+                  aria-hidden="true"
+                  className="absolute inset-x-0 top-0 h-px w-0 bg-linear-to-r from-tick-deep to-transparent transition-all duration-700 group-hover:w-full"
+                />
+
                 <p className="text-[11px] font-semibold tracking-wider text-tick-deep">
                   {String(index + 1).padStart(2, "0")}
                 </p>
@@ -400,9 +576,25 @@ const STEPS = [
   },
 ];
 
+/**
+ * De tre stegen i verkstaden.
+ *
+ * STEGNUMRET STÅR TVÅ GÅNGER, och det är inte ett förbiseende. Det lilla står
+ * i etikettraden där man läser det; det stora står bakom rubriken som en vattnad
+ * siffra, och det är det man ser när man skrollar förbi utan att läsa. Den som
+ * skummar sidan ska kunna se att det är tre steg och var hen är i dem.
+ *
+ * Vartannat avsnitt speglas, så att blicken flyttas i sidled på vägen ned i
+ * stället för att falla rakt igenom. Bilden lutar åt det håll den ligger: en
+ * bild i höger spalt vrids bort från mitten, så att den bortre kanten pekar ut
+ * ur sidan och den närmaste mot texten den hör till.
+ */
 export function HowItWorks() {
   return (
-    <section id="sa-funkar-det" className="scroll-mt-16 bg-white">
+    <section
+      id="sa-funkar-det"
+      className="relative scroll-mt-16 overflow-hidden bg-white"
+    >
       <div className={SHELL}>
         <SectionHead
           index="02"
@@ -411,26 +603,37 @@ export function HowItWorks() {
           intro="De två första stegen sker vid maskinen och kräver ingen inloggning."
         />
 
-        <div className="mt-20 space-y-20">
+        <div className="mt-20 space-y-24 sm:space-y-32">
           {STEPS.map((step, index) => (
-            <Reveal key={step.number}>
-              <div className="grid items-center gap-10 border-t border-neutral-200 pt-12 lg:grid-cols-2 lg:gap-16">
-                {/* Vartannat avsnitt speglas, så att blicken flyttas i sidled
-                    på vägen ned i stället för att falla rakt igenom. */}
-                <div className={index % 2 === 1 ? "lg:order-2" : ""}>
-                  <p className="text-[11px] font-semibold uppercase tracking-wider text-tick-deep">
-                    Steg {step.number}
-                  </p>
-                  <h3 className="mt-4 text-[24px] font-semibold tracking-tight text-neutral-900 sm:text-[28px]">
-                    {step.title}
-                  </h3>
-                  <p className="mt-5 max-w-md text-[15px] leading-relaxed text-neutral-600">
-                    {step.body}
-                  </p>
+            <Reveal key={step.number} variant="soft">
+              <div className="grid items-center gap-12 lg:grid-cols-2 lg:gap-16">
+                <div
+                  className={`relative ${index % 2 === 1 ? "lg:order-2" : ""}`}
+                >
+                  <span
+                    aria-hidden="true"
+                    className="pointer-events-none absolute -left-2 -top-14 select-none text-[120px] font-semibold leading-none tracking-tight text-neutral-100 sm:-top-16 sm:text-[160px]"
+                  >
+                    {step.number}
+                  </span>
+
+                  <div className="relative">
+                    <p className="text-[11px] font-semibold uppercase tracking-wider text-tick-deep">
+                      Steg {step.number}
+                    </p>
+                    <h3 className="mt-4 text-[24px] font-semibold tracking-tight text-neutral-900 sm:text-[28px]">
+                      {step.title}
+                    </h3>
+                    <p className="mt-5 max-w-md text-[15px] leading-relaxed text-neutral-600">
+                      {step.body}
+                    </p>
+                  </div>
                 </div>
 
                 <div className={index % 2 === 1 ? "lg:order-1" : ""}>
-                  {step.mockup}
+                  <Plate tilt={index % 2 === 1 ? "left" : "right"}>
+                    {step.mockup}
+                  </Plate>
                 </div>
               </div>
             </Reveal>
@@ -442,13 +645,76 @@ export function HowItWorks() {
 }
 
 /* -------------------------------------------------------------------------- */
+/* Bandet med samtliga ytor                                                    */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * GÅNGJÄRNET MELLAN VERKSTADEN OCH KONTORET.
+ *
+ * Avsnitten ovanför visar tre ytor, ett åt gången, vid texten som förklarar
+ * dem. Det är rätt för den som läser uppifrån och ned. Det svarar bara inte på
+ * frågan en köpare har efter två avsnitt: hur mycket är det här?
+ *
+ * Bandet svarar på den utan ett ord. Åtta ytor ur produkten drar förbi i jämn
+ * takt, och den som tittar i fem sekunder har sett omfattningen. Rörelsen och
+ * varför spåret innehåller samma bilder två gånger står i `Showcase.tsx`.
+ *
+ * INGET NUMMER OCH INGEN RUBRIK I AVSNITTSFORM. Numren är sidans
+ * innehållsförteckning, och en bild av omfattningen är inte ett kapitel.
+ * Rubriken står därför centrerad och liten, utan spalt, och avsnittet är
+ * kortare än de andra: det är en övergång och inte ett stopp.
+ *
+ * FULLBREDD MED FLIT. Bandet är det enda på sidan som går utanför spalten, och
+ * det är hela greppet — produkten fortsätter utanför det man ser.
+ */
+export function Surfaces() {
+  return (
+    <section className="relative overflow-hidden bg-neutral-900 py-20 sm:py-24">
+      <Aurora tone="onDark" />
+      <Grid tone="onDark" />
+
+      <div className="relative">
+        <div className="mx-auto max-w-6xl px-6 text-center">
+          <p className="text-[11px] font-medium uppercase tracking-wider text-tick">
+            Samtliga ytor
+          </p>
+          <h2 className="sheen-text mx-auto mt-4 max-w-xl bg-linear-to-b from-white via-white to-neutral-200 text-[26px] font-semibold leading-tight tracking-tight sm:text-[34px]">
+            Stämplingsskärmen, panelen och underlagen
+          </h2>
+        </div>
+
+        <div className="mt-14">
+          <SurfaceStrip />
+        </div>
+      </div>
+    </section>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
 /* 03 På kontoret                                                              */
 /* -------------------------------------------------------------------------- */
 
+/**
+ * Panelen.
+ *
+ * DE TVÅ BILDERNA LIGGER PÅ VARANDRA och inte under varandra. Rapporten ligger
+ * framför översikten, förskjuten nedåt och åt sidan, så att översiktens kant
+ * sticker fram bakom den. Det är samma yta sedd två gånger, och staplingen
+ * säger det: panelen är ett ställe med flera vyer, inte två produkter.
+ *
+ * Staplingen gäller från `lg`. Under den bredden står bilderna under varandra,
+ * eftersom två överlappande bilder på en telefon är en bild och en skymd kant.
+ */
 export function AdminSection() {
   return (
-    <section id="panelen" className="scroll-mt-16 bg-neutral-50">
-      <div className={SHELL}>
+    <section
+      id="panelen"
+      className="relative scroll-mt-16 overflow-hidden bg-neutral-50"
+    >
+      <Aurora tone="onLight" />
+
+      <div className={`relative ${SHELL}`}>
         <SectionHead
           index="03"
           eyebrow="På kontoret"
@@ -456,7 +722,7 @@ export function AdminSection() {
           intro="Ett tryck på skärmen i verkstaden syns i panelen i samma stund."
         />
 
-        <div className="mt-16 grid items-start gap-12 lg:grid-cols-2 lg:gap-16">
+        <div className="mt-16 grid items-start gap-12 lg:grid-cols-2 lg:gap-20">
           <dl>
             <SpecRow term="Rapporter">
               Filtrera på period, order, kund, anställd och arbetsmoment. Ta ut
@@ -479,10 +745,30 @@ export function AdminSection() {
             </SpecRow>
           </dl>
 
-          <div className="space-y-6">
-            <ReportMockup />
-            <div className="hidden lg:block">
-              <AdminMockup />
+          {/* ÖVERLAPPET GÖRS MED EN NEGATIV MARGINAL OCH INTE MED ABSOLUT
+              PLACERING. En absolut placerad bild tas ur flödet, och då måste
+              behållaren få en höjd satt för hand — en höjd som stämmer tills
+              någon lägger till en rad i tabellen, varefter nästa avsnitt
+              lägger sig över kanten utan att något syns i koden.
+
+              Med en negativ marginal styr bildernas egna höjder behållarens,
+              precis som annars. Den undre bilden ritas sist och hamnar därmed
+              överst, vilket är vad överlappet ska visa.
+
+              `flex-col` med `gap` och inte `space-y`: under lg står bilderna
+              under varandra, och vid lg byter behållaren till `block`, där en
+              negativ marginal fungerar som den ska. */}
+          <div className="flex flex-col gap-6 lg:block">
+            <div className="lg:w-[88%]">
+              <Plate tilt="none">
+                <AdminMockup />
+              </Plate>
+            </div>
+
+            <div className="lg:-mt-24 lg:ml-auto lg:w-[88%]">
+              <Plate tilt="none">
+                <ReportMockup />
+              </Plate>
             </div>
           </div>
         </div>
@@ -518,7 +804,10 @@ export function Documents() {
   ];
 
   return (
-    <section id="underlag" className="scroll-mt-16 bg-white">
+    <section
+      id="underlag"
+      className="relative scroll-mt-16 overflow-hidden bg-white"
+    >
       <div className={SHELL}>
         <SectionHead
           index="04"
@@ -527,16 +816,27 @@ export function Documents() {
           intro="Tid som registrerats en gång blir underlag till kundens faktura, till er egen efterkalkyl och till lönen."
         />
 
-        <div className="mt-16 grid gap-10 lg:grid-cols-3 lg:gap-8">
+        <div className="mt-20 grid gap-14 lg:grid-cols-3 lg:gap-10">
           {docs.map((doc, index) => (
             /* h-full hela vägen ned: de tre pappersytorna blir lika höga även
                när en tabell har en rad mer, och rubrikerna under dem hamnar på
-               samma linje. */
-            <Reveal key={doc.title} delay={index * 90} className="h-full">
-              <div className="flex h-full flex-col">
-                <div className="flex-1">{doc.mockup}</div>
+               samma linje.
 
-                <div className="mt-6 border-t border-neutral-200 pt-5">
+               `tilt="none"`: tre lutade papper bredvid varandra blir ett
+               mönster, och de tre dokumenten är inte ett mönster utan tre
+               mottagare. Lyftet vid beröring står kvar. */
+            <Reveal
+              key={doc.title}
+              delay={index * 90}
+              variant="soft"
+              className="h-full"
+            >
+              <div className="flex h-full flex-col">
+                <Plate tilt="none" className="flex-1">
+                  {doc.mockup}
+                </Plate>
+
+                <div className="mt-8 border-t border-neutral-200 pt-5">
                   <p className="text-[11px] font-medium uppercase tracking-wider text-tick-deep">
                     {doc.kicker}
                   </p>
@@ -568,11 +868,15 @@ interface Capability {
 }
 
 /**
- * Sidans andra mörka yta, och den enda som är en ren uppräkning.
+ * Sidans sista mörka yta, och den enda som är en ren uppräkning.
  *
  * Fjord gör att listan läses som ett datablad i stället för som ännu ett ljust
- * avsnitt att skumma. Den ligger dessutom mitt emellan hero och slutblocket,
- * vilket ger sidan tre mörka hållpunkter på jämnt avstånd.
+ * avsnitt att skumma.
+ *
+ * RADERNA LYSER UPP EN ÅT GÅNGEN. En lista på sexton rader läses inte, den
+ * skummas, och den som hittat raden hen letade efter ska kunna se att hen står
+ * på den. Markören till vänster växer ur ingenting, så listan i vila är precis
+ * den täta uppräkning den ska vara.
  */
 export function Capabilities() {
   const groups: { title: string; rows: Capability[] }[] = [
@@ -664,6 +968,8 @@ export function Capabilities() {
       id="funktioner"
       className="relative scroll-mt-16 overflow-hidden bg-neutral-900"
     >
+      <Aurora tone="onDark" />
+      <Grid tone="onDark" />
       <Motif tone="onDark" className="-right-72 -top-56 h-[50rem] w-[50rem]" />
 
       <div className={`relative ${SHELL}`}>
@@ -686,17 +992,21 @@ export function Capabilities() {
                   {group.rows.map((row) => (
                     <div
                       key={row.term}
-                      className="border-t border-neutral-800 py-4"
+                      className="group relative border-t border-white/10 py-4 transition-colors duration-300"
                     >
+                      <span
+                        aria-hidden="true"
+                        className="absolute -left-4 top-0 h-px w-0 bg-tick transition-all duration-500 group-hover:w-4"
+                      />
                       <dt className="flex items-center gap-2 text-[14px] font-medium text-white">
                         {row.term}
                         {row.tillval && (
-                          <span className="rounded border border-neutral-700 px-1.5 py-0.5 text-[9px] uppercase tracking-wider text-neutral-400">
+                          <span className="rounded border border-white/15 px-1.5 py-0.5 text-[9px] uppercase tracking-wider text-neutral-400">
                             Tillval
                           </span>
                         )}
                       </dt>
-                      <dd className="mt-1.5 text-[13px] leading-relaxed text-neutral-400">
+                      <dd className="mt-1.5 text-[13px] leading-relaxed text-neutral-400 transition-colors duration-300 group-hover:text-neutral-300">
                         {row.body}
                       </dd>
                     </div>
@@ -724,6 +1034,12 @@ export function Capabilities() {
  *
  * Siffrorna kommer från prislistan hos betaltjänsten och inte från koden. En
  * prisändring syns här utan att något behöver byggas om.
+ *
+ * KORTETS KANT ÄR EN GRADIENT och inte en linje. Den går från Lav genom en
+ * svag ton av Tick och tillbaka, alltså ljusast där basen står. Kortet är
+ * sidans viktigaste yta efter hero, och en kant som fångar ljus i överkanten
+ * är det minsta sätt att säga det. Grönt i kanten är accent i ordets egen
+ * mening; som fyllning hade det varit huvudfärg, vilket guiden förbjuder.
  */
 /**
  * Säljtexten för varje tillval.
@@ -763,8 +1079,10 @@ export function Pricing({
   }));
 
   return (
-    <section id="pris" className="scroll-mt-16 bg-white">
-      <div className={SHELL}>
+    <section id="pris" className="relative scroll-mt-16 overflow-hidden bg-white">
+      <Aurora tone="onLight" className="inset-x-0 top-0 h-[40rem]" />
+
+      <div className={`relative ${SHELL}`}>
         <SectionHead
           index="06"
           eyebrow="Pris"
@@ -772,104 +1090,113 @@ export function Pricing({
           intro="Antalet anställda, ordrar och stämplingar påverkar inte priset."
         />
 
-        <div className="mt-16 overflow-hidden rounded-xl border border-neutral-200">
-          {/* Basen. Den stora siffran till vänster och innehållet till höger,
-              som en rad i en prislista snarare än ett paketkort. */}
-          <div className="grid gap-8 border-b border-neutral-200 bg-white p-7 sm:p-10 lg:grid-cols-[20rem_1fr] lg:gap-12">
-            <div>
-              <p className="text-[11px] font-medium uppercase tracking-wider text-tick-deep">
-                Bas
-              </p>
-              <p className="mt-5 flex items-baseline gap-2">
-                <span className="text-[56px] font-semibold leading-none tracking-tight tabular-nums text-neutral-900">
-                  {kr(pricing.month)}
-                </span>
-                <span className="text-[15px] text-neutral-500">
-                  kr per skärm och månad
-                </span>
-              </p>
-              <p className="mt-3 text-[13px] text-neutral-500">
-                Exklusive moms. Ingen bindningstid.
-              </p>
-
-              {pricing.year !== null && (
-                <p className="mt-5 inline-flex flex-wrap items-center gap-2 rounded-md border border-neutral-200 bg-neutral-50 px-3 py-1.5 text-[13px] text-neutral-700">
-                  <span className="font-medium tabular-nums">
-                    {kr(pricing.year)} kr per år
-                  </span>
-                  <span className="text-neutral-500">
-                    tio månaders pris för tolv
-                  </span>
-                </p>
-              )}
-            </div>
-
-            <div>
-              <p className="text-[14px] font-medium text-neutral-900">
-                Ingår i basen
-              </p>
-              <ul className="mt-4 grid gap-x-8 gap-y-2 sm:grid-cols-2">
-                {[
-                  "Obegränsat antal anställda",
-                  "Obegränsat antal ordrar och moment",
-                  "Obegränsat antal stämplingar",
-                  "Rapporter, PDF, Excel och utskrift",
-                  "Efterkalkyl och kundregister",
-                  "Flera administratörer",
-                  "Uppdateringar och drift",
-                  "Support på svenska",
-                ].map((item) => (
-                  <li
-                    key={item}
-                    className="border-t border-neutral-100 py-1.5 text-[13px] text-neutral-600"
-                  >
-                    {item}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          </div>
-
-          {/* Tillvalen. En rad var med tonad botten, så att det syns att de
-              är något annat än basen och inte paket till. */}
-          {offers.map((offer) => (
-            <div
-              key={offer.key}
-              className="grid gap-6 border-b border-neutral-200 bg-neutral-50 p-7 last:border-b-0 sm:p-10 lg:grid-cols-[20rem_1fr] lg:gap-12"
-            >
+        {/* Kanten som gradient: en pixel yttre ruta med gradienten som
+            fyllning, och kortet innanför. Greppet gör att hörnradien stämmer
+            hela vägen runt, vilket en ritad kant inte kan. */}
+        <div className="mt-16 rounded-2xl bg-linear-to-b from-neutral-200 via-tick/40 to-neutral-200 p-px shadow-[0_28px_64px_-32px_rgba(14,26,43,0.28)]">
+          <div className="overflow-hidden rounded-[15px] bg-white">
+            {/* Basen. Den stora siffran till vänster och innehållet till
+                höger, som en rad i en prislista snarare än ett paketkort. */}
+            <div className="grid gap-8 border-b border-neutral-200 bg-white p-7 sm:p-10 lg:grid-cols-[20rem_1fr] lg:gap-12">
               <div>
-                <p className="text-[11px] font-medium uppercase tracking-wider text-neutral-500">
-                  Tillval
+                <p className="text-[11px] font-medium uppercase tracking-wider text-tick-deep">
+                  Bas
                 </p>
                 <p className="mt-5 flex items-baseline gap-2">
-                  <span className="text-[32px] font-semibold leading-none tracking-tight tabular-nums text-neutral-900">
-                    {kr(offer.price.month)}
+                  <span className="sheen-text bg-linear-to-b from-neutral-900 to-neutral-600 text-[56px] font-semibold leading-none tracking-tight tabular-nums">
+                    {kr(pricing.month)}
                   </span>
-                  <span className="text-[14px] text-neutral-500">
-                    kr per månad och företag
+                  <span className="text-[15px] text-neutral-500">
+                    kr per skärm och månad
                   </span>
                 </p>
-                {offer.price.year !== null && (
-                  <p className="mt-3 text-[13px] text-neutral-500">
-                    eller {kr(offer.price.year)} kr per år
+                <p className="mt-3 text-[13px] text-neutral-500">
+                  Exklusive moms. Ingen bindningstid.
+                </p>
+
+                {pricing.year !== null && (
+                  <p className="mt-5 inline-flex flex-wrap items-center gap-2 rounded-md border border-neutral-200 bg-neutral-50 px-3 py-1.5 text-[13px] text-neutral-700">
+                    <span className="font-medium tabular-nums">
+                      {kr(pricing.year)} kr per år
+                    </span>
+                    <span className="text-neutral-500">
+                      tio månaders pris för tolv
+                    </span>
                   </p>
                 )}
               </div>
 
               <div>
                 <p className="text-[14px] font-medium text-neutral-900">
-                  {offer.name}
+                  Ingår i basen
                 </p>
-                <p className="mt-2.5 max-w-xl text-[13px] leading-relaxed text-neutral-600">
-                  {offer.body}
-                </p>
+                <ul className="mt-4 grid gap-x-8 gap-y-2 sm:grid-cols-2">
+                  {[
+                    "Obegränsat antal anställda",
+                    "Obegränsat antal ordrar och moment",
+                    "Obegränsat antal stämplingar",
+                    "Rapporter, PDF, Excel och utskrift",
+                    "Efterkalkyl och kundregister",
+                    "Flera administratörer",
+                    "Uppdateringar och drift",
+                    "Support på svenska",
+                  ].map((item) => (
+                    <li
+                      key={item}
+                      className="group flex items-center gap-2 border-t border-neutral-100 py-1.5 text-[13px] text-neutral-600"
+                    >
+                      <span
+                        aria-hidden="true"
+                        className="h-1 w-1 shrink-0 rounded-full bg-neutral-300 transition-colors duration-300 group-hover:bg-tick-deep"
+                      />
+                      {item}
+                    </li>
+                  ))}
+                </ul>
               </div>
             </div>
-          ))}
 
-          {/* Sista raden i priskortet: kundens egen summa. Styckpriserna står
-              kvar ovanför — det är dem man ska kunna upprepa. */}
-          <PriceCalculator pricing={pricing} modules={modules} />
+            {/* Tillvalen. En rad var med tonad botten, så att det syns att de
+                är något annat än basen och inte paket till. */}
+            {offers.map((offer) => (
+              <div
+                key={offer.key}
+                className="group grid gap-6 border-b border-neutral-200 bg-neutral-50 p-7 transition-colors duration-300 last:border-b-0 hover:bg-neutral-100/70 sm:p-10 lg:grid-cols-[20rem_1fr] lg:gap-12"
+              >
+                <div>
+                  <p className="text-[11px] font-medium uppercase tracking-wider text-neutral-500">
+                    Tillval
+                  </p>
+                  <p className="mt-5 flex items-baseline gap-2">
+                    <span className="text-[32px] font-semibold leading-none tracking-tight tabular-nums text-neutral-900">
+                      {kr(offer.price.month)}
+                    </span>
+                    <span className="text-[14px] text-neutral-500">
+                      kr per månad och företag
+                    </span>
+                  </p>
+                  {offer.price.year !== null && (
+                    <p className="mt-3 text-[13px] text-neutral-500">
+                      eller {kr(offer.price.year)} kr per år
+                    </p>
+                  )}
+                </div>
+
+                <div>
+                  <p className="text-[14px] font-medium text-neutral-900">
+                    {offer.name}
+                  </p>
+                  <p className="mt-2.5 max-w-xl text-[13px] leading-relaxed text-neutral-600">
+                    {offer.body}
+                  </p>
+                </div>
+              </div>
+            ))}
+
+            {/* Sista raden i priskortet: kundens egen summa. Styckpriserna står
+                kvar ovanför — det är dem man ska kunna upprepa. */}
+            <PriceCalculator pricing={pricing} modules={modules} />
+          </div>
         </div>
 
         <div className="mt-10 flex flex-wrap items-center gap-5">
@@ -893,27 +1220,39 @@ export function Faq({ modules }: { modules: ModulePricing }) {
   const questions = faqQuestions(modules);
 
   return (
-    <section id="fragor" className="scroll-mt-16 bg-neutral-50">
-      <div className={SHELL}>
+    <section
+      id="fragor"
+      className="relative scroll-mt-16 overflow-hidden bg-neutral-50"
+    >
+      <Motif tone="onLight" className="-bottom-96 -right-72 h-[48rem] w-[48rem]" />
+
+      <div className={`relative ${SHELL}`}>
         <SectionHead index="07" eyebrow="Frågor" title="Vanliga frågor" />
 
         {/* <details> ger utfällbara svar utan JavaScript. Fungerar även om
-            något går fel, och går att söka i med webbläsarens egen funktion. */}
-        <div className="mt-14 border-t border-neutral-200">
+            något går fel, och går att söka i med webbläsarens egen funktion.
+
+            Frågan ligger i ett kort som lyser upp när pekaren vilar på det,
+            och den öppna frågan behåller den ljusa ytan: en öppen fråga ska
+            synas som öppen även när pekaren flyttat sig. */}
+        <div className="mt-14 space-y-2">
           {questions.map((item) => (
-            <details key={item.q} className="group border-b border-neutral-200">
+            <details
+              key={item.q}
+              className="group rounded-xl border border-neutral-200 bg-white/60 px-5 transition-colors duration-300 open:border-neutral-300 open:bg-white hover:border-neutral-300 hover:bg-white"
+            >
               <summary className="flex cursor-pointer list-none items-center justify-between gap-6 py-5 text-[16px] font-medium text-neutral-900 [&::-webkit-details-marker]:hidden">
                 {item.q}
                 <span
                   aria-hidden="true"
-                  className="shrink-0 text-neutral-400 transition-transform group-open:rotate-45 group-open:text-tick-deep"
+                  className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-neutral-200 text-neutral-400 transition-all duration-300 group-open:rotate-45 group-open:border-tick-deep group-open:text-tick-deep"
                 >
                   <svg
                     viewBox="0 0 20 20"
-                    className="h-5 w-5"
+                    className="h-3.5 w-3.5"
                     fill="none"
                     stroke="currentColor"
-                    strokeWidth={1.5}
+                    strokeWidth={1.75}
                     strokeLinecap="round"
                   >
                     <path d="M10 4v12M4 10h12" />
@@ -941,11 +1280,23 @@ export function Faq({ modules }: { modules: ModulePricing }) {
  * Grönt är accent och aldrig huvudfärg. Ett block, sist, är precis vad
  * varumärkets egen delningsbild gör — och det blir sidans starkaste yta just
  * för att färgen inte förekommit som yta tidigare.
+ *
+ * GLANSEN GÅR ÖVER HELA BLOCKET och inte över knappen. Knappen i det här
+ * avsnittet är Fjord, inte Tick, och en glans över en mörk knapp blir ett grått
+ * streck. Ytan bakom den är däremot sidans ljusaste, och den tål ljus: bandet
+ * vandrar över den en gång var nionde sekund och står still resten av tiden.
+ * Resten av varvet står det utanför kanten, eftersom en glans som rör sig
+ * oavbrutet drar blicken från det man ska läsa.
  */
 export function FinalCta({ pricing }: { pricing: ScreenPricing }) {
   return (
     <section className="relative overflow-hidden bg-tick">
       <Motif tone="onTick" className="-right-48 -top-64 h-[48rem] w-[48rem]" />
+
+      <span
+        aria-hidden="true"
+        className="animate-sheen pointer-events-none absolute inset-y-0 left-0 w-1/4 bg-linear-to-r from-transparent via-white/30 to-transparent"
+      />
 
       <div className={`relative ${SHELL}`}>
         <div className="grid items-end gap-12 lg:grid-cols-2">
@@ -970,7 +1321,7 @@ export function FinalCta({ pricing }: { pricing: ScreenPricing }) {
                   såg ut att sakna ram tills man letade efter den. */}
               <Link
                 href="/admin/login"
-                className="rounded-lg border border-neutral-900/55 px-6 py-3.5 text-[15px] font-semibold text-neutral-900 transition-colors hover:border-neutral-900 hover:bg-neutral-900/5"
+                className="rounded-lg border border-neutral-900/55 px-6 py-3.5 text-[15px] font-semibold text-neutral-900 transition-all duration-300 hover:-translate-y-0.5 hover:border-neutral-900 hover:bg-neutral-900/5"
               >
                 Logga in
               </Link>

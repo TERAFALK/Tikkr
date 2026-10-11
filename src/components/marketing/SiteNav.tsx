@@ -32,15 +32,25 @@ export default function SiteNav() {
 
   return (
     <>
-      {/* Bred skärm: länkarna står utskrivna. */}
+      {/* Bred skärm: länkarna står utskrivna.
+
+          Länken får en grön linje under sig när pekaren vilar på den.
+
+          Linjen växer ur ingenting och ligger inte och väntar i en svagare
+          ton: en rad med fem ljusa streck under länkarna läses som fem
+          markerade länkar, och ingen av dem är markerad. */}
       <nav aria-label="Avsnitt" className="hidden gap-6 md:flex">
         {NAV.map((item) => (
           <a
             key={item.href}
             href={item.href}
-            className="text-[13px] text-neutral-400 transition-colors hover:text-white"
+            className="group relative py-1 text-[13px] text-neutral-400 transition-colors hover:text-white"
           >
             {item.label}
+            <span
+              aria-hidden="true"
+              className="absolute inset-x-0 -bottom-0.5 mx-auto h-px w-0 bg-tick transition-all duration-300 group-hover:w-full"
+            />
           </a>
         ))}
       </nav>

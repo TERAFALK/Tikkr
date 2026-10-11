@@ -12,14 +12,31 @@ import { useEffect, useRef, useState } from "react";
  * Elementet visas direkt om webbläsaren saknar stödet, och all rörelse stängs
  * av för den som valt minskad rörelse i sitt system. En animation som inte går
  * att stänga av är ett tillgänglighetsproblem, inte en effekt.
+ *
+ * TVÅ LÄGEN, OCH VALET ÄR INNEHÅLLETS.
+ *
+ *  - `rise` är textens. Tjugo pixlar och ingenting mer. En rubrik man läser
+ *    ska stå still när blicken når den.
+ *  - `soft` är produktbildernas. Fyrtio pixlar och en knapp förminskning, så
+ *    att bilden kommer fram mot läsaren i stället för att glida upp.
+ *
+ * Lägena ligger som KLASSER i `globals.css` och inte som inline-stilar här.
+ * Skälet är `prefers-reduced-motion`: en inline-stil kan ingen mediafråga nå,
+ * och varje läge hade då behövt ett eget undantag i JavaScript, som dessutom
+ * bara hade gällt den som har JavaScript.
  */
+
+export type RevealVariant = "rise" | "soft";
+
 export default function Reveal({
   children,
   delay = 0,
+  variant = "rise",
   className = "",
 }: {
   children: React.ReactNode;
   delay?: number;
+  variant?: RevealVariant;
   className?: string;
 }) {
   const ref = useRef<HTMLDivElement>(null);
@@ -56,10 +73,8 @@ export default function Reveal({
     <div
       ref={ref}
       style={{ transitionDelay: `${delay}ms` }}
-      className={`transition-all duration-700 ease-out motion-reduce:transition-none ${
-        visible
-          ? "translate-y-0 opacity-100"
-          : "translate-y-5 opacity-0 motion-reduce:translate-y-0 motion-reduce:opacity-100"
+      className={`reveal ${
+        visible ? "reveal-shown" : `reveal-${variant}`
       } ${className}`}
     >
       {children}
