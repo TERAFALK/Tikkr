@@ -11,7 +11,6 @@ import {
 } from "@/lib/stripe";
 import { activeNotices } from "@/lib/notices";
 import { hasUnreadNews, runningVersion, visibleReleases } from "@/lib/news";
-import { hasUnseenSupportUpdates } from "@/lib/feedback";
 import AdminSidebar from "@/components/admin/AdminSidebar";
 import NoticeBanner from "@/components/ui/NoticeBanner";
 import SupportBanner from "@/components/admin/SupportBanner";
@@ -80,12 +79,7 @@ export default async function PanelLayout({
     ? null
     : await session.db.adminUser.findFirst({
         where: { id: session.userId },
-        select: {
-          email: true,
-          emailVerifiedAt: true,
-          newsSeenVersion: true,
-          supportSeenAt: true,
-        },
+        select: { email: true, emailVerifiedAt: true, newsSeenVersion: true },
       });
 
   // OBEKRÄFTAD E-POSTADRESS. Remsan står tills länken använts, så att ett
@@ -107,12 +101,6 @@ export default async function PanelLayout({
   const unreadNews =
     me !== null &&
     hasUnreadNews(visibleReleases(version, modules), me.newsSeenVersion);
-
-  // Pricken vid Support: svar eller ny status på ett av personens egna
-  // meddelanden sedan sidan senast öppnades. Se feedback.ts.
-  const supportUpdates =
-    me !== null &&
-    (await hasUnseenSupportUpdates(session.db, session.userId, me.supportSeenAt));
 
   const access = evaluateAccess({
     status: company?.subscriptionStatus ?? "TRIALING",
@@ -139,7 +127,6 @@ export default async function PanelLayout({
         // inte ett av kundens. Se admin-session.ts.
         showAccount={!session.support}
         unreadNews={unreadNews}
-        supportUpdates={supportUpdates}
         version={version}
       />
 

@@ -91,7 +91,7 @@ export default function PlatformFrame({
   children,
 }: {
   email: string;
-  /** Nya supportmeddelanden, siffran vid Inkorg. Se PlatformShell. */
+  /** Fel och förslag som inte är klarmarkerade, siffran vid Inkorg. */
   inboxCount: number;
   children: ReactNode;
 }) {

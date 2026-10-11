@@ -64,7 +64,12 @@ export default function ActionDialog<S extends DialogState>({
   onDone,
   children,
 }: {
-  trigger: ReactNode;
+  /**
+   * Knappens text, eller en funktion som ritar en egen knapp och får
+   * funktionen som öppnar rutan. Den senare för en ikon i menyn, där en
+   * vanlig knapp är för stor.
+   */
+  trigger: ReactNode | ((open: () => void) => ReactNode);
   triggerTone?: "primary" | "secondary" | "danger" | "ghost";
   title: string;
   description?: string;
@@ -129,13 +134,17 @@ export default function ActionDialog<S extends DialogState>({
 
   return (
     <>
-      <Button
-        type="button"
-        tone={triggerTone}
-        onClick={() => dialog.current?.showModal()}
-      >
-        {trigger}
-      </Button>
+      {typeof trigger === "function" ? (
+        trigger(() => dialog.current?.showModal())
+      ) : (
+        <Button
+          type="button"
+          tone={triggerTone}
+          onClick={() => dialog.current?.showModal()}
+        >
+          {trigger}
+        </Button>
+      )}
 
       {/* Webbläsarens egen dialog. Den sköter bakgrundsdämpning,
           tangentbordsfokus, Escape och att resten av sidan inte går att nå

@@ -161,9 +161,8 @@ model Company {
   customers       Customer[]
   supportVisits   SupportVisit[]
 
-  /// Supporten. Se FeedbackMessage.
+  /// Fel och förslag. Se FeedbackMessage.
   feedbackMessages FeedbackMessage[]
-  feedbackReplies  FeedbackReply[]
 
   // Löneunderlaget. Se avsnittet längst ner i filen.
   workSchedules   WorkSchedule[]
@@ -761,11 +760,6 @@ model AdminUser {
   /// synliga när versionen installeras, inte på ett datum.
   newsSeenVersion String? @map("news_seen_version")
 
-  /// SUPPORTEN (tillagt 2026-10-11, issue #8). När personen senast öppnade
-  /// sidan Support. Pricken i menyn står när ett av personens meddelanden fått
-  /// svar eller ny status efter det. Se feedback.ts.
-  supportSeenAt DateTime? @map("support_seen_at")
-
   company             Company             @relation(fields: [companyId], references: [id], onDelete: Cascade)
   passwordResets      PasswordReset[]
   emailVerifications  EmailVerification[]
@@ -934,32 +928,26 @@ model SupportVisit {
   @@map("support_visits")
 }
 
-/// Vad ett meddelande till supporten gäller. Styr etiketten, inget annat.
+/// Vad ett meddelande gäller. Styr etiketten, inget annat.
 enum FeedbackKind {
   BUG
   SUGGESTION
   FEEDBACK
 }
 
-/// Var ett meddelande står hos oss. Kunden ser samma ord.
-enum FeedbackStatus {
-  NEW
-  IN_PROGRESS
-  DONE
-}
-
-/// ETT MEDDELANDE FRÅN KUNDEN TILL SUPPORTEN (tillagt 2026-10-11, issue #8).
+/// ETT FEL, FÖRSLAG ELLER EN SYNPUNKT FRÅN KUNDEN (tillagt 2026-10-11, issue
+/// #8, förenklat samma dag).
 ///
-/// Fel, förslag och synpunkter, skickade från sidan Support i panelen och
-/// lästa i plattformens inkorg. Ingen mejlavisering: inkorgen är platsen.
+/// Skickas från knappen längst ner i panelens meny och läses i plattformens
+/// inkorg. Kunden får ingen återkoppling, och ingen mejlavisering skickas.
 ///
 /// Kundens egen data och därför företagsfiltrerad, se tenant.ts. Kunden
-/// skriver genom sin egen klient; plattformen läser och svarar globalt, på
+/// skriver genom sin egen klient; plattformen läser och arkiverar globalt, på
 /// samma sätt som CompanyPrice.
 ///
 /// Avsändarens adress och namn kopieras in. Tas användaren bort ska
-/// meddelandet fortfarande gå att läsa och besvara, och kopplingen till
-/// kontot nollas då av databasen.
+/// meddelandet fortfarande gå att läsa, och kopplingen till kontot nollas då
+/// av databasen.
 model FeedbackMessage {
   id        String @id @default(cuid())
   companyId String @map("company_id")
@@ -980,48 +968,25 @@ model FeedbackMessage {
 
   body String
 
-  status               FeedbackStatus @default(NEW)
-  statusChangedAt      DateTime?      @map("status_changed_at")
-  statusChangedByEmail String?        @map("status_changed_by_email")
-
-  /// Senaste gången något hände som kunden ska se: ett svar eller en ny
-  /// status. Tänder pricken vid Support, se AdminUser.supportSeenAt.
-  customerUpdatedAt DateTime? @map("customer_updated_at")
+  /// KLARMARKERAD, och därmed i arkivet. Tomt betyder att det ligger i
+  /// inkorgen. Ingen statuskolumn bredvid: raden ÄR tillståndet, samma skäl
+  /// som company_modules (CLAUDE.md § 3.1).
+  ///
+  /// Anteckningen krävs. Ett arkiv där det inte står vad som gjordes går inte
+  /// att läsa ett halvår senare.
+  doneAt      DateTime? @map("done_at")
+  doneNote    String?   @map("done_note")
+  doneByEmail String?   @map("done_by_email")
 
   createdAt DateTime @default(now()) @map("created_at")
 
-  company Company         @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  author  AdminUser?      @relation(fields: [authorUserId], references: [id], onDelete: SetNull)
-  replies FeedbackReply[]
+  company Company    @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  author  AdminUser? @relation(fields: [authorUserId], references: [id], onDelete: SetNull)
 
   @@index([companyId, createdAt])
-  @@index([status, createdAt])
+  @@index([doneAt, createdAt])
   @@index([authorUserId, createdAt])
   @@map("feedback_messages")
-}
-
-/// Vårt svar på ett meddelande. Visas för kunden under meddelandet.
-///
-/// Bara åt ett håll: kunden svarar genom att skicka ett nytt meddelande. En
-/// tråd åt båda hållen är ett ärendesystem, och det är inte vad issuen bad om.
-model FeedbackReply {
-  id        String @id @default(cuid())
-  companyId String @map("company_id")
-  messageId String @map("message_id")
-
-  body String
-
-  /// Plattformskontot som svarade. Visas aldrig för kunden, där står "Tikkr".
-  authorEmail String @map("author_email")
-
-  createdAt DateTime @default(now()) @map("created_at")
-
-  company Company         @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  message FeedbackMessage @relation(fields: [messageId], references: [id], onDelete: Cascade)
-
-  @@index([messageId, createdAt])
-  @@index([companyId])
-  @@map("feedback_replies")
 }
 
 model PlatformState {

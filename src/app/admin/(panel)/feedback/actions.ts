@@ -1,22 +1,25 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
 import { assertWritable, requireAdmin } from "@/lib/admin-session";
 import { FeedbackError, sendFeedback } from "@/lib/feedback";
-import { saved, type SaveState } from "@/lib/save-state";
+
+export interface FeedbackFormState {
+  error?: string;
+  ok?: string;
+}
 
 /**
- * Skickar ett meddelande till supporten.
+ * Skickar ett fel, ett förslag eller en synpunkt från rutan i menyn.
  *
  * Företaget och avsändaren tas ur sessionen. Formuläret bär bara det kunden
- * själv skrivit och valt, och sidan hen kom ifrån. Supportläget kan inte
+ * själv skrivit och valt, och sidan hen stod på. Supportläget kan inte
  * skicka: ett meddelande från oss till oss, i kundens namn, vore just den
  * sortens lånade identitet supportläget är byggt för att undvika.
  */
 export async function sendFeedbackAction(
-  _previous: SaveState,
+  _previous: FeedbackFormState,
   formData: FormData
-): Promise<SaveState> {
+): Promise<FeedbackFormState> {
   const session = await requireAdmin();
   await assertWritable(session);
 
@@ -46,6 +49,5 @@ export async function sendFeedbackAction(
     throw error;
   }
 
-  revalidatePath("/admin/support");
-  return saved("Meddelandet är skickat");
+  return { ok: "Meddelandet är skickat." };
 }

@@ -2,27 +2,24 @@
 
 import { revalidatePath } from "next/cache";
 import { requirePlatformAdmin } from "@/lib/platform-admin";
-import {
-  FeedbackError,
-  isFeedbackStatus,
-  replyToFeedback,
-  setFeedbackStatus,
-} from "@/lib/feedback";
-import { saved, type SaveState } from "@/lib/save-state";
+import { FeedbackError, markFeedbackDone } from "@/lib/feedback";
 
-const PATH = "/plattform/inkorg";
+export interface DoneFormState {
+  error?: string;
+  ok?: string;
+}
 
-/** Svarar kunden. Svaret syns under meddelandet på kundens sida Support. */
-export async function replyAction(
-  _previous: SaveState,
+/** Klarmarkerar ett meddelande med en anteckning och flyttar det till arkivet. */
+export async function markDoneAction(
+  _previous: DoneFormState,
   formData: FormData
-): Promise<SaveState> {
+): Promise<DoneFormState> {
   const { email } = await requirePlatformAdmin();
 
   try {
-    await replyToFeedback({
+    await markFeedbackDone({
       id: String(formData.get("id") ?? ""),
-      body: String(formData.get("body") ?? ""),
+      note: String(formData.get("note") ?? ""),
       byEmail: email,
     });
   } catch (error) {
@@ -30,21 +27,6 @@ export async function replyAction(
     throw error;
   }
 
-  revalidatePath(PATH);
-  return saved("Svaret är skickat");
-}
-
-export async function setStatusAction(formData: FormData) {
-  const { email } = await requirePlatformAdmin();
-
-  const status = String(formData.get("status") ?? "");
-  if (!isFeedbackStatus(status)) return;
-
-  await setFeedbackStatus({
-    id: String(formData.get("id") ?? ""),
-    status,
-    byEmail: email,
-  });
-
-  revalidatePath(PATH);
+  revalidatePath("/plattform/inkorg");
+  return { ok: "Klarmarkerad" };
 }

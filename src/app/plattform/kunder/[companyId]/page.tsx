@@ -162,7 +162,7 @@ export default async function CompanyPage({
     select: { id: true, email: true, startedAt: true, lastSeenAt: true },
   });
 
-  // Kundens senaste meddelanden till supporten. Svaras i inkorgen.
+  // Kundens senaste fel och förslag. Hanteras i inkorgen.
   const feedback = await recentCompanyFeedback(companyId);
 
   const inactiveDays = stats.lastActivityAt
@@ -503,10 +503,10 @@ export default async function CompanyPage({
 
         {feedback.length > 0 && (
           <Section
-            title="Support"
+            title="Fel och förslag"
             action={
               <ButtonLink
-                href={`/plattform/inkorg?status=alla&kund=${company.id}`}
+                href={`/plattform/inkorg?kund=${company.id}`}
                 tone="secondary"
               >
                 I inkorgen
@@ -521,7 +521,7 @@ export default async function CompanyPage({
                       <span className="font-medium text-neutral-900">
                         {FEEDBACK_KIND_LABEL[message.kind]} · {areaLabel(message.area)}
                       </span>
-                      <FeedbackStatusBadge status={message.status} />
+                      <FeedbackStatusBadge doneAt={message.doneAt} />
                       <span className="ml-auto text-neutral-500">
                         {formatDateTime(message.createdAt)}
                       </span>
