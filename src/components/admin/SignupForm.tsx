@@ -6,24 +6,31 @@ import { register, type SignupState } from "@/app/registrera/actions";
 import { Alert, Button, Field, Input } from "@/components/ui";
 
 /**
- * REGISTRERINGEN I TVÅ STEG (ändrat 2026-10-11, issue #16).
+ * REGISTRERINGEN I TRE STEG (ändrat 2026-10-11, issue #16).
  *
- * Var sex fält under varandra. På en telefon betydde det att den som skulle
+ * Var sju fält under varandra. På en telefon betydde det att den som skulle
  * skapa en arbetsyta mötte ett formulär som fortsatte nedanför skärmkanten,
  * och ett formulär man inte ser slutet på ser ut att ta längre tid än det gör.
  *
- * Nu: steg 1 är personen, steg 2 är arbetsytan. Fyra fält och tre.
+ * Nu: personen, lösenordet, arbetsytan. Fyra fält, två och ett.
  *
- * ETT ENDA FORMULÄR, OCH DET ÄR HELA KONSTRUKTIONEN. Båda stegens fält ligger
- * kvar i DOM:en hela tiden; steget styr bara vilket som syns. Två formulär
- * efter varandra hade krävt att steg 1 lagrades någonstans mellan dem, och det
- * någonstans är antingen en server som får halva uppgifter eller en lagring i
- * webbläsaren med personuppgifter i. Här står uppgifterna på ett ställe, i
- * formuläret, till dess att de skickas en gång.
+ * ORDNINGEN ÄR VALD OCH INTE GIVEN. Lösenordet låg först på samma steg som
+ * företagets namn, och "Företagets namn" följt av "Lösenord" lästes som ett
+ * lösenord FÖR FÖRETAGET. Allt som är personen står därför före arbetsytan.
+ * Att företagsnamnet blev ett eget steg med ett enda fält är inte en förlust:
+ * det är sista steget, knappen står direkt under, och "vad heter företaget"
+ * är en fråga man svarar på utan att läsa.
+ *
+ * ETT ENDA FORMULÄR, OCH DET ÄR HELA KONSTRUKTIONEN. Alla stegens fält ligger
+ * kvar i DOM:en hela tiden; steget styr bara vilket som syns. Tre formulär
+ * efter varandra hade krävt att de tidigare stegen lagrades någonstans mellan
+ * dem, och det någonstans är antingen en server som får halva uppgifter eller
+ * en lagring i webbläsaren med personuppgifter i. Här står uppgifterna på ett
+ * ställe, i formuläret, till dess att de skickas en gång.
  *
  * `required` SITTER BARA PÅ DET SYNLIGA STEGET. Ett tomt `required`-fält som
  * är gömt gör formuläret ogiltigt, och webbläsaren vägrar då skicka det utan
- * att kunna peka på vilket fält som brast. Steg 1 kontrolleras i stället när
+ * att kunna peka på vilket fält som brast. Stegen kontrolleras i stället när
  * man trycker Fortsätt, med webbläsarens egen kontroll, och servern
  * kontrollerar allt igen oavsett vad som stod i formuläret.
  *
@@ -33,30 +40,35 @@ import { Alert, Button, Field, Input } from "@/components/ui";
  * allting. Lösenorden ekas inte, se SignupValues.
  *
  * UTAN JAVASCRIPT FINNS INGA STEG, och ingenting går förlorat. Stilen i
- * `noscript` nedan visar båda stegen och gömmer stegmätaren och de knappar som
- * bara flyttar mellan dem. Kvar står ett formulär med sex fält och en knapp,
+ * `noscript` nedan visar alla steg och gömmer stegmätaren och de knappar som
+ * bara flyttar mellan dem. Kvar står ett formulär med sju fält och en knapp,
  * alltså precis det som fanns före den här ändringen. Samma hållning som
  * pointerparallaxen på säljsidan har, se `Parallax.tsx`.
  */
 
-type Step = 1 | 2;
+type Step = 1 | 2 | 3;
 
 const STEPS: Record<Step, string> = {
   1: "Om dig",
-  2: "Arbetsytan",
+  2: "Lösenord",
+  3: "Arbetsytan",
 };
+
+const ORDER: Step[] = [1, 2, 3];
+const LAST: Step = 3;
 
 export default function SignupForm() {
   const [state, action] = useActionState<SignupState, FormData>(register, {});
   const [step, setStep] = useState<Step>(1);
 
-  // Tomt vid första visningen, ifyllt efter ett fel. Se SignupState.
-  const was = state.values;
-
   const panes = useRef<Record<Step, HTMLFieldSetElement | null>>({
     1: null,
     2: null,
+    3: null,
   });
+
+  // Tomt vid första visningen, ifyllt efter ett fel. Se SignupState.
+  const was = state.values;
 
   /**
    * Sätts när ANVÄNDAREN byter steg, och inte när ett serverfel gör det.
@@ -67,7 +79,7 @@ export default function SignupForm() {
    */
   const focusNext = useRef(false);
 
-  // Felet kan höra till ett fält på det andra steget. Se SignupState.
+  // Felet kan höra till ett fält på ett annat steg. Se SignupState.
   useEffect(() => {
     if (state.step) setStep(state.step);
   }, [state]);
@@ -84,28 +96,31 @@ export default function SignupForm() {
   }
 
   /**
-   * Vidare till steg 2, om webbläsaren godkänner fälten på steg 1.
+   * Vidare till nästa steg, om webbläsaren godkänner fälten på det här.
    *
    * `reportValidity` på varje fält i tur och ordning, och inte på formuläret:
-   * formuläret innehåller även steg 2, som är tomt vid det här laget.
+   * formuläret innehåller även stegen som ligger framför, och de är tomma vid
+   * det här laget.
    */
   function forward() {
-    const pane = panes.current[1];
+    const pane = panes.current[step];
     if (!pane) return;
 
     for (const field of pane.querySelectorAll("input")) {
       if (!field.reportValidity()) return;
     }
 
-    goTo(2);
+    if (step < LAST) goTo((step + 1) as Step);
   }
 
   return (
     <form action={action} className="space-y-5">
       <noscript>
         <style>
-          {'[data-signup-pane],[data-signup-nav="2"]{display:revert!important}' +
-            '[data-signup-steps],[data-signup-nav="1"],[data-signup-back]{display:none!important}'}
+          {"[data-signup-pane]{display:revert!important}" +
+            '[data-signup-nav="3"]{display:flex!important}' +
+            '[data-signup-steps],[data-signup-nav="1"],[data-signup-nav="2"],' +
+            "[data-signup-back]{display:none!important}"}
         </style>
       </noscript>
 
@@ -183,16 +198,10 @@ export default function SignupForm() {
         }}
         className="space-y-4"
       >
-        <Field label="Företagets namn">
-          <Input
-            name="companyName"
-            placeholder="Mekaniska AB"
-            defaultValue={was?.companyName ?? ""}
-            required={step === 2}
-          />
-        </Field>
-
-        <Field label="Lösenord" hint="Minst 10 tecken">
+        {/* "Ditt" och inte bara "Lösenord". Steget heter Lösenord och nästa
+            heter Arbetsytan, och den som läser snabbt ska aldrig kunna tro
+            att koden hör till företaget. */}
+        <Field label="Ditt lösenord" hint="Minst 10 tecken">
           <Input
             name="password"
             type="password"
@@ -213,6 +222,24 @@ export default function SignupForm() {
         </Field>
       </fieldset>
 
+      <fieldset
+        data-signup-pane=""
+        hidden={step !== 3}
+        ref={(node) => {
+          panes.current[3] = node;
+        }}
+        className="space-y-4"
+      >
+        <Field label="Företagets namn">
+          <Input
+            name="companyName"
+            placeholder="Mekaniska AB"
+            defaultValue={was?.companyName ?? ""}
+            required={step === 3}
+          />
+        </Field>
+      </fieldset>
+
       <div data-signup-nav="1" hidden={step !== 1}>
         <Button type="button" onClick={forward} className="w-full">
           Fortsätt
@@ -221,6 +248,13 @@ export default function SignupForm() {
 
       <div data-signup-nav="2" hidden={step !== 2} className="flex gap-3">
         <BackButton onClick={() => goTo(1)} />
+        <Button type="button" onClick={forward} className="flex-1">
+          Fortsätt
+        </Button>
+      </div>
+
+      <div data-signup-nav="3" hidden={step !== 3} className="flex gap-3">
+        <BackButton onClick={() => goTo(2)} />
         <SubmitButton />
       </div>
     </form>
@@ -230,7 +264,7 @@ export default function SignupForm() {
 /**
  * STEGMÄTAREN.
  *
- * Två band och två namn. Bandet före det man står på ligger kvar ifyllt, så
+ * Tre band och tre namn. Banden före det man står på ligger kvar ifyllda, så
  * att mätaren svarar på både var man är och hur mycket som återstår.
  *
  * Fjord och inte grönt. Grönt betyder "pågår just nu" i hela produkten, och en
@@ -238,8 +272,8 @@ export default function SignupForm() {
  */
 function Stepper({ step }: { step: Step }) {
   return (
-    <ol data-signup-steps="" className="grid grid-cols-2 gap-2">
-      {([1, 2] as const).map((number) => {
+    <ol data-signup-steps="" className="grid grid-cols-3 gap-2">
+      {ORDER.map((number) => {
         const here = number === step;
         const passed = number <= step;
 
@@ -265,7 +299,7 @@ function Stepper({ step }: { step: Step }) {
 }
 
 /**
- * Tillbaka till steg 1.
+ * Ett steg tillbaka.
  *
  * Avstängd medan arbetsytan skapas. Går man tillbaka mitt i skickandet står
  * man på ett formulär som ser ifyllbart ut medan servern redan hashar

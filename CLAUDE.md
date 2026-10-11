@@ -1118,15 +1118,22 @@ ligger i `src/lib/feedback.ts`, och `tests/feedback.test.ts` fäller den.
    databasen (§ 0 punkt 7). Kolumnen tas bort i en senare release, som fälten
    för ingående komptid.
 
-   **REGISTRERINGEN GÅR I TVÅ STEG** (ändrat 2026-10-11, issue #16). Steg 1 är
-   personen, steg 2 är arbetsytan, med en stegmätare överst. Sex fält under
-   varandra betydde att den som skapade en arbetsyta på en telefon mötte ett
-   formulär som fortsatte nedanför skärmkanten.
+   **REGISTRERINGEN GÅR I TRE STEG** (ändrat 2026-10-11, issue #16): personen,
+   lösenordet, arbetsytan, med en stegmätare överst. Sju fält under varandra
+   betydde att den som skapade en arbetsyta på en telefon mötte ett formulär
+   som fortsatte nedanför skärmkanten.
 
-   **Det är ETT formulär**, och båda stegens fält ligger kvar i DOM:en hela
-   tiden. Två formulär efter varandra hade krävt att steg 1 lagrades någonstans
-   mellan dem, och det någonstans är antingen en server som får halva uppgifter
-   eller en lagring i webbläsaren med personuppgifter i.
+   **Ordningen är vald och inte given.** Lösenordet låg först på samma steg som
+   företagets namn, och "Företagets namn" följt av "Lösenord" lästes som ett
+   lösenord FÖR FÖRETAGET. Allt som är personen står därför före arbetsytan.
+   Att företagsnamnet blev ett eget steg med ett enda fält är inte en förlust:
+   det är sista steget, knappen står direkt under, och "vad heter företaget" är
+   en fråga man svarar på utan att läsa.
+
+   **Det är ETT formulär**, och alla stegens fält ligger kvar i DOM:en hela
+   tiden. Tre formulär efter varandra hade krävt att de tidigare stegen
+   lagrades någonstans mellan dem, och det någonstans är antingen en server som
+   får halva uppgifter eller en lagring i webbläsaren med personuppgifter i.
 
    Ett fel vet vilket steg det hör till och skickar formuläret dit, eftersom
    servern vet vilket fält som brast och webbläsaren inte gör det. Fälten får
@@ -1135,7 +1142,7 @@ ligger i `src/lib/feedback.ts`, och `tests/feedback.test.ts` fäller den.
    detsamma som att skriva om allting.
 
    Utan JavaScript finns inga steg, och ingenting går förlorat: en stil i
-   `noscript` visar båda stegen och gömmer mätaren. Kvar står formuläret som
+   `noscript` visar alla stegen och gömmer mätaren. Kvar står formuläret som
    fanns före ändringen.
 
 4. **Anomali-varningar** (senare fas, ej MVP-kritiskt) — flagga t.ex. ett jobb

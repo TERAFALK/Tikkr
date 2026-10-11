@@ -82,10 +82,10 @@ describe("kontroll av uppgifter", () => {
     expect(validateSignup(base)).toBeNull();
   });
 
-  it("kräver ett företagsnamn, på steg 2", () => {
+  it("kräver ett företagsnamn, på steg 3", () => {
     expect(validateSignup({ ...base, companyName: " " })).toEqual({
       message: "Ange företagets namn.",
-      step: 2,
+      step: 3,
     });
   });
 
@@ -100,16 +100,19 @@ describe("kontroll av uppgifter", () => {
   });
 
   /**
-   * ETT FEL PÅ STEG 1 GÅR FÖRE ETT FEL PÅ STEG 2.
+   * ETT FEL PÅ ETT TIDIGARE STEG GÅR FÖRE ETT PÅ ETT SENARE.
    *
-   * Formuläret går till det steg felet pekar ut, och den som har fel i båda
+   * Formuläret går till det steg felet pekar ut, och den som har fel i flera
    * ska skickas till det första. Rättas det bakifrån hoppar formuläret fram
    * och tillbaka mellan stegen.
    */
   it("det första steget rapporteras först", () => {
     expect(
-      validateSignup({ ...base, lastName: "", companyName: "" })
+      validateSignup({ ...base, lastName: "", password: "", companyName: "" })
     ).toEqual({ message: "Ange ditt efternamn.", step: 1 });
+
+    // Lösenordet ligger före arbetsytan, se SignupStep.
+    expect(validateSignup({ ...base, password: "", companyName: "" })?.step).toBe(2);
   });
 
   it("e-post normaliseras", () => {

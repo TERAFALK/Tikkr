@@ -92,6 +92,7 @@ export async function register(
   const repeat = String(formData.get("repeat") ?? "");
 
   if (password !== repeat) {
+    // Steg 2 är lösenordets eget, se SignupStep.
     return { error: "Lösenorden är inte lika.", step: 2, values };
   }
 
