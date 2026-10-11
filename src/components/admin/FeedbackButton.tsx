@@ -16,11 +16,15 @@ import {
 } from "@/lib/feedback-form";
 
 /**
- * FEL OCH FÖRSLAG: EN IKON I MENYNS FOT OCH EN LITEN RUTA (issue #8).
+ * LÄMNA FEEDBACK: EN IKON I MENYNS FOT OCH EN LITEN RUTA (issue #8).
  *
  * En brevlåda och inget ärendesystem. Kunden skriver, trycker Skicka och får
- * ett tack; svaret, om det blir något, kommer i en senare version. Se
+ * en kvittens; svaret, om det blir något, kommer i en senare version. Se
  * feedback.ts.
+ *
+ * Underrubriken skickar den som behöver hjälp till hjälpcentret, eftersom ett
+ * ärende som hamnar här aldrig blir besvarat. Länken är relativ av samma skäl
+ * som i HelpLink.
  *
  * Sidan man står på följer med. Den förväljer området och sparas med
  * meddelandet, så att vi ser var felet uppstod utan att behöva fråga.
@@ -52,13 +56,28 @@ export default function FeedbackButton({
             type="button"
             onClick={open}
             className={className}
-            aria-label="Fel eller förslag"
-            title="Fel eller förslag"
+            aria-label="Lämna feedback"
+            title="Lämna feedback"
           >
             <IconMessage />
           </button>
         )}
-        title="Fel eller förslag"
+        title="Lämna feedback"
+        description={
+          <>
+            För förbättringsförslag, synpunkter och mindre fel. Inget svar
+            skickas. Behöver du hjälp, gå till{" "}
+            <a
+              href="/support"
+              target="_blank"
+              rel="noopener"
+              className="font-medium text-tick-deep hover:underline"
+            >
+              supporten
+            </a>
+            .
+          </>
+        }
         action={sendFeedbackAction}
         initial={{}}
         submitLabel="Skicka"

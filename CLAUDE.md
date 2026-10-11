@@ -1019,7 +1019,10 @@ Inga öppettider för support står utskrivna. Inga är bestämda.
 
 **Fel, förslag och synpunkter skickas från panelen** (tillagt 2026-10-11,
 steg 2 av issue #8, förenklat samma dag). En **pratbubbla i menyns fot**
-öppnar en liten ruta: typ (Fel, Förslag, Synpunkt), område och meddelande.
+öppnar en liten ruta, **Lämna feedback**: typ (Fel, Förslag, Synpunkt),
+område och meddelande. Underrubriken säger att rutan är för förslag och
+mindre fel, att inget svar skickas, och länkar till hjälpcentret för den som
+behöver hjälp.
 Bara inloggade, och företaget och avsändaren tas ur sessionen, aldrig ur
 formuläret. Sidan man stod på följer med, förväljer området ur `areaForPath`
 i `help/areas.ts` och sparas med meddelandet.
@@ -1031,7 +1034,7 @@ supportärende i stället för en brevlåda, och togs bort samma dag. Ingen
 mejlavisering åt något håll.
 
 **Hjälp och pratbubblan är ikoner i menyns fot**, bredvid Tikkr-märket, och
-inte rader i menyn. De handlar om Tikkr och inte om arbetsytan, och den nedre
+inte rader i menyn. Versionen står inte där, utan på sidan Nyheter. De handlar om Tikkr och inte om arbetsytan, och den nedre
 delen av menyn ska bara bära Nyheter, kontot, Inställningar och Logga ut.
 
 **Vi hanterar dem i plattformens Inkorg** (`/plattform/inkorg`), med en
@@ -1220,7 +1223,8 @@ ligger. Punkter som bara rör ett tillval visas bara för kunder som har det.
 Pricken vid Nyheter är per administratör: `admin_users.news_seen_version`
 håller den senaste versionen personen sett, och sidan skriver den när den
 öppnas. Den skrivs bara framåt, så att en backad version inte tänder pricken
-igen. Versionen som kör står i menyn, bredvid Tikkr-märket.
+igen. Versionen som kör står på sidan Nyheter, och inte i menyn (ändrat
+2026-10-11).
 
 Produktionsservern kör Caddy framför appen (`deploy/Caddyfile`,
 `docker-compose.prod.yml`), och dess `.env` sätter `COMPOSE_FILE` så att

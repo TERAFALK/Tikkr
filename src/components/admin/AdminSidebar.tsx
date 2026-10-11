@@ -125,7 +125,6 @@ export default function AdminSidebar({
   modules,
   showAccount,
   unreadNews,
-  version,
 }: {
   companyName: string;
   email: string;
@@ -142,8 +141,6 @@ export default function AdminSidebar({
   showAccount: boolean;
   /** Pricken vid Nyheter: en nyare version än den personen sett. */
   unreadNews: boolean;
-  /** Versionen som kör, från bygget. */
-  version: string;
 }) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
@@ -337,7 +334,9 @@ export default function AdminSidebar({
         </form>
 
         {/* Tikkr-märket nedtonat. Panelen tillhör kunden — deras logotyp står
-            överst, vår står i marginalen.
+            överst, vår står i marginalen. Versionen står på sidan Nyheter
+            och inte här (ändrat 2026-10-11): den säger kunden något bara där
+            ändringarna i den står.
 
             HJÄLPEN OCH RUTAN FÖR FEL OCH FÖRSLAG står här, som ikoner, och
             inte som rader i listan ovanför (ändrat 2026-10-11). De handlar om
@@ -347,9 +346,6 @@ export default function AdminSidebar({
         <div className="relative flex items-center gap-2 px-2 pt-2.5 text-neutral-400">
           <LogoMark size={22} />
           <WordmarkOnly height={10} tone="current" />
-          <span className="min-w-0 truncate text-[11px] tabular-nums">
-            {version}
-          </span>
           <span className="ml-auto flex shrink-0 items-center">
             <a
               href="/support"

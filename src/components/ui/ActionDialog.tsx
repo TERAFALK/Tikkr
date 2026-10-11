@@ -72,7 +72,8 @@ export default function ActionDialog<S extends DialogState>({
   trigger: ReactNode | ((open: () => void) => ReactNode);
   triggerTone?: "primary" | "secondary" | "danger" | "ghost";
   title: string;
-  description?: string;
+  /** En mening under rubriken. Får bära en länk. */
+  description?: ReactNode;
   /** Se kommentaren ovanför om varför `previous` är DialogState och inte S. */
   action: (previous: DialogState, formData: FormData) => Promise<S>;
   /** Utgångsläget. Skickas in eftersom typen är åtgärdens, inte rutans. */

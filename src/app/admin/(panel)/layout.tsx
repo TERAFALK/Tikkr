@@ -127,7 +127,6 @@ export default async function PanelLayout({
         // inte ett av kundens. Se admin-session.ts.
         showAccount={!session.support}
         unreadNews={unreadNews}
-        version={version}
       />
 
       <div className="min-w-0 flex-1">
