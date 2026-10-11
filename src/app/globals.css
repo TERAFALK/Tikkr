@@ -383,3 +383,375 @@ dialog {
     padding-bottom: 0.625rem;
   }
 }
+
+/* ==========================================================================
+   SÄLJSIDANS DJUP OCH RÖRELSE.
+
+   Avsnittet ovanför ger sidan dess intoning vid inladdning. Det här ger den
+   dess ytor: ljuset bakom produktbilderna, rutnätet i de mörka avsnitten,
+   draget i bandet med gränssnitten och glansen över det gröna slutblocket.
+
+   TVÅ REGLER STYR ALLT HÄR, OCH BÅDA ÄR PRESTANDA.
+
+   1. BARA transform OCH opacity ANIMERAS. Webbläsaren kan flytta dem på
+      grafikkortet utan att räkna om sidans layout. Animeras i stället höjd,
+      bredd eller filter räknas hela sidan om varje bildruta, och en
+      verkstadschef som öppnar sidan på en billig surfplatta får en sida som
+      hackar, vilket är motsatsen till det den här filen finns för.
+
+   2. LJUSET RITAS SOM GRADIENTER, ALDRIG MED blur(). En oskärpa över en yta
+      på tusen pixlar kostar en egen renderingsbuffert i varje bildruta.
+      radial-gradient ser likadant ut och kostar ingenting: den räknas ut en
+      gång och ligger sedan still som vilken bakgrundsbild som helst.
+
+   FÄRGERNA ÄR GUIDENS SEX, inget annat. De står som hexkoder här eftersom
+   gradienter behöver genomskinlighet, och color-mix() i en gradientstopp inte
+   går att lita på i varje webbläsare än. Värdena är desamma som tokens längst
+   upp i filen: Fjord #0E1A2B, Tick #2ED196, Tick Deep #0F9E68, Snö #F5F6F2.
+
+   ALLT SOM RÖR SIG STÄNGS AV av prefers-reduced-motion längst ned. Ljuset och
+   rutnätet står kvar, eftersom de ligger still, men varje drift, puls och
+   glans upphör.
+   ========================================================================== */
+
+/* --------------------------------------------------------------------------
+   Rutnätet.
+
+   Linjerna i de mörka avsnitten, knappt synliga. Greppet hör till verkstadens
+   egen värld: ett ritningsrutnät, inte en utsmyckning.
+
+   Masken tonar ut rutnätet mot kanterna. Utan den slutar linjerna i en rak
+   skarv mitt på ytan, och skarven är det enda man därefter ser.
+   -------------------------------------------------------------------------- */
+.brand-grid {
+  background-image:
+    linear-gradient(to right, rgba(245, 246, 242, 0.055) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(245, 246, 242, 0.055) 1px, transparent 1px);
+  background-size: 64px 64px;
+  -webkit-mask-image: radial-gradient(
+    ellipse 85% 70% at 50% 0%,
+    #000 20%,
+    transparent 78%
+  );
+  mask-image: radial-gradient(
+    ellipse 85% 70% at 50% 0%,
+    #000 20%,
+    transparent 78%
+  );
+}
+
+/*
+  Samma rutnät på ljus yta: Fjord i stället för Snö, och svagare. Ett mörkt
+  streck mot vitt syns mer än ett ljust streck mot Fjord.
+*/
+.brand-grid-light {
+  background-image:
+    linear-gradient(to right, rgba(14, 26, 43, 0.04) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(14, 26, 43, 0.04) 1px, transparent 1px);
+  background-size: 64px 64px;
+  -webkit-mask-image: radial-gradient(
+    ellipse 70% 60% at 50% 45%,
+    #000 10%,
+    transparent 75%
+  );
+  mask-image: radial-gradient(
+    ellipse 70% 60% at 50% 45%,
+    #000 10%,
+    transparent 75%
+  );
+}
+
+/* --------------------------------------------------------------------------
+   Ljuset bakom produktbilderna.
+
+   Tre gradienter i ett lager: Tick uppe till höger, Tick Deep nere till
+   vänster, och en svag ljusning i Snö som binder dem. Driften flyttar hela
+   lagret ett par procent, långsamt nog att inte gå att se medan man tittar och
+   tydligt nog att ytan inte känns som en stillbild.
+   -------------------------------------------------------------------------- */
+.brand-aurora {
+  background-image:
+    radial-gradient(
+      42rem 28rem at 78% 10%,
+      rgba(46, 209, 150, 0.18),
+      transparent 68%
+    ),
+    radial-gradient(
+      38rem 26rem at 10% 88%,
+      rgba(15, 158, 104, 0.15),
+      transparent 70%
+    ),
+    radial-gradient(
+      30rem 22rem at 52% 44%,
+      rgba(245, 246, 242, 0.05),
+      transparent 72%
+    );
+}
+
+/* Samma ljus, mycket svagare, för ett ljust avsnitt. */
+.brand-aurora-light {
+  background-image:
+    radial-gradient(
+      40rem 26rem at 82% 8%,
+      rgba(46, 209, 150, 0.1),
+      transparent 70%
+    ),
+    radial-gradient(
+      34rem 24rem at 8% 92%,
+      rgba(14, 26, 43, 0.05),
+      transparent 72%
+    );
+}
+
+@keyframes aurora-drift {
+  0% {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  50% {
+    transform: translate3d(-2.5%, 2%, 0) scale(1.06);
+  }
+  100% {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+}
+
+.animate-aurora {
+  animation: aurora-drift 26s ease-in-out infinite;
+  will-change: transform;
+}
+
+/* --------------------------------------------------------------------------
+   Glansen.
+
+   Ett smalt ljust band som vandrar över en yta och sedan står still större
+   delen av varvet. Ligger på det gröna slutblocket och på knappen som leder
+   vidare.
+
+   Bandet lutar 18 grader och går inte rakt. En rak glans läses som ett fel i
+   renderingen; en lutad läses som ljus.
+   -------------------------------------------------------------------------- */
+@keyframes sheen {
+  /*
+    PROCENTEN RÄKNAS PÅ BANDETS EGEN BREDD, inte på ytans.
+
+    Bandet är en tredjedel av ytan brett, så 300 % är en hel ytbredd. Därför
+    måste resan börja under −300 % för att bandet ska stå utanför vänsterkanten
+    och sluta över 300 % för att det ska lämna högerkanten. Står det i stället
+    `-250%` till `350%` passerar det hela ytan precis en gång, oavsett om
+    bandet är en tredjedel eller en fjärdedel brett.
+
+    Siffrorna stod en kort stund som −130 % och 250 %, med ytan själv i tankarna
+    och inte bandet. Bandet gick då från utanför kanten till strax utanför
+    kanten, alltså aldrig in över ytan, och effekten fanns inte.
+  */
+  0% {
+    transform: translateX(-250%) skewX(-18deg);
+  }
+  /*
+    Resten av varvet står bandet utanför högerkanten. En glans som vandrar
+    oavbrutet drar blicken från texten under den.
+  */
+  30%,
+  100% {
+    transform: translateX(350%) skewX(-18deg);
+  }
+}
+
+.animate-sheen {
+  animation: sheen 9s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+  will-change: transform;
+}
+
+/* --------------------------------------------------------------------------
+   Lagren som svävar.
+
+   Satellitkorten i hero rör sig några pixlar upp och ned, i olika takt och med
+   olika fas. Det är rörelsen som gör att de läses som kort FRAMFÖR skärmen i
+   stället för kort klistrade på den.
+   -------------------------------------------------------------------------- */
+@keyframes float-soft {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0);
+  }
+  50% {
+    transform: translate3d(0, -10px, 0);
+  }
+}
+
+.animate-float {
+  animation: float-soft 7s ease-in-out infinite;
+  will-change: transform;
+}
+
+.animate-float-slow {
+  animation: float-soft 9.5s ease-in-out infinite;
+  animation-delay: -2.5s;
+  will-change: transform;
+}
+
+/* --------------------------------------------------------------------------
+   Pulsen runt punkten som visar att något pågår just nu.
+   -------------------------------------------------------------------------- */
+@keyframes ping-soft {
+  0% {
+    transform: scale(1);
+    opacity: 0.6;
+  }
+  70%,
+  100% {
+    transform: scale(2.6);
+    opacity: 0;
+  }
+}
+
+.animate-ping-soft {
+  animation: ping-soft 2.8s cubic-bezier(0, 0, 0.2, 1) infinite;
+}
+
+/* --------------------------------------------------------------------------
+   PRODUKTBILDEN SOM ETT FÖREMÅL.
+
+   Skuggan har TVÅ LAGER med flit. Det täta lagret närmast kanten ger bilden
+   en vikt; det stora diffusa lagret längre ut ger rummet omkring den. Ett
+   enda lager ger antingen en hård kant eller ett dis, aldrig ett föremål.
+
+   Lutningen sätts i komponenten och inte här, eftersom den bara gäller från
+   lg och uppåt: en lutad produktbild på en telefon är en bild man inte kan
+   läsa.
+   -------------------------------------------------------------------------- */
+.plate {
+  transition:
+    transform 0.6s cubic-bezier(0.16, 1, 0.3, 1),
+    box-shadow 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.plate-light {
+  box-shadow:
+    0 1px 1px rgba(14, 26, 43, 0.06),
+    0 2px 6px -1px rgba(14, 26, 43, 0.1),
+    0 24px 48px -16px rgba(14, 26, 43, 0.24),
+    0 64px 96px -48px rgba(14, 26, 43, 0.36);
+}
+
+.plate-dark {
+  box-shadow:
+    0 2px 6px -1px rgba(3, 7, 12, 0.5),
+    0 32px 64px -24px rgba(3, 7, 12, 0.66),
+    0 80px 120px -60px rgba(3, 7, 12, 0.78);
+}
+
+/* --------------------------------------------------------------------------
+   POINTERPARALLAXEN.
+
+   Parallax.tsx skriver två variabler när pekaren rör sig, och varje lager
+   flyttar sig efter sitt eget djup. Variablerna sätts på elementet och inte
+   via React-tillstånd: ett tillstånd per musrörelse hade ritat om trädet
+   sextio gånger i sekunden.
+
+   De har ett värde här också, så att lagren står rätt innan JavaScript hunnit
+   köra, och står kvar rätt om det aldrig gör det.
+   -------------------------------------------------------------------------- */
+.parallax-layer {
+  --parallax-x: 0;
+  --parallax-y: 0;
+  --parallax-depth: 1;
+  transform: translate3d(
+    calc(var(--parallax-x) * var(--parallax-depth) * 1px),
+    calc(var(--parallax-y) * var(--parallax-depth) * 1px),
+    0
+  );
+  transition: transform 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* --------------------------------------------------------------------------
+   RUBRIKEN MED ETT FALL I TONEN.
+
+   En rubrik i sextioåtta punkter på en platt färg ser tryckt ut. Samma rubrik
+   med ett fall från vitt till Lav ser ut att stå i ljus. Ingen ny färg kommer
+   in: fallet går mellan två av guidens sex, och grönt rör aldrig en rubrik.
+
+   Gradienten själv sitter som Tailwind-klasser på elementet, eftersom den
+   skiljer sig mellan en mörk och en ljus yta. Den här klassen gör bara det som
+   är gemensamt: låter bakgrunden klippas till bokstävernas form.
+
+   HÖGKONTRASTLÄGE ÄR SKÄLET ATT DET ÄR EN KLASS OCH INTE TVÅ TAILWIND-KLASSER.
+   I Windows eget högkontrastläge ritar webbläsaren inte bakgrundsbilder, men
+   texten är fortfarande genomskinlig, och då försvinner varje rubrik på sidan
+   helt. Undantaget nedan ger tillbaka både färgen och texten, och det går att
+   skriva en enda gång just för att klippningen har ett eget namn.
+   -------------------------------------------------------------------------- */
+.sheen-text {
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+@media (forced-colors: active) {
+  .sheen-text {
+    background-image: none;
+    color: CanvasText;
+  }
+}
+
+/* --------------------------------------------------------------------------
+   Intoningen som Reveal använder.
+
+   Lägena ligger som klasser och inte som inline-stilar, så att
+   prefers-reduced-motion nedan kan stänga av dem allihop på ett ställe.
+   -------------------------------------------------------------------------- */
+.reveal {
+  transition:
+    opacity 0.8s cubic-bezier(0.16, 1, 0.3, 1),
+    transform 0.8s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.reveal-rise {
+  opacity: 0;
+  transform: translateY(20px);
+}
+
+.reveal-soft {
+  opacity: 0;
+  transform: translateY(40px) scale(0.975);
+}
+
+/*
+  INGEN OSKÄRPA I NÅGOT AV LÄGENA.
+
+  Ett tredje läge som tonade in ur en oskärpa låg här en stund. Det ser bra ut
+  på ett kort och är fel på ett avsnitt: `filter` kostar en egen
+  renderingsbuffert så länge övergången pågår, och ett avsnitt på tvåtusen
+  pixlar är en buffert i den storleken. Förflyttning och genomskinlighet räcker,
+  och de kostar ingenting.
+*/
+.reveal-shown {
+  opacity: 1;
+  transform: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-aurora,
+  .animate-sheen,
+  .animate-float,
+  .animate-float-slow,
+  .animate-ping-soft {
+    animation: none;
+  }
+
+  .plate,
+  .reveal,
+  .parallax-layer {
+    transition: none;
+  }
+
+  .parallax-layer {
+    transform: none;
+  }
+
+  .reveal-rise,
+  .reveal-soft {
+    opacity: 1;
+    transform: none;
+  }
+}

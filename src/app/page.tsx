@@ -42,6 +42,23 @@ export const metadata: Metadata = pageMetadata({
     "Tidregistrering per order och arbetsmoment, direkt i verkstaden.",
 });
 
+/**
+ * SIDANS ORDNING OCH DESS YTOR.
+ *
+ * Avsnitten ligger på var sin yta, och ordningen är satt i `Sections.tsx`:
+ * Fjord, Snö, vit, Snö, vit, Fjord, vit, Snö, Tick.
+ *
+ * YTORNA MÖTS I EN RAK KANT. Mellan avsnitten låg tidigare en tonad skarv som
+ * smetade ut den ena färgen i den andra över ett par centimeter. Den syntes
+ * som ett grumligt band tvärs över sidan, och nio sådana band gjorde att
+ * sidan såg suddig ut i stället för sammanhållen. En rak kant mellan två
+ * ytor är inget ögat snubblar på — det är så en sida med tryckta ytor ser ut.
+ *
+ * DE TVÅ LJUSA YTORNA SKILJS AV EN HÅRLINJE. Snö och vitt ligger nära
+ * varandra, och utan linje läses kanten som ett misstag i stället för som ett
+ * byte. Linjen står på avsnittet som ligger UNDER, eftersom bara det vet vad
+ * som kom före. Mot en mörk eller grön yta behövs ingen: kontrasten är kanten.
+ */
 export default async function Home() {
   // Hämtas parallellt. Båda ligger bakom samma korta minne i stripe.ts, så
   // det är en fråga till betaltjänsten och inte två.
@@ -63,24 +80,31 @@ export default async function Home() {
       <Reveal>
         <Problem />
       </Reveal>
+
       <Reveal>
         <HowItWorks />
       </Reveal>
+
       <Reveal>
         <AdminSection />
       </Reveal>
+
       <Reveal>
         <Documents />
       </Reveal>
+
       <Reveal>
         <Capabilities />
       </Reveal>
+
       <Reveal>
         <Pricing pricing={pricing} modules={modules} />
       </Reveal>
+
       <Reveal>
         <Faq modules={modules} />
       </Reveal>
+
       <Reveal>
         <FinalCta pricing={pricing} />
       </Reveal>

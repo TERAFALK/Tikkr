@@ -33,7 +33,12 @@ const TONES = [
   "bg-neutral-200 text-neutral-700",
 ];
 
-function toneFor(name: string): string {
+/**
+ * Tonen ur namnet. Exporterad eftersom säljsidans produktbilder ritar samma
+ * kort: en kopia där hade varit två ställen som ska säga samma sak, och de
+ * hinner alltid sluta göra det.
+ */
+export function toneFor(name: string): string {
   let sum = 0;
   for (let i = 0; i < name.length; i += 1) sum += name.charCodeAt(i);
   return TONES[sum % TONES.length];

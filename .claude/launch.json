@@ -1,0 +1,14 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "tikkr-dev",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["next", "dev", "-p", "3123"],
+      "port": 3123,
+      "env": {
+        "DATABASE_URL": "postgresql://ingen:ingen@127.0.0.1:1/finns_inte_test"
+      }
+    }
+  ]
+}

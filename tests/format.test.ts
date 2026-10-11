@@ -137,6 +137,45 @@ describe("ingen skärm visar decimaltimmar", () => {
     ).toEqual([]);
   });
 
+  /**
+   * SAMMA REGEL FÖR TID SOM ÄR SKRIVEN FÖR HAND.
+   *
+   * Kontrollen ovanför letar efter ANROP av toDecimalHours och
+   * formatDecimalHours, och den duger för kod som räknar. Säljsidans
+   * produktbilder räknar inte: de skriver tiden som en sträng, och därför gick
+   * "7,50" och "+0,75" igenom i två av dem i ett halvår. Underlaget och
+   * tidrapporten på säljsidan stod alltså i ett format produkten inte
+   * använder, vilket är precis den besvikelse som kommer fram efter köpet.
+   *
+   * Beloppen är undantagna, och bara de: pengar SKA skrivas med två
+   * decimaler, se money.ts. Påslaget skrivs "×1,40" av samma skäl.
+   */
+  it("säljsidans produktbilder skriver tiden som tim:min", () => {
+    const file = path.join(SRC, "components/marketing/Mockups.tsx");
+
+    const text = readFileSync(file, "utf8")
+      // KOMMENTARERNA LÄSES INTE. De är för utvecklaren, se CLAUDE.md § 7.1, och
+      // den här filens egna kommentarer skriver ut just de decimaltal som en
+      // gång stod i bilderna. En kontroll som fäller sin egen förklaring är en
+      // kontroll någon stänger av.
+      .replace(/\/\*[\s\S]*?\*\//g, "")
+      .replace(/\/\/.*/g, "")
+      // Skuggor och ljus: rgba(14,26,43,0.04).
+      .replace(/rgba?\([^)]*\)/g, "")
+      // Belopp: "20 375,00 kr", "−1 426,25 kr". Pengar SKA ha två decimaler.
+      .replace(/−?\d[\d ]*,\d{2} kr/g, "")
+      // Påslaget: "×1,40".
+      .replace(/×\d+,\d+/g, "");
+
+    const found = text.match(/\d+,\d+/g) ?? [];
+
+    expect(
+      found,
+      "Tiden i produktbilderna ska stå som tim:min, inte som decimaltimmar. " +
+        "Samma regel som i panelen, kiosken och varje PDF."
+    ).toEqual([]);
+  });
+
   it("varje undantag används faktiskt", () => {
     // Ett undantag som ingen längre behöver är ett hål som står kvar och
     // väntar på nästa fil med samma behov.

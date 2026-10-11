@@ -10,36 +10,81 @@
  * 3. De innehåller ingen riktig kunddata. En skärmdump från en testmiljö har
  *    en tråkig vana att innehålla något man inte tänkt på.
  *
- * DE MÅSTE HÅLLAS I TAKT MED PRODUKTEN. Namnknappen visade länge en tickande
- * tidräknare som tagits bort ur kiosken för länge sedan: där står numera VAD
- * personen är instämplad på, eftersom det är den frågan man har när man går
- * fram till skärmen. En säljsida som visar en äldre version är en besvikelse
- * som kommer fram först efter köpet.
+ * DE MÅSTE HÅLLAS I TAKT MED PRODUKTEN, och det är den dyra delen av valet
+ * ovan. En skärmdump blir uppenbart gammal; en ritad bild blir tyst gammal.
+ * Bilderna hade glidit på fem punkter innan någon märkte det: ordervalet
+ * ritades som rutnätet fastän knappsatsen är första vyn sedan 2026-10-01,
+ * granskningen hade två knappar där produkten har ett fält och en, panelen
+ * visade tre nyckeltal av fyra, rapporten ett stapeldiagram som inte finns,
+ * och två dokument stod i decimaltimmar fastän tid skrivs tim:min sedan
+ * 2026-10-01. En säljsida som visar en äldre version är en besvikelse som
+ * kommer fram först efter köpet.
+ *
+ * DÄRFÖR GÄLLER: ÄNDRAS EN YTA I PRODUKTEN ÄNDRAS BILDEN I SAMMA GREN.
+ * Kolumnrubriker, knapptexter och format skrivs av ur produktens egen kod och
+ * gissas inte. Siffrorna i en bild går dessutom ihop med varandra: summan är
+ * summan av raderna, och priset är kostnaden gånger påslaget minus rabatten.
+ * En bild vars tal inte stämmer läses av precis den sortens köpare som räknar
+ * efter.
+ *
+ * TIDEN SKRIVS TIM:MIN, ALDRIG DECIMALT. Samma regel som i panelen, kiosken
+ * och varje PDF, se CLAUDE.md § 7.1 punkt 8. Decimaltimmar finns bara i
+ * Excel-arket, och säljsidan visar inget Excel-ark.
  *
  * RAMEN HAR INGA FÖNSTERKNAPPAR. Tre färgade prickar i hörnet härmar ett
  * operativsystem produkten inte körs i. En etikettrad som säger vad man tittar
  * på bär mer information och ljuger inte.
  */
 
+import { initialsOf, toneFor } from "@/components/ui/EmployeeAvatar";
 import { WordmarkOnly } from "@/components/ui/Logo";
+
+/**
+ * HUR TUNGT RAMEN LIGGER.
+ *
+ * `flat` är ramens eget förval och den som gäller när bilden står i en spalt
+ * bland text: en hårfin skugga som bara skiljer pappret från ytan.
+ *
+ * `onDark` ligger i `globals.css` som `.plate-dark`, med skuggan i två lager.
+ * Skälet till två lager står där. Den gäller när bilden ligger mot Fjord, där
+ * en ljus skugga inte syns alls.
+ *
+ * MOT EN LJUS YTA SÄTTS DEN DJUPA SKUGGAN AV `Plate` och inte här. Skälet är
+ * att den bilden dessutom lutar och har en bakplatta bakom sig, och skuggan
+ * hör till den uppställningen och inte till ramen. Ramen behåller då sin egen
+ * hårfina skugga, som blir uppställningens innersta lager.
+ */
+export type FrameLift = "flat" | "onDark";
+
+const LIFTS: Record<FrameLift, string> = {
+  flat: "shadow-[0_1px_1px_rgba(14,26,43,0.04),0_24px_48px_-28px_rgba(14,26,43,0.35)]",
+  onDark: "plate plate-dark",
+};
 
 export function Frame({
   label,
   meta,
   children,
+  lift = "flat",
   className = "",
 }: {
   label: string;
   /** Höger sida av etikettraden, t.ex. ett filnamn eller en period. */
   meta?: string;
   children: React.ReactNode;
+  lift?: FrameLift;
   className?: string;
 }) {
   return (
     <div
-      className={`overflow-hidden rounded-lg border border-neutral-200 bg-white shadow-[0_1px_1px_rgba(14,26,43,0.04),0_24px_48px_-28px_rgba(14,26,43,0.35)] ${className}`}
+      className={`overflow-hidden rounded-lg border border-neutral-200 bg-white ${LIFTS[lift]} ${className}`}
     >
-      <div className="flex items-center justify-between gap-3 border-b border-neutral-200 bg-neutral-50 px-3 py-2">
+      {/* Etikettraden har en hårfin ljusning överst.
+
+          En ram utan den läses som ett utskuret fält; med den läses den som
+          ett föremål med en kant som fångar ljus. Det är samma greppet som
+          skuggans täta innerlager, bara från andra sidan. */}
+      <div className="flex items-center justify-between gap-3 border-b border-neutral-200 bg-linear-to-b from-white to-neutral-50 px-3 py-2">
         <span className="truncate text-[10px] font-semibold uppercase tracking-[0.12em] text-neutral-400">
           {label}
         </span>
@@ -59,15 +104,28 @@ export function Frame({
 /* -------------------------------------------------------------------------- */
 
 /**
- * Rubrikraden i kiosken: företaget till vänster, Tikkr nedtonat till höger.
+ * Rubrikraden i kiosken: företaget till vänster, steget i mitten, Tikkr
+ * nedtonat till höger.
  *
  * Samma uppdelning som på riktigt. Skärmen hänger på kundens vägg och är
  * deras.
+ *
+ * STEGET STÅR I RUBRIKEN OCH INTE I RAMENS ETIKETT. Så ligger det i
+ * produkten: `STEPS` i KioskScreen ger en numrerad cirkel och en etikett mitt
+ * i rubriken, och den syns bara mitt i ett val. Stod det i etikettraden ovanför
+ * bilden påstod bilden att produkten har en sådan rad, vilket den inte har.
  */
-export function KioskChrome({ children }: { children?: React.ReactNode }) {
+export function KioskChrome({
+  step,
+  children,
+}: {
+  /** Var i flödet skärmen står. Utelämnas på namnrutnätet, som i produkten. */
+  step?: { number: number; label: string };
+  children?: React.ReactNode;
+}) {
   return (
     <div className="flex items-center gap-2.5 border-b border-neutral-200 bg-white px-3 py-2.5">
-      <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-neutral-900 text-[11px] font-semibold text-white">
+      <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-neutral-900 text-[11px] font-semibold text-white">
         D
       </span>
       <span className="min-w-0">
@@ -79,7 +137,16 @@ export function KioskChrome({ children }: { children?: React.ReactNode }) {
         </span>
       </span>
 
-      <span className="ml-auto flex items-center gap-2">
+      {step && (
+        <span className="ml-3 hidden min-w-0 items-center gap-1.5 text-[10px] font-medium text-neutral-500 sm:flex">
+          <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-blue-600 text-[8px] font-semibold text-white">
+            {step.number}
+          </span>
+          <span className="truncate">{step.label}</span>
+        </span>
+      )}
+
+      <span className="ml-auto flex shrink-0 items-center gap-2">
         {children}
         {/* Riktiga ordmärket och inte ordet skrivet som text. Mockupen är en
             bild av produkten, och en logotyp som skiljer sig från produktens
@@ -92,31 +159,43 @@ export function KioskChrome({ children }: { children?: React.ReactNode }) {
   );
 }
 
+/** Knappen som leder tillbaka. Finns i rubriken så snart man valt ett namn. */
+function CancelChip() {
+  return (
+    <span className="rounded-md border border-neutral-200 px-2 py-1 text-[10px] font-semibold text-neutral-500">
+      Avbryt
+    </span>
+  );
+}
+
 /** En person på stämplingsskärmen, som kortet faktiskt ser ut. */
 export interface KioskPerson {
   name: string;
-  /** Order och moment, eller null för utstämplad. */
+  /** Jobbet personen står på, eller null för utstämplad och för rast. */
   job: string | null;
+  /**
+   * Ett andra pågående jobb. En operatör som kör två maskiner har två öppna
+   * stämplingar, och kortet visar båda med en bricka över dem.
+   */
+  alsoJob?: string;
+  /** Improduktiv tid i stället för en order. Ger ett gult kort. */
+  indirect?: boolean;
+  /** Rasten personen är på. Ger ett Fjord-kort, och `job` är då null. */
+  onBreak?: string;
   /** Det som står på en utstämplad knapp. */
   last?: string;
-  /** Klass för initialerna när kortet är vitt. Ur produktens egen palett. */
-  tone: string;
-}
-
-/** Förnamnets och efternamnets första bokstav, som i produkten. */
-function initials(name: string): string {
-  const parts = name.trim().split(/\s+/);
-  const first = parts[0]?.[0] ?? "";
-  const last = parts.length > 1 ? (parts[parts.length - 1][0] ?? "") : "";
-  return (first + last).toUpperCase();
 }
 
 /**
- * NAMNKNAPPEN.
+ * NAMNKNAPPEN, OCH DESS FYRA LÄGEN.
  *
- * Grön fyllning betyder instämplad, vit betyder utstämplad, och det som står
- * under namnet är jobbet. Ingen tidräknare: hur länge man varit inne står i
- * panelen, inte på väggen.
+ * Fyllningen är hela svaret på den enda fråga skärmen finns för att besvara,
+ * och den går att läsa tvärs över en verkstad: vitt hemma, grönt på order,
+ * gult improduktivt, Fjord på rast. Tonerna är `JOB_TONE` i KioskScreen.
+ *
+ * Under namnet står JOBBET, aldrig hur länge det pågått. Ingen tidräknare:
+ * den som går fram till skärmen behöver veta vad hen är instämplad på, och
+ * hur många timmar det blivit står i panelen.
  */
 export function KioskCard({
   person,
@@ -126,44 +205,106 @@ export function KioskCard({
   /** "stor" används i hero, där bilden får mer plats. */
   size?: "normal" | "stor";
 }) {
-  const working = person.job !== null;
+  const jobs = [person.job, person.alsoJob].filter(
+    (job): job is string => Boolean(job)
+  );
+  const working = jobs.length > 0;
+  const filled = working || Boolean(person.onBreak);
   const big = size === "stor";
 
+  const fill = working
+    ? person.indirect
+      ? "border-amber-500 bg-amber-500"
+      : "border-emerald-600 bg-emerald-600"
+    : person.onBreak
+      ? "border-blue-600 bg-blue-600"
+      : "border-neutral-200 bg-white";
+
   return (
+    /*
+      `h-full` SÅ ATT KNAPPARNA I EN RAD BLIR LIKA HÖGA.
+
+      Rutnätet sträcker sina celler till radens höjd, men kortet inuti cellen
+      är en vanlig blockruta och tar bara den höjd innehållet kräver. En rad
+      med Anna, som kör två maskiner, och Carina, som kör en, fick därför ett
+      högt kort bredvid ett lågt med en lucka under — och på en riktig
+      stämplingsskärm är knapparna lika stora. Bilden ska visa skärmen och
+      inte en hopplockad rad rutor.
+
+      `min-h` står kvar: den gäller en rad där ingen har mer än ett jobb, och
+      sätter då golvet för hur liten en knapp får bli.
+    */
     <div
-      className={`flex flex-col justify-between rounded-lg border p-2.5 ${
+      className={`flex h-full flex-col justify-between rounded-lg border p-2.5 ${
         big ? "min-h-[86px]" : "min-h-[64px]"
-      } ${
-        working
-          ? "border-emerald-600 bg-emerald-600"
-          : "border-neutral-200 bg-white"
-      }`}
+      } ${fill}`}
     >
       <span className="flex items-center gap-2">
+        {/* INITIALERNA OCH TONEN KOMMER UR PRODUKTENS EGNA FUNKTIONER, se
+            EmployeeAvatar. Samma namn ger därmed samma bokstäver och samma
+            färg här som på en riktig skärm.
+
+            Bilderna visar fallet UTAN foto, fastkodat. Produkten visar ett
+            porträtt när ett finns, men ett ansikte på säljsidan vore en
+            riktig person. */}
         <span
           aria-hidden="true"
           className={`flex shrink-0 items-center justify-center rounded-full font-semibold ${
             big ? "h-7 w-7 text-[10px]" : "h-6 w-6 text-[9px]"
-          } ${working ? "bg-white/20 text-white" : person.tone}`}
+          } ${
+            filled
+              ? "bg-white/20 text-white ring-1 ring-white/40"
+              : `${toneFor(person.name)} ring-1 ring-neutral-200`
+          }`}
         >
-          {initials(person.name)}
+          {initialsOf(person.name)}
         </span>
         <span
           className={`min-w-0 truncate font-semibold leading-tight ${
             big ? "text-[12px]" : "text-[11px]"
-          } ${working ? "text-white" : "text-neutral-900"}`}
+          } ${filled ? "text-white" : "text-neutral-900"}`}
         >
           {person.name}
         </span>
       </span>
 
       {working ? (
-        <span
-          className={`mt-2 block truncate font-semibold leading-snug text-white ${
-            big ? "text-[12px]" : "text-[11px]"
-          }`}
-        >
-          {person.job}
+        <span className="mt-2 block">
+          {/* Antalet först när flera jobb pågår. Ett dolt jobb är värre än ett
+              förkortat namn, och brickan är produktens egen. */}
+          {jobs.length > 1 && (
+            <span className="mb-1 inline-flex items-center gap-1.5 rounded bg-white/15 px-1.5 py-0.5 text-[9px] font-semibold text-white ring-1 ring-inset ring-white/25">
+              <span className="h-1 w-1 rounded-full bg-white" />
+              {jobs.length} jobb igång
+            </span>
+          )}
+          {jobs.map((job) => (
+            <span
+              key={job}
+              className={`block truncate font-semibold leading-snug text-white ${
+                big ? "text-[12px]" : "text-[11px]"
+              }`}
+            >
+              {job}
+            </span>
+          ))}
+        </span>
+      ) : person.onBreak ? (
+        /* VILKEN rast, inte bara att det är rast. Den som ser "Lunch" tvärs
+           över verkstaden vet om personen är tillbaka om tio minuter eller om
+           fyrtio. */
+        <span className="mt-2 block">
+          <span className="inline-flex items-center gap-1.5 rounded bg-white/15 px-1.5 py-0.5 text-[9px] font-semibold text-white ring-1 ring-inset ring-white/25">
+            <span className="h-1 w-1 rounded-full bg-white" />
+            Rast
+          </span>
+          <span
+            className={`mt-1 block truncate font-semibold leading-snug text-white ${
+              big ? "text-[12px]" : "text-[11px]"
+            }`}
+          >
+            {person.onBreak}
+          </span>
         </span>
       ) : person.last ? (
         <span className="mt-2 block truncate text-[10px] text-neutral-500">
@@ -182,84 +323,217 @@ export function KioskCard({
  * Personerna som återkommer i bilderna.
  *
  * Samma namn överallt, så att den som skrollar känner igen sig och förstår att
- * bilderna visar samma verkstad från olika håll. Tonerna är hämtade ur
- * produktens egen palett för initialer.
+ * bilderna visar samma verkstad från olika håll.
+ *
+ * ALLA FYRA LÄGEN FINNS MED. Anna kör två maskiner, Gustav städar, Frida har
+ * lunch, och tre står utstämplade. En uppsättning där alla antingen arbetar
+ * eller är hemma visar hälften av vad skärmen kan säga.
  */
 export const PEOPLE: KioskPerson[] = [
   {
     name: "Anna Andersson",
     job: "2601 · Svetsning",
-    tone: "bg-blue-100 text-blue-700",
+    alsoJob: "2604 · Fräsning",
   },
-  {
-    name: "Björn Bergqvist",
-    job: null,
-    last: "2602 · Montering",
-    tone: "bg-emerald-100 text-emerald-700",
-  },
-  {
-    name: "Carina Cederlund",
-    job: "2603 · Montering",
-    tone: "bg-amber-100 text-amber-700",
-  },
-  { name: "David Dahl", job: null, tone: "bg-blue-200 text-blue-800" },
-  {
-    name: "Erik Ek",
-    job: "2601 · Fräsning",
-    tone: "bg-emerald-200 text-emerald-800",
-  },
-  {
-    name: "Frida Falk",
-    job: null,
-    last: "2603 · Kapning",
-    tone: "bg-neutral-200 text-neutral-700",
-  },
-  {
-    name: "Gustav Gran",
-    job: "2604 · Lackering",
-    tone: "bg-blue-100 text-blue-700",
-  },
-  { name: "Hanna Holm", job: null, tone: "bg-emerald-100 text-emerald-700" },
-  {
-    name: "Ivar Isaksson",
-    job: "2605 · Kapning",
-    tone: "bg-amber-100 text-amber-700",
-  },
+  { name: "Björn Bergqvist", job: null, last: "2602 · Montering" },
+  { name: "Carina Cederlund", job: "2603 · Montering" },
+  { name: "David Dahl", job: null },
+  { name: "Erik Ek", job: "2601 · Fräsning" },
+  { name: "Frida Falk", job: null, onBreak: "Lunch" },
+  { name: "Gustav Gran", job: "Städning", indirect: true },
+  { name: "Hanna Holm", job: null, last: "2605 · Kapning" },
+  { name: "Ivar Isaksson", job: "2605 · Kapning" },
 ];
 
 /* -------------------------------------------------------------------------- */
-/* Stämplingsskärmen — steg två, välj order                                    */
+/* Stämplingsskärmen — namnrutnätet                                            */
 /* -------------------------------------------------------------------------- */
-
-const ORDERS = [
-  { number: "2601", customer: "Volvo Lastvagnar" },
-  { number: "2603", customer: "Atlas Copco" },
-  { number: "2604", customer: "Sandvik Coromant" },
-  { number: "2605", customer: "SKF Sverige" },
-];
 
 /**
- * Andra steget i kiosken.
+ * Namnrutnätet, skärmens första vy.
  *
- * Finns med för att visa att valet är knappar och inte en rullgardinslista.
- * Skillnaden är hela poängen för den som står med arbetshandskar på.
+ * Sex kort i tre spalter, som på en liggande skärm i verkstaden. Urvalet är
+ * inte de sex första i listan utan de sex som visar alla fyra lägen: två
+ * ordrar på en person, en order, improduktiv tid, rast och utstämplad.
  */
-export function OrderPickMockup({ className = "" }: { className?: string }) {
+const SHOWN = [0, 2, 6, 5, 8, 1].map((index) => PEOPLE[index]);
+
+export function RunningMockup({ className = "" }: { className?: string }) {
   return (
-    <Frame label="Stämplingsskärmen" meta="steg 2 av 3" className={className}>
-      <KioskChrome>
-        <span className="rounded-md border border-neutral-200 px-2 py-1 text-[10px] font-semibold text-neutral-500">
-          Avbryt
-        </span>
+    <Frame label="Stämplingsskärmen" className={className}>
+      <KioskChrome />
+
+      <div className="grid grid-cols-2 gap-2 bg-neutral-50 p-3 sm:grid-cols-3">
+        {SHOWN.map((person, index) => (
+          <div
+            key={person.name}
+            className="animate-rise"
+            style={{ animationDelay: `${200 + index * 70}ms` }}
+          >
+            <KioskCard person={person} />
+          </div>
+        ))}
+      </div>
+    </Frame>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+/* Stämplingsskärmen — knappsatsen                                             */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * ORDERNUMMER PÅ KNAPPSATS, och det här är vyn man möter.
+ *
+ * Ordervalet börjar på knappsatsen sedan 2026-10-01, både vid instämpling och
+ * vid jobbyte. Den som ska börja på ett jobb har ordernumret på ritningen
+ * framför sig, och rutnätet med öppna ordrar ligger ett tryck bort på "Visa
+ * öppna ordrar".
+ *
+ * Bilden låg länge som rutnätet, alltså som den vy produkten numera har ett
+ * steg bort. Det är precis den sortens glidning som gör en ritad bild tyst
+ * gammal.
+ *
+ * KNAPPEN BEKRÄFTAR KUNDEN OCH INTE SIFFRORNA. Man bekräftar inte ett nummer
+ * — man bekräftar vilken kund arbetet ska faktureras. Numret står som
+ * underrad.
+ */
+const KEYS = ["1", "2", "3", "4", "5", "6", "7", "8", "9"];
+
+export function OrderNumberMockup({ className = "" }: { className?: string }) {
+  return (
+    <Frame label="Stämplingsskärmen" className={className}>
+      <KioskChrome step={{ number: 2, label: "Slå in ordernummer" }}>
+        <CancelChip />
       </KioskChrome>
 
       <div className="bg-neutral-50 p-3">
-        <div className="mb-2 flex items-center justify-between gap-2">
-          <p className="text-[11px] font-semibold text-neutral-900">
-            Anna Andersson: välj order
-          </p>
-          <span className="shrink-0 rounded border border-neutral-200 bg-white px-1.5 py-0.5 text-[9px] font-semibold text-neutral-500">
+        <p className="text-[11px] font-semibold text-neutral-900">
+          Anna Andersson: slå in ordernummer
+        </p>
+
+        {/* Displayen och beskedet under den har fast höjd i produkten, så att
+            knappsatsen inte hoppar när första siffran trycks in. */}
+        <div className="mt-2 flex h-11 items-center justify-center rounded-lg border-2 border-neutral-200 bg-white">
+          <span className="text-[22px] font-semibold tabular-nums tracking-[0.2em] text-neutral-900">
+            2604
+          </span>
+        </div>
+        <div className="flex h-6 items-center justify-center">
+          <span className="text-[10px] font-semibold text-emerald-700">
+            Sandvik Coromant
+          </span>
+        </div>
+
+        <div className="grid grid-cols-3 gap-1.5">
+          {KEYS.map((key, index) => (
+            <span
+              key={key}
+              className="animate-rise flex h-8 items-center justify-center rounded-lg border border-neutral-200 bg-white text-[13px] font-semibold text-neutral-900"
+              style={{ animationDelay: `${200 + index * 25}ms` }}
+            >
+              {key}
+            </span>
+          ))}
+
+          {/* Ritad pil och inte tecknet ⌫, som i produkten: tecknet saknas i
+              en del fonter och blir då en tom fyrkant. */}
+          <span className="flex h-8 items-center justify-center rounded-lg border border-neutral-200 bg-white text-neutral-500">
+            <svg
+              viewBox="0 0 24 24"
+              className="h-4 w-4"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth={2}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden="true"
+            >
+              <path d="M20 6H9l-5 6 5 6h11z" />
+              <path d="m15 10-4 4m0-4 4 4" />
+            </svg>
+          </span>
+          <span className="flex h-8 items-center justify-center rounded-lg border border-neutral-200 bg-white text-[13px] font-semibold text-neutral-900">
+            0
+          </span>
+          <span className="flex h-8 items-center justify-center rounded-lg border border-neutral-200 bg-white text-[10px] font-semibold text-neutral-500">
+            Rensa
+          </span>
+        </div>
+
+        <div className="mt-1.5 rounded-lg bg-blue-600 px-3 py-2 text-center">
+          <span className="block text-[12px] font-semibold text-white">
+            Sandvik Coromant
+          </span>
+          <span className="block text-[9px] text-white/80">order 2604</span>
+        </div>
+
+        {/* Vägarna vidare under knappsatsen. Amber på snabbjobbet: att lägga
+            upp en ny order är något annat än att välja en befintlig. */}
+        <div className="mt-1.5 flex gap-1.5">
+          <span className="flex-1 rounded-lg border border-neutral-200 bg-white px-2 py-1.5 text-center text-[10px] font-semibold text-neutral-900">
+            Visa öppna ordrar
+          </span>
+          <span className="rounded-lg border border-amber-300 bg-amber-50 px-2 py-1.5 text-[10px] font-semibold text-amber-900">
+            Snabbjobb
+          </span>
+          <span className="rounded-lg border border-neutral-200 bg-white px-2 py-1.5 text-[10px] font-semibold text-neutral-600">
+            Improduktiv tid
+          </span>
+        </div>
+      </div>
+    </Frame>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+/* Stämplingsskärmen — rutnätet med öppna ordrar                               */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * HÖGSTA ORDERNUMMER FÖRST (ändrat 2026-10-07).
+ *
+ * Nya ordrar får höga nummer, och det är dem folk stämplar på. Bilden visade
+ * dem i stigande ordning, alltså med det äldsta jobbet överst.
+ */
+const ORDERS = [
+  { number: "2605", customer: "SKF Sverige" },
+  { number: "2604", customer: "Sandvik Coromant" },
+  { number: "2603", customer: "Atlas Copco" },
+  { number: "2601", customer: "Volvo Lastvagnar" },
+];
+
+/**
+ * Rutnätet med öppna ordrar, ett tryck bort från knappsatsen.
+ *
+ * Finns med för att visa att valet är knappar och inte en rullgardinslista.
+ * Skillnaden är hela poängen för den som står med arbetshandskar på.
+ *
+ * De tre vägarna vid rubriken är produktens egna och ligger där med flit:
+ * improduktiv tid hör inte till någon kund, och den som letar efter sin order
+ * ska inte kunna råka trycka på Städning.
+ */
+export function OrderPickMockup({ className = "" }: { className?: string }) {
+  return (
+    <Frame label="Stämplingsskärmen" className={className}>
+      <KioskChrome step={{ number: 2, label: "Välj order" }}>
+        <CancelChip />
+      </KioskChrome>
+
+      <div className="bg-neutral-50 p-3">
+        <p className="text-[11px] font-semibold text-neutral-900">
+          Anna Andersson: välj order
+        </p>
+
+        <div className="mb-2 mt-1.5 flex flex-wrap gap-1.5">
+          <span className="rounded border border-neutral-200 bg-white px-1.5 py-0.5 text-[9px] font-semibold text-neutral-900">
             Slå in ordernummer
+          </span>
+          <span className="rounded border border-amber-300 bg-amber-50 px-1.5 py-0.5 text-[9px] font-semibold text-amber-900">
+            Snabbjobb
+          </span>
+          <span className="rounded border border-neutral-200 bg-white px-1.5 py-0.5 text-[9px] font-semibold text-neutral-600">
+            Improduktiv tid
           </span>
         </div>
 
@@ -285,59 +559,28 @@ export function OrderPickMockup({ className = "" }: { className?: string }) {
 }
 
 /* -------------------------------------------------------------------------- */
-/* Stämplingsskärmen — namnrutnätet                                            */
+/* Adminpanelen — menyn                                                        */
 /* -------------------------------------------------------------------------- */
 
 /**
- * Namnrutnätet.
+ * Menyn, med sina avdelningar.
  *
- * Grönt kort betyder instämplad och ordern står under namnet. Vem som arbetar
- * med vad går att läsa från andra sidan verkstaden, vilket är skälet att
- * korten är så stora.
+ * Panelens meny är inte en platt lista utan grupper med rubrik: Dagligen,
+ * Register, Uppsättning. Bilden visade en platt lista av fem rader, vilket
+ * fick panelen att se mindre ut än den är.
+ *
+ * Uppsättningen utelämnas. Den gruppen försvinner i produkten när
+ * uppsättningen är klar, och bilderna visar en arbetsyta i drift.
  */
-export function RunningMockup({ className = "" }: { className?: string }) {
-  return (
-    <Frame label="Stämplingsskärmen" className={className}>
-      <KioskChrome />
-
-      <div className="grid grid-cols-2 gap-2 bg-neutral-50 p-3">
-        {PEOPLE.slice(0, 4).map((person, index) => (
-          <div
-            key={person.name}
-            className="animate-rise"
-            style={{ animationDelay: `${200 + index * 80}ms` }}
-          >
-            <KioskCard person={person} />
-          </div>
-        ))}
-      </div>
-    </Frame>
-  );
-}
-
-/* -------------------------------------------------------------------------- */
-/* Adminpanelen — översikten                                                   */
-/* -------------------------------------------------------------------------- */
-
-const ROWS = [
+const MENU: { title: string; items: string[] }[] = [
   {
-    name: "Anna Andersson",
-    order: "2601",
-    customer: "Volvo Lastvagnar",
-    time: "2:15",
+    title: "Dagligen",
+    items: ["Översikt", "Rapporter", "Veckovy", "Tidrapport", "Granskning"],
   },
-  { name: "Anna Andersson", order: "2604", customer: "Sandvik", time: "1:40" },
-  {
-    name: "Carina Cederlund",
-    order: "2603",
-    customer: "Atlas Copco",
-    time: "0:48",
-  },
+  { title: "Register", items: ["Kunder", "Ordrar", "Anställda"] },
 ];
 
-const MENU = ["Översikt", "Rapporter", "Tidrapport", "Granskning", "Ordrar"];
-
-function Sidebar({ active = 0 }: { active?: number }) {
+function Sidebar({ active }: { active: string }) {
   return (
     <div className="hidden w-32 shrink-0 border-r border-neutral-200 p-2 sm:block">
       <div className="mb-3 flex items-center gap-1.5 px-1">
@@ -349,21 +592,39 @@ function Sidebar({ active = 0 }: { active?: number }) {
         </span>
       </div>
 
-      {MENU.map((item, index) => (
-        <div
-          key={item}
-          className={`mb-0.5 rounded px-2 py-1 text-[10px] font-medium ${
-            index === active
-              ? "bg-neutral-100 text-neutral-900"
-              : "text-neutral-500"
-          }`}
-        >
-          {item}
+      {MENU.map((group) => (
+        <div key={group.title} className="mb-2">
+          <p className="mb-1 px-2 text-[8px] font-semibold uppercase tracking-wider text-neutral-400">
+            {group.title}
+          </p>
+          {group.items.map((item) => (
+            <div
+              key={item}
+              className={`mb-0.5 flex items-center justify-between gap-1 rounded px-2 py-1 text-[10px] font-medium ${
+                item === active
+                  ? "bg-neutral-100 text-neutral-900"
+                  : "text-neutral-500"
+              }`}
+            >
+              <span className="truncate">{item}</span>
+              {/* Siffran vid Granskning är produktens egen. Den finns för att
+                  en post utan utstämpling ska synas utan att man letar. */}
+              {item === "Granskning" && (
+                <span className="shrink-0 rounded bg-amber-100 px-1 text-[8px] font-semibold tabular-nums text-amber-800">
+                  1
+                </span>
+              )}
+            </div>
+          ))}
         </div>
       ))}
     </div>
   );
 }
+
+/* -------------------------------------------------------------------------- */
+/* Adminpanelen — översikten                                                   */
+/* -------------------------------------------------------------------------- */
 
 /**
  * Översikten i panelen.
@@ -371,46 +632,117 @@ function Sidebar({ active = 0 }: { active?: number }) {
  * Här STÅR tiden som gått, till skillnad från på stämplingsskärmen. Det är
  * skillnaden mellan de två ytorna: skärmen svarar på vad man är instämplad på,
  * panelen på hur länge.
+ *
+ * FYRA NYCKELTAL OCH INTE TRE. Öppna ordrar är det fjärde i produkten, och det
+ * är dessutom det som säger att panelen håller ordning på jobben och inte bara
+ * på klockan.
+ *
+ * Anna står på två rader. En operatör som kör två maskiner har två öppna
+ * stämplingar, och båda ordrarna ska betala sin — därför är nyckeltalet fyra
+ * personer och fem jobb.
  */
+const ROWS = [
+  {
+    name: "Anna Andersson",
+    order: "2601",
+    customer: "Volvo Lastvagnar",
+    moment: "Svetsning",
+    time: "2:15",
+  },
+  {
+    name: "Anna Andersson",
+    order: "2604",
+    customer: "Sandvik Coromant",
+    moment: "Fräsning",
+    time: "1:40",
+  },
+  {
+    name: "Carina Cederlund",
+    order: "2603",
+    customer: "Atlas Copco",
+    moment: "Montering",
+    time: "0:48",
+  },
+  {
+    name: "Erik Ek",
+    order: "2601",
+    customer: "Volvo Lastvagnar",
+    moment: "Fräsning",
+    time: "3:05",
+  },
+  {
+    name: "Gustav Gran",
+    order: null,
+    customer: null,
+    moment: "Städning",
+    time: "0:25",
+  },
+];
+
 export function AdminMockup({ className = "" }: { className?: string }) {
   return (
     <Frame label="Adminpanelen" meta="översikt" className={className}>
       <div className="flex">
-        <Sidebar active={0} />
+        <Sidebar active="Översikt" />
 
         <div className="min-w-0 flex-1 bg-neutral-50 p-3">
-          <div className="mb-3 grid grid-cols-3 gap-2">
-            <Stat label="Arbetar just nu" value="3" tone="emerald" />
+          <div className="mb-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
+            <Stat
+              label="Arbetar just nu"
+              value="4"
+              hint="5 pågående jobb"
+              tone="emerald"
+            />
             <Stat label="Registrerat idag" value="18:30" />
             <Stat label="Att granska" value="1" tone="amber" />
+            <Stat label="Öppna ordrar" value="4" />
           </div>
 
           <div className="overflow-hidden rounded-lg border border-neutral-200 bg-white">
-            <div className="flex items-center justify-between border-b border-neutral-200 bg-neutral-50/70 px-3 py-1.5">
-              <span className="text-[10px] font-medium text-neutral-500">
+            <div className="border-b border-neutral-200 px-3 py-1.5">
+              <span className="text-[10px] font-semibold text-neutral-900">
                 Pågående arbete
               </span>
-              {/* Anna står två gånger. En operatör som kör två maskiner har
-                  två öppna stämplingar, och båda ordrarna ska betala sin. */}
-              <span className="text-[10px] text-neutral-400">
-                3 jobb · 2 personer
+            </div>
+
+            <div className="flex items-center gap-2 border-b border-neutral-200 bg-neutral-50/70 px-3 py-1">
+              <span className="min-w-0 flex-1 text-[9px] font-medium uppercase tracking-wider text-neutral-400">
+                Anställd
+              </span>
+              <span className="w-16 shrink-0 text-[9px] font-medium uppercase tracking-wider text-neutral-400">
+                Order
+              </span>
+              <span className="hidden w-16 shrink-0 text-[9px] font-medium uppercase tracking-wider text-neutral-400 sm:block">
+                Moment
+              </span>
+              <span className="w-10 shrink-0 text-right text-[9px] font-medium uppercase tracking-wider text-neutral-400">
+                Tid
               </span>
             </div>
 
             {ROWS.map((row, index) => (
               <div
-                key={`${row.name}-${row.order}`}
-                className="animate-rise flex items-center gap-2 border-b border-neutral-100 px-3 py-2 last:border-0"
-                style={{ animationDelay: `${500 + index * 90}ms` }}
+                key={`${row.name}-${row.order ?? row.moment}`}
+                className="animate-rise flex items-center gap-2 border-b border-neutral-100 px-3 py-1.5 last:border-0"
+                style={{ animationDelay: `${500 + index * 80}ms` }}
               >
-                <span className="min-w-0 flex-1 truncate text-[11px] font-medium text-neutral-900">
+                <span className="min-w-0 flex-1 truncate text-[10px] font-medium text-neutral-900">
                   {row.name}
                 </span>
-                <span className="hidden text-[10px] text-neutral-500 sm:block">
-                  {row.order} · {row.customer}
+                <span className="w-16 shrink-0 truncate text-[10px] text-neutral-500">
+                  {row.order ?? (
+                    <span className="rounded bg-neutral-100 px-1 py-0.5 text-[9px] font-medium text-neutral-600">
+                      Improduktiv
+                    </span>
+                  )}
                 </span>
-                <span className="rounded bg-emerald-50 px-1.5 py-0.5 text-[10px] font-medium tabular-nums text-emerald-700 ring-1 ring-inset ring-emerald-200">
-                  {row.time}
+                <span className="hidden w-16 shrink-0 truncate text-[10px] text-neutral-500 sm:block">
+                  {row.moment}
+                </span>
+                <span className="w-10 shrink-0 text-right">
+                  <span className="rounded bg-emerald-50 px-1 py-0.5 text-[10px] font-medium tabular-nums text-emerald-700 ring-1 ring-inset ring-emerald-200">
+                    {row.time}
+                  </span>
                 </span>
               </div>
             ))}
@@ -424,10 +756,12 @@ export function AdminMockup({ className = "" }: { className?: string }) {
 function Stat({
   label,
   value,
+  hint,
   tone,
 }: {
   label: string;
   value: string;
+  hint?: string;
   tone?: "emerald" | "amber";
 }) {
   const valueTone =
@@ -438,13 +772,29 @@ function Stat({
         : "text-neutral-900";
 
   return (
-    <div className="rounded-lg border border-neutral-200 bg-white px-2.5 py-2">
-      <span className="block text-[9px] font-medium text-neutral-500">
+    <div className="flex h-full flex-col rounded-lg border border-neutral-200 bg-white px-2.5 py-2">
+      {/* Etiketten bryter rader i stället för att kapas. Fyra nyckeltal står
+          bredvid varandra i en bild som är en halv spalt bred, och "Ogranska…"
+          är ett ord som inte betyder något.
+
+          HÖJDEN ÄR RESERVERAD FÖR TVÅ RADER, och det är hela skälet att den
+          står här. "Att granska" ryms på en rad och "Arbetar just nu" på två,
+          och utan reserverad höjd hamnade de fyra talen under varandra på
+          fyra olika höjder. En rad nyckeltal med talen i otakt ser ut som ett
+          fel i bilden, inte som fyra olika långa etiketter. */}
+      <span className="block min-h-[2.1em] text-[9px] font-medium leading-tight text-neutral-500">
         {label}
       </span>
       <span className={`block text-sm font-semibold tabular-nums ${valueTone}`}>
         {value}
       </span>
+      {/* Tipsraden ligger sist och trycks nedåt, så att den inte flyttar
+          talet ovanför i de rutor som har en. */}
+      {hint && (
+        <span className="mt-auto block pt-0.5 text-[8px] leading-tight text-neutral-400">
+          {hint}
+        </span>
+      )}
     </div>
   );
 }
@@ -453,20 +803,46 @@ function Stat({
 /* Adminpanelen — rapporten                                                    */
 /* -------------------------------------------------------------------------- */
 
+/**
+ * Rapporten. Summeringen som svarar på vad som ska faktureras.
+ *
+ * INGA STAPLAR. Bilden ritade ett stapeldiagram per order, och det finns inte
+ * i produkten: summeringarna är listor med namn till vänster och tid till
+ * höger. En bild som visar ett diagram kunden inte får är ett löfte som bryts
+ * efter köpet, och det var dessutom det enda i bilden som inte gick att peka
+ * på i panelen.
+ *
+ * Kvar står det som faktiskt finns: fyra nyckeltal, summeringarna per order,
+ * kund, anställd och arbetsmoment, och de två uttagen.
+ *
+ * TVÅ UTTAG OCH INGEN UTSKRIFT. Rapporten lämnas ut som PDF eller Excel.
+ * Utskriftsknappen finns på underlagen och på tidrapporten, inte här.
+ */
 const REPORT = [
-  { order: "2601", customer: "Volvo Lastvagnar", hours: "42:15", share: 100 },
-  { order: "2603", customer: "Atlas Copco", hours: "28:00", share: 66 },
-  { order: "2604", customer: "Sandvik Coromant", hours: "14:15", share: 34 },
+  { order: "2601", customer: "Volvo Lastvagnar", hours: "42:15" },
+  { order: "2603", customer: "Atlas Copco", hours: "28:00" },
+  { order: "2604", customer: "Sandvik Coromant", hours: "14:15" },
 ];
 
-/** Summeringen per order. Svaret på vad som ska faktureras. */
 export function ReportMockup({ className = "" }: { className?: string }) {
   return (
     <Frame label="Adminpanelen" meta="rapporter" className={className}>
       <div className="flex">
-        <Sidebar active={1} />
+        <Sidebar active="Rapporter" />
 
         <div className="min-w-0 flex-1 bg-neutral-50 p-3">
+          <div className="mb-2.5 flex items-center gap-2">
+            <span className="text-[11px] font-semibold text-neutral-900">
+              Rapporter
+            </span>
+            <span className="ml-auto rounded-md border border-neutral-200 bg-white px-2 py-1 text-[9px] font-semibold text-neutral-700">
+              PDF
+            </span>
+            <span className="rounded-md bg-neutral-900 px-2 py-1 text-[9px] font-semibold text-white">
+              Excel
+            </span>
+          </div>
+
           <div className="mb-2.5 flex flex-wrap gap-1.5">
             {["Förra veckan", "Alla ordrar", "Fakturerbar tid"].map((chip) => (
               <span
@@ -476,51 +852,38 @@ export function ReportMockup({ className = "" }: { className?: string }) {
                 {chip}
               </span>
             ))}
-            <span className="ml-auto rounded-md bg-neutral-900 px-2 py-1 text-[9px] font-semibold text-white">
-              PDF
-            </span>
           </div>
 
-          <div className="overflow-hidden rounded-lg border border-neutral-200 bg-white">
-            <div className="flex items-center justify-between border-b border-neutral-200 bg-neutral-50/70 px-3 py-1.5">
-              <span className="text-[10px] font-medium text-neutral-500">
-                Tid per order
-              </span>
-              <span className="text-[10px] font-semibold tabular-nums text-neutral-900">
-                84:30
-              </span>
-            </div>
+          <div className="mb-2.5 grid grid-cols-2 gap-2 sm:grid-cols-4">
+            <Stat label="Total tid" value="84:30" hint="tim:min" />
+            <Stat label="Stämplingar" value="37" />
+            <Stat label="Pågår just nu" value="4" tone="emerald" />
+            <Stat label="Ogranskade" value="1" tone="amber" />
+          </div>
 
-            {REPORT.map((row, index) => (
-              <div
-                key={row.order}
-                className="border-b border-neutral-100 px-3 py-2 last:border-0"
-              >
-                <div className="flex items-center gap-2">
-                  <span className="text-[11px] font-medium text-neutral-900">
+          <div className="rounded-lg border border-neutral-200 bg-white p-2.5">
+            <p className="mb-1.5 text-[9px] font-semibold uppercase tracking-wider text-neutral-500">
+              Per order
+            </p>
+            <ul>
+              {REPORT.map((row, index) => (
+                <li
+                  key={row.order}
+                  className="animate-rise flex items-baseline gap-2 py-1"
+                  style={{ animationDelay: `${300 + index * 90}ms` }}
+                >
+                  <span className="text-[10px] font-medium text-neutral-900">
                     {row.order}
                   </span>
                   <span className="min-w-0 flex-1 truncate text-[10px] text-neutral-500">
                     {row.customer}
                   </span>
-                  <span className="text-[10px] font-semibold tabular-nums text-neutral-900">
+                  <span className="shrink-0 text-[10px] font-medium tabular-nums text-neutral-900">
                     {row.hours}
                   </span>
-                </div>
-
-                {/* Stapeln gör förhållandet mellan ordrarna läsbart utan att
-                    någon behöver jämföra siffror i huvudet. */}
-                <div className="mt-1.5 h-1 overflow-hidden rounded-full bg-neutral-100">
-                  <div
-                    className="animate-rise h-full rounded-full bg-blue-600"
-                    style={{
-                      width: `${row.share}%`,
-                      animationDelay: `${300 + index * 120}ms`,
-                    }}
-                  />
-                </div>
-              </div>
-            ))}
+                </li>
+              ))}
+            </ul>
           </div>
         </div>
       </div>
@@ -535,8 +898,15 @@ export function ReportMockup({ className = "" }: { className?: string }) {
 /**
  * Posten där utstämplingen saknas.
  *
- * Sluttiden är beräknad, den är märkt som beräknad, och den ligger i en lista
- * som gås igenom före fakturering.
+ * ETT FÄLT OCH EN KNAPP, inte två knappar. Bilden visade "Ange rätt sluttid"
+ * och "Godkänn" bredvid varandra, alltså den uppställning produkten hade innan
+ * den togs bort: valet låg på den som granskar fastän servern kan göra det
+ * bättre, och de två knapparna såg ut att göra samma sak. Nu finns en fråga att
+ * svara på — när slutade arbetet? — och servern avgör själv om tiden godkändes
+ * eller rättades.
+ *
+ * Sluttiden i fältet är den beräknade, ifylld i förväg. Den som bara ska
+ * godkänna behöver därför inte skriva något.
  */
 export function ReviewMockup({ className = "" }: { className?: string }) {
   return (
@@ -545,41 +915,55 @@ export function ReviewMockup({ className = "" }: { className?: string }) {
         <div className="mb-2.5 flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2">
           <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-amber-500" />
           <span className="text-[10px] font-medium text-amber-900">
-            1 post behöver granskas före fakturering
+            1 post behöver granskas
           </span>
         </div>
 
         <div className="overflow-hidden rounded-lg border border-neutral-200 bg-white">
-          <div className="border-b border-neutral-100 px-3 py-2.5">
-            <div className="flex items-center gap-2">
-              <span className="text-[11px] font-medium text-neutral-900">
-                David Dahl
-              </span>
-              <span className="text-[10px] text-neutral-500">
-                2601 · Lackering
-              </span>
-              <span className="ml-auto rounded bg-amber-50 px-1.5 py-0.5 text-[10px] font-medium tabular-nums text-amber-700 ring-1 ring-inset ring-amber-200">
-                9:48
-              </span>
-            </div>
-
-            <div className="mt-1.5 flex flex-wrap gap-x-4 gap-y-1 text-[9px] text-neutral-500">
-              <span>
-                Instämplad <span className="tabular-nums">07:12</span>
-              </span>
-              <span className="text-amber-700">
-                Beräknad sluttid <span className="tabular-nums">18:00</span>
-              </span>
-            </div>
+          <div className="border-b border-neutral-200 px-3 py-2">
+            <p className="text-[10px] font-semibold text-neutral-900">
+              1 post att gå igenom
+            </p>
+            <p className="text-[9px] text-neutral-500">
+              Rätta sluttiden, eller godkänn den beräknade.
+            </p>
           </div>
 
-          <div className="flex items-center gap-1.5 bg-neutral-50/70 px-3 py-2">
-            <span className="rounded border border-neutral-200 bg-white px-2 py-1 text-[9px] font-medium text-neutral-600">
-              Ange rätt sluttid
-            </span>
-            <span className="rounded bg-neutral-900 px-2 py-1 text-[9px] font-semibold text-white">
-              Godkänn
-            </span>
+          <div className="px-3 py-2.5">
+            <div className="flex items-start gap-2">
+              <span className="min-w-0 flex-1">
+                <span className="block text-[11px] font-medium text-neutral-900">
+                  David Dahl
+                </span>
+                <span className="block truncate text-[9px] text-neutral-500">
+                  2601 · Lackering · Volvo Lastvagnar
+                </span>
+              </span>
+              <span className="shrink-0 text-right">
+                <span className="rounded bg-amber-50 px-1.5 py-0.5 text-[10px] font-medium tabular-nums text-amber-700 ring-1 ring-inset ring-amber-200">
+                  10:48
+                </span>
+                <span className="mt-1 block text-[8px] text-neutral-400">
+                  beräknad till 18:00
+                </span>
+              </span>
+            </div>
+
+            <p className="mt-1.5 text-[9px] text-neutral-500">
+              Instämplad <span className="tabular-nums">2026-04-16 07:12</span>
+            </p>
+
+            {/* Fältet bär den beräknade sluttiden, som i produkten. Knappen
+                heter Godkänn oavsett om tiden ändrats: servern jämför och
+                avgör själv vad som hände. */}
+            <div className="mt-2 flex items-center gap-1.5">
+              <span className="min-w-0 flex-1 truncate rounded-md border border-neutral-400 bg-white px-2 py-1 text-[10px] tabular-nums text-neutral-900">
+                2026-04-16 18:00
+              </span>
+              <span className="shrink-0 rounded-md bg-neutral-900 px-2.5 py-1 text-[10px] font-semibold text-white">
+                Godkänn
+              </span>
+            </div>
           </div>
         </div>
       </div>
@@ -596,13 +980,27 @@ export function ReviewMockup({ className = "" }: { className?: string }) {
  *
  * Logotypsrutan överst är med avsikt. Det är den detalj som gör skillnaden
  * mellan en systemutskrift och ett dokument från leverantören.
+ *
+ * TIM:MIN OCH INTE DECIMALTIMMAR. Raderna stod som "7,50" och summan som
+ * "22,75 timmar", vilket är det format som bara hör i Excel-arket. Tid som ska
+ * LÄSAS skrivs tim:min, och "7,50" lästes dessutom som 7:50 av precis den
+ * sortens läsare dokumentet är till för. Kolumnrubriken bär enheten, som i
+ * dokumentet.
+ *
+ * Kundens adress och organisationsnummer står under namnet. De skrevs för hand
+ * varje gång innan kundregistret fanns, och att de står där är skälet att
+ * underlaget går att bifoga en faktura utan att kompletteras.
+ *
+ * BELOPPEN SAKNAS MED FLIT. De tas med först när den som tar ut underlaget
+ * kryssar i det, och utan kryss visas bara tid. Självkostnad och marginal kan
+ * aldrig hamna här, se order-price.ts.
  */
 export function ExportMockup({ className = "" }: { className?: string }) {
   const rows = [
-    ["Anna Andersson", "Svetsning", "7,50"],
-    ["Erik Ek", "Fräsning", "8,00"],
-    ["Carina Cederlund", "Montering", "4,25"],
-    ["Anna Andersson", "Kvalitetskontroll", "3,00"],
+    ["Anna Andersson", "Svetsning", "7:30"],
+    ["Erik Ek", "Fräsning", "8:00"],
+    ["Carina Cederlund", "Montering", "4:15"],
+    ["Anna Andersson", "Kvalitetskontroll", "3:00"],
   ];
 
   return (
@@ -612,17 +1010,34 @@ export function ExportMockup({ className = "" }: { className?: string }) {
           er logotyp
         </div>
 
+        <p className="mt-2 text-[10px] font-semibold text-neutral-900">
+          Demo Mekaniska AB
+        </p>
+
         <p className="mt-3 text-[13px] font-semibold text-neutral-900">
           Order 2601
         </p>
-        <p className="text-[10px] text-neutral-500">Volvo Lastvagnar</p>
+        <p className="text-[10px] text-neutral-700">Volvo Lastvagnar</p>
+        <p className="text-[9px] leading-snug text-neutral-500">
+          Gropegårdsgatan 2
+          <br />
+          417 15 Göteborg
+          <br />
+          Org.nr 556013-9700
+        </p>
 
-        <table className="mt-3 w-full text-[10px]">
+        <p className="mt-2 text-[8px] text-neutral-500">
+          Period: 2026-04-13 – 2026-04-17 · Underlag skapat 2026-04-17
+        </p>
+
+        <table className="mt-2.5 w-full text-[10px]">
           <thead>
             <tr className="bg-neutral-900 text-white">
               <th className="px-2 py-1 text-left font-medium">Anställd</th>
-              <th className="px-2 py-1 text-left font-medium">Moment</th>
-              <th className="px-2 py-1 text-right font-medium">Timmar</th>
+              <th className="px-2 py-1 text-left font-medium">Arbetsmoment</th>
+              <th className="px-2 py-1 text-right font-medium">
+                Tid (tim:min)
+              </th>
             </tr>
           </thead>
           <tbody>
@@ -650,9 +1065,15 @@ export function ExportMockup({ className = "" }: { className?: string }) {
             TOTALT
           </span>
           <span className="text-[10px] font-semibold tabular-nums text-neutral-900">
-            22,75 timmar
+            22:45
           </span>
         </div>
+
+        {/* Jämförelsen med den beräknade tiden står direkt under totalen,
+            eftersom det är där den görs. */}
+        <p className="mt-1 text-[8px] text-neutral-500">
+          Beräknad tid 24:00. Upparbetat 95 %.
+        </p>
       </div>
     </Frame>
   );
@@ -665,17 +1086,30 @@ export function ExportMockup({ className = "" }: { className?: string }) {
 /**
  * Efterkalkylen.
  *
- * Bandet överst är produktens eget och står på varje sida.
+ * Bandet överst är produktens eget och står först av allt, före logotypen: det
+ * ska inte gå att missa vad man håller i, och en logotyp överst får ett papper
+ * att se ut som något man skickar vidare.
  *
  * INGA TIMKOSTNADER, som i dokumentet: pappret rör sig, och vad en namngiven
  * person kostar i timmen hör inte hemma på ett bord i verkstaden. Kvar står
  * tiden och kostnaden per arbetsmoment.
+ *
+ * RADERNA PER ANSTÄLLD UTELÄMNAS, delsummorna står kvar. Dokumentet
+ * grupperar per arbetsmoment med en rad per stämpling under varje rubrik och
+ * en delsumma sist i gruppen. Bilden är en tredjedel av en spalt bred och
+ * rymmer inte sex kolumner; delsummorna är det den som läser kalkylen går
+ * till, och de är ett äkta utsnitt av dokumentet och inte en egen tabell.
+ *
+ * SUMMERINGENS ETIKETTER ÄR DOKUMENTETS EGNA. "Självkostnad" och "Påslag
+ * 40 %" stod här tidigare; raderna heter "Total operationskostnad" och
+ * "Påslag ×1,40", och påslaget skrivs med varifrån det kom, eftersom tre
+ * ställen kan bestämma det.
  */
 export function CalcMockup({ className = "" }: { className?: string }) {
   const rows = [
-    ["Svetsning", "12:30", "10 625"],
-    ["Fräsning", "8:00", "7 200"],
-    ["Montering", "4:15", "2 550"],
+    ["Svetsning", "12:30", "10 625,00 kr"],
+    ["Fräsning", "8:00", "7 200,00 kr"],
+    ["Montering", "4:15", "2 550,00 kr"],
   ];
 
   return (
@@ -687,16 +1121,23 @@ export function CalcMockup({ className = "" }: { className?: string }) {
           </span>
         </div>
 
-        <p className="mt-3 text-[13px] font-semibold text-neutral-900">
+        <p className="mt-2.5 text-[10px] font-semibold text-neutral-900">
+          Demo Mekaniska AB
+        </p>
+
+        <p className="mt-2.5 text-[13px] font-semibold text-neutral-900">
           Efterkalkyl order 2601
         </p>
-        <p className="text-[10px] text-neutral-500">Volvo Lastvagnar</p>
+        <p className="text-[10px] text-neutral-700">Volvo Lastvagnar</p>
+        <p className="mt-1 text-[8px] text-neutral-500">
+          Period: 2026-04-13 – 2026-04-17 · 12 stämplingar
+        </p>
 
-        <table className="mt-3 w-full text-[10px]">
+        <table className="mt-2.5 w-full text-[10px]">
           <thead>
             <tr className="border-b border-neutral-200 text-neutral-500">
               <th className="py-1 text-left font-medium">Arbetsmoment</th>
-              <th className="py-1 text-right font-medium">Tid</th>
+              <th className="py-1 text-right font-medium">Tid (tim:min)</th>
               <th className="py-1 text-right font-medium">Kostnad</th>
             </tr>
           </thead>
@@ -715,16 +1156,17 @@ export function CalcMockup({ className = "" }: { className?: string }) {
           </tbody>
         </table>
 
-        <dl className="mt-3 space-y-1 text-[10px]">
-          <Line label="Självkostnad" value="20 375 kr" />
-          <Line label="Påslag 40 %" value="8 150 kr" />
-          <Line label="Rabatt 5 %" value="−1 426 kr" muted />
+        <dl className="mt-2.5 space-y-1 text-[10px]">
+          <Line label="Total operationstid (tim:min)" value="24:45" />
+          <Line label="Total operationskostnad" value="20 375,00 kr" />
+          <Line label="Påslag ×1,40 (kundens)" value="8 150,00 kr" />
+          <Line label="Rabatt 5 % (kundens)" value="−1 426,25 kr" muted />
         </dl>
 
         <div className="mt-2 flex items-center justify-between rounded bg-neutral-900 px-2 py-1.5">
           <span className="text-[10px] font-semibold text-white">PRIS</span>
           <span className="text-[10px] font-semibold tabular-nums text-white">
-            27 099 kr
+            27 098,75 kr
           </span>
         </div>
       </div>
@@ -742,11 +1184,11 @@ function Line({
   muted?: boolean;
 }) {
   return (
-    <div className="flex items-center justify-between">
+    <div className="flex items-baseline justify-between gap-2">
       <dt className={muted ? "text-neutral-500" : "text-neutral-600"}>
         {label}
       </dt>
-      <dd className="tabular-nums text-neutral-900">{value}</dd>
+      <dd className="shrink-0 tabular-nums text-neutral-900">{value}</dd>
     </div>
   );
 }
@@ -755,74 +1197,198 @@ function Line({
 /* Dokument 3 — tidrapporten                                                   */
 /* -------------------------------------------------------------------------- */
 
-/** Tidrapporten per anställd. Underlaget som går vidare till lönen. */
-export function TimesheetMockup({ className = "" }: { className?: string }) {
-  const days = [
-    ["Må", "8,50", "8,50", "0,00"],
-    ["Ti", "8,50", "9,25", "+0,75"],
-    ["On", "8,50", "8,50", "0,00"],
-    ["To", "8,50", "0,00", "sjuk"],
-    ["Fr", "6,00", "6,00", "0,00"],
-  ];
+/**
+ * Tidrapporten per anställd. Underlaget som går vidare till lönen.
+ *
+ * DOKUMENTET LISTAR STÄMPLINGAR PER DAG, inte en rad per dag med planerat och
+ * utfall bredvid varandra. Bilden visade det senare, alltså en tabell som inte
+ * finns: dagen är en rubrik, raderna under den är passen med start och stopp,
+ * och en fet dagssumma avslutar dagen. Frånvaro står som en egen rad i gult,
+ * raster i grått.
+ *
+ * TIM:MIN OCH INTE DECIMALTIMMAR. "8,50" och "+0,75" stod här tidigare. Det
+ * är felet som gav regeln: tidrapporten stod i decimaltimmar medan tabellen
+ * under den stod i tim:min, på samma sida om samma dag, och "1,99" lästes som
+ * 1:59 — fyra minuter fel. Saldon får sitt tecken utskrivet.
+ *
+ * SAMMANSTÄLLNINGEN ÄR KUNDENS EGEN ORDNING, två kolumner i tre rader, och
+ * talen går ihop enligt flexformeln i CLAUDE.md § 3 regel 7: arbetad tid plus
+ * frånvaro minus planerad tid minus intjänad komp. 32:15 + 8:00 − 40:00 = +0:15.
+ *
+ * UNDERSKRIFTSRADEN ÄR MED. Den är raden förmannen skriver på, och fälten är
+ * kundens egna från blanketten de använt i tio år.
+ */
+interface TimesheetRow {
+  what: string;
+  from: string;
+  to: string;
+  time: string;
+}
 
+interface TimesheetEntry {
+  day: string;
+  /** Frånvaron har varken start eller stopp, bara ett antal minuter. */
+  absence?: { what: string; time: string };
+  rows: TimesheetRow[];
+  rest?: TimesheetRow;
+  /** Dagssumman. Saknas på en dag utan arbetad tid, som i dokumentet. */
+  sum?: string;
+}
+
+const DAYS: TimesheetEntry[] = [
+  {
+    day: "Må 2026-04-13",
+    rows: [
+      { what: "2601 · Svetsning", from: "07:00", to: "11:30", time: "4:30" },
+      { what: "2604 · Fräsning", from: "12:15", to: "16:00", time: "3:45" },
+    ],
+    rest: { what: "Lunch", from: "11:30", to: "12:15", time: "0:45" },
+    sum: "8:15",
+  },
+  {
+    day: "Ti 2026-04-14",
+    absence: { what: "Sjuk", time: "8:00" },
+    rows: [],
+  },
+  {
+    day: "On 2026-04-15",
+    rows: [
+      { what: "2603 · Montering", from: "07:00", to: "15:45", time: "8:00" },
+    ],
+    rest: { what: "Lunch", from: "11:30", to: "12:15", time: "0:45" },
+    sum: "8:00",
+  },
+];
+
+export function TimesheetMockup({ className = "" }: { className?: string }) {
   return (
     <Frame label="Till lönen" meta="tidrapport.pdf" className={className}>
       <div className="px-4 py-4">
-        <div className="flex items-baseline justify-between">
-          <p className="text-[13px] font-semibold text-neutral-900">
-            Johan Andersson
+        <div className="flex items-start justify-between gap-3">
+          <p className="text-[10px] font-semibold text-neutral-900">
+            Demo Mekaniska AB
           </p>
-          <span className="text-[10px] tabular-nums text-neutral-400">
-            v. 16
+          <span className="shrink-0 text-right">
+            <span className="block text-[8px] text-neutral-500">Anställd</span>
+            <span className="block text-[11px] font-semibold tabular-nums text-neutral-900">
+              12
+            </span>
           </span>
         </div>
 
-        <table className="mt-3 w-full text-[10px]">
+        {/* Namnrutan i Snö, med företaget och perioden till höger. */}
+        <div className="mt-2 flex items-end justify-between gap-3 rounded bg-neutral-100 px-2 py-1.5">
+          <span>
+            <span className="block text-[8px] text-neutral-500">Namn</span>
+            <span className="block text-[11px] font-semibold text-neutral-900">
+              Johan Andersson
+            </span>
+          </span>
+          <span className="shrink-0 text-[8px] tabular-nums text-neutral-500">
+            2026-04-13 – 2026-04-17
+          </span>
+        </div>
+
+        <table className="mt-2.5 w-full text-[9px]">
           <thead>
             <tr className="border-b border-neutral-200 text-neutral-500">
               <th className="py-1 text-left font-medium">Dag</th>
-              <th className="py-1 text-right font-medium">Planerat</th>
-              <th className="py-1 text-right font-medium">Närvaro</th>
-              <th className="py-1 text-right font-medium">Flex</th>
+              <th className="py-1 text-left font-medium">Order</th>
+              <th className="py-1 text-right font-medium">Start</th>
+              <th className="py-1 text-right font-medium">Stopp</th>
+              <th className="py-1 text-right font-medium">Tid</th>
             </tr>
           </thead>
           <tbody>
-            {days.map((day) => (
-              <tr key={day[0]} className="border-b border-neutral-100">
-                <td className="py-1 text-neutral-700">{day[0]}</td>
-                <td className="py-1 text-right tabular-nums text-neutral-600">
-                  {day[1]}
-                </td>
-                <td className="py-1 text-right tabular-nums text-neutral-600">
-                  {day[2]}
-                </td>
-                <td
-                  className={`py-1 text-right tabular-nums ${
-                    day[3] === "sjuk" ? "text-amber-700" : "text-neutral-900"
-                  }`}
-                >
-                  {day[3]}
-                </td>
-              </tr>
+            {DAYS.map((entry) => (
+              <TimesheetDay key={entry.day} entry={entry} />
             ))}
           </tbody>
         </table>
 
-        <dl className="mt-3 space-y-1 text-[10px]">
-          <Line label="Planerad tid" value="40,00 tim" />
-          <Line label="Närvarotid" value="32,25 tim" />
-          <Line label="Frånvaro, sjuk" value="8,50 tim" muted />
+        <div className="mt-1 flex items-center justify-between rounded bg-neutral-100 px-2 py-1.5">
+          <span className="text-[10px] font-semibold text-neutral-900">
+            Totalt för perioden
+          </span>
+          <span className="text-[10px] font-semibold tabular-nums text-neutral-900">
+            32:15
+          </span>
+        </div>
+
+        <dl className="mt-2 grid grid-cols-2 gap-x-3 rounded bg-neutral-100 px-2 py-2 text-[9px]">
+          <Line label="Planerad tid" value="40:00" />
+          <Line label="Närvarotid" value="32:15" />
+          <Line label="Frånvaro" value="8:00" />
+          <Line label="Rast" value="3:00" />
+          <Line label="Flextid, perioden" value="+0:15" />
+          <Line label="Flexsaldo" value="+2:30" />
         </dl>
 
-        <div className="mt-2 flex items-center justify-between rounded border border-neutral-200 bg-neutral-50 px-2 py-1.5">
-          <span className="text-[10px] font-semibold text-neutral-900">
-            Flexsaldo
-          </span>
-          <span className="text-[10px] font-semibold tabular-nums text-emerald-700">
-            +0,75 tim
-          </span>
+        {/* Underskriftsfälten, kundens egna. Ritas alltid i dokumentet. */}
+        <div className="mt-2.5 grid grid-cols-3 gap-2">
+          {["Spara ___ tim", "Övertid ok", "Tidrapport ok"].map((field) => (
+            <span key={field} className="block">
+              <span className="block text-[8px] text-neutral-500">
+                {field}
+              </span>
+              <span className="mt-2.5 block border-t border-neutral-300" />
+            </span>
+          ))}
         </div>
       </div>
     </Frame>
+  );
+}
+
+function TimesheetDay({ entry }: { entry: TimesheetEntry }) {
+  return (
+    <>
+      {entry.absence && (
+        <tr className="border-b border-neutral-100">
+          <td className="py-1 text-amber-700">{entry.day}</td>
+          <td className="py-1 text-amber-700" colSpan={3}>
+            {entry.absence.what}
+          </td>
+          <td className="py-1 text-right tabular-nums text-amber-700">
+            {entry.absence.time}
+          </td>
+        </tr>
+      )}
+
+      {entry.rows.map((row) => (
+        <tr key={row.what} className="border-b border-neutral-100">
+          <td className="py-1 text-neutral-900">{entry.day}</td>
+          <td className="truncate py-1 text-neutral-700">{row.what}</td>
+          <td className="py-1 text-right tabular-nums text-neutral-600">
+            {row.from}
+          </td>
+          <td className="py-1 text-right tabular-nums text-neutral-600">
+            {row.to}
+          </td>
+          <td className="py-1 text-right tabular-nums text-neutral-900">
+            {row.time}
+          </td>
+        </tr>
+      ))}
+
+      {entry.rest && (
+        <tr className="border-b border-neutral-100 text-neutral-400">
+          <td className="py-1">{entry.day}</td>
+          <td className="py-1">{entry.rest.what}</td>
+          <td className="py-1 text-right tabular-nums">{entry.rest.from}</td>
+          <td className="py-1 text-right tabular-nums">{entry.rest.to}</td>
+          <td className="py-1 text-right tabular-nums">{entry.rest.time}</td>
+        </tr>
+      )}
+
+      {entry.sum && (
+        <tr className="border-b border-neutral-200">
+          <td colSpan={4} />
+          <td className="py-1 text-right font-semibold tabular-nums text-neutral-900">
+            {entry.sum}
+          </td>
+        </tr>
+      )}
+    </>
   );
 }
