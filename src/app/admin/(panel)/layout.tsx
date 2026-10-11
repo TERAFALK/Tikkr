@@ -1,4 +1,5 @@
 import { cookies } from "next/headers";
+import { redirect } from "next/navigation";
 import { READ_ONLY_COOKIE, requireAdmin } from "@/lib/admin-session";
 import { unsafeGlobalPrisma } from "@/lib/db";
 import { getOnboardingState } from "@/lib/onboarding";
@@ -83,9 +84,26 @@ export default async function PanelLayout({
       });
 
   // OBEKRÄFTAD E-POSTADRESS. Remsan står tills länken använts, så att ett
-  // stavfel vid registreringen syns första dagen och inte den dag lösenordet
-  // glömts. Den spärrar ingenting. Se email-verification.ts.
+  // stavfel syns första dagen och inte den dag lösenordet glömts. Den spärrar
+  // ingenting. Se email-verification.ts.
   const unverifiedEmail = me && !me.emailVerifiedAt ? me.email : null;
+
+  /**
+   * DEN NYREGISTRERADE KOMMER INTE IN FÖRRÄN ADRESSEN ÄR BEKRÄFTAD
+   * (2026-10-11).
+   *
+   * Gäller bara den första sessionen, den som släpptes in utan uppsatt app
+   * (`mfaPending`, se admin-session.ts). För alla andra står remsan kvar som
+   * förut och spärrar ingenting: de har tvåsteg, och en adress som blivit
+   * obekräftad för att någon rättat den ska inte låsa ute en arbetsyta mitt i
+   * en arbetsdag.
+   *
+   * Spärren är ett FLÖDESSTEG och inte en säkerhetsgräns: arbetsytan är
+   * personens egen, och det som skyddas är att vi kan nå hen. Därför räcker
+   * den här kontrollen, till skillnad från modulgrinden i § 3.1, som måste
+   * ligga i varje rutt.
+   */
+  if (session.mfaPending && unverifiedEmail) redirect("/admin/bekrafta-adressen");
 
   // Vilka menypunkter som ska synas. ATT DÖLJA DEM ÄR BARA KOSMETIK —
   // sidorna bakom vaktas var för sig av requireModule() och svarar 404
@@ -134,6 +152,30 @@ export default async function PanelLayout({
             Vilket läge man är i avgör hur allt annat på sidan ska läsas. */}
         {session.support && <SupportBanner companyName={session.companyName} />}
         <ReadOnlyToast show={deniedWrite} />
+
+        {/* TVÅSTEGSVERIFIERINGEN ÄR INTE UPPSATT (2026-10-11).
+            
+            Står bara för den som släppts in utan app, alltså den som nyss
+            registrerat. Den spärrar ingenting här — nästa inloggning gör det,
+            eftersom inloggningssidan möter ett konto utan app med QR-koden.
+            Remsan säger det rakt ut, så att det inte kommer som en
+            överraskning nästa morgon.
+            
+            Knappen leder till Ditt konto med rutan redan öppen. Rutan finns
+            byggd på ett ställe, se konto/page.tsx. */}
+        {session.mfaPending && (
+          <div className="border-b border-amber-200 bg-amber-50 px-4 py-2.5 sm:px-6 lg:px-8">
+            <div className="mx-auto flex max-w-7xl flex-wrap items-center gap-x-4 gap-y-1 text-[13px] text-amber-900">
+              <p>
+                <strong>Tvåstegsverifieringen är inte uppsatt.</strong> Nästa
+                gång du loggar in behöver du en kod från en app i telefonen.
+              </p>
+              <Link href="/admin/konto?tvasteg=1" className="font-medium underline">
+                Koppla app
+              </Link>
+            </div>
+          </div>
+        )}
 
         {unverifiedEmail && (
           <div className="border-b border-amber-200 bg-amber-50 px-4 py-2.5 sm:px-6 lg:px-8">

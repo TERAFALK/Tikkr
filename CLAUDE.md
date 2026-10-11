@@ -1174,9 +1174,47 @@ ligger i `src/lib/feedback.ts`, och `tests/feedback.test.ts` fäller den.
    flöde. Steg ett är lösenordet, som bara lämnar en signerad lapp i tio
    minuter (`login-ticket.ts`). Steg två visar en QR-kod första gången och
    frågar sedan efter koden (TOTP, `totp.ts`, `two-step.ts`). Sessionen
-   skapas först när koden godkänts, och registrering, inbjudan och
-   återställning går samma väg. `currentAdmin()` släpper inte in ett konto
-   utan bekräftad app. Nycklarna lagras krypterade med `AUTH_SECRET`.
+   skapas först när koden godkänts, och inbjudan och återställning går samma
+   väg. `currentAdmin()` släpper inte in ett konto utan bekräftad app.
+   Nycklarna lagras krypterade med `AUTH_SECRET`.
+
+   **REGISTRERINGEN ÄR UNDANTAGET, PÅ EN ENDA SESSION** (ändrat 2026-10-11,
+   produktägarens beslut). Den som skapar en arbetsyta mötte en QR-kod innan
+   hen sett en enda sida av produkten, och ett krav man inte förstår skälet
+   till är ett krav man avbryter på.
+
+   Nu skapas sessionen av registreringen själv. Beviset är lappen: signerad,
+   tio minuter, satt i samma webbläsare i samma begäran, och märkt `fresh`.
+   `auth.ts` tar emot den under sättet `signup` och märker sessionen
+   `mfaDeferred`; `currentAdmin()` släpper in ett konto utan app **bara** när
+   det märket finns. Märket går inte att be om och följer inte med vidare:
+   nästa inloggning utfärdar en ny session, och den går genom inloggningssidan,
+   som möter ett konto utan app med QR-koden. Tvånget vid nästa inloggning
+   krävde därför ingen ny kod.
+
+   **I stället spärrar E-POSTADRESSEN.** Den nyregistrerade kommer inte in i
+   panelen förrän länken i välkomstmejlet använts, och skickas så länge till
+   `/admin/bekrafta-adressen`. Med tvåsteget flyttat är adressen det enda som
+   binder arbetsytan till en människa vi kan nå, och ett stavfel där upptäcks
+   annars den dag lösenordet ska återställas. Sidan ligger utanför `(panel)`,
+   eftersom en spärrsida inuti den layout som skickar dit hade skickat vidare
+   till sig själv, och den bär en väg att **rätta adressen** — utan den vore en
+   felskriven adress detsamma som en arbetsyta ingen kommer in i.
+
+   Spärren är ett flödessteg och inte en säkerhetsgräns: arbetsytan är
+   personens egen. Därför räcker kontrollen i layouten, till skillnad från
+   modulgrinden i § 3.1, som måste ligga i varje rutt.
+
+   **Panelen tjatar till dess appen är kopplad.** En remsa högst upp, av samma
+   slag som den om e-postadressen, med en knapp som leder till Ditt konto med
+   rutan öppen. Uppsättningen bor i `TwoStepEnrollment`, som inloggningen och
+   panelen delar: instruktionen är det som gör uppsättningen möjlig för den som
+   aldrig gjort den förut, och två texter som glider isär hade låst ute folk.
+
+   Priset är uttryckligt: ett stulet lösenord räcker aldrig för att komma in,
+   men den FÖRSTA webbläsarens cookie räcker i upp till sju dagar för ett konto
+   som inte hunnit koppla appen. **Inbjudna administratörer omfattas inte** —
+   de tvingas direkt, som förut.
 
    **Två lättnader för kunderna, ingen för plattformen** (beslutat
    2026-10-07, eftersom pilotkunden tyckte koden var jobbig). Appen sätts

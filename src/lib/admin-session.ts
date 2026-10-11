@@ -50,6 +50,15 @@ export interface AdminSession {
    * `unsafeGlobalPrisma` — måste börja med `await assertWritable(session)`.
    */
   support?: SupportContext;
+  /**
+   * SATT NÄR APPEN INTE ÄR KOPPLAD ÄN, och sessionen ändå släpps in.
+   *
+   * Gäller bara den första sessionen efter en registrering (2026-10-11). Är
+   * den satt visar panelen remsan om tvåstegsverifiering, och är dessutom
+   * e-postadressen obekräftad visas spärren i stället för panelen. Se
+   * admin/(panel)/layout.tsx.
+   */
+  mfaPending?: true;
 }
 
 export interface SupportContext {
@@ -163,10 +172,27 @@ export async function currentAdmin(): Promise<AdminSession | null> {
 
   if (!account) return null;
 
-  // Tvåstegsinloggning är obligatorisk (2026-10-06). En session från innan
-  // kravet, eller ett konto vars tvåsteg nollställts, kommer inte in förrän
-  // appen satts upp — inloggningen visar då QR-koden.
-  if (!account.totpEnabledAt) return null;
+  /**
+   * TVÅSTEGSINLOGGNING ÄR OBLIGATORISK (2026-10-06), MED ETT UNDANTAG PÅ EN
+   * SESSION (2026-10-11).
+   *
+   * En session från innan kravet, eller ett konto vars tvåsteg nollställts,
+   * kommer inte in förrän appen satts upp — inloggningen visar då QR-koden.
+   *
+   * Undantaget är den som nyss registrerat en arbetsyta. Hen har ingen app
+   * och har aldrig loggat in, och att möta en QR-kod innan man sett vad man
+   * köpt är det branta steget produktägaren ville bort från. Märket sitter i
+   * sessionen och sätts bara av registreringen, se auth.ts: det går inte att
+   * be om, och det följer inte med till nästa inloggning, eftersom en ny
+   * session utfärdas av inloggningssidan, som kräver koden.
+   *
+   * Priset är uttryckligt: ett stulet lösenord räcker aldrig för att komma
+   * in, men den HÄR webbläsarens cookie räcker i upp till sju dagar för ett
+   * konto som inte hunnit koppla appen. Panelen tjatar därför om det, och
+   * nästa inloggning tvingar fram det.
+   */
+  const mfaPending = !account.totpEnabledAt;
+  if (mfaPending && session.user.mfaDeferred !== true) return null;
 
   // En session som utfärdades före det senaste lösenordsbytet, eller före en
   // utloggning på alla enheter, gäller inte. Annars vore det meningslöst att
@@ -194,6 +220,7 @@ export async function currentAdmin(): Promise<AdminSession | null> {
     companyId: account.companyId,
     companyName: account.company.name,
     role: account.role,
+    ...(mfaPending ? { mfaPending: true as const } : {}),
     db: forCompany(account.companyId),
   };
 }

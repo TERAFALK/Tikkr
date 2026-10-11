@@ -1,7 +1,8 @@
 "use server";
 
 import { redirect } from "next/navigation";
-import { issueTicket } from "@/lib/login-ticket";
+import { clearTicket, issueTicket, rawTicket } from "@/lib/login-ticket";
+import { signIn, SIGNUP_METHOD } from "@/lib/auth";
 import {
   createCompanyWithOwner,
   SignupError,
@@ -112,13 +113,46 @@ export async function register(
 
   if (ip) noteFailedLogin(SIGNUP_SCOPE, ip);
 
-  // Bekräftelsen spärrar ingenting och får inte stoppa registreringen. Går
-  // mejlet inte iväg visar panelen en remsa med en knapp för att försöka igen.
+  // Bekräftelsen SPÄRRAR NU PANELEN för den nya ägaren, tills länken använts.
+  // Går mejlet inte iväg finns en knapp för att försöka igen på spärrsidan.
+  // Se email-verification.ts och admin/(panel)/layout.tsx.
   await sendEmailVerification(ownerId);
 
-  // Vidare till tvåstegsinloggningen, utan att skriva lösenordet igen: det
-  // valdes för tio sekunder sedan. Inloggningssidan visar QR-koden, och efter
-  // den första koden hamnar den nya ägaren i kom igång-guiden.
-  await issueTicket("admin", ownerId, "/admin/kom-igang");
-  redirect("/admin/login");
+  /**
+   * RAKT IN I PANELEN, UTAN KOD FRÅN EN APP (ändrat 2026-10-11).
+   *
+   * Registreringen ledde förut till inloggningssidan, som mötte den
+   * nyregistrerade med en QR-kod innan hen sett en enda sida av produkten.
+   * Nu skapas sessionen här, och kravet på tvåsteg flyttas till en remsa i
+   * panelen och till nästa inloggning. Se § 4 punkt 5 i CLAUDE.md.
+   *
+   * Lappen är beviset: signerad, tio minuter, satt i den här webbläsaren i
+   * samma begäran. `fresh` kan därför inte komma någon annanstans ifrån.
+   * Den läses av auth.ts och märker sessionen, och ingen annan session i
+   * systemet kan komma in utan uppsatt app.
+   */
+  await issueTicket("admin", ownerId, undefined, { fresh: true });
+
+  let signedIn = true;
+
+  try {
+    await signIn("credentials", {
+      ticket: await rawTicket("admin"),
+      method: SIGNUP_METHOD,
+      redirect: false,
+    });
+  } catch {
+    // ARBETSYTAN FINNS REDAN NÄR VI KOMMER HIT. Går inloggningen inte igenom
+    // ändå ska kunden inte mötas av ett fel, utan av inloggningssidan: kontot
+    // och lösenordet fungerar, och den vägen in är den vanliga. Lappen får då
+    // ligga kvar, så att steg två tar vid direkt.
+    signedIn = false;
+  }
+
+  // Utanför try, eftersom redirect() gör sitt jobb genom att kasta: låg den
+  // innanför skulle fångsten ovan svälja den och sidan bli stående.
+  if (!signedIn) redirect("/admin/login");
+
+  await clearTicket("admin");
+  redirect("/admin/kom-igang");
 }

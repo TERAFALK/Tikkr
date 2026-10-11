@@ -43,8 +43,26 @@ export interface LoginTicket {
    * byta lösenordet och ta emot koden. Se loginAlternatives i admin-mfa.ts.
    */
   afterReset?: boolean;
+  /**
+   * Satt när kontot just skapats vid registreringen (2026-10-11).
+   *
+   * Lappen är då beviset i stället för en kod från appen: lösenordet valdes
+   * för några sekunder sedan, i den här webbläsaren, och kontot har ingen app
+   * kopplad än. Se SIGNUP_METHOD i auth.ts, och § 4 punkt 5 i CLAUDE.md om
+   * varför tvåsteg ändå krävs från andra inloggningen.
+   *
+   * Gäller bara tio minuter, som alla lappar, och kan inte förfalskas: den är
+   * signerad med AUTH_SECRET.
+   */
+  fresh?: boolean;
   /** Utgångstid, sekunder sedan epoch. */
   exp: number;
+}
+
+/** Det som kan följa med utöver kontot och vägen vidare. */
+export interface TicketExtra {
+  afterReset?: boolean;
+  fresh?: boolean;
 }
 
 function signingKey(scope: TicketScope): string {
@@ -67,13 +85,14 @@ export function encodeTicket(
   sub: string,
   next?: string,
   now: Date = new Date(),
-  extra: { afterReset?: boolean } = {}
+  extra: TicketExtra = {}
 ): string {
   const payload: LoginTicket = {
     sub,
     next: safeNext(next),
     exp: Math.floor(now.getTime() / 1000) + LIFETIME_SECONDS,
     ...(extra.afterReset ? { afterReset: true } : {}),
+    ...(extra.fresh ? { fresh: true } : {}),
   };
   const body = Buffer.from(JSON.stringify(payload)).toString("base64url");
   return `${body}.${sign(scope, body)}`;
@@ -114,7 +133,7 @@ export async function issueTicket(
   scope: TicketScope,
   sub: string,
   next?: string,
-  extra: { afterReset?: boolean } = {}
+  extra: TicketExtra = {}
 ): Promise<void> {
   (await cookies()).set(COOKIE[scope], encodeTicket(scope, sub, next, new Date(), extra), {
     httpOnly: true,

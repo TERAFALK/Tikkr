@@ -11,6 +11,7 @@ import {
   sendEmailVerification,
 } from "@/lib/email-verification";
 import { normalizePhone } from "@/lib/phone";
+import { verifyAdminCode } from "@/lib/admin-mfa";
 import { nameProblem, storedName } from "@/lib/person-name";
 import { saved, type SaveState } from "@/lib/save-state";
 import { assertWritable, requireAdmin } from "@/lib/admin-session";
@@ -163,4 +164,39 @@ export async function changeEmail(
 
   revalidatePath("/admin", "layout");
   return saved("Adressen är ändrad. En ny länk är skickad");
+}
+
+/**
+ * KOPPLAR AUTENTISERINGSAPPEN INIFRÅN PANELEN (2026-10-11).
+ *
+ * Den som registrerat en arbetsyta släpps in utan app och sätter upp den
+ * härifrån, eller tvingas vid nästa inloggning. Se § 4 punkt 5 i CLAUDE.md.
+ *
+ * Nyckeln är redan skapad när rutan visades, se konto/page.tsx. Den första
+ * godkända koden är det som räknas som uppsatt: `verifyAdminCode` sätter
+ * `totpEnabledAt` när den saknas, och det är samma rad som inloggningens
+ * uppsättning går genom. Två vägar in i samma tillstånd, en enda som skriver
+ * det.
+ *
+ * Id:t tas ur sessionen och aldrig ur formuläret, som allt annat på sidan.
+ */
+export async function enableTwoStep(
+  _previous: SaveState,
+  formData: FormData
+): Promise<SaveState> {
+  const session = await requireAdmin();
+  await assertWritable(session);
+
+  const code = String(formData.get("code") ?? "").replace(/\s/g, "");
+
+  if (!(await verifyAdminCode(session.userId, code))) {
+    return {
+      error:
+        "Koden stämmer inte. Kontrollera att telefonens klocka går rätt och försök igen.",
+    };
+  }
+
+  // Remsan högst upp ligger i layouten och försvinner först när den ritas om.
+  revalidatePath("/admin", "layout");
+  return saved("Appen är kopplad");
 }

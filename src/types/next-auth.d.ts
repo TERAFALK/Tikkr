@@ -17,6 +17,14 @@ declare module "next-auth" {
        * äldre sessioner ogiltiga. Se currentAdmin() i src/lib/admin-session.ts.
        */
       issuedAt?: number;
+      /**
+       * Satt bara på den första sessionen efter en registrering, och bara så
+       * länge appen inte är kopplad.
+       *
+       * currentAdmin() släpper in ett konto utan uppsatt tvåsteg enbart när
+       * den står här. Se auth.ts och § 4 punkt 5 i CLAUDE.md.
+       */
+      mfaDeferred?: boolean;
     } & DefaultSession["user"];
   }
 
@@ -24,6 +32,7 @@ declare module "next-auth" {
     companyId: string;
     companyName: string;
     role: string;
+    mfaDeferred?: boolean;
   }
 }
 
@@ -32,5 +41,6 @@ declare module "next-auth/jwt" {
     companyId?: string;
     companyName?: string;
     role?: string;
+    mfaDeferred?: boolean;
   }
 }

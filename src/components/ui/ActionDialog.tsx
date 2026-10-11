@@ -61,6 +61,7 @@ export default function ActionDialog<S extends DialogState>({
   submitTone = "primary",
   pendingLabel = "Sparar…",
   disabled = false,
+  openOnMount = false,
   onDone,
   children,
 }: {
@@ -83,6 +84,17 @@ export default function ActionDialog<S extends DialogState>({
   pendingLabel?: string;
   /** Spärrar knappen inuti rutan. Förklaringen står då som children. */
   disabled?: boolean;
+  /**
+   * Öppnar rutan direkt när sidan visas.
+   *
+   * För den som kommit hit genom att trycka på något annat än knappen — en
+   * remsa högst upp, en länk i ett mejl. Utan den landar man på en sida där
+   * man måste leta rätt på samma knapp en gång till, och det är precis det
+   * steget remsan fanns till för att ta bort.
+   *
+   * Sidan avgör det, av sin adress. Rutan vet inget om varför.
+   */
+  openOnMount?: boolean;
   /** Anropas med beskedet när rutan stängt, så sidan kan visa det. */
   onDone?: (ok: string) => void;
   children: ReactNode;
@@ -109,6 +121,12 @@ export default function ActionDialog<S extends DialogState>({
    * körning stänger, en omöppnad ruta gör det inte.
    */
   const handled = useRef<DialogState | null>(null);
+
+  // En gång, vid uppkopplingen. Stänger man rutan ska den stanna stängd, och
+  // adressen står kvar som den är.
+  useEffect(() => {
+    if (openOnMount) dialog.current?.showModal();
+  }, [openOnMount]);
 
   useEffect(() => {
     if (!state.ok || handled.current === state) return;
