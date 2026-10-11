@@ -63,7 +63,7 @@ export function faqQuestions(modules: ModulePricing): FaqItem[] {
     },
     {
       q: "Var lagras uppgifterna?",
-      a: "På servrar i Sverige. Personuppgiftsbiträdesavtal ingår och kan läsas innan ni börjar. Uppgifterna om en anställd omfattar namn, valfritt anställningsnummer och registrerad tid, och kan exporteras eller raderas i panelen.",
+      a: "På servrar i Sverige. Personuppgiftsbiträdesavtal ingår och kan läsas innan ni börjar. Uppgifterna om en anställd omfattar namn, valfritt anställningsnummer, valfritt porträtt och registrerad tid. Med tillvalet Löneunderlag tillkommer schema, raster, flex och frånvaro. Samtliga uppgifter kan exporteras eller raderas i panelen.",
     },
     {
       q: "Vad händer vid utebliven betalning?",

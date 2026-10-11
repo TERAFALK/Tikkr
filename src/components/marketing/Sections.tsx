@@ -4,6 +4,7 @@ import {
   CalcMockup,
   ExportMockup,
   Frame,
+  OrderNumberMockup,
   OrderPickMockup,
   ReportMockup,
   ReviewMockup,
@@ -415,7 +416,7 @@ export function Hero() {
           >
             <SatelliteCard
               label="Arbetar just nu"
-              value="3"
+              value="5"
               foot="Av nio anställda"
             />
           </div>
@@ -559,8 +560,8 @@ const STEPS = [
   {
     number: "1",
     title: "Namn, order, arbetsmoment",
-    body: "Tre tryck, med knappar anpassade för arbetshandskar. Den som har ordernumret på ritningen kan ange det på en knappsats i stället. Saknas ordern läggs den upp vid skärmen och markeras för komplettering på kontoret.",
-    mockup: <OrderPickMockup />,
+    body: "Tre tryck, med knappar anpassade för arbetshandskar. Ordernumret slås in på en knappsats, och knappen som bekräftar bär kundens namn. Listan med öppna ordrar ligger ett tryck bort. Saknas ordern läggs den upp vid skärmen och markeras för komplettering på kontoret.",
+    mockup: <OrderNumberMockup />,
   },
   {
     number: "2",
@@ -725,8 +726,9 @@ export function AdminSection() {
         <div className="mt-16 grid items-start gap-12 lg:grid-cols-2 lg:gap-20">
           <dl>
             <SpecRow term="Rapporter">
-              Filtrera på period, order, kund, anställd och arbetsmoment. Ta ut
-              som PDF eller Excel, eller skriv ut direkt.
+              Filtrera på period, order, kund, anställd och arbetsmoment.
+              Summeringar per order, kund, anställd och arbetsmoment. Ta ut som
+              PDF eller Excel.
             </SpecRow>
             <SpecRow term="Granskning">
               Beräknade sluttider och ordrar som lagts upp vid skärmen samlas på
@@ -786,7 +788,7 @@ export function Documents() {
     {
       kicker: "Till kunden",
       title: "Underlag per order",
-      body: "PDF eller Excel med er logotyp, ordernummer och kund som rubrik, samtliga stämplingar och en summa sist. Belopp tas med när ni väljer det.",
+      body: "PDF med er logotyp, ordernummer och kund som rubrik, samtliga stämplingar och en summa sist. Skrivs ut direkt eller laddas ner. Belopp tas med när ni väljer det.",
       mockup: <ExportMockup className="h-full" />,
     },
     {
@@ -816,37 +818,49 @@ export function Documents() {
           intro="Tid som registrerats en gång blir underlag till kundens faktura, till er egen efterkalkyl och till lönen."
         />
 
-        <div className="mt-20 grid gap-14 lg:grid-cols-3 lg:gap-10">
-          {docs.map((doc, index) => (
-            /* h-full hela vägen ned: de tre pappersytorna blir lika höga även
-               när en tabell har en rad mer, och rubrikerna under dem hamnar på
-               samma linje.
+        {/* TVÅ RADER SOM DE TRE KORTEN DELAR: papperen överst, texterna under.
 
-               `tilt="none"`: tre lutade papper bredvid varandra blir ett
+            Korten var tidigare var sin kolumn med `h-full` och en platta som
+            tog plats som blev över. Det höll så länge de tre dokumenten råkade
+            bli ungefär lika höga; när underlaget fick kundens adress och
+            tidrapporten fick sina pass blev papperen olika höga, och de tre
+            rubrikerna hamnade på tre olika linjer med fyrtiofem pixlars
+            förskjutning. Det syns direkt och ser ut som ett fel, eftersom
+            avsnittet är tre jämbördiga mottagare och inte en trappa.
+
+            `grid-rows-subgrid` låter varje kort ärva de två raderna i stället
+            för att räkna ut sin egen höjd. Pappersraden blir så hög som det
+            högsta pappret, alla tre sträcks till den, och textraden börjar på
+            samma linje i alla tre. Att ett kortare dokument får vit yta
+            nedtill är rätt: ett A4 är lika stort oavsett hur mycket som står
+            på det.
+
+            Under lg står korten under varandra, och då gäller varken raderna
+            eller mellanrummet — därav `mt-10` på texten, som bara slår till
+            där. */}
+        <div className="mt-20 grid gap-14 lg:grid-cols-3 lg:grid-rows-[auto_auto] lg:gap-x-10 lg:gap-y-8">
+          {docs.map((doc, index) => (
+            /* `tilt="none"`: tre lutade papper bredvid varandra blir ett
                mönster, och de tre dokumenten är inte ett mönster utan tre
                mottagare. Lyftet vid beröring står kvar. */
             <Reveal
               key={doc.title}
               delay={index * 90}
               variant="soft"
-              className="h-full"
+              className="lg:row-span-2 lg:grid lg:grid-rows-subgrid lg:gap-y-8"
             >
-              <div className="flex h-full flex-col">
-                <Plate tilt="none" className="flex-1">
-                  {doc.mockup}
-                </Plate>
+              <Plate tilt="none">{doc.mockup}</Plate>
 
-                <div className="mt-8 border-t border-neutral-200 pt-5">
-                  <p className="text-[11px] font-medium uppercase tracking-wider text-tick-deep">
-                    {doc.kicker}
-                  </p>
-                  <h3 className="mt-2.5 text-[18px] font-semibold tracking-tight text-neutral-900">
-                    {doc.title}
-                  </h3>
-                  <p className="mt-2.5 text-[14px] leading-relaxed text-neutral-600">
-                    {doc.body}
-                  </p>
-                </div>
+              <div className="mt-10 border-t border-neutral-200 pt-5 lg:mt-0">
+                <p className="text-[11px] font-medium uppercase tracking-wider text-tick-deep">
+                  {doc.kicker}
+                </p>
+                <h3 className="mt-2.5 text-[18px] font-semibold tracking-tight text-neutral-900">
+                  {doc.title}
+                </h3>
+                <p className="mt-2.5 text-[14px] leading-relaxed text-neutral-600">
+                  {doc.body}
+                </p>
               </div>
             </Reveal>
           ))}
@@ -910,7 +924,7 @@ export function Capabilities() {
       rows: [
         {
           term: "Rapporter och export",
-          body: "PDF, Excel och utskrift. Flera markerade ordrar ger en fil per order.",
+          body: "Rapporten tas ut som PDF eller Excel. Underlag och efterkalkyl skrivs ut direkt eller laddas ner som PDF, och flera markerade ordrar ger en fil per order i ett zip-arkiv.",
         },
         {
           term: "Efterkalkyl",
@@ -944,8 +958,12 @@ export function Capabilities() {
           body: "Servrar i Sverige. Personuppgiftsbiträdesavtal ingår.",
         },
         {
+          term: "Tvåstegsinloggning",
+          body: "Krävs för varje konto i panelen. Kod ur en app, eller via e-post till en bekräftad adress.",
+        },
+        {
           term: "Spårbarhet",
-          body: "Varje stämpling registrerar tidpunkt, skärm och IP-adress.",
+          body: "Varje stämpling registrerar tidpunkt, skärm och IP-adress. Ändringar av tid, frånvaro, timkostnad och roller loggas med värdet före och efter.",
         },
         {
           term: "Dataskydd",
@@ -1135,7 +1153,7 @@ export function Pricing({
                     "Obegränsat antal anställda",
                     "Obegränsat antal ordrar och moment",
                     "Obegränsat antal stämplingar",
-                    "Rapporter, PDF, Excel och utskrift",
+                    "Rapporter som PDF och Excel",
                     "Efterkalkyl och kundregister",
                     "Flera administratörer",
                     "Uppdateringar och drift",

@@ -3,6 +3,7 @@ import {
   AdminMockup,
   CalcMockup,
   ExportMockup,
+  OrderNumberMockup,
   OrderPickMockup,
   ReportMockup,
   ReviewMockup,
@@ -206,9 +207,9 @@ export function SatelliteCard({
  * rätt för den som läser uppifrån och ned, men det svarar aldrig på frågan en
  * köpare faktiskt har efter tre avsnitt: hur mycket ÄR det här?
  *
- * Bandet svarar på den. Åtta ytor ur produkten i en rad som drar förbi i jämn
- * takt — stämplingsskärmen, panelen, rapporten, granskningen och de tre
- * dokumenten. Ingen text, inga rubriker. Den som tittar i fem sekunder har
+ * Bandet svarar på den. Nio ytor ur produkten i en rad som drar förbi i jämn
+ * takt — stämplingsskärmens tre vyer, panelen, rapporten, granskningen och de
+ * tre dokumenten. Ingen text, inga rubriker. Den som tittar i fem sekunder har
  * förstått omfattningen.
  *
  * SPÅRET INNEHÅLLER SAMMA BILDER TVÅ GÅNGER. Animationen flyttar det exakt
@@ -217,7 +218,7 @@ export function SatelliteCard({
  * vid varje varv, och ett hopp var sextionde sekund är värre än inget band.
  *
  * `aria-hidden` på den andra uppsättningen: den är en kopia, och den som
- * lyssnar på sidan ska inte höra åtta produktbilder två gånger.
+ * lyssnar på sidan ska inte höra nio produktbilder två gånger.
  *
  * BILDERNA ÄR INTE INTERAKTIVA, och det är avsiktligt. De är bilder av
  * produkten; vill man röra den finns provperioden. Draget pausas däremot när
@@ -225,6 +226,7 @@ export function SatelliteCard({
  */
 const STRIP = [
   { key: "kiosk", node: <RunningMockup /> },
+  { key: "pad", node: <OrderNumberMockup /> },
   { key: "order", node: <OrderPickMockup /> },
   { key: "admin", node: <AdminMockup /> },
   { key: "report", node: <ReportMockup /> },
