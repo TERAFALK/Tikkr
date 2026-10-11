@@ -1,7 +1,7 @@
-# Kontrollen som körs innan något når main.
+# Kontrollen som körs innan något når dev eller prod.
 #
-# Varje pull request och varje push till main går igenom två jobb, som körs
-# samtidigt:
+# Varje pull request och varje push till dev och prod går igenom två jobb,
+# som körs samtidigt:
 #
 #   test   typkontroll och alla tester, mot en riktig Postgres
 #   image  bygger samma Docker-image som servern bygger
@@ -15,7 +15,7 @@ name: CI
 on:
   pull_request:
   push:
-    branches: [main]
+    branches: [dev, prod]
 
 # En ny push till samma gren avbryter körningen som redan pågår. Den gamla
 # koden är ändå inaktuell.

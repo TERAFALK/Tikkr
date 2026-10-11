@@ -115,7 +115,7 @@ databasen — plus en `migrate`-container som kör och avslutas.
 
 ```
 Laptop      →  GitHub (PR + CI)  →  Labbet          →  Produktionen
-gren, commit   main                 release.sh main    release.sh vX.Y.Z
+gren, commit   dev → prod           release.sh dev     release.sh vX.Y.Z
 ```
 
 ---
@@ -209,7 +209,7 @@ skärm kopplas om med en ny kod.
 ## Driftsätta en version
 
 ```bash
-./scripts/release.sh main      # labbet: senaste main
+./scripts/release.sh dev       # labbet: senaste dev
 ./scripts/release.sh v1.2.0    # produktionen: bara släppta versioner
 ```
 
@@ -296,8 +296,8 @@ Se [docs/drift.md](docs/drift.md) punkt 9.
 
 ## CI
 
-Varje pull request och push till `main` kör typkontroll, alla tester mot en
-egen Postgres och ett bygge av Docker-imagen, se
+Varje pull request och push till `dev` och `prod` kör typkontroll, alla
+tester mot en egen Postgres och ett bygge av Docker-imagen, se
 [.github/workflows/ci.yml](.github/workflows/ci.yml). Ett rött kryss betyder
 att PR:en inte ska slås ihop. CI driftsätter ingenting.
 
@@ -316,7 +316,7 @@ Se läget just nu:
 
 | Dokument | Innehåll |
 |---|---|
-| [docs/release.md](docs/release.md) | Från main till produktion, och tillbaka |
+| [docs/release.md](docs/release.md) | Från dev till produktion, och tillbaka |
 | [docs/drift.md](docs/drift.md) | Spärrar innan skarp drift, server, backup, autoutstämpling |
 | [docs/kiosk-lage.md](docs/kiosk-lage.md) | Chrome Kiosk och Android — låsa ner en skärm |
 | [docs/kioskskarm.md](docs/kioskskarm.md) | Hårdvara: skärm, stativ, strömmatning |

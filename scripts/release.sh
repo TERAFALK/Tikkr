@@ -2,7 +2,7 @@
 # Driftsätter en version. Samma skript i labbet och i produktionen.
 #
 #   ./scripts/release.sh v1.2.0       en släppt version — det enda produktionen tar
-#   ./scripts/release.sh main         senaste main (bara i labbet)
+#   ./scripts/release.sh dev          senaste dev (bara i labbet)
 #   ./scripts/release.sh fix/nagot    en gren under arbete (bara i labbet)
 #
 # ATT BACKA är samma kommando med den förra versionen:
@@ -13,7 +13,7 @@
 # backar KODEN. Databasen backas aldrig av sig själv — se docs/release.md.
 #
 # Ordningen, och varför:
-#   1. Kontroll   rätt version, ren mapp, och i produktion en släppt tagg på main
+#   1. Kontroll   rätt version, ren mapp, och i produktion en släppt tagg på prod
 #   2. Backup     före allt annat; det är återställningspunkten om något går fel
 #   3. Bygge      medan den gamla versionen kör vidare — går bygget sönder
 #                 har ingenting ändrats
@@ -81,9 +81,10 @@ if git rev-parse -q --verify "refs/tags/$TARGET" >/dev/null; then
   COMMIT="$(git rev-parse "refs/tags/$TARGET^{commit}")"
   VERSION="$TARGET"
 
-  # En tagg utanför main är kod som aldrig gått igenom en PR och CI.
-  git merge-base --is-ancestor "$COMMIT" origin/main \
-    || fail "$TARGET ligger inte på main. Slå ihop koden först och tagga sedan."
+  # En tagg utanför prod är kod som aldrig gått igenom en PR och CI, eller
+  # som aldrig släppts. Grenen hette main till 2026-10-11.
+  git merge-base --is-ancestor "$COMMIT" origin/prod \
+    || fail "$TARGET ligger inte på prod. Slå ihop dev i prod först och tagga sedan."
 elif git rev-parse -q --verify "refs/remotes/origin/$TARGET" >/dev/null; then
   COMMIT="$(git rev-parse "refs/remotes/origin/$TARGET")"
   # Grenens namn plus commit, så att två bygg av samma gren inte delar image.
@@ -107,7 +108,7 @@ PREVIOUS_COMMIT="$(git rev-parse HEAD)"
 RUNNING="$(running_version)"
 
 # Det som ska stå i "backa med"-raden. Bara en släppt version går att
-# driftsätta tillbaka med namn; "dev" och "main-3f2a1c9" pekar inte ut något
+# driftsätta tillbaka med namn; "dev" och "dev-3f2a1c9" pekar inte ut något
 # skriptet kan hämta.
 if printf '%s' "${RUNNING:-}" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+$'; then
   ROLLBACK="$RUNNING"

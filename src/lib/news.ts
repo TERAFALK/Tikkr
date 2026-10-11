@@ -8,7 +8,7 @@ import { RELEASES, type NewsItem, type Release } from "./release-notes";
  *
  * 1. **Bara installerade versioner.** Kör produktionen v1.2.0 visas ingen post
  *    för v1.3.0, även om texten redan ligger i koden. Det händer när en
- *    rättelse taggas på en `main` där nästa versions nyheter redan slagits
+ *    rättelse taggas på en `prod` där nästa versions nyheter redan slagits
  *    ihop. I labbet och lokalt, där versionen inte är en tagg, visas allt:
  *    där ska texten provläsas.
  * 2. **Bara kundens tillval.** En punkt om löneunderlaget visas inte för den

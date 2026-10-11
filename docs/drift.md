@@ -413,7 +413,7 @@ Ett nytt fynd som inte står här ska bedömas innan nästa release.
 |---|---|
 | Driftkontroll | `./scripts/status.sh` |
 | Driftsätta en version | `./scripts/release.sh v1.2.0` — se [release.md](release.md) |
-| Labbet till senaste main | `./scripts/release.sh main` |
+| Labbet till senaste dev | `./scripts/release.sh dev` |
 | Loggar | `docker compose logs -f app` |
 | Kör testerna | `./scripts/test.sh` |
 | Ny migration (laptopen) | `node scripts/new-migration.mjs <namn>` |

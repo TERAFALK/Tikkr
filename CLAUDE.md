@@ -5,15 +5,15 @@
 
 ## 0. Arbetsflödet — gäller varje session (beslutat 2026-10-10)
 
-Kod går gren → PR → CI → `main` → labbet → tagg → produktionen. Rutinen står
-i `docs/release.md`, skälen i § 5.
+Kod går gren → PR → CI → `dev` → labbet → `prod` → tagg → produktionen.
+Rutinen står i `docs/release.md`, skälen i § 5.
 
 ### Före arbetet
 1. Kör `git status` och `git branch --show-current`. Finns ändringar jag inte
    gjort: fråga innan något rörs.
-2. Arbeta aldrig på `main`. Skapa en gren från senaste `origin/main`:
-   `feat/<namn>`, `fix/<namn>` eller `chore/<namn>`. En gren är en avgränsad
-   ändring.
+2. Arbeta aldrig på `dev` eller `prod`. Skapa en gren från senaste
+   `origin/dev`: `feat/<namn>`, `fix/<namn>` eller `chore/<namn>`. En gren
+   är en avgränsad ändring.
 3. Läs koden, testerna och avsnittet i denna fil som rör ändringen innan något
    ändras. Är nuvarande beteende oklart: fråga, anta inte.
 
@@ -38,13 +38,15 @@ i `docs/release.md`, skälen i § 5.
    bygget. Testerna med databas körs av CI på PR:en — läs resultatet innan
    något kallas klart. Skriv vad som är verifierat och vad som inte är det.
 10. Läs hela diffen. Inga hemligheter, felsökningsrader eller orelaterade filer.
-11. Commit och push till grenen. Öppna PR mot `main` med `gh pr create`: vad,
+11. Commit och push till grenen. Öppna PR mot `dev` med `gh pr create`: vad,
     hur det testats, migrationer, driftändringar. **Aldrig push eller
-    force-push till `main`**, aldrig `--no-verify`.
+    force-push till `dev` eller `prod`**, aldrig `--no-verify`. En akut
+    rättelse i produktionen grenas från `origin/prod` och går mot `prod`, se
+    `docs/release.md` steg 7.
 
 ### Det som bara användaren beslutar
-12. Sammanslagning till `main`, en tagg `v*`, en GitHub Release och varje
-    driftsättning kräver användarens uttryckliga ja i samma session.
+12. Sammanslagning till `dev` eller `prod`, en tagg `v*`, en GitHub Release
+    och varje driftsättning kräver användarens uttryckliga ja i samma session.
 13. Claude har ingen åtkomst till servrarna och ska inte ha det. Claude ger
     kommandon, ett i taget; användaren kör dem.
 14. Ett kommando som raderar eller skriver över data (`restore.sh`,
@@ -1179,15 +1181,26 @@ Alla kunder delar samma server, och en trasig driftsättning slår mot alla på
 en gång. Därför (beslutat 2026-10-10):
 
 ```
-gren → PR → CI → main → labbet (release.sh main) → tagg vX.Y.Z → produktionen (release.sh vX.Y.Z)
+gren → PR → CI → dev → labbet (release.sh dev) → PR dev → prod → tagg vX.Y.Z → produktionen (release.sh vX.Y.Z)
 ```
+
+**`dev` och `prod`** (beslutat 2026-10-11, `prod` hette `main` till dess).
+`dev` är det labbet kör, och dit går varje PR. `prod` är det som släpps, och
+får nya funktioner bara genom att `dev` slås ihop i den — det är det som gör
+en version. Skälet är att `main` blandade två saker: det som provades och det
+som var redo att släppas.
+
+`dev` går till `prod` med en vanlig sammanslagning, aldrig squash, och `prod`
+får inga egna commits utom en akut rättelse, som sedan slås ihop tillbaka i
+`dev`. Då har `prod` exakt det innehåll labbet provat, och taggen sätts utan
+en ny omgång i labbet.
 
 - **CI** (`.github/workflows/ci.yml`) kör typkontroll, alla tester mot en egen
   Postgres, ett bygge av Docker-imagen och en kontroll av compose-filerna på
-  varje PR och push till `main`. Den driftsätter ingenting.
+  varje PR och push till `dev` och `prod`. Den driftsätter ingenting.
 - **Labbet är staging.** Ingen tredje miljö, se § 9.
-- **Produktionen kör bara taggar**, och taggen sätts när labbet kört samma
-  commit. Driftsättningen är ett kommando som användaren själv kör på
+- **Produktionen kör bara taggar**, och taggen sätts på `prod` när labbet kört
+  samma innehåll på `dev`. Driftsättningen är ett kommando som användaren själv kör på
   servern; det är godkännandet. Ingen automatisk driftsättning, och inga
   SSH-nycklar hos GitHub.
 - **Imagen bär versionen** (`tikkr-app:v1.2.0`), som visas i `/api/health`.
@@ -1204,7 +1217,7 @@ Nyheter i panelen står vad som ändrats i varje version, och texten ligger i
 `src/lib/release-notes.ts`, inte i databasen. Den granskas därmed som koden,
 och syns när versionen installeras utan att någon trycker på något.
 `news.ts` gömmer dessutom poster för versioner som är nyare än den som kör,
-eftersom en rättelse kan taggas på en `main` där nästa versions text redan
+eftersom en rättelse kan taggas på en `prod` där nästa versions text redan
 ligger. Punkter som bara rör ett tillval visas bara för kunder som har det.
 
 Pricken vid Nyheter är per administratör: `admin_users.news_seen_version`
@@ -1567,7 +1580,7 @@ servern — Claude har **ingen** SSH-åtkomst och ska alltid leverera kommandon 
 färdiga kodblock, ett i taget, med förklaring av vad de gör.
 
 ```
-Laptop (gren, commit)  →  GitHub (PR, CI, main, tagg)  →  Server: ./scripts/release.sh <version>
+Laptop (gren, commit)  →  GitHub (PR, CI, dev, prod, tagg)  →  Server: ./scripts/release.sh <version>
 ```
 
 ### Utvecklingsdator
@@ -1612,7 +1625,7 @@ separat server som sätts upp senare, mot tikkr.se.
 | Port 80/443 | 🔴 upptagna av **Nginx Proxy Manager** — rör dem inte |
 | Port 3000 | ✅ Tikkr, men bara `127.0.0.1` — all trafik går via proxyn |
 | Adress | ✅ `https://www.tikkr.se` och `portal.tikkr.se` via NPM, tills produktionen tar över dem |
-| Gren | `main`. En gren under arbete kan provas här före sammanslagning |
+| Gren | `dev`. En gren under arbete kan provas här före sammanslagning, och `prod` vid en akut rättelse |
 | Övrigt på servern | kör andra tjänster — kontrollera alltid innan portar tas |
 
 ### Miljöerna (beslutat 2026-10-10)
@@ -1640,7 +1653,7 @@ varje skärm kopplas om med en ny kod.
 
 | Sak | Status |
 |---|---|
-| GitHub-repo | ⚠ `TERAFALK/Tikkr` finns men är **publikt**. Ska bli privat; gratisplanen kan då inte skydda `main` |
+| GitHub-repo | ⚠ `TERAFALK/Tikkr` finns men är **publikt**. Ska bli privat; gratisplanen kan då inte skydda `prod` |
 | Produktionsserver | ⏸ Glesys-VPS, senare. Föreslaget: 2 vCPU, 4 GB RAM, 50 GB, Ubuntu 24.04 |
 | Offsite-backup (rclone-mål) | ⏸ Glesys Object Storage, köps till. `BACKUP_REMOTE` sätts före lansering |
 | Uptime-övervakning | ⏸ sätts upp mot produktionens adress |
