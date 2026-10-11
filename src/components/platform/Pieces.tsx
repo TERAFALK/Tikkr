@@ -1,5 +1,7 @@
 import type { ReactNode } from "react";
+import type { FeedbackStatus } from "@prisma/client";
 import { Badge } from "@/components/ui";
+import { FEEDBACK_STATUS_LABEL } from "@/lib/feedback";
 
 /**
  * SMÅDELAR SOM ÅTERKOMMER I PLATTFORMSPANELEN.
@@ -72,4 +74,14 @@ export function Section({
       {children}
     </section>
   );
+}
+
+/**
+ * Ett supportmeddelandes status i plattformen. Gult är Ny, eftersom något
+ * väntar på oss; kundens sida har inget gult, där väntar ingenting på kunden.
+ */
+export function FeedbackStatusBadge({ status }: { status: FeedbackStatus }) {
+  const tone =
+    status === "NEW" ? "warning" : status === "IN_PROGRESS" ? "active" : "muted";
+  return <Badge tone={tone}>{FEEDBACK_STATUS_LABEL[status]}</Badge>;
 }

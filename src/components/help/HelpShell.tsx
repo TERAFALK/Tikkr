@@ -111,6 +111,19 @@ function ContactCard() {
             </dd>
           </div>
         )}
+        {/* Formuläret i panelen. Kräver inloggning, och middleware skickar
+            /admin vidare till portalen när säljsidan har en egen adress. */}
+        <div>
+          <dt className="text-neutral-500">Fel och förslag</dt>
+          <dd className="mt-0.5">
+            <a
+              href="/admin/support"
+              className="font-medium text-tick-deep hover:underline"
+            >
+              Skicka ett meddelande
+            </a>
+          </dd>
+        </div>
       </dl>
 
       <p className="mt-5 text-[13px] text-neutral-500">

@@ -2,7 +2,7 @@ import { readFileSync, readdirSync, statSync } from "node:fs";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { NextRequest } from "next/server";
-import { HELP_AREAS } from "@/lib/help/areas";
+import { HELP_AREAS, areaForPath } from "@/lib/help/areas";
 import { GUIDES, guideBySlug, type Guide } from "@/lib/help/guides";
 import { HELP_FAQ } from "@/lib/help/faq";
 import { normalize, searchGuides } from "@/lib/help/search";
@@ -144,6 +144,22 @@ describe("sökningen", () => {
 
   it("alla sökord måste träffa", () => {
     expect(searchGuides("stämpla xyzzy")).toEqual([]);
+  });
+});
+
+describe("området för en sida i panelen", () => {
+  it("förväljer rätt område, även på en undersida", () => {
+    expect(areaForPath("/admin/planering")).toBe("PLANNING");
+    expect(areaForPath("/admin/planering/stationer")).toBe("PLANNING");
+    expect(areaForPath("/admin/installningar/franvaro")).toBe("PAYROLL");
+    expect(areaForPath("/admin/installningar/prenumeration")).toBe("ACCOUNT");
+  });
+
+  it("ingen gissning där sidan inte hör till ett område", () => {
+    expect(areaForPath("/admin")).toBeNull();
+    expect(areaForPath("/admin/installningar")).toBeNull();
+    expect(areaForPath("/admin/planeringar")).toBeNull();
+    expect(areaForPath(null)).toBeNull();
   });
 });
 

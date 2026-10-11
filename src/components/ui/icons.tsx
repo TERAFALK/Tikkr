@@ -237,6 +237,21 @@ export const IconPrinter = (props: IconProps) => (
   </Icon>
 );
 
+/** Support i kundens panel. En pratbubbla. */
+export const IconMessage = (props: IconProps) => (
+  <Icon {...props}>
+    <path d="M4 5h16a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H9l-5 4V6a1 1 0 0 1 1-1Z" />
+  </Icon>
+);
+
+/** Plattformens inkorg. Ett fack med en öppning. */
+export const IconInbox = (props: IconProps) => (
+  <Icon {...props}>
+    <path d="M4 13 6.5 5h11L20 13v6a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1Z" />
+    <path d="M4 13h4.5l1.5 2.5h4l1.5-2.5H20" />
+  </Icon>
+);
+
 /** Hjälpcentret. Frågetecken i en ring. */
 export const IconHelp = (props: IconProps) => (
   <Icon {...props}>
