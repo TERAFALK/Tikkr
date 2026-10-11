@@ -206,6 +206,38 @@ describe("hjälpcentrets adress", () => {
     );
   });
 
+  // Labbet: bara APP_URL och SUPPORT_HOST, ingen egen säljsida eller portal.
+  function configureLab() {
+    delete process.env.MARKETING_HOST;
+    delete process.env.PORTAL_HOST;
+    process.env.APP_URL = "https://www.tikkr.se";
+    process.env.SUPPORT_HOST = "support.tikkr.se";
+  }
+
+  it("i labbet leder inloggningen på hjälpadressen till systemets adress", () => {
+    configureLab();
+    expect(visit("https://support.tikkr.se/admin/login")).toBe(
+      "https://www.tikkr.se/admin/login"
+    );
+    expect(visit("https://support.tikkr.se/registrera")).toBe(
+      "https://www.tikkr.se/registrera"
+    );
+  });
+
+  it("i labbet leder /hjalp på systemets adress till hjälpadressen", () => {
+    configureLab();
+    expect(visit("https://www.tikkr.se/hjalp")).toBe(
+      "https://support.tikkr.se/hjalp"
+    );
+    expect(visit("https://support.tikkr.se/hjalp/rast")).toBeNull();
+  });
+
+  it("APP_URL på hjälpadressen ger ingen rundgång", () => {
+    configureLab();
+    process.env.APP_URL = "https://support.tikkr.se";
+    expect(visit("https://support.tikkr.se/admin/login")).toBeNull();
+  });
+
   it("utan SUPPORT_HOST ligger hjälpcentret kvar där det är", () => {
     configure();
     delete process.env.SUPPORT_HOST;

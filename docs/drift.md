@@ -376,11 +376,11 @@ hjälpcentret på `www.tikkr.se/hjalp`. För att ge det en egen adress:
 2. Avkommentera blocket `support.tikkr.se` i `deploy/Caddyfile`. I labbet
    skapas i stället ett proxy host i Nginx Proxy Manager, likadant som för
    `www.tikkr.se`
-3. Lägg till `SUPPORT_HOST=support.tikkr.se` i `.env` och bygg om:
+3. Lägg till `SUPPORT_HOST=support.tikkr.se` i `.env` och driftsätt på nytt
+   med `./scripts/release.sh <version>`, som bygger om appen.
 
-```bash
-docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
-```
+I labbet, där säljsidan och portalen inte har egna adresser, skickas
+systemets sidor på support.tikkr.se till adressen i `APP_URL`.
 
 ---
 

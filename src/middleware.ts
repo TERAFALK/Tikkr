@@ -45,6 +45,16 @@ function isHelpPath(pathname: string): boolean {
   return pathname === HELP_PATH || pathname.startsWith(`${HELP_PATH}/`);
 }
 
+/** Värden ur en adress, eller undefined om adressen saknas eller är trasig. */
+function hostOf(url: string | undefined): string | undefined {
+  if (!url?.trim()) return undefined;
+  try {
+    return new URL(url.trim()).hostname.toLowerCase();
+  } catch {
+    return undefined;
+  }
+}
+
 /**
  * HJÄLPCENTRET PÅ EN EGEN ADRESS.
  *
@@ -63,8 +73,13 @@ function isHelpPath(pathname: string): boolean {
  *   <annan adress>/hjalp/...   → support.tikkr.se, så att varje guide har en
  *                                adress och inte tre
  *
+ * Saknas MARKETING_HOST och PORTAL_HOST, som i labbet, är systemets adress
+ * ur APP_URL både säljsida och portal. Utan den reserven visade
+ * support.tikkr.se hela systemet, och "Logga in" i hjälpcentrets meny gav en
+ * inloggning på hjälpadressen i stället för där kontona hör hemma.
+ *
  * Utan SUPPORT_HOST händer ingenting av det här, och hjälpcentret ligger på
- * /hjalp vid säljsidan. Det är läget i labbet.
+ * /hjalp vid säljsidan.
  */
 function supportRedirect(
   request: NextRequest,
@@ -103,6 +118,12 @@ export function middleware(request: NextRequest) {
   const portalHost = process.env.PORTAL_HOST?.toLowerCase();
   const supportHost = process.env.SUPPORT_HOST?.trim().toLowerCase();
 
+  // Systemets adress ur APP_URL, reserv för hjälpcentrets omdirigeringar när
+  // säljsidan och portalen inte har egna. Aldrig hjälpadressen själv: det
+  // hade gett en omdirigering till samma sida i en evig rundgång.
+  const appHost = hostOf(process.env.APP_URL);
+  const fallbackHost = appHost && appHost !== supportHost ? appHost : undefined;
+
   // Bakom en reverse proxy står den riktiga adressen i x-forwarded-host.
   const host = (
     request.headers.get("x-forwarded-host") ??
@@ -119,8 +140,8 @@ export function middleware(request: NextRequest) {
       request,
       host,
       supportHost,
-      marketingHosts[0],
-      portalHost
+      marketingHosts[0] ?? fallbackHost,
+      portalHost ?? fallbackHost
     );
     if (redirect) return redirect;
   }
