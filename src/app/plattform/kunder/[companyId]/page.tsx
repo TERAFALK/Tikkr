@@ -39,6 +39,7 @@ import ActivityTable from "@/components/platform/ActivityTable";
 import {
   Fact,
   Facts,
+  FeedbackStatusBadge,
   Section,
   SubscriptionBadge,
 } from "@/components/platform/Pieces";
@@ -50,6 +51,11 @@ import { SCREEN_ITEM } from "@/lib/price-book";
 import { discountFrom } from "@/lib/company-prices";
 import { MODULES, MODULE_KEYS } from "@/lib/modules";
 import { formatPhone } from "@/lib/phone";
+import {
+  FEEDBACK_KIND_LABEL,
+  areaLabel,
+  recentCompanyFeedback,
+} from "@/lib/feedback";
 
 export const dynamic = "force-dynamic";
 
@@ -155,6 +161,9 @@ export default async function CompanyPage({
     take: 20,
     select: { id: true, email: true, startedAt: true, lastSeenAt: true },
   });
+
+  // Kundens senaste meddelanden till supporten. Svaras i inkorgen.
+  const feedback = await recentCompanyFeedback(companyId);
 
   const inactiveDays = stats.lastActivityAt
     ? Math.floor(
@@ -491,6 +500,39 @@ export default async function CompanyPage({
             </Card>
           </div>
         </Section>
+
+        {feedback.length > 0 && (
+          <Section
+            title="Support"
+            action={
+              <ButtonLink
+                href={`/plattform/inkorg?status=alla&kund=${company.id}`}
+                tone="secondary"
+              >
+                I inkorgen
+              </ButtonLink>
+            }
+          >
+            <Card>
+              <ul className="divide-y divide-neutral-100">
+                {feedback.map((message) => (
+                  <li key={message.id} className="px-5 py-3 text-[13px]">
+                    <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                      <span className="font-medium text-neutral-900">
+                        {FEEDBACK_KIND_LABEL[message.kind]} · {areaLabel(message.area)}
+                      </span>
+                      <FeedbackStatusBadge status={message.status} />
+                      <span className="ml-auto text-neutral-500">
+                        {formatDateTime(message.createdAt)}
+                      </span>
+                    </div>
+                    <p className="mt-1 line-clamp-2 text-neutral-600">{message.body}</p>
+                  </li>
+                ))}
+              </ul>
+            </Card>
+          </Section>
+        )}
 
         <Section
           title="Spår"

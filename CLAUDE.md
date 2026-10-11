@@ -220,12 +220,16 @@ time_entries   — id, company_id, employee_id, kind,
                  needs_review, review_note, kiosk_device_id, source_ip
 admin_users    — id, company_id, email, name?, phone?, password_hash, role,
                  password_changed_at?, sessions_revoked_at?, email_verified_at?,
-                 news_seen_version?
+                 news_seen_version?, support_seen_at?
 email_verifications — id, user_id, token_hash, email, expires_at, used_at
 audit_events   — id, company_id, actor_email, entity, entity_id, action,
                  before, after, subject_employee_id
 kiosk_devices  — id, company_id, name, device_token, active, last_seen_at
 support_visits — id, company_id, email, started_at, last_seen_at
+feedback_messages — id, company_id, author_user_id?, author_email, author_name?,
+                 kind, area?, page?, body, status, status_changed_at?,
+                 status_changed_by_email?, customer_updated_at?
+feedback_replies — id, company_id, message_id, body, author_email
 
   — löneunderlaget, se regel 7 —
 work_schedules   — id, company_id, name, is_default
@@ -1012,6 +1016,37 @@ och en miljövariabel för något som säljsidan redan bär.
 "Planering" ska betyda samma sak i hjälpcentret och i plattformens inkorg.
 
 Inga öppettider för support står utskrivna. Inga är bestämda.
+
+**Fel, förslag och synpunkter skickas från panelen** (tillagt 2026-10-11,
+steg 2 av issue #8). Sidan **Support** (`/admin/support`) står under Hjälp i
+menyn: typ (Fel, Förslag, Synpunkt), område och meddelande. Bara inloggade,
+och företaget och avsändaren tas ur sessionen, aldrig ur formuläret. Menyn
+skickar med sidan man stod på, som förväljer området ur `areaForPath` i
+`help/areas.ts` och sparas med meddelandet.
+
+Under formuläret står ARBETSYTANS skickade meddelanden, med status och våra
+svar. Hela arbetsytans och inte bara de egna, så att två administratörer som
+hittar samma fel ser att det redan är anmält.
+
+**Vi svarar i plattformens Inkorg** (`/plattform/inkorg`), med en siffra för
+antalet nya i menyn. Status är Ny, Pågår eller Klar, och Klar är arkivet:
+inkorgen visar det som inte är klart om inget annat väljs. Svaren går bara åt
+ett håll. Kunden svarar genom att skicka ett nytt meddelande, eftersom en
+tråd åt båda hållen är ett ärendesystem, och issuen bad uttryckligen om att
+slippa ett. Ett svar på ett nytt meddelande gör det till Pågår; Klar sätts
+alltid för hand. Statusbyten och svar skrivs i plattformens händelselogg.
+
+**Ingen mejlavisering, åt något håll** (produktägarens val). I stället får
+kunden en **prick vid Support** när ett av hens EGNA meddelanden fått svar
+eller ny status sedan sidan senast öppnades (`admin_users.support_seen_at`
+mot `feedback_messages.customer_updated_at`). Utan pricken hade ett svar
+aldrig blivit läst.
+
+Tabellerna är kundens data och står i `TENANT_SCOPED_MODELS`. Kunden skriver
+genom sin egen klient; inkorgen läser och svarar via `unsafeGlobalPrisma`,
+som för `CompanyPrice`. Supportläget kan inte skicka, se § 4 punkt 5. Tas en
+användare bort står meddelandet kvar med den kopierade adressen. All logik
+ligger i `src/lib/feedback.ts`, och `tests/feedback.test.ts` fäller den.
 
 ## 4. Kritiska säkerhetskrav
 

@@ -11,6 +11,7 @@ import {
   IconDevice,
   IconHelp,
   IconLogout,
+  IconMessage,
   IconMoment,
   IconOrder,
   IconOverview,
@@ -124,6 +125,7 @@ export default function AdminSidebar({
   modules,
   showAccount,
   unreadNews,
+  supportUpdates,
   version,
 }: {
   companyName: string;
@@ -138,6 +140,8 @@ export default function AdminSidebar({
   showAccount: boolean;
   /** Pricken vid Nyheter: en nyare version än den personen sett. */
   unreadNews: boolean;
+  /** Pricken vid Support: svar eller ny status på ett eget meddelande. */
+  supportUpdates: boolean;
   /** Versionen som kör, från bygget. */
   version: string;
 }) {
@@ -154,6 +158,14 @@ export default function AdminSidebar({
     if (onNews) setNewsOpened(true);
   }, [onNews]);
   const showNewsDot = unreadNews && !newsOpened && !onNews;
+
+  // Samma sak för Support.
+  const onSupport = pathname.startsWith("/admin/support");
+  const [supportOpened, setSupportOpened] = useState(false);
+  useEffect(() => {
+    if (onSupport) setSupportOpened(true);
+  }, [onSupport]);
+  const showSupportDot = supportUpdates && !supportOpened && !onSupport;
 
   // Typen skrivs ut, annars slår TypeScript ihop avsnitten till en union där
   // fält som bara finns på vissa länkar (badge, exact) försvinner.
@@ -316,6 +328,32 @@ export default function AdminSidebar({
           <IconHelp className="text-neutral-400" />
           Hjälp
         </a>
+
+        {/* SUPPORTEN, bredvid hjälpcentret: den som inte hittade svaret där
+            är ett steg från att skriva till oss. Sidan man står på följer
+            med, så att formuläret kan förvälja området och vi ser var felet
+            uppstod. Se support/page.tsx. */}
+        <Link
+          href={
+            onSupport
+              ? "/admin/support"
+              : `/admin/support?sida=${encodeURIComponent(pathname)}`
+          }
+          onClick={() => setOpen(false)}
+          className={`flex items-center gap-2.5 rounded-md px-2 py-1.5 text-[13px] font-medium transition-colors ${
+            onSupport
+              ? "bg-neutral-100 text-neutral-900"
+              : "text-neutral-600 hover:bg-neutral-50 hover:text-neutral-900"
+          }`}
+        >
+          <IconMessage className={onSupport ? "text-tick-deep" : "text-neutral-400"} />
+          <span className="flex-1">Support</span>
+          {showSupportDot && (
+            <span className="size-2 rounded-full bg-tick-deep">
+              <span className="sr-only">Uppdaterat</span>
+            </span>
+          )}
+        </Link>
 
         <Link
           href="/admin/installningar"
