@@ -970,12 +970,20 @@ visar VILKA som står instämplade innan de stämplas ut; den listan går inte a
 visa för tio ordrar på ett begripligt sätt, och att stämpla ut folk tyst i bulk
 vore att göra precis det mellansteget finns för att förhindra.
 
-**Stämplingar går inte att radera** (ändrat 2026-09-29). Knappen fanns för
-felregistreringar. En felaktig stämpling rättas i stället genom att skrivas om:
-tiden är både faktura- och löneunderlag, en ändrad post bär spår av vem som
-ändrade den, och en raderad post lämnar bara ett hål ingen kan förklara i
-efterhand. Ska en persons tid bort helt finns GDPR-raderingen i
-inställningarna.
+**Stämplingar går att ta bort igen** (ändrat 2026-10-13, kundens begäran;
+var borttaget 2026-09-29). Skälet att ta bort knappen var att en raderad post
+lämnade ett hål ingen kunde förklara. Det föll med ändringsloggen
+(2026-10-05): `deleteEntryManually` i `clock.ts` skriver hela posten som den
+såg ut och vem som tog bort den, i samma transaktion som borttagningen. Bara
+avslutade poster, av samma skäl som de är de enda som går att ändra: en
+pågående stämpling tillhör någon som står vid en skärm. Ska en persons tid
+bort helt finns fortfarande GDPR-raderingen i inställningarna.
+
+**Improduktiv tid går att lägga in för hand** (ändrat 2026-10-13). Ny
+stämpling lade bara in ordertid, med skälet att glömd improduktiv tid hellre
+stämplas på skärmen. Med löneunderlaget är den saknade städtimmen någons
+arbetstid, och utan vägen bokades den på en order, vilket gör ordern dyrare
+än den var (§ 1).
 
 ### 3.3 Hjälpcentret (beslutat 2026-10-11, issue #8)
 

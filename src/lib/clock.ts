@@ -1100,6 +1100,51 @@ export async function updateEntryManually(
   });
 }
 
+/**
+ * Tar bort en stämpling (tillagt igen 2026-10-13, kundens begäran).
+ *
+ * Togs bort 2026-09-29 med skälet att en raderad post lämnar ett hål ingen kan
+ * förklara. Det skälet föll med ändringsloggen (2026-10-05): hela posten som
+ * den såg ut skrivs dit, med vem som tog bort den, i samma transaktion. Hålet
+ * går därmed att förklara, och en felstämpling som aldrig skulle ha funnits
+ * behöver inte skrivas om till något den inte var.
+ *
+ * BARA AVSLUTADE POSTER. En pågående stämpling tillhör någon som står vid en
+ * skärm, och togs den bort skulle personen stå utstämplad utan att veta om
+ * det. Samma regel som för att ändra en post.
+ *
+ * Uppslaget går genom företagsfiltret: ett id från en annan kund hittar
+ * ingenting, och då händer ingenting.
+ */
+export async function deleteEntryManually(
+  companyId: string,
+  entryId: string,
+  byEmail: string
+): Promise<void> {
+  const db = forCompany(companyId);
+
+  const entry = await db.timeEntry.findFirst({ where: { id: entryId } });
+  if (!entry) throw new ClockError("Posten finns inte kvar.");
+
+  if (entry.clockOutAt === null) {
+    throw new ClockError("Stämplingen pågår. Den går att ta bort när den avslutats.");
+  }
+
+  await db.$transaction(async (tx) => {
+    await tx.timeEntry.deleteMany({ where: { id: entryId } });
+
+    await recordAudit(tx, {
+      companyId,
+      actorEmail: byEmail,
+      entity: "TimeEntry",
+      entityId: entryId,
+      action: "delete",
+      before: timeEntrySnapshot(entry),
+      subjectEmployeeId: entry.employeeId,
+    });
+  });
+}
+
 /** Rimlighetskontroll av ett tidsintervall. */
 function assertSaneInterval(from: Date, to: Date) {
   if (Number.isNaN(from.getTime()) || Number.isNaN(to.getTime())) {
