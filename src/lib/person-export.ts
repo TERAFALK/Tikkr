@@ -127,9 +127,14 @@ export async function buildPersonExport(
     ["Porträtt", employee.photoData && photoExtension ? "Bifogat i arkivet" : "Inget"],
     ["Arbetstidsschema", employee.schedule ? "Eget schema" : "Företagets"],
     ["Ingående flexsaldo", formatSignedDuration(employee.flexOpeningMinutes)],
-    ["Ingående komptid", formatSignedDuration(employee.compOpeningMinutes)],
+    // Komptiden togs bort 2026-10-13. Ett ingående värde från tiden innan
+    // finns kvar i databasen och lämnas ut så länge det finns, men en rad med
+    // 0:00 för alla andra vore en uppgift om något som inte längre finns.
+    ...(employee.compOpeningMinutes !== 0
+      ? [["Ingående komptid", formatSignedDuration(employee.compOpeningMinutes)] as [string, string]]
+      : []),
     [
-      "Saldon räknas från",
+      "Startdatum",
       employee.balanceOpeningDate
         ? formatDate(employee.balanceOpeningDate, timeZone)
         : "Första stämplingen",

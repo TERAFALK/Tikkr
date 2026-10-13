@@ -83,8 +83,8 @@ const sections: Section[] = [
           <strong className="font-medium text-neutral-900">
             Med tillvalet Löneunderlag
           </strong>{" "}
-          lagras dessutom personens arbetstidsschema, stämplade raster, flex-
-          och komptidssaldo, frånvaro med orsak och anteckning, och en personlig
+          lagras dessutom personens arbetstidsschema, startdatum, stämplade
+          raster, flexsaldo, frånvaro med orsak och anteckning, och en personlig
           kod som visar saldot på stämplingsskärmen. Frånvaroorsaken kan säga
           något om hälsa, till exempel sjukdom eller vård av barn. Frånvaro
           registreras bara av arbetsgivarens administratörer, aldrig på
@@ -140,7 +140,7 @@ const sections: Section[] = [
           Ändamålet är att kunden ska kunna registrera arbetad tid per kundorder
           och använda den som underlag för fakturering. Med tillvalet
           Löneunderlag är ändamålet också att ta fram underlag för lön: arbetad
-          tid, flex, komptid och frånvaro. Uppgifterna används inte för något
+          tid, flex och frånvaro. Uppgifterna används inte för något
           annat. De säljs inte, lämnas inte ut för marknadsföring och
           används inte för att träna maskininlärningsmodeller.
         </p>

@@ -23,6 +23,10 @@ import {
  *
  * Utan angiven anställd tas hela personalen med, en person per sida. Det är så
  * en lönekörning går till: alla på en gång, i en fil.
+ *
+ * `rader=franvaro` ger samma dokument med bara frånvaron i raderna, utan
+ * stämplingar och raster. Summeringen är densamma. Se `rows` i
+ * timesheet-pdf.ts.
  */
 
 export const runtime = "nodejs";
@@ -132,17 +136,21 @@ export async function GET(request: NextRequest) {
         }
       : null;
 
+  const absenceOnly = params.get("rader") === "franvaro";
+
   const pdf = await buildTimesheetPdf(
     { name: companyName, timezone: timeZone, logo },
-    periods
+    periods,
+    { rows: absenceOnly ? "absence" : "all" }
   );
 
   // Filnamnet säger vad filen är. En tidrapport ska inte kunna förväxlas med
   // ett orderunderlag i samma nedladdningsmapp.
+  const kind = absenceOnly ? "franvaro" : "tidrapport";
   const base =
     periods.length === 1
-      ? `tidrapport-${slugify(periods[0].employee.name)}-${toDateInput(from, timeZone)}`
-      : `tidrapporter-${slugify(companyName)}-${toDateInput(from, timeZone)}`;
+      ? `${kind}-${slugify(periods[0].employee.name)}-${toDateInput(from, timeZone)}`
+      : `${absenceOnly ? "franvaro" : "tidrapporter"}-${slugify(companyName)}-${toDateInput(from, timeZone)}`;
 
   // VISNING ELLER NEDLADDNING.
   //

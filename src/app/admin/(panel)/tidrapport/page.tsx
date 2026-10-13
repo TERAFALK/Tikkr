@@ -33,9 +33,7 @@ import ActionDialog from "@/components/ui/ActionDialog";
 import {
   adjustFlexBalance,
   deleteAbsence,
-  deleteCompEarned,
   saveAbsence,
-  saveCompEarned,
   type BalanceState,
 } from "./actions";
 
@@ -182,6 +180,7 @@ export default async function TimesheetPage({
     date: toDateInput(day.date, timeZone),
     dayLabel: `${dayName(day.weekday)} ${formatDate(day.date, timeZone)}`,
     weekday: day.weekday,
+    beforeStart: day.beforeStart,
     plannedMinutes: day.plannedMinutes,
     workedMinutes: day.workedMinutes,
     productiveMinutes: day.productiveMinutes,
@@ -189,15 +188,12 @@ export default async function TimesheetPage({
     breakMinutes: day.breakMinutes,
     absenceMinutes: day.absenceMinutes,
     flexMinutes: day.flexMinutes,
-    absences: day.absences.map((absence) => ({
-      ...absence,
-      withdrawsComp: day.comp.some((row) => row.absenceId === absence.id),
+    absences: day.absences.map(({ id, reason, minutes, note }) => ({
+      id,
+      reason,
+      minutes,
+      note,
     })),
-    // Bara det som skrivits för hand. Ett uttag som en frånvaro skrivit tas
-    // bort med frånvaron, och removeCompAdjustment vägrar ta det ensamt.
-    comp: day.comp
-      .filter((row) => row.absenceId === null)
-      .map(({ id, minutes, note }) => ({ id, minutes, note })),
     entries: day.entries.map((entry) => ({
       id: entry.id,
       from: formatTime(entry.clockInAt, timeZone),
@@ -225,8 +221,8 @@ export default async function TimesheetPage({
    * FÖRRA VECKAN FÖR HELA PERSONALEN, en person per sida.
    *
    * Utan `anstalld` tar rutten med alla aktiva, se timesheet/route.ts. Varje
-   * papper bär personens dagrader OCH summeringen med planerad tid, flex och
-   * komp — det är den summeringen som gör utskriften värd att dela ut.
+   * papper bär personens dagrader OCH summeringen med planerad tid och flex —
+   * det är den summeringen som gör utskriften värd att dela ut.
    *
    * Den hämtar alltså tidrapporten och inte rapportexporten. Knappen gjorde
    * det förut, och kunde då inte få med summeringen: de siffrorna är
@@ -236,9 +232,20 @@ export default async function TimesheetPage({
    * Konsekvensen är att knappen hör till lönemodulen, vilket den här sidan
    * redan gör.
    */
-  const lastWeek = datePresets(timeZone).lastWeek;
+  const { lastWeek, lastMonth } = datePresets(timeZone);
   const lastWeekHref =
     `/api/admin/export/timesheet?from=${lastWeek.from}&to=${lastWeek.to}`;
+
+  /*
+   * FÖRRA MÅNADEN FÖR HELA PERSONALEN, MED BARA FRÅNVARON (tillagt
+   * 2026-10-13, kundens begäran). Samma papper som veckan, men utan
+   * stämplingar och raster i raderna. Det går till lönen, som behöver
+   * frånvaron dag för dag och summeringen, men inte varje stämpling under en
+   * hel månad. Se `rows` i timesheet-pdf.ts.
+   */
+  const lastMonthHref =
+    `/api/admin/export/timesheet?from=${lastMonth.from}&to=${lastMonth.to}` +
+    `&rader=franvaro`;
 
   return (
     <>
@@ -289,6 +296,11 @@ export default async function TimesheetPage({
               label="Förra veckan per anställd"
             />
 
+            <PrintButton
+              href={lastMonthHref}
+              label="Förra månaden per anställd"
+            />
+
             <ButtonLink href={exportHref} tone="secondary">
               PDF
             </ButtonLink>
@@ -313,7 +325,7 @@ export default async function TimesheetPage({
 
       {filters}
 
-      <div className="mb-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="mb-6 grid gap-4 sm:grid-cols-3">
         <Stat
           label="Planerad tid"
           value={formatDuration(period.totals.planned)}
@@ -324,26 +336,17 @@ export default async function TimesheetPage({
           value={formatDuration(period.totals.worked)}
           hint="tim:min"
         />
-        {/* FLEX OCH KOMP GÖMS FÖR EN TIMANSTÄLLD. Hen mäts inte mot något
-            schema, så det finns ingen planerad tid att ligga över eller under.
-            Två rutor med 0:00 hade sett ut som ett saldo i jämvikt, vilket är
-            något helt annat än att saldot inte finns. */}
+        {/* FLEXEN GÖMS FÖR EN TIMANSTÄLLD. Hen mäts inte mot något schema,
+            så det finns ingen planerad tid att ligga över eller under. En ruta
+            med 0:00 hade sett ut som ett saldo i jämvikt, vilket är något helt
+            annat än att saldot inte finns. */}
         {!period.employee.hourly && (
-          <>
-            <Stat
-              label="Flextid, perioden"
-              value={formatSignedDuration(period.totals.flex)}
-              tone={period.totals.flex >= 0 ? "active" : "warning"}
-              hint={`saldo ${formatSignedDuration(period.flex.closing)}`}
-            />
-            <Stat
-              label="Komptid"
-              value={formatSignedDuration(period.comp.closing)}
-              hint={`${formatSignedDuration(period.comp.earned)} intjänat, ${formatDuration(
-                period.comp.taken
-              )} uttaget`}
-            />
-          </>
+          <Stat
+            label="Flextid, perioden"
+            value={formatSignedDuration(period.totals.flex)}
+            tone={period.totals.flex >= 0 ? "active" : "warning"}
+            hint={`saldo ${formatSignedDuration(period.flex.closing)}`}
+          />
         )}
       </div>
 
@@ -367,12 +370,9 @@ export default async function TimesheetPage({
           days={days}
           employeeId={employeeId}
           employeeName={period.employee.name}
-          hourly={period.employee.hourly}
           reasons={reasons}
           absenceAction={saveAbsence}
-          compAction={saveCompEarned}
           deleteAbsenceAction={deleteAbsence}
-          deleteCompAction={deleteCompEarned}
         />
       </div>
 

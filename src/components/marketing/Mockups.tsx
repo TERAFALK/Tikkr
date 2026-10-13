@@ -1213,7 +1213,7 @@ function Line({
  *
  * SAMMANSTÄLLNINGEN ÄR KUNDENS EGEN ORDNING, två kolumner i tre rader, och
  * talen går ihop enligt flexformeln i CLAUDE.md § 3 regel 7: arbetad tid plus
- * frånvaro minus planerad tid minus intjänad komp. 32:15 + 8:00 − 40:00 = +0:15.
+ * frånvaro minus planerad tid minus uttagen flex. 32:15 + 8:00 − 40:00 = +0:15.
  *
  * UNDERSKRIFTSRADEN ÄR MED. Den är raden förmannen skriver på, och fälten är
  * kundens egna från blanketten de använt i tio år.

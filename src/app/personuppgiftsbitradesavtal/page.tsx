@@ -82,7 +82,7 @@ const sections: Section[] = [
             {
               term: "Föremål",
               description:
-                "Behandling som krävs för att tillhandahålla tidregistrering per kundorder och arbetsmoment. För den ansvarige som har tillvalet Löneunderlag även behandling som krävs för att ta fram underlag för lön: arbetstidsschema, raster, flex, komptid och frånvaro.",
+                "Behandling som krävs för att tillhandahålla tidregistrering per kundorder och arbetsmoment. För den ansvarige som har tillvalet Löneunderlag även behandling som krävs för att ta fram underlag för lön: arbetstidsschema, raster, flex och frånvaro.",
             },
             {
               term: "Varaktighet",
@@ -102,7 +102,7 @@ const sections: Section[] = [
             {
               term: "Kategorier av uppgifter",
               description:
-                "Namn, frivilligt anställningsnummer, frivilligt porträtt, frivillig timkostnad per person samt registrerad arbetstid med tidpunkt, kundorder, arbetsmoment, stämplingsskärm och IP-adress. Med tillvalet Löneunderlag även arbetstidsschema, stämplade raster, flex- och komptidssaldo, frånvaro med orsak och anteckning, samt en personlig kod för att visa saldot, lagrad som envägskryptering. För administratörer namn, e-postadress, telefonnummer och krypterat lösenord.",
+                "Namn, frivilligt anställningsnummer, frivilligt porträtt, frivillig timkostnad per person samt registrerad arbetstid med tidpunkt, kundorder, arbetsmoment, stämplingsskärm och IP-adress. Med tillvalet Löneunderlag även arbetstidsschema, startdatum, stämplade raster, flexsaldo, frånvaro med orsak och anteckning, samt en personlig kod för att visa saldot, lagrad som envägskryptering. För administratörer namn, e-postadress, telefonnummer och krypterat lösenord.",
             },
           ]}
         />
@@ -253,7 +253,7 @@ const sections: Section[] = [
         </p>
         <List
           items={[
-            "Registerutdrag tas ut per person under Inställningar, Dataskydd, och innehåller samtliga register: uppgifterna om personen, stämplingar, raster, frånvaro, komptid, ändringar och porträtt.",
+            "Registerutdrag tas ut per person under Inställningar, Dataskydd, och innehåller samtliga register: uppgifterna om personen, stämplingar, raster, frånvaro, ändringar och porträtt.",
             "Radering sker genom anonymisering: namnet tas bort permanent medan den registrerade tiden finns kvar utan koppling till en namngiven person. Skälet är att rätten att bli glömd och bokföringslagens krav på bevarande av räkenskapsinformation annars står i konflikt.",
             "Rättelse av felaktig tid görs av den ansvariges administratör, och märks som manuell ändring.",
           ]}

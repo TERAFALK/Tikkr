@@ -20,8 +20,12 @@ import { DOC } from "./brand";
  * sammanställning som står i en annan ordning blir läst fel innan den blir
  * läst rätt. Därför samma block, i samma följd: raderna per dag, dagssumman,
  * periodsumman, och sammanställningen längst ner med planerad tid, närvarotid,
- * produktiv och improduktiv tid, flex och komp — och sist vad den improduktiva
- * tiden gick till.
+ * produktiv och improduktiv tid och flex — och sist vad den improduktiva tiden
+ * gick till.
+ *
+ * MÅNADSUTSKRIFTEN HAR BARA FRÅNVARON I RADERNA (tillagt 2026-10-13). Samma
+ * dokument, men utan stämplingar och raster: lönen behöver frånvaron dag för
+ * dag och summeringen längst ner, inte en månad av stämplingar. Se `rows`.
  *
  * TID SKRIVS SOM TIM:MIN (33:45), som i hela resten av applikationen. Se
  * `format.ts`: det som ska läsas skrivs tim:min, det som ska räknas skrivs
@@ -54,10 +58,21 @@ export interface TimesheetCompany {
   logo: { data: Buffer; mimeType: string } | null;
 }
 
+export interface TimesheetOptions {
+  /**
+   * Vad raderna visar. "all" är stämplingar, raster och frånvaro; "absence"
+   * är bara frånvaron. Summeringen är densamma i båda.
+   */
+  rows?: "all" | "absence";
+}
+
 export function buildTimesheetPdf(
   company: TimesheetCompany,
-  periods: PayrollPeriod[]
+  periods: PayrollPeriod[],
+  options: TimesheetOptions = {}
 ): Promise<Buffer> {
+  const absenceOnly = options.rows === "absence";
+
   const doc = new PDFDocument({
     size: "A4",
     margin: MARGIN,
@@ -79,7 +94,7 @@ export function buildTimesheetPdf(
 
   periods.forEach((period, index) => {
     if (index > 0) doc.addPage();
-    renderPeriod(doc, company, period);
+    renderPeriod(doc, company, period, absenceOnly);
   });
 
   if (periods.length === 0) {
@@ -96,7 +111,8 @@ export function buildTimesheetPdf(
 function renderPeriod(
   doc: PDFKit.PDFDocument,
   company: TimesheetCompany,
-  period: PayrollPeriod
+  period: PayrollPeriod,
+  absenceOnly: boolean
 ) {
   const tz = company.timezone;
   let y = MARGIN;
@@ -154,7 +170,7 @@ function renderPeriod(
 
   /* --- Raderna ------------------------------------------------------------ */
 
-  y = drawRowHeader(doc, y);
+  y = drawRowHeader(doc, y, absenceOnly);
 
   for (const day of period.days) {
     // DAGAR UTAN RADER UTELÄMNAS HELT (ändrat 2026-10-01).
@@ -167,17 +183,18 @@ function renderPeriod(
     //
     // Den planerade tiden försvinner inte med dagen. Den står i summeringen
     // längre ned, som är där man läser den.
-    const empty =
-      day.entries.length === 0 &&
-      day.breaks.length === 0 &&
-      day.absences.length === 0;
+    const empty = absenceOnly
+      ? day.absences.length === 0
+      : day.entries.length === 0 &&
+        day.breaks.length === 0 &&
+        day.absences.length === 0;
 
     if (empty) continue;
 
     if (y > 690) {
       doc.addPage();
       y = MARGIN;
-      y = drawRowHeader(doc, y);
+      y = drawRowHeader(doc, y, absenceOnly);
     }
 
     const label = `${dayName(day.weekday)} ${formatDate(day.date, tz)}`;
@@ -195,6 +212,13 @@ function renderPeriod(
         lineBreak: false,
       });
       y += 16;
+    }
+
+    // Bara frånvaron: inga stämplingar, inga raster och ingen dagssumma, som
+    // är närvarotiden och alltså stämplingarnas summa.
+    if (absenceOnly) {
+      y = drawDayRule(doc, y);
+      continue;
     }
 
     for (const entry of day.entries) {
@@ -263,12 +287,16 @@ function renderPeriod(
       y += 15;
     }
 
-    doc
-      .moveTo(MARGIN, y)
-      .lineTo(A4_WIDTH - MARGIN, y)
-      .strokeColor(DOC.rule)
-      .stroke();
-    y += 4;
+    y = drawDayRule(doc, y);
+  }
+
+  // En månad utan frånvaro ska inte se ut som en sida där raderna fallit bort.
+  if (absenceOnly && period.absenceByReason.length === 0) {
+    doc.font("Helvetica").fontSize(9).fillColor(DOC.muted);
+    doc.text("Ingen frånvaro under perioden.", MARGIN + 4, y + 4, {
+      lineBreak: false,
+    });
+    y += 20;
   }
 
   /* --- Periodsumma -------------------------------------------------------- */
@@ -282,8 +310,9 @@ function renderPeriod(
   doc.rect(MARGIN, y, CONTENT_WIDTH, 24).fill(DOC.tint);
   doc.font("Helvetica-Bold").fontSize(10).fillColor(DOC.heading);
   doc.text("Totalt för perioden", MARGIN + 8, y + 7, { width: 240 });
+  // Summan av raderna ovanför: frånvaron när det är den som står där.
   doc.text(
-    formatDuration(period.totals.worked),
+    formatDuration(absenceOnly ? period.totals.absence : period.totals.worked),
     A4_WIDTH - MARGIN - 68,
     y + 7,
     { width: 60, align: "right" }
@@ -292,7 +321,7 @@ function renderPeriod(
 
   /* --- Sammanställningen -------------------------------------------------- */
 
-  y = drawSummary(doc, y, period);
+  y = drawSummary(doc, y, period, absenceOnly);
 
   /* --- Improduktiv tid per typ -------------------------------------------- */
 
@@ -359,15 +388,28 @@ function renderPeriod(
   });
 }
 
-function drawRowHeader(doc: PDFKit.PDFDocument, y: number): number {
+function drawRowHeader(
+  doc: PDFKit.PDFDocument,
+  y: number,
+  absenceOnly: boolean
+): number {
   doc.font("Helvetica-Bold").fontSize(8).fillColor(DOC.muted);
   doc.text("Dag", MARGIN + 4, y, { width: 90, lineBreak: false });
-  doc.text("Order / improduktivt", MARGIN + 100, y, { width: 200, lineBreak: false });
-  doc.text("Start", MARGIN + 305, y, { width: 46, lineBreak: false });
-  doc.text("Stopp", MARGIN + 355, y, { width: 46, lineBreak: false });
-  // P och I i stället för orden. Kolumnen är smal, och förkortningen förklaras
-  // i foten på sammanställningen.
-  doc.text("P/I", MARGIN + 408, y, { width: 20, lineBreak: false });
+
+  if (absenceOnly) {
+    doc.text("Frånvaro", MARGIN + 100, y, { width: 200, lineBreak: false });
+  } else {
+    doc.text("Order / improduktivt", MARGIN + 100, y, {
+      width: 200,
+      lineBreak: false,
+    });
+    doc.text("Start", MARGIN + 305, y, { width: 46, lineBreak: false });
+    doc.text("Stopp", MARGIN + 355, y, { width: 46, lineBreak: false });
+    // P och I i stället för orden. Kolumnen är smal, och förkortningen
+    // förklaras i foten på sammanställningen.
+    doc.text("P/I", MARGIN + 408, y, { width: 20, lineBreak: false });
+  }
+
   // Enheten i rubriken och inte i en fotnot, precis som i pdf.ts.
   doc.text("Tid (tim:min)", A4_WIDTH - MARGIN - 74, y, {
     width: 70,
@@ -385,16 +427,26 @@ function drawRowHeader(doc: PDFKit.PDFDocument, y: number): number {
   return y + 2;
 }
 
+/** Linjen som avslutar en dag. */
+function drawDayRule(doc: PDFKit.PDFDocument, y: number): number {
+  doc
+    .moveTo(MARGIN, y)
+    .lineTo(A4_WIDTH - MARGIN, y)
+    .strokeColor(DOC.rule)
+    .stroke();
+  return y + 4;
+}
+
 /**
- * Sammanställningen längst ner — kundens fyra efterfrågade rader plus flex
- * och komp.
+ * Sammanställningen längst ner — kundens fyra efterfrågade rader plus flex.
  *
  * Två kolumner i tre rader, som i deras gamla rapport. Ordningen är deras.
  */
 function drawSummary(
   doc: PDFKit.PDFDocument,
   y: number,
-  period: PayrollPeriod
+  period: PayrollPeriod,
+  absenceOnly: boolean
 ): number {
   const rows: [string, string][][] = [
     [
@@ -413,11 +465,6 @@ function drawSummary(
       ["Flextid, perioden", pdfSigned(period.totals.flex)],
       ["Flexsaldo", pdfSigned(period.flex.closing)],
     ],
-    [
-      ["Intjänad komp", formatDuration(period.comp.earned)],
-      ["Uttagen komp", formatDuration(period.comp.taken)],
-    ],
-    [["Komptidssaldo", pdfSigned(period.comp.closing)], ["", ""]],
   ];
 
   const height = rows.length * 16 + 14;
@@ -447,6 +494,9 @@ function drawSummary(
   }
 
   y += height + 6;
+
+  // Utan stämplingar i raderna finns ingen P/I-kolumn att förklara.
+  if (absenceOnly) return y;
 
   // Teckenförklaring, inte en förklaring av räkningen. Två bokstäver i en smal
   // kolumn är inte självförklarande; hur flexen räknas fram hör hemma i

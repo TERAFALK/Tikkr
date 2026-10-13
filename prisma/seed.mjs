@@ -202,7 +202,7 @@ async function main() {
     ["Föräldraledig", false],
     ["Tjänstledig", false],
     ["Permission", false],
-    ["Uttagen komp", true],
+    ["Flexledig", true],
     ["Övrigt", false],
   ];
 

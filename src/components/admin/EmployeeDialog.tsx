@@ -65,8 +65,10 @@ export default function EmployeeDialog({
     hasPhoto: boolean;
     /** true när en kod för flexsaldot redan är satt. Koden går inte att läsa. */
     hasFlexCode: boolean;
-    /** Timanställd: inget schema, inget flexsaldo, ingen komptid. */
+    /** Timanställd: inget schema och inget flexsaldo. */
     hourly: boolean;
+    /** Dagen flexen räknas från, "ÅÅÅÅ-MM-DD". Tomt är första stämplingen. */
+    startDate: string | null;
   };
   /**
    * Personens egna arbetstider, eller null när hen går på företagets schema.
@@ -277,8 +279,8 @@ export default function EmployeeDialog({
                 att tiderna ändå gäller.
 
                 Den enda förklaringen i rutan som behövs, eftersom följden
-                inte går att se på skärmen: flexsaldot och komptiden försvinner
-                för personen. */}
+                inte går att se på skärmen: flexsaldot försvinner för
+                personen. */}
             {payroll && (
               <div className="border-t border-neutral-200 pt-4">
                 <label className="flex cursor-pointer items-start gap-2 text-[13px]">
@@ -294,10 +296,28 @@ export default function EmployeeDialog({
                       Timanställd
                     </span>
                     <span className="block text-neutral-500">
-                      Inget schema, inget flexsaldo och ingen komptid
+                      Inget schema och inget flexsaldo
                     </span>
                   </span>
                 </label>
+              </div>
+            )}
+
+            {/* STARTDATUMET. Bara för den som har flex: en timanställd har
+                inget saldo som kan börja någonstans. Utan fältet i formuläret
+                rör servern inte datumet. */}
+            {payroll && !hourly && (
+              <div className="border-t border-neutral-200 pt-4">
+                <Field
+                  label="Startdatum"
+                  hint="Flexen räknas från denna dag. Tomt betyder första stämplingen"
+                >
+                  <Input
+                    type="date"
+                    name="startDate"
+                    defaultValue={employee?.startDate ?? ""}
+                  />
+                </Field>
               </div>
             )}
 

@@ -29,7 +29,7 @@ enum SubscriptionStatus {
 /// Ett nytt värde här är en additiv ändring. Ta ALDRIG bort ett värde som
 /// något företag kan ha en rad på — raden är deras köp.
 enum CompanyModuleKey {
-  /// Löneunderlaget: schema, raster, flex, komp och frånvaro.
+  /// Löneunderlaget: schema, raster, flex och frånvaro.
   PAYROLL
 
   /// Planeringen: stationer, veckovis tidslinje och planerade jobb.
@@ -265,10 +265,12 @@ model Employee {
   /// arbetat in.
   flexOpeningMinutes Int @default(0) @map("flex_opening_minutes")
 
-  /// Komptidssaldot när Tikkr togs i bruk, i minuter.
+  /// DÖD KOLUMN sedan 2026-10-13, då komptiden togs bort. Bar komptidssaldot
+  /// när Tikkr togs i bruk. Läses bara av registerutdraget, för den som har ett
+  /// värde kvar. Tas bort i en senare release.
   compOpeningMinutes Int @default(0) @map("comp_opening_minutes")
 
-  /// TIMANSTÄLLD: ingen planerad tid, inget flexsaldo, ingen komptid.
+  /// TIMANSTÄLLD: ingen planerad tid och inget flexsaldo.
   ///
   /// Den som är timanställd har inte lovat några timmar, och mäts därför inte
   /// mot något schema. Utan det här fältet föll hen tillbaka på företagets
@@ -279,8 +281,9 @@ model Employee {
   /// bara mätningen mot ett schema som faller bort.
   hourly Boolean @default(false)
 
-  /// Dagen saldona ovan gällde. Tikkr räknar från och med denna dag och
-  /// framåt; allt före den ligger i ingående saldo.
+  /// STARTDATUMET, som sätts under Anställda. Flexen räknas från och med
+  /// denna dag; allt före den ligger i ingående saldo, och dagar före den har
+  /// ingen planerad tid.
   ///
   /// Tomt betyder att personen räknas från sin första stämpling.
   balanceOpeningDate DateTime? @map("balance_opening_date")
@@ -1495,12 +1498,12 @@ model AbsenceReason {
   /// Ordningen i listan. Den vanligaste orsaken ska stå först.
   sortOrder Int @default(0) @map("sort_order")
 
-  /// DRAR ÄVEN PÅ KOMPTIDSSALDOT.
+  /// DRAR PÅ FLEXSALDOT (ändrat 2026-10-13, hette komptid till dess).
   ///
-  /// Sätts på den orsak som betyder "jag tar ut komp". Registreras frånvaro på
-  /// den skrivs samtidigt ett uttag i komptidsboken, så att saldot minskar.
-  /// Utan den kopplingen skulle en uttagen komptimme räknas två gånger: en
-  /// gång som frånvaro och en gång som ett saldo som aldrig minskar.
+  /// Sätts på den orsak som betyder "jag är flexledig". Frånvaro på den täcker
+  /// inte den planerade tiden, och flexsaldot minskar med ledigheten. Se
+  /// flexformeln i payroll.ts. Namnet står kvar, eftersom ett namnbyte på en
+  /// kolumn kräver en migration i två steg och ingenting kunden ser ändras.
   countsAsComp Boolean @default(false) @map("counts_as_comp")
 
   createdAt DateTime @default(now()) @map("created_at")
@@ -1515,6 +1518,10 @@ model AbsenceReason {
 }
 
 /// En post i komptidsboken. Plus är intjänat, minus är uttaget.
+///
+/// LÄSES INTE SEDAN 2026-10-13, då komptiden togs bort: kunden skiljer inte
+/// på komp och flex. Raderna ligger kvar, lämnas ut i registerutdraget och
+/// raderas vid anonymisering. Tabellen tas bort i en senare release.
 ///
 /// Intjänad komp skrivs in av administratören när övertid godkänts — den
 /// uppstår aldrig av sig själv. Skälet: tid utöver schemat är flex till dess

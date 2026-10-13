@@ -1,5 +1,7 @@
 import { requireAdmin } from "@/lib/admin-session";
 import { hasModule } from "@/lib/company-modules";
+import { companyTimeZone } from "@/lib/company";
+import { toDateInput } from "@/lib/time-zone";
 import EmployeeDialog from "@/components/admin/EmployeeDialog";
 import EmployeeAvatar from "@/components/ui/EmployeeAvatar";
 import type { ScheduleDayValue } from "@/components/admin/ScheduleDays";
@@ -43,6 +45,7 @@ export default async function EmployeesPage() {
   const { db, companyId } = session;
 
   const payroll = await hasModule(companyId, "PAYROLL");
+  const timeZone = await companyTimeZone(companyId);
 
   const employees = await db.employee.findMany({
     orderBy: [{ active: "desc" }, { name: "asc" }],
@@ -58,6 +61,7 @@ export default async function EmployeesPage() {
       // Bara OM en kod finns. Hashen lamnar aldrig servern.
       flexCodeHash: true,
       hourly: true,
+      balanceOpeningDate: true,
       _count: { select: { timeEntries: true } },
     },
   });
@@ -165,6 +169,9 @@ export default async function EmployeesPage() {
                           hasPhoto: Boolean(employee.photoMimeType),
                           hasFlexCode: Boolean(employee.flexCodeHash),
                           hourly: employee.hourly,
+                          startDate: employee.balanceOpeningDate
+                            ? toDateInput(employee.balanceOpeningDate, timeZone)
+                            : null,
                         }}
                         payroll={payroll}
                         scheduleDays={toDayValues(schedules.get(employee.id))}
