@@ -572,6 +572,10 @@ export const GUIDES = [
         title: "Ge en anställd egna tider vid behov",
         body: "Under Anställda, Ändra, kryssa i Egna arbetstider. Utan kryss gäller företagets.",
       },
+      {
+        title: "Lägg in årets röda dagar",
+        body: "Under Inställningar, Röda dagar. En röd dag har ingen planerad tid för någon.",
+      },
     ],
     notes: [
       "En timanställd mäts inte mot något schema och har inget flexsaldo. Kryssa i Timanställd under Anställda.",

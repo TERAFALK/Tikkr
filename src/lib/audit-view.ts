@@ -21,6 +21,7 @@ const ENTITY_LABELS: Record<string, string> = {
   TimeEntry: "Stämpling",
   Absence: "Frånvaro",
   CompAdjustment: "Komptid",
+  Holiday: "Röd dag",
   Employee: "Anställd",
   AdminUser: "Administratör",
   Company: "Företaget",
@@ -63,6 +64,7 @@ const FIELD_LABELS: Record<string, string> = {
   markupPercent: "Påslag",
   autoCloseAt: "Automatisk utstämpling",
   timezone: "Tidszon",
+  name: "Namn",
   atfAgreement: "Kollektivavtal för ATF",
   atfWorkForm: "Arbetstidsform för ATF",
 };

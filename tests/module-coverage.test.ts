@@ -86,6 +86,7 @@ const MODULE_SURFACES: Record<string, ModuleSurface> = {
       "timesheet-pdf",
       "atf",
       "collective-agreements",
+      "holidays",
     ],
     models: [
       "breakType",
@@ -96,6 +97,7 @@ const MODULE_SURFACES: Record<string, ModuleSurface> = {
       "workSchedule",
       "scheduleDay",
       "scheduleBreak",
+      "holiday",
     ],
     surface: [
       "app/admin/(panel)/tidrapport/page.tsx",
@@ -106,6 +108,8 @@ const MODULE_SURFACES: Record<string, ModuleSurface> = {
       "app/admin/(panel)/installningar/franvaro/actions.ts",
       "app/admin/(panel)/installningar/atf/page.tsx",
       "app/admin/(panel)/installningar/atf/actions.ts",
+      "app/admin/(panel)/installningar/roda-dagar/page.tsx",
+      "app/admin/(panel)/installningar/roda-dagar/actions.ts",
       "app/api/admin/export/timesheet/route.ts",
       "app/api/kiosk/flex/route.ts",
       "app/api/kiosk/punch/route.ts",

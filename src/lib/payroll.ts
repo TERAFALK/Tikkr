@@ -9,6 +9,7 @@ import {
   type Schedule,
 } from "./schedule";
 import { addDaysInZone, dayNumberIn, startOfDayIn } from "./time-zone";
+import { holidaysBetween } from "./holidays";
 
 /**
  * LÖNEUNDERLAGET — TIDRAPPORTEN PER ANSTÄLLD.
@@ -54,6 +55,13 @@ import { addDaysInZone, dayNumberIn, startOfDayIn } from "./time-zone";
  * Flexen räknas från personens startdatum (`balanceOpeningDate`), eller från
  * första stämplingen när inget datum är satt. Dagar före den har varken
  * planerad tid eller flex. Se `balanceStart`.
+ *
+ * ── RÖDA DAGAR ───────────────────────────────────────────────────────────
+ *
+ * En röd dag ur kundens lista (holidays.ts) har ingen planerad tid. Den som
+ * är ledig tappar då ingenting, och den som arbetar får tiden som plus.
+ * Frånvaro utan angivet antal timmar täcker noll en röd dag, av samma skäl
+ * som en lördag.
  *
  * ── ARBETAD TID ÄR HUVUDSTÄMPLINGEN ──────────────────────────────────────
  *
@@ -101,6 +109,11 @@ export interface PayrollDay {
    * eller flex, men stämplingar och frånvaro visas som vanligt.
    */
   beforeStart: boolean;
+  /**
+   * Dagen är röd. `minutes` är den planerade tid schemat hade haft, som
+   * ATF-underlaget räknar med; se atf.ts.
+   */
+  holiday: { name: string; minutes: number } | null;
   plannedMinutes: number;
   /** Huvudstämplingen. Se `mainMinutes`. */
   workedMinutes: number;
@@ -217,7 +230,7 @@ export async function buildPayrollPeriod(
   // 15:30 sista dagen ska med.
   const periodEnd = startOfDayIn(addDaysInZone(to, 1, timeZone), timeZone);
 
-  const [entries, breakEntries, absences, schedules, start] = await Promise.all([
+  const [entries, breakEntries, absences, schedules, start, holidays] = await Promise.all([
     db.timeEntry.findMany({
       where: {
         employeeId,
@@ -262,6 +275,7 @@ export async function buildPayrollPeriod(
     }),
     schedulesForEmployees(db, [employeeId]),
     balanceStart(db, employee, timeZone),
+    holidaysBetween(db, periodStart, periodEnd, timeZone),
   ]);
 
   const schedule = schedules.get(employeeId) ?? null;
@@ -314,9 +328,15 @@ export async function buildPayrollPeriod(
     // annars blivit minus i flex för tid hen aldrig lovat.
     const beforeStart = startDay === null || key < startDay;
 
-    const plannedMinutes = beforeStart
-      ? 0
-      : plannedMinutesForDay(schedule, weekday);
+    // RÖD DAG: schemat gäller inte. Tiden det hade haft sparas för
+    // ATF-underlaget, som inte ska minska av en helgdag.
+    const holidayName = holidays.get(key) ?? null;
+    const scheduleMinutes = plannedMinutesForDay(schedule, weekday);
+    const holiday = holidayName
+      ? { name: holidayName, minutes: scheduleMinutes }
+      : null;
+
+    const plannedMinutes = beforeStart || holiday ? 0 : scheduleMinutes;
 
     // Huvudstämplingen. Ett sidojobb är inte en extra timme någon varit på
     // plats — det är samma timme, bokförd på en order till.
@@ -378,8 +398,9 @@ export async function buildPayrollPeriod(
     //
     // Schemats dag och inte `plannedMinutes`, som är noll före startdatumet.
     // En sjukdag där ska ändå stå med sina timmar i löneunderlaget; det är
-    // bara flexen som inte räknas.
-    const scheduledMinutes = plannedMinutesForDay(schedule, weekday);
+    // bara flexen som inte räknas. En röd dag har däremot inga timmar att
+    // vara borta från.
+    const scheduledMinutes = holiday ? 0 : scheduleMinutes;
 
     const absenceRows = dayAbsences.map((absence) => ({
       id: absence.id,
@@ -400,6 +421,7 @@ export async function buildPayrollPeriod(
       date,
       weekday,
       beforeStart,
+      holiday,
       plannedMinutes,
       workedMinutes,
       productiveMinutes,
@@ -552,7 +574,7 @@ async function openingFlex(
 
   const beforeStart = { gte: since, lt: periodStart };
 
-  const [entries, absences, schedules] = await Promise.all([
+  const [entries, absences, schedules, holidays] = await Promise.all([
     db.timeEntry.findMany({
       where: { employeeId: employee.id, clockInAt: beforeStart },
       select: { clockInAt: true, clockOutAt: true },
@@ -566,9 +588,17 @@ async function openingFlex(
       },
     }),
     schedulesForEmployees(db, [employee.id]),
+    holidaysBetween(db, since, periodStart, timeZone),
   ]);
 
   const schedule = schedules.get(employee.id) ?? null;
+
+  // Schemats tid en dag, och noll en röd dag. Samma regel som dagarna i
+  // buildPayrollPeriod, för planerad tid och för frånvaro som täcker dagen.
+  const plannedOn = (date: Date) =>
+    holidays.has(dayNumberIn(date, timeZone))
+      ? 0
+      : plannedMinutesForDay(schedule, isoWeekdayIn(date, timeZone));
 
   const spansByDay = new Map<number, Span[]>();
   for (const entry of entries) {
@@ -590,10 +620,7 @@ async function openingFlex(
     if (absence.reason.countsAsComp) continue;
 
     const key = dayNumberIn(absence.date, timeZone);
-    const planned = plannedMinutesForDay(
-      schedule,
-      isoWeekdayIn(absence.date, timeZone)
-    );
+    const planned = plannedOn(absence.date);
     absenceByDay.set(
       key,
       (absenceByDay.get(key) ?? 0) + (absence.minutes ?? planned)
@@ -610,10 +637,7 @@ async function openingFlex(
     timeZone
   )) {
     const key = dayNumberIn(date, timeZone);
-    const planned = plannedMinutesForDay(
-      schedule,
-      isoWeekdayIn(date, timeZone)
-    );
+    const planned = plannedOn(date);
 
     flex +=
       mainMinutes(spansByDay.get(key) ?? []) +

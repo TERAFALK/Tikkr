@@ -31,6 +31,7 @@ export type AuditEntity =
   | "TimeEntry"
   | "Absence"
   | "CompAdjustment"
+  | "Holiday"
   | "Employee"
   | "AdminUser"
   | "Company";

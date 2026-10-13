@@ -522,6 +522,9 @@ function drawSummary(
             "arbetad tid och frånvaro som ger ATF"
         : `ATF enligt ${atf.agreementName}, ${atf.workFormLabel.toLowerCase()}: ` +
             `planerad tid ${formatDuration(atf.plannedMinutes)}, ` +
+            (atf.holidayMinutes > 0
+              ? `röda dagar ${formatDuration(atf.holidayMinutes)}, `
+              : "") +
             `flex föregående månad ${pdfSigned(atf.previousMonthFlexMinutes)}, ` +
             `frånvaro som inte ger ATF ${formatDuration(atf.invalidAbsenceMinutes)}`,
       MARGIN,
