@@ -188,6 +188,7 @@ export default async function TimesheetPage({
     dayLabel: `${dayName(day.weekday)} ${formatDate(day.date, timeZone)}`,
     weekday: day.weekday,
     beforeStart: day.beforeStart,
+    holiday: day.holiday?.name ?? null,
     plannedMinutes: day.plannedMinutes,
     workedMinutes: day.workedMinutes,
     productiveMinutes: day.productiveMinutes,

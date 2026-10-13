@@ -246,6 +246,7 @@ absences         — id, company_id, employee_id, date, reason_id, minutes,
                    note, created_by_email
 comp_adjustments — id, company_id, employee_id, date, minutes,
                    note, created_by_email, absence_id
+holidays         — id, company_id, date, name, created_by_email
 
   — planeringen, se regel 8 —
 stations         — id, company_id, name, moment_id, active, sort_order
@@ -423,6 +424,17 @@ stripe_prices    — item, month_price_id, year_price_id, updated_by_email
    Ett eget schema utan dagar finns inte. Kryssas rutan ur raderas schemat och
    kopplingen, samma princip som att raden ÄR tillståndet i § 3.1.
 
+   **RÖDA DAGAR ÄR KUNDENS EGEN LISTA** (tillagt 2026-10-13), under
+   Inställningar, Röda dagar, i `holidays`. En röd dag har ingen planerad tid
+   för någon i arbetsytan: den som är ledig tappar ingenting i flex, den som
+   arbetar får tiden som plus, och frånvaro utan timmar täcker noll, som en
+   lördag. En uträknad kalender med Sveriges helgdagar valdes bort av
+   produktägaren: vilka aftnar och klämdagar som är lediga skiljer sig mellan
+   verkstäder, och en lista kunden skrivit säger exakt det som gäller hos dem.
+   Priset är att listan måste fyllas i varje år. Ändringar loggas, eftersom
+   en röd dag flyttar flexen för alla på en gång. ATF-underlaget minskar inte
+   av en röd dag, se ATF nedan.
+
    **TIMANSTÄLLD MÄTS INTE MOT NÅGOT SCHEMA** (tillagt 2026-10-07).
    `employees.hourly` stänger av planerad tid och flexsaldo för den
    personen. Arbetad tid, raster och frånvaro registreras som för alla andra.
@@ -467,6 +479,9 @@ stripe_prices    — item, month_price_id, year_price_id, updated_by_email
    - **Timanställda** räknas på arbetad tid och frånvaro som ger ATF. Formeln
      hade gett dem noll, och avtalet ger den som arbetar kortare tid ATF i
      proportion.
+   - **Röda dagar minskar inte underlaget.** De har ingen planerad tid, men
+     avtalet räknar en vecka med en helgdag som fullgjord, så schemats tid de
+     dagarna läggs tillbaka och står för sig på utskriften.
    - **Bara för en hel kalendermånad.** Formeln blandar två månader, och för en
      vecka finns ingen föregående månad. Då visas ingen ATF alls hellre än en
      som är fel.

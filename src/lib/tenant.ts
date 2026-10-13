@@ -57,6 +57,7 @@ export const TENANT_SCOPED_MODELS = [
   "AbsenceReason",
   "Absence",
   "CompAdjustment",
+  "Holiday",
   // Planeringen.
   "Station",
   "StationDay",

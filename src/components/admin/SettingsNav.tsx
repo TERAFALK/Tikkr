@@ -92,6 +92,12 @@ const sections: SettingsSection[] = [
         icon: IconCalendar,
       },
       {
+        href: "/admin/installningar/roda-dagar",
+        label: "Röda dagar",
+        description: "Dagar utan planerad tid",
+        icon: IconCalendar,
+      },
+      {
         href: "/admin/installningar/atf",
         label: "Arbetstidsförkortning",
         description: "ATF enligt kollektivavtal",

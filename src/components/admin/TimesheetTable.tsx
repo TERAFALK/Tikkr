@@ -24,6 +24,8 @@ export interface TimesheetDayRow {
   weekday: number;
   /** Före personens startdatum: ingen planerad tid och ingen flex. */
   beforeStart: boolean;
+  /** Namnet på dagen när den är röd. Röda dagar har ingen planerad tid. */
+  holiday: string | null;
   plannedMinutes: number;
   workedMinutes: number;
   productiveMinutes: number;
@@ -114,6 +116,11 @@ export default function TimesheetTable({
                   >
                     {day.dayLabel}
                   </button>
+                  {day.holiday && (
+                    <span className="ml-2">
+                      <Badge tone="muted">{day.holiday}</Badge>
+                    </span>
+                  )}
                   {day.absences.map((absence) => (
                     <span key={absence.id} className="ml-2">
                       <Badge tone="warning">{absence.reason}</Badge>

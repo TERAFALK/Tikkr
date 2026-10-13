@@ -182,6 +182,7 @@ model Company {
   prices          CompanyPrice[]
   absences        Absence[]
   compAdjustments CompAdjustment[]
+  holidays        Holiday[]
 
   /// Tillvalen. Se CompanyModule längst ner i filen.
   stations      Station[]
@@ -1577,6 +1578,38 @@ model CompAdjustment {
 
   @@index([companyId, employeeId, date])
   @@map("comp_adjustments")
+}
+
+/// EN RÖD DAG, SOM KUNDEN SJÄLV LÄGGER IN (tillagt 2026-10-13).
+///
+/// En röd dag har ingen planerad tid. Den som inte arbetar då tappar alltså
+/// ingenting i flex, och den som arbetar får tiden som plus.
+///
+/// Kundens egen lista och inte en uträknad kalender, kundens val. Verkstäder
+/// skiljer sig åt i vilka aftnar och klämdagar som är lediga, och en lista
+/// kunden skrivit själv säger exakt det som gäller hos dem.
+///
+/// Gäller alla anställda i arbetsytan. Räknas i payroll.ts, och dagen sparas
+/// vid dygnets början i företagets tidszon, som frånvaron.
+model Holiday {
+  id        String @id @default(cuid())
+  companyId String @map("company_id")
+
+  date DateTime
+  /// "Juldagen", "Klämdag". Visas på tidrapporten.
+  name String
+
+  createdByEmail String @map("created_by_email")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  // En dag är röd eller inte. Två rader för samma dag hade bara kunnat säga
+  // samma sak med olika namn.
+  @@unique([companyId, date])
+  @@map("holidays")
 }
 
 // ---------------------------------------------------------------------------

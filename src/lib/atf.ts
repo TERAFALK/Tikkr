@@ -31,6 +31,11 @@ import { addDaysInZone, wallTimeIn } from "./time-zone";
  * Frånvaro före startdatumet dras inte: där finns ingen planerad tid att dra
  * den från.
  *
+ * RÖDA DAGAR MINSKAR INTE UNDERLAGET. En röd dag har ingen planerad tid i
+ * flexen, men avtalet räknar en vecka med en helgdag som en fullgjord vecka.
+ * Schemats tid de dagarna läggs därför tillbaka här, och står för sig på
+ * utskriften.
+ *
  * TIMANSTÄLLD har varken planerad tid eller flex, och formeln hade gett noll.
  * Avtalet ger den som arbetar kortare tid ATF i proportion, så underlaget är i
  * stället arbetad tid och frånvaro som ger ATF. Det är vad formeln räknar
@@ -48,6 +53,8 @@ export interface AtfBasis {
   agreementName: string;
   workFormLabel: string;
   plannedMinutes: number;
+  /** Schemats tid de röda dagarna, som inte är planerad tid men ger ATF. */
+  holidayMinutes: number;
   previousMonthFlexMinutes: number;
   invalidAbsenceMinutes: number;
   /** Underlaget som ATF räknas på. Aldrig negativt. */
@@ -104,6 +111,7 @@ export async function buildAtf(
       agreementName: agreement.name,
       workFormLabel: form.label,
       plannedMinutes: 0,
+      holidayMinutes: 0,
       previousMonthFlexMinutes: 0,
       invalidAbsenceMinutes: 0,
       basisMinutes: basis,
@@ -130,15 +138,23 @@ export async function buildAtf(
   const previousMonthFlexMinutes = previous?.totals.flex ?? 0;
   const invalidAbsenceMinutes = atfAbsence((absence) => !absence.givesAtf);
 
+  const holidayMinutes = period.days
+    .filter((day) => !day.beforeStart && day.holiday)
+    .reduce((sum, day) => sum + day.holiday!.minutes, 0);
+
   const basis = Math.max(
     0,
-    period.totals.planned + previousMonthFlexMinutes - invalidAbsenceMinutes
+    period.totals.planned +
+      holidayMinutes +
+      previousMonthFlexMinutes -
+      invalidAbsenceMinutes
   );
 
   return {
     agreementName: agreement.name,
     workFormLabel: form.label,
     plannedMinutes: period.totals.planned,
+    holidayMinutes,
     previousMonthFlexMinutes,
     invalidAbsenceMinutes,
     basisMinutes: basis,

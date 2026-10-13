@@ -35,6 +35,7 @@ const PAYROLL_MODULES = [
   "timesheet-pdf",
   "atf",
   "collective-agreements",
+  "holidays",
 ];
 
 /** Filerna som bygger underlag till kundens kund. */
