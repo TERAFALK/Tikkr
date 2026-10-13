@@ -444,10 +444,10 @@ export const GUIDES = [
   {
     slug: "andra-stampling",
     area: "DOCUMENTS",
-    title: "Ändra eller lägg till en stämpling",
+    title: "Ändra, lägg till eller ta bort en stämpling",
     summary:
-      "En felaktig stämpling rättas genom att skrivas om. Stämplingar raderas aldrig.",
-    keywords: ["ändra", "rätta", "fel tid", "lägga till tid", "manuell", "efterregistrera", "radera"],
+      "En felaktig stämpling skrivs om eller tas bort. Borttagna poster står kvar i ändringsloggen.",
+    keywords: ["ändra", "rätta", "fel tid", "lägga till tid", "manuell", "efterregistrera", "radera", "ta bort", "improduktiv"],
     steps: [
       {
         title: "Öppna Stämplingar",
@@ -459,11 +459,16 @@ export const GUIDES = [
       },
       {
         title: "Tryck Ny stämpling för tid som aldrig stämplades",
-        body: "Välj anställd, order, arbetsmoment och tider.",
+        body: "Välj Ordertid eller Improduktiv tid, sedan anställd, jobb och tider.",
+      },
+      {
+        title: "Tryck Ta bort på en stämpling som inte skulle ha funnits",
+        body: "Kan inte ångras. Posten står kvar i ändringsloggen med vem som tog bort den.",
       },
     ],
     notes: [
       "Två stämplingar på samma anställd och arbetsmoment får inte överlappa.",
+      "En pågående stämpling går varken att ändra eller ta bort förrän den avslutats.",
       "Ska en persons tid bort helt används raderingen under Inställningar, Dataskydd.",
     ],
     related: ["granskning", "gdpr"],

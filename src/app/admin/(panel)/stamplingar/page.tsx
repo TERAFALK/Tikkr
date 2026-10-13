@@ -32,7 +32,8 @@ import {
 import { datePresets } from "@/lib/date-presets";
 import { weekStep } from "@/lib/week-nav";
 import WeekStepper from "@/components/admin/WeekStepper";
-import { editEntry, type EditEntryState } from "./actions";
+import ConfirmButton from "@/components/admin/ConfirmButton";
+import { deleteEntry, editEntry, type EditEntryState } from "./actions";
 
 export const dynamic = "force-dynamic";
 
@@ -237,6 +238,9 @@ export default async function EntriesPage({
             employees={employeeOptions}
             orders={orderOptions}
             moments={pickableMoments}
+            indirectMoments={indirectMoments
+              .filter((moment) => moment.active)
+              .map((moment) => ({ id: moment.id, label: moment.name }))}
           />
         }
       />
@@ -388,13 +392,9 @@ export default async function EntriesPage({
                           Ändras när den avslutats
                         </span>
                       ) : (
-                        // BARA ÄNDRA, INGEN RADERING (ändrat 2026-09-29).
-                        // Knappen fanns för felregistreringar, men en
-                        // felstämpling rättas genom att skrivas om: tiden är
-                        // fakturaunderlag och numera även löneunderlag, och en
-                        // rad som försvinner går inte att få tillbaka. En
-                        // ändrad post bär dessutom spår av vem som ändrade
-                        // den, vilket en raderad inte gör.
+                        // ÄNDRA OCH TA BORT. Borttagningen fanns inte mellan
+                        // 2026-09-29 och 2026-10-13; den lämnar numera hela
+                        // posten i ändringsloggen. Se deleteEntryManually.
                         <div className="flex items-center justify-end gap-2">
                           {withHistory.has(entry.id) && (
                             <Link
@@ -507,6 +507,19 @@ export default async function EntriesPage({
                               </Field>
                             </div>
                           </ActionDialog>
+
+                          <form action={deleteEntry}>
+                            <input type="hidden" name="id" value={entry.id} />
+                            <ConfirmButton
+                              type="submit"
+                              tone="ghost"
+                              question={`Ta bort stämplingen för ${
+                                entry.employee.name
+                              }, ${formatDateTime(entry.clockInAt, timeZone)}? Kan inte ångras. Posten sparas i ändringsloggen.`}
+                            >
+                              Ta bort
+                            </ConfirmButton>
+                          </form>
                         </div>
                       )}
                     </Td>

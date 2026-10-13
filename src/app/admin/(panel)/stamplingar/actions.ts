@@ -6,6 +6,7 @@ import { companyTimeZone } from "@/lib/company";
 import {
   ClockError,
   createManualEntry,
+  deleteEntryManually,
   updateEntryManually,
 } from "@/lib/clock";
 import { parseLocalDateTime } from "@/lib/time-zone";
@@ -48,8 +49,25 @@ export async function addEntry(
   const timeZone = await companyTimeZone(companyId);
   const input = readForm(formData, timeZone);
 
-  if (!input.employeeId || !input.orderId || !input.momentId) {
-    return { error: "Välj anställd, order och arbetsmoment." };
+  // ORDERTID ELLER IMPRODUKTIV TID (ändrat 2026-10-13, kundens begäran).
+  // Rutan lade bara in ordertid, med skälet att glömd improduktiv tid hellre
+  // stämplas på skärmen. Med löneunderlaget ÄR den saknade städtimmen någons
+  // arbetstid, och utan den här vägen fick den bokas på en order — precis det
+  // som gör den ordern dyrare än den var. Se avgränsningen i CLAUDE.md § 1.
+  const job =
+    input.kind === "INDIRECT"
+      ? ({ kind: "INDIRECT", indirectMomentId: input.indirectMomentId } as const)
+      : ({ kind: "ORDER", orderId: input.orderId, momentId: input.momentId } as const);
+
+  if (!input.employeeId) return { error: "Välj en anställd." };
+
+  if (job.kind === "INDIRECT" ? !job.indirectMomentId : !job.orderId || !job.momentId) {
+    return {
+      error:
+        job.kind === "INDIRECT"
+          ? "Välj ett improduktivt moment."
+          : "Välj både order och arbetsmoment.",
+    };
   }
   if (!input.clockInAt || !input.clockOutAt) {
     return { error: "Fyll i både start- och sluttid." };
@@ -57,14 +75,8 @@ export async function addEntry(
 
   try {
     await createManualEntry(companyId, {
-      // Adminpanelen lägger bara in ORDERTID för hand. Improduktiv tid som
-      // glömts stämplas hellre in på skärmen än skrivs in i efterhand — den
-      // ska ändå inte faktureras, och en inskriven städtimme är ingen som
-      // saknar den.
-      kind: "ORDER",
+      ...job,
       employeeId: input.employeeId,
-      orderId: input.orderId,
-      momentId: input.momentId,
       clockInAt: input.clockInAt,
       clockOutAt: input.clockOutAt,
       byEmail: email,
@@ -170,15 +182,30 @@ export async function editEntry(
   return { ok: "Stämplingen är ändrad." };
 }
 
-/*
- * DET FINNS INGEN RADERING HÄR (borttagen 2026-09-29).
+/**
+ * Tar bort en avslutad stämpling (tillagt igen 2026-10-13, kundens begäran).
  *
- * Den fanns för felregistreringar, och gränssnittet frågade innan. Kunden bad
- * ändå att knappen skulle bort, och skälet håller: en felaktig stämpling
- * rättas genom att skrivas om, inte genom att försvinna. Tiden är både
- * fakturaunderlag och löneunderlag, en ändrad post bär spår av vem som ändrade
- * den, och en raderad post lämnar bara ett hål ingen kan förklara i efterhand.
+ * Togs bort 2026-09-29, eftersom en raderad post lämnade ett hål ingen kunde
+ * förklara. Sedan dess skriver ändringsloggen hela posten som den såg ut och
+ * vem som tog bort den, se deleteEntryManually.
  *
- * Ska en persons tid bort helt finns GDPR-raderingen i inställningarna, som är
- * avsiktligt svårare att nå och som tar med allt som hör personen till.
+ * Felet visas inte i en ruta: knappen frågar innan, och det enda som kan gå
+ * fel är att posten redan är borta eller fortfarande pågår, vilket listan
+ * visar så fort sidan laddas om.
  */
+export async function deleteEntry(formData: FormData) {
+  const session = await requireAdmin();
+  await assertWritable(session);
+
+  const id = String(formData.get("id") ?? "");
+  if (!id) return;
+
+  try {
+    await deleteEntryManually(session.companyId, id, session.email);
+  } catch (error) {
+    if (!(error instanceof ClockError)) throw error;
+  }
+
+  revalidatePath(PATH);
+  revalidatePath("/admin");
+}
