@@ -11,6 +11,7 @@ import {
   dialogSurface,
   Field,
   Input,
+  Select,
 } from "@/components/ui";
 import EmployeeAvatar from "@/components/ui/EmployeeAvatar";
 import ScheduleDays, {
@@ -46,6 +47,7 @@ export default function EmployeeDialog({
   employee,
   scheduleDays,
   payroll = false,
+  atfForms,
 }: {
   trigger: string;
   triggerTone?: "primary" | "secondary" | "ghost";
@@ -69,6 +71,8 @@ export default function EmployeeDialog({
     hourly: boolean;
     /** Dagen flexen räknas från, "ÅÅÅÅ-MM-DD". Tomt är första stämplingen. */
     startDate: string | null;
+    /** Arbetstidsformen för ATF. Tomt är avtalets förval. */
+    atfWorkForm: string | null;
   };
   /**
    * Personens egna arbetstider, eller null när hen går på företagets schema.
@@ -84,6 +88,14 @@ export default function EmployeeDialog({
    * frågar själv om modulen innan den skriver något av dem.
    */
   payroll?: boolean;
+  /**
+   * Arbetstidsformerna i företagets kollektivavtal för ATF. Utelämnad när
+   * inget avtal är valt, och då visas inget val.
+   */
+  atfForms?: {
+    defaultForm: string;
+    forms: { key: string; label: string }[];
+  };
 }) {
   const dialog = useRef<HTMLDialogElement>(null);
   const [state, submit] = useActionState<EmployeeState, FormData>(action, {});
@@ -317,6 +329,25 @@ export default function EmployeeDialog({
                     name="startDate"
                     defaultValue={employee?.startDate ?? ""}
                   />
+                </Field>
+              </div>
+            )}
+
+            {/* ARBETSTIDSFORMEN FÖR ATF. Även för en timanställd: ATF tjänas
+                in på arbetad tid, inte mot ett schema. */}
+            {payroll && atfForms && (
+              <div className="border-t border-neutral-200 pt-4">
+                <Field label="Arbetstidsform för ATF">
+                  <Select
+                    name="atfWorkForm"
+                    defaultValue={employee?.atfWorkForm ?? atfForms.defaultForm}
+                  >
+                    {atfForms.forms.map((form) => (
+                      <option key={form.key} value={form.key}>
+                        {form.label}
+                      </option>
+                    ))}
+                  </Select>
                 </Field>
               </div>
             )}

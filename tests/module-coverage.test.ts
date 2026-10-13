@@ -78,7 +78,15 @@ interface ModuleSurface {
 
 const MODULE_SURFACES: Record<string, ModuleSurface> = {
   PAYROLL: {
-    libs: ["payroll", "schedule", "absence", "breaks", "timesheet-pdf"],
+    libs: [
+      "payroll",
+      "schedule",
+      "absence",
+      "breaks",
+      "timesheet-pdf",
+      "atf",
+      "collective-agreements",
+    ],
     models: [
       "breakType",
       "breakEntry",
@@ -96,6 +104,8 @@ const MODULE_SURFACES: Record<string, ModuleSurface> = {
       "app/admin/(panel)/installningar/schema/actions.ts",
       "app/admin/(panel)/installningar/franvaro/page.tsx",
       "app/admin/(panel)/installningar/franvaro/actions.ts",
+      "app/admin/(panel)/installningar/atf/page.tsx",
+      "app/admin/(panel)/installningar/atf/actions.ts",
       "app/api/admin/export/timesheet/route.ts",
       "app/api/kiosk/flex/route.ts",
       "app/api/kiosk/punch/route.ts",

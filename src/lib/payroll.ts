@@ -117,6 +117,8 @@ export interface PayrollDay {
     note: string | null;
     /** Orsaken drar på flexen: personen är ledig på inarbetad tid. */
     drawsOnFlex: boolean;
+    /** Orsaken räknas som arbetad tid när ATF tjänas in. Se atf.ts. */
+    givesAtf: boolean;
   }[];
   /** Den del av frånvaron som drar på flexen. */
   flexTakenMinutes: number;
@@ -148,6 +150,8 @@ export interface PayrollPeriod {
     employeeNumber: string | null;
     /** Timanställd: ingen planerad tid och inget flexsaldo. */
     hourly: boolean;
+    /** Arbetstidsformen för ATF. Tomt är avtalets förval. */
+    atfWorkForm: string | null;
   };
   from: Date;
   to: Date;
@@ -185,6 +189,7 @@ export async function buildPayrollPeriod(
       flexOpeningMinutes: true,
       balanceOpeningDate: true,
       hourly: true,
+      atfWorkForm: true,
     },
   });
 
@@ -252,7 +257,7 @@ export async function buildPayrollPeriod(
         date: true,
         minutes: true,
         note: true,
-        reason: { select: { name: true, countsAsComp: true } },
+        reason: { select: { name: true, countsAsComp: true, givesAtf: true } },
       },
     }),
     schedulesForEmployees(db, [employeeId]),
@@ -382,6 +387,7 @@ export async function buildPayrollPeriod(
       minutes: absence.minutes ?? scheduledMinutes,
       note: absence.note,
       drawsOnFlex: absence.reason.countsAsComp,
+      givesAtf: absence.reason.givesAtf,
     }));
 
     const absenceMinutes = sum(absenceRows, (row) => row.minutes);
@@ -459,6 +465,7 @@ export async function buildPayrollPeriod(
       name: employee.name,
       employeeNumber: employee.employeeNumber,
       hourly: employee.hourly,
+      atfWorkForm: employee.atfWorkForm,
     },
     from,
     to,

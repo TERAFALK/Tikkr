@@ -139,6 +139,9 @@ export async function buildPersonExport(
         ? formatDate(employee.balanceOpeningDate, timeZone)
         : "Första stämplingen",
     ],
+    ...(employee.atfWorkForm
+      ? [["Arbetstidsform för ATF", employee.atfWorkForm] as [string, string]]
+      : []),
     // Själva koden går inte att lämna ut: den lagras bara som envägskryptering.
     ["Personlig kod för flexsaldot", employee.flexCodeHash ? "Satt" : "Inte satt"],
   ];

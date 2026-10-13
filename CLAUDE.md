@@ -203,9 +203,10 @@ admin-UI m.m.). Kraftfullt, men det motsäger målet om *ett* enkelt paket.
 ## 3. Datamodell
 
 ```
-companies      — id, name, subscription_status, created_at
+companies      — id, name, subscription_status, created_at, atf_agreement?
 employees      — id, company_id, name, active, cost_rate_ore,
-                 schedule_id?, flex_opening_minutes, flex_code_hash?, hourly
+                 schedule_id?, flex_opening_minutes, flex_code_hash?, hourly,
+                 balance_opening_date?, atf_work_form?
 customers      — id, company_id, name, customer_number, org_number,
                  contact_name, email, phone,
                  address_line, postal_code, city,
@@ -239,7 +240,8 @@ schedule_breaks  — id, company_id, schedule_day_id, start_minute, end_minute
 break_types      — id, company_id, name, active, sort_order
 break_entries    — id, company_id, employee_id, break_type_id,
                    started_at, ended_at, source, needs_review
-absence_reasons  — id, company_id, name, active, sort_order, counts_as_comp
+absence_reasons  — id, company_id, name, active, sort_order, counts_as_comp,
+                   gives_atf
 absences         — id, company_id, employee_id, date, reason_id, minutes,
                    note, created_by_email
 comp_adjustments — id, company_id, employee_id, date, minutes,
@@ -439,10 +441,45 @@ stripe_prices    — item, month_price_id, year_price_id, updated_by_email
    gäller. Ett eget schema raderas när krysset sätts. Rutan som justerar
    saldot avvisar personen på servern, inte bara i menyn.
 
-   **ATF är inte byggt** (2026-10-07). Hur många timmar någon tjänar in står i
-   kollektivavtalet, och det räknar Tikkr aldrig. Blir det aktuellt är formen
-   ett eget saldo kontoret fyller på, och uttag genom en frånvaroorsak som
-   drar på det, så som Flexledig drar på flexen.
+   **ATF RÄKNAS SOM UNDERLAG, ALDRIG SOM SALDO** (beslutat 2026-10-13, ersätter
+   "ATF är inte byggt" från 2026-10-07). Pilotkunden behövde intjänad
+   arbetstidsförkortning på löneunderlaget, och lämnade sin egen formel:
+
+   ```
+   ATF = (planerad tid + flex föregående månad − ogiltig frånvaro) × faktor
+   ```
+
+   Faktorn är avtalets minuter per heltidsvecka delat med veckans minuter.
+   Teknikavtalet IF Metall ger 82 minuter på 40 timmar för dagtid, alltså
+   0,03417, det kunden räknat som 0,0342, och 202 minuter för tvåskift.
+
+   - **Avtalet väljs per företag** under Inställningar, Arbetstidsförkortning,
+     och **arbetstidsformen per anställd**. Värdena står i
+     `src/lib/collective-agreements.ts` med källa och avtalsperiod. Ändras
+     avtalet ändras raden där, i en egen PR, så att ändringen syns i en
+     granskning. Det är skälet att de inte skrivs in i en ruta i panelen.
+   - **Flexen är FÖREGÅENDE månads**, kundens val: deras lönekörning räknar
+     ATF innan månaden är slut. Det är månadens flex och aldrig saldot, som
+     hade räknat samma timmar en gång till för varje månad de stod kvar.
+   - **Ogiltig frånvaro** är frånvaro på en orsak utan kryss i **Ger ATF**, ett
+     val kunden gör per orsak, eftersom avtalen säger olika. En orsak som drar
+     på flexen dras aldrig: den ledigheten syns redan som minus i flexen.
+   - **Timanställda** räknas på arbetad tid och frånvaro som ger ATF. Formeln
+     hade gett dem noll, och avtalet ger den som arbetar kortare tid ATF i
+     proportion.
+   - **Bara för en hel kalendermånad.** Formeln blandar två månader, och för en
+     vecka finns ingen föregående månad. Då visas ingen ATF alls hellre än en
+     som är fel.
+
+   **Tikkr håller inget ATF-saldo.** Tidbanken, uttagen och det som vid
+   årsskiftet blir pensionspremie hör till lönesystemet. Underlaget står på
+   tidrapporten och på utskriften Förra månaden per anställd, med en rad som
+   visar talen det räknats på. Allt räknas i `src/lib/atf.ts`, och
+   `tests/atf.test.ts` fäller det.
+
+   Det är inte ett avsteg från avgränsningen överst: ATF är timmar, inte
+   kronor. Det avtalet styr är hur många timmar, och därför står avtalets tal
+   för sig, med källa, och inte utspridda i räkningen.
 
    **Rasterna STÄMPLAS** (kundens val), och ett rasttryck stänger ALLA
    pågående jobb. Därmed faller rasten bort ur närvarotiden av sig själv, och

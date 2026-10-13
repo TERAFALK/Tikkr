@@ -2,6 +2,8 @@ import { requireAdmin } from "@/lib/admin-session";
 import { hasModule } from "@/lib/company-modules";
 import { companyTimeZone } from "@/lib/company";
 import { toDateInput } from "@/lib/time-zone";
+import { unsafeGlobalPrisma } from "@/lib/db";
+import { findAgreement } from "@/lib/collective-agreements";
 import EmployeeDialog from "@/components/admin/EmployeeDialog";
 import EmployeeAvatar from "@/components/ui/EmployeeAvatar";
 import type { ScheduleDayValue } from "@/components/admin/ScheduleDays";
@@ -47,6 +49,22 @@ export default async function EmployeesPage() {
   const payroll = await hasModule(companyId, "PAYROLL");
   const timeZone = await companyTimeZone(companyId);
 
+  // Arbetstidsformerna i företagets avtal, för valet i rutan. Utan avtal, eller
+  // utan löneunderlaget, finns inget val att göra.
+  const company = payroll
+    ? await unsafeGlobalPrisma.company.findUnique({
+        where: { id: companyId },
+        select: { atfAgreement: true },
+      })
+    : null;
+  const agreement = findAgreement(company?.atfAgreement);
+  const atfForms = agreement
+    ? {
+        defaultForm: agreement.defaultForm,
+        forms: agreement.forms.map(({ key, label }) => ({ key, label })),
+      }
+    : undefined;
+
   const employees = await db.employee.findMany({
     orderBy: [{ active: "desc" }, { name: "asc" }],
     select: {
@@ -62,6 +80,7 @@ export default async function EmployeesPage() {
       flexCodeHash: true,
       hourly: true,
       balanceOpeningDate: true,
+      atfWorkForm: true,
       _count: { select: { timeEntries: true } },
     },
   });
@@ -82,6 +101,7 @@ export default async function EmployeesPage() {
       action={createEmployee}
       submitLabel="Lägg till"
       payroll={payroll}
+      atfForms={atfForms}
     />
   );
 
@@ -172,8 +192,10 @@ export default async function EmployeesPage() {
                           startDate: employee.balanceOpeningDate
                             ? toDateInput(employee.balanceOpeningDate, timeZone)
                             : null,
+                          atfWorkForm: employee.atfWorkForm,
                         }}
                         payroll={payroll}
+                        atfForms={atfForms}
                         scheduleDays={toDayValues(schedules.get(employee.id))}
                       />
 

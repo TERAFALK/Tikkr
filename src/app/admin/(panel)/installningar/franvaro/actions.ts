@@ -54,6 +54,7 @@ export async function addAbsenceReason(
         name,
         sortOrder: count,
         countsAsComp: formData.get("countsAsComp") === "on",
+        givesAtf: givesAtfFrom(formData) ?? false,
       },
     });
   } catch (error) {
@@ -70,9 +71,21 @@ export async function addAbsenceReason(
 }
 
 /**
+ * Krysset "Ger ATF" ur formuläret, eller null när rutan inte visades.
+ *
+ * En flexledig orsak får aldrig krysset: den ledigheten syns redan i flexen,
+ * och ATF räknas på flexen. Det vaktas i atf.ts, som bortser från krysset på
+ * en sådan orsak, inte här.
+ */
+function givesAtfFrom(formData: FormData): boolean | null {
+  if (formData.get("givesAtfShown") !== "1") return null;
+  return formData.get("givesAtf") === "on";
+}
+
+/**
  * Byter namn på en orsak.
  *
- * Namnet, och ingenting annat. Kryssrutan som drar på flexsaldot sätts när
+ * Namnet, och krysset för ATF. Kryssrutan som drar på flexsaldot sätts när
  * orsaken läggs upp och ändras inte i efterhand: den styr en RÄKNING, och
  * saldot härleds på nytt vid varje läsning. Att vända den hade flyttat
  * flexsaldot för varje person som någonsin varit ledig på orsaken, utan att en
@@ -99,12 +112,16 @@ export async function renameAbsenceReason(
   if (!name) return { error: "Ange ett namn." };
 
   try {
+    // Krysset för ATF rörs bara när rutan visades. Utan valt avtal finns den
+    // inte i formuläret, och ett namnbyte ska inte nollställa den.
+    const givesAtf = givesAtfFrom(formData);
+
     // updateMany och inte update: `where` får då företagsfiltret med sig, och
     // ett id från ett annat företag träffar ingenting. Samma skäl som i
     // toggleAbsenceReason nedan.
     const { count } = await db.absenceReason.updateMany({
       where: { id },
-      data: { name },
+      data: givesAtf === null ? { name } : { name, givesAtf },
     });
 
     if (count === 0) return { error: "Orsaken finns inte längre." };

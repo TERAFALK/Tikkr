@@ -585,7 +585,7 @@ export const GUIDES = [
     summary:
       "Planerad tid, närvarotid, flex och frånvaro per anställd och period.",
     module: "PAYROLL",
-    keywords: ["lön", "löneunderlag", "flex", "flextid", "flexsaldo", "närvaro", "saldo", "justera", "startdatum"],
+    keywords: ["lön", "löneunderlag", "flex", "flextid", "flexsaldo", "närvaro", "saldo", "justera", "startdatum", "atf", "arbetstidsförkortning"],
     steps: [
       {
         title: "Öppna Tidrapport och välj anställd och period",
@@ -610,6 +610,7 @@ export const GUIDES = [
     notes: [
       "Tid utöver schemat är flex.",
       "Flexen räknas från startdatumet, som sätts under Anställda. Utan startdatum räknas den från första stämplingen.",
+      "Intjänad ATF visas för en hel kalendermånad när ett kollektivavtal är valt under Inställningar, Arbetstidsförkortning. Tikkr håller inget ATF-saldo.",
       "Tikkr räknar timmar. Lönearter, OB och övertidsersättning hanteras i lönesystemet.",
       "Tidrapporten är ett internt dokument och ska inte skickas till en kund.",
       "Den anställde ser sitt saldo på stämplingsskärmen med en kod som sätts under Anställda.",

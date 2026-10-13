@@ -22,6 +22,7 @@ import {
   Stat,
 } from "@/components/ui";
 import { buildPayrollPeriod, currentFlexMinutes } from "@/lib/payroll";
+import { buildAtf } from "@/lib/atf";
 import {
   formatDate,
   formatDuration,
@@ -64,7 +65,7 @@ export default async function TimesheetPage({
 
   const company = await unsafeGlobalPrisma.company.findUnique({
     where: { id: companyId },
-    select: { timezone: true },
+    select: { timezone: true, atfAgreement: true },
   });
 
   const timeZone = company?.timezone ?? "Europe/Stockholm";
@@ -106,6 +107,12 @@ export default async function TimesheetPage({
   // på ett annat saldo än det personen har just nu.
   const flexToday = employeeId
     ? await currentFlexMinutes(db, timeZone, employeeId)
+    : null;
+
+  // ATF-underlaget, när perioden är en hel kalendermånad och företaget valt
+  // ett avtal. Annars null, och rutan visas inte. Se atf.ts.
+  const atf = period
+    ? await buildAtf(db, timeZone, period, company?.atfAgreement ?? null)
     : null;
 
   // Pilarna och veckonumret. Samma räkning som på Rapporter och Stämplingar,
@@ -325,7 +332,11 @@ export default async function TimesheetPage({
 
       {filters}
 
-      <div className="mb-6 grid gap-4 sm:grid-cols-3">
+      <div
+        className={`mb-6 grid gap-4 ${
+          atf ? "sm:grid-cols-2 lg:grid-cols-4" : "sm:grid-cols-3"
+        }`}
+      >
         <Stat
           label="Planerad tid"
           value={formatDuration(period.totals.planned)}
@@ -346,6 +357,13 @@ export default async function TimesheetPage({
             value={formatSignedDuration(period.totals.flex)}
             tone={period.totals.flex >= 0 ? "active" : "warning"}
             hint={`saldo ${formatSignedDuration(period.flex.closing)}`}
+          />
+        )}
+        {atf && (
+          <Stat
+            label="Intjänad ATF"
+            value={formatDuration(atf.earnedMinutes)}
+            hint={`underlag ${formatDuration(atf.basisMinutes)}`}
           />
         )}
       </div>

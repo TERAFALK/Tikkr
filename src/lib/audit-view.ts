@@ -2,6 +2,7 @@ import type { AuditEvent } from "@prisma/client";
 import type { CompanyDb } from "./tenant";
 import { formatDate, formatDateTime, formatDuration, formatSignedDuration } from "./format";
 import { formatCurrency, formatMarkup } from "./money";
+import { findAgreement } from "./collective-agreements";
 
 /**
  * ÄNDRINGSLOGGEN SOM TEXT.
@@ -62,6 +63,8 @@ const FIELD_LABELS: Record<string, string> = {
   markupPercent: "Påslag",
   autoCloseAt: "Automatisk utstämpling",
   timezone: "Tidszon",
+  atfAgreement: "Kollektivavtal för ATF",
+  atfWorkForm: "Arbetstidsform för ATF",
 };
 
 const SOURCE_LABELS: Record<string, string> = {
@@ -191,6 +194,8 @@ export async function describeAuditEvents(
       case "needsReview":
       case "active":
         return value ? "Ja" : "Nej";
+      case "atfAgreement":
+        return findAgreement(String(value))?.name ?? String(value);
       default:
         return String(value);
     }

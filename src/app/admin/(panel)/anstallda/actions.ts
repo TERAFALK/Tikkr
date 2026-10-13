@@ -9,6 +9,8 @@ import { auditEmployeeChange, employeeBefore } from "@/lib/audit";
 import { readScheduleDays, saveOwnScheduleDays } from "@/lib/schedule";
 import { companyTimeZone } from "@/lib/company";
 import { parseLocalDate, startOfDayIn } from "@/lib/time-zone";
+import { unsafeGlobalPrisma } from "@/lib/db";
+import { findAgreement } from "@/lib/collective-agreements";
 import type { CompanyDb } from "@/lib/tenant";
 
 // Varje åtgärd börjar med requireAdmin(). Det ger både inloggningskontroll och
@@ -171,6 +173,37 @@ async function startDateFields(
   return { balanceOpeningDate: startOfDayIn(date, timeZone) };
 }
 
+/**
+ * ARBETSTIDSFORMEN FÖR ATF (tillagt 2026-10-13), till exempel dagtid eller
+ * tvåskift. Prövas mot formerna i företagets avtal, så att en form som inte
+ * finns där aldrig sparas.
+ *
+ * Saknas fältet i formuläret rörs värdet inte. Det visas bara med
+ * löneunderlaget och ett valt avtal, och den som byter avtal fram och tillbaka
+ * ska inte tappa formen på varje person.
+ */
+async function atfWorkFormFields(
+  formData: FormData,
+  companyId: string,
+  payroll: boolean
+): Promise<{ error: string } | { atfWorkForm?: string }> {
+  if (!payroll || !formData.has("atfWorkForm")) return {};
+
+  const company = await unsafeGlobalPrisma.company.findUnique({
+    where: { id: companyId },
+    select: { atfAgreement: true },
+  });
+  const agreement = findAgreement(company?.atfAgreement);
+  if (!agreement) return {};
+
+  const key = String(formData.get("atfWorkForm") ?? "");
+  if (!agreement.forms.some((form) => form.key === key)) {
+    return { error: "Välj en arbetstidsform i listan." };
+  }
+
+  return { atfWorkForm: key };
+}
+
 async function saveSchedule(
   db: CompanyDb,
   companyId: string,
@@ -268,6 +301,9 @@ export async function createEmployee(
   const startDate = await startDateFields(formData, companyId, payroll);
   if ("error" in startDate) return { error: startDate.error };
 
+  const atfWorkForm = await atfWorkFormFields(formData, companyId, payroll);
+  if ("error" in atfWorkForm) return { error: atfWorkForm.error };
+
   let created: { id: string };
 
   try {
@@ -281,6 +317,7 @@ export async function createEmployee(
         ...photoFields(photo, false),
         ...flexCode,
         ...startDate,
+        ...atfWorkForm,
       },
       select: { id: true },
     });
@@ -336,6 +373,9 @@ export async function updateEmployee(
   const startDate = await startDateFields(formData, companyId, payroll);
   if ("error" in startDate) return { error: startDate.error };
 
+  const atfWorkForm = await atfWorkFormFields(formData, companyId, payroll);
+  if ("error" in atfWorkForm) return { error: atfWorkForm.error };
+
   // Timkostnaden följer med varje ny stämpling. En ändring av den ska gå att
   // spåra, se audit.ts.
   const before = await employeeBefore(db, id);
@@ -354,6 +394,7 @@ export async function updateEmployee(
         ...photoFields(photo, removePhoto),
         ...flexCode,
         ...startDate,
+        ...atfWorkForm,
       },
     });
   } catch (error) {
