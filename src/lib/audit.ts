@@ -128,6 +128,7 @@ export function employeeSnapshot(employee: {
   flexOpeningMinutes: number;
   compOpeningMinutes: number;
   balanceOpeningDate: Date | null;
+  atfWorkForm: string | null;
 }): Record<string, unknown> {
   return {
     active: employee.active,
@@ -135,6 +136,7 @@ export function employeeSnapshot(employee: {
     flexOpeningMinutes: employee.flexOpeningMinutes,
     compOpeningMinutes: employee.compOpeningMinutes,
     balanceOpeningDate: employee.balanceOpeningDate?.toISOString() ?? null,
+    atfWorkForm: employee.atfWorkForm,
   };
 }
 
@@ -196,6 +198,7 @@ export const EMPLOYEE_AUDIT_FIELDS = {
   flexOpeningMinutes: true,
   compOpeningMinutes: true,
   balanceOpeningDate: true,
+  atfWorkForm: true,
 } as const;
 
 /** Personens fält före en ändring, för auditEmployeeChange. */

@@ -33,6 +33,8 @@ const PAYROLL_MODULES = [
   "breaks",
   "break-close",
   "timesheet-pdf",
+  "atf",
+  "collective-agreements",
 ];
 
 /** Filerna som bygger underlag till kundens kund. */

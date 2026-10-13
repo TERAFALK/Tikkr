@@ -121,6 +121,14 @@ model Company {
   /// mellan sommar och vinter.
   timezone String @default("Europe/Stockholm")
 
+  /// KOLLEKTIVAVTALET SOM ATF RÄKNAS EFTER (tillagt 2026-10-13). En nyckel i
+  /// `src/lib/collective-agreements.ts`, till exempel "TEKNIK_IF_METALL".
+  /// Tomt betyder ingen ATF, och då visas ingen rad om den någonstans.
+  ///
+  /// Text och inte en enum: ett nytt avtal är en rad i registret, inte en
+  /// migration. Värdet prövas mot registret när det sparas.
+  atfAgreement String? @map("atf_agreement")
+
   /// Påslag på självkostnaden i kalkylen, i PROCENT. 140 betyder ×1,40.
   ///
   /// Heltalsprocent och inte en faktor med decimaler, eftersom 1,4 inte går
@@ -287,6 +295,12 @@ model Employee {
   ///
   /// Tomt betyder att personen räknas från sin första stämpling.
   balanceOpeningDate DateTime? @map("balance_opening_date")
+
+  /// ARBETSTIDSFORMEN FÖR ATF (tillagt 2026-10-13), till exempel dagtid eller
+  /// tvåskift. En nyckel bland avtalets former i
+  /// `src/lib/collective-agreements.ts`. Tomt betyder avtalets förval, som är
+  /// dagtid. Används bara när företaget valt ett avtal.
+  atfWorkForm String? @map("atf_work_form")
 
   company     Company     @relation(fields: [companyId], references: [id], onDelete: Cascade)
   timeEntries TimeEntry[]
@@ -1505,6 +1519,13 @@ model AbsenceReason {
   /// flexformeln i payroll.ts. Namnet står kvar, eftersom ett namnbyte på en
   /// kolumn kräver en migration i två steg och ingenting kunden ser ändras.
   countsAsComp Boolean @default(false) @map("counts_as_comp")
+
+  /// GER ATF (tillagt 2026-10-13). Frånvaron räknas som arbetad tid när
+  /// arbetstidsförkortningen tjänas in, till exempel permission. Utan kryss
+  /// dras frånvaron från ATF-underlaget. Kundens eget val per orsak; avtalen
+  /// säger olika. Betyder ingenting för en orsak som drar på flexen, eftersom
+  /// den redan syns i flexen. Se src/lib/atf.ts.
+  givesAtf Boolean @default(false) @map("gives_atf")
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")

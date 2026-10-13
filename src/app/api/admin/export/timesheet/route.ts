@@ -5,6 +5,7 @@ import { evaluateAccess } from "@/lib/subscription";
 import { unsafeGlobalPrisma } from "@/lib/db";
 import { buildPayrollPeriod, type PayrollPeriod } from "@/lib/payroll";
 import { buildTimesheetPdf } from "@/lib/timesheet-pdf";
+import { buildAtf, type AtfBasis } from "@/lib/atf";
 import { slugify } from "@/lib/order-export";
 import {
   addDaysInZone,
@@ -47,6 +48,7 @@ export async function GET(request: NextRequest) {
     where: { id: companyId },
     select: {
       timezone: true,
+      atfAgreement: true,
       logoWideData: true,
       logoWideMimeType: true,
       subscriptionStatus: true,
@@ -106,6 +108,7 @@ export async function GET(request: NextRequest) {
   }
 
   const periods: PayrollPeriod[] = [];
+  const atf: Record<string, AtfBasis | null> = {};
 
   for (const employeeId of employeeIds) {
     // En i taget och inte parallellt: varje tidrapport gör flera frågor, och
@@ -121,7 +124,18 @@ export async function GET(request: NextRequest) {
 
     // En anställd som inte finns i företaget ger null. Den hoppas över
     // tyst — filtreringslagret har redan gjort sitt jobb.
-    if (period) periods.push(period);
+    if (!period) continue;
+
+    periods.push(period);
+
+    // Bara för en hel kalendermånad och bara med ett valt avtal; annars null,
+    // och PDF:en visar ingen ATF. Se atf.ts.
+    atf[period.employee.id] = await buildAtf(
+      db,
+      timeZone,
+      period,
+      company?.atfAgreement ?? null
+    );
   }
 
   if (periods.length === 0) {
@@ -141,7 +155,7 @@ export async function GET(request: NextRequest) {
   const pdf = await buildTimesheetPdf(
     { name: companyName, timezone: timeZone, logo },
     periods,
-    { rows: absenceOnly ? "absence" : "all" }
+    { rows: absenceOnly ? "absence" : "all", atf }
   );
 
   // Filnamnet säger vad filen är. En tidrapport ska inte kunna förväxlas med

@@ -205,6 +205,7 @@ describe("loggen bär inga namn", () => {
       flexOpeningMinutes: 0,
       compOpeningMinutes: 0,
       balanceOpeningDate: null,
+      atfWorkForm: null,
     });
 
     expect(Object.keys(snapshot)).not.toContain("name");

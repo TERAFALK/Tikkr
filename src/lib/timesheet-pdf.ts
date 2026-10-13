@@ -1,5 +1,6 @@
 import PDFDocument from "pdfkit";
 import type { PayrollPeriod } from "./payroll";
+import type { AtfBasis } from "./atf";
 import {
   formatDate,
   formatDuration,
@@ -64,6 +65,12 @@ export interface TimesheetOptions {
    * är bara frånvaron. Summeringen är densamma i båda.
    */
   rows?: "all" | "absence";
+  /**
+   * ATF-underlaget per anställd, nyckel = personens id. Saknas personen här
+   * visas ingen ATF, vilket är fallet när företaget inte valt något avtal
+   * eller perioden inte är en hel kalendermånad. Se atf.ts.
+   */
+  atf?: Record<string, AtfBasis | null>;
 }
 
 export function buildTimesheetPdf(
@@ -94,7 +101,7 @@ export function buildTimesheetPdf(
 
   periods.forEach((period, index) => {
     if (index > 0) doc.addPage();
-    renderPeriod(doc, company, period, absenceOnly);
+    renderPeriod(doc, company, period, absenceOnly, options.atf?.[period.employee.id] ?? null);
   });
 
   if (periods.length === 0) {
@@ -112,7 +119,8 @@ function renderPeriod(
   doc: PDFKit.PDFDocument,
   company: TimesheetCompany,
   period: PayrollPeriod,
-  absenceOnly: boolean
+  absenceOnly: boolean,
+  atf: AtfBasis | null
 ) {
   const tz = company.timezone;
   let y = MARGIN;
@@ -321,7 +329,7 @@ function renderPeriod(
 
   /* --- Sammanställningen -------------------------------------------------- */
 
-  y = drawSummary(doc, y, period, absenceOnly);
+  y = drawSummary(doc, y, period, absenceOnly, atf);
 
   /* --- Improduktiv tid per typ -------------------------------------------- */
 
@@ -446,7 +454,8 @@ function drawSummary(
   doc: PDFKit.PDFDocument,
   y: number,
   period: PayrollPeriod,
-  absenceOnly: boolean
+  absenceOnly: boolean,
+  atf: AtfBasis | null
 ): number {
   const rows: [string, string][][] = [
     [
@@ -466,6 +475,14 @@ function drawSummary(
       ["Flexsaldo", pdfSigned(period.flex.closing)],
     ],
   ];
+
+  // ATF är ett underlag till lönen, inget saldo. Se atf.ts.
+  if (atf) {
+    rows.push([
+      ["Underlag ATF", formatDuration(atf.basisMinutes)],
+      ["Intjänad ATF", formatDuration(atf.earnedMinutes)],
+    ]);
+  }
 
   const height = rows.length * 16 + 14;
   doc.rect(MARGIN, y, CONTENT_WIDTH, height).fill(DOC.tint);
@@ -494,6 +511,25 @@ function drawSummary(
   }
 
   y += height + 6;
+
+  // Hur underlaget räknats, så att lönekontoret kan stämma av det. Samma
+  // tre tal som formeln i atf.ts, i samma ordning.
+  if (atf) {
+    doc.font("Helvetica").fontSize(7).fillColor(DOC.faint);
+    doc.text(
+      period.employee.hourly
+        ? `ATF enligt ${atf.agreementName}, ${atf.workFormLabel.toLowerCase()}: ` +
+            "arbetad tid och frånvaro som ger ATF"
+        : `ATF enligt ${atf.agreementName}, ${atf.workFormLabel.toLowerCase()}: ` +
+            `planerad tid ${formatDuration(atf.plannedMinutes)}, ` +
+            `flex föregående månad ${pdfSigned(atf.previousMonthFlexMinutes)}, ` +
+            `frånvaro som inte ger ATF ${formatDuration(atf.invalidAbsenceMinutes)}`,
+      MARGIN,
+      y,
+      { width: CONTENT_WIDTH }
+    );
+    y = doc.y + 4;
+  }
 
   // Utan stämplingar i raderna finns ingen P/I-kolumn att förklara.
   if (absenceOnly) return y;
