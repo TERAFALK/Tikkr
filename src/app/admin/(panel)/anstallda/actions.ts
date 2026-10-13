@@ -7,6 +7,8 @@ import { hasModule } from "@/lib/company-modules";
 import { parseOre } from "@/lib/money";
 import { auditEmployeeChange, employeeBefore } from "@/lib/audit";
 import { readScheduleDays, saveOwnScheduleDays } from "@/lib/schedule";
+import { companyTimeZone } from "@/lib/company";
+import { parseLocalDate, startOfDayIn } from "@/lib/time-zone";
 import type { CompanyDb } from "@/lib/tenant";
 
 // Varje åtgärd börjar med requireAdmin(). Det ger både inloggningskontroll och
@@ -129,13 +131,44 @@ interface PhotoFields {
  * Ger ett felmeddelande att visa, eller inget alls.
  */
 /**
- * TIMANSTÄLLD: ingen planerad tid, inget flexsaldo, ingen komptid.
+ * TIMANSTÄLLD: ingen planerad tid och inget flexsaldo.
  *
  * Krysset är bara läsbart med löneunderlaget. Utan modulen finns varken
  * schema eller flex att stänga av, och fältet ritas inte heller.
  */
 function readHourly(formData: FormData, payroll: boolean): boolean {
   return payroll && formData.get("hourly") === "on";
+}
+
+/**
+ * STARTDATUMET, dagen flexen börjar räknas (tillagt 2026-10-13).
+ *
+ * Lagras i `balanceOpeningDate`, som payroll.ts redan räknade från. Tomt fält
+ * betyder första stämplingen, vilket är vad kolumnen alltid betytt när den är
+ * tom.
+ *
+ * Fältet finns bara i rutan med löneunderlaget och utan krysset för
+ * timanställd. Saknas det i formuläret rörs datumet inte, så att den som
+ * kryssar i Timanställd och sedan ur igen inte tappar det.
+ *
+ * Sparas vid dygnets början i företagets tidszon. parseLocalDate landar
+ * klockan 12, och förmiddagens stämplingar på startdagen ska räknas med.
+ */
+async function startDateFields(
+  formData: FormData,
+  companyId: string,
+  payroll: boolean
+): Promise<{ error: string } | { balanceOpeningDate?: Date | null }> {
+  if (!payroll || !formData.has("startDate")) return {};
+
+  const raw = String(formData.get("startDate") ?? "").trim();
+  if (!raw) return { balanceOpeningDate: null };
+
+  const timeZone = await companyTimeZone(companyId);
+  const date = parseLocalDate(raw, timeZone);
+  if (!date) return { error: "Startdatumet går inte att läsa." };
+
+  return { balanceOpeningDate: startOfDayIn(date, timeZone) };
 }
 
 async function saveSchedule(
@@ -232,6 +265,9 @@ export async function createEmployee(
   const flexCode = await flexCodeFields(formData, payroll);
   if ("error" in flexCode) return { error: flexCode.error };
 
+  const startDate = await startDateFields(formData, companyId, payroll);
+  if ("error" in startDate) return { error: startDate.error };
+
   let created: { id: string };
 
   try {
@@ -244,6 +280,7 @@ export async function createEmployee(
         hourly: readHourly(formData, payroll),
         ...photoFields(photo, false),
         ...flexCode,
+        ...startDate,
       },
       select: { id: true },
     });
@@ -296,6 +333,9 @@ export async function updateEmployee(
   const flexCode = await flexCodeFields(formData, payroll);
   if ("error" in flexCode) return { error: flexCode.error };
 
+  const startDate = await startDateFields(formData, companyId, payroll);
+  if ("error" in startDate) return { error: startDate.error };
+
   // Timkostnaden följer med varje ny stämpling. En ändring av den ska gå att
   // spåra, se audit.ts.
   const before = await employeeBefore(db, id);
@@ -313,6 +353,7 @@ export async function updateEmployee(
         hourly: readHourly(formData, payroll),
         ...photoFields(photo, removePhoto),
         ...flexCode,
+        ...startDate,
       },
     });
   } catch (error) {

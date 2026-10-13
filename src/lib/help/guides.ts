@@ -581,18 +581,18 @@ export const GUIDES = [
   {
     slug: "tidrapport",
     area: "PAYROLL",
-    title: "Tidrapport, flex och komp",
+    title: "Tidrapport och flex",
     summary:
-      "Planerad tid, närvarotid, flex, komp och frånvaro per anställd och period.",
+      "Planerad tid, närvarotid, flex och frånvaro per anställd och period.",
     module: "PAYROLL",
-    keywords: ["lön", "löneunderlag", "flex", "flexsaldo", "komp", "komptid", "närvaro", "saldo", "justera"],
+    keywords: ["lön", "löneunderlag", "flex", "flextid", "flexsaldo", "närvaro", "saldo", "justera", "startdatum"],
     steps: [
       {
         title: "Öppna Tidrapport och välj anställd och period",
       },
       {
         title: "Kontrollera summeringen",
-        body: "Flex är arbetad tid plus frånvaro, minus planerad tid och intjänad komp.",
+        body: "Flex är arbetad tid plus frånvaro, minus planerad tid. Flexledighet drar på saldot.",
       },
       {
         title: "Justera flexsaldot vid behov",
@@ -602,9 +602,14 @@ export const GUIDES = [
         title: "Skriv ut Förra veckan per anställd",
         body: "En person per sida, för att dela ut.",
       },
+      {
+        title: "Skriv ut Förra månaden per anställd till lönen",
+        body: "Samma sida per person, med bara frånvaron dag för dag.",
+      },
     ],
     notes: [
-      "Tid utöver schemat är flex tills någon beslutat att den är övertid och komp.",
+      "Tid utöver schemat är flex.",
+      "Flexen räknas från startdatumet, som sätts under Anställda. Utan startdatum räknas den från första stämplingen.",
       "Tikkr räknar timmar. Lönearter, OB och övertidsersättning hanteras i lönesystemet.",
       "Tidrapporten är ett internt dokument och ska inte skickas till en kund.",
       "Den anställde ser sitt saldo på stämplingsskärmen med en kod som sätts under Anställda.",
@@ -618,7 +623,7 @@ export const GUIDES = [
     summary:
       "Sjukdom, semester och annan frånvaro registreras i panelen och täcker den planerade tiden.",
     module: "PAYROLL",
-    keywords: ["sjuk", "semester", "vab", "ledig", "frånvaroorsak", "tjänstledig", "komp uttag"],
+    keywords: ["sjuk", "semester", "vab", "ledig", "frånvaroorsak", "tjänstledig", "flexledig"],
     steps: [
       {
         title: "Öppna Tidrapport och välj den anställde",
@@ -629,7 +634,7 @@ export const GUIDES = [
       },
     ],
     notes: [
-      "Orsakerna läggs upp under Inställningar, Frånvaroorsaker. En orsak som drar på komptid minskar komptidssaldot.",
+      "Orsakerna läggs upp under Inställningar, Frånvaroorsaker. En orsak som drar på flexsaldot, som Flexledig, minskar saldot.",
       "Frånvaro registreras aldrig på stämplingsskärmen.",
     ],
     related: ["tidrapport"],

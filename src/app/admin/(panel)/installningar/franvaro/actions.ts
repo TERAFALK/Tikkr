@@ -72,12 +72,12 @@ export async function addAbsenceReason(
 /**
  * Byter namn på en orsak.
  *
- * Namnet, och ingenting annat. Kryssrutan som drar på komptidssaldot sätts när
+ * Namnet, och ingenting annat. Kryssrutan som drar på flexsaldot sätts när
  * orsaken läggs upp och ändras inte i efterhand: den styr en RÄKNING, och
- * frånvaro som redan registrerats har skrivit sina komprader utifrån det läge
- * som gällde då. Att vända den i efterhand hade gjort gamla poster
- * oförklarliga utan att röra en siffra på skärmen. Är den fel läggs orsaken
- * upp på nytt och den gamla avaktiveras.
+ * saldot härleds på nytt vid varje läsning. Att vända den hade flyttat
+ * flexsaldot för varje person som någonsin varit ledig på orsaken, utan att en
+ * enda post ändrats. Är den fel läggs orsaken upp på nytt och den gamla
+ * avaktiveras.
  *
  * Omdöpningen når varje post som redan ligger på orsaken, eftersom frånvaron
  * pekar på raden och inte bär en kopia av namnet. Det är meningen: ett stavfel

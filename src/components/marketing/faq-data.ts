@@ -47,7 +47,7 @@ export function faqQuestions(modules: ModulePricing): FaqItem[] {
     },
     {
       q: "Kan Tikkr användas för löneunderlag?",
-      a: `Ja, som tillval för ${kr(modules.PAYROLL.month)} kr per månad: arbetstidsschema, stämplade raster, flex, komp, frånvaro och tidrapport per anställd. Tikkr redovisar timmar. Lönearter, OB och övertidsersättning regleras i kollektivavtal och hanteras i lönesystemet.`,
+      a: `Ja, som tillval för ${kr(modules.PAYROLL.month)} kr per månad: arbetstidsschema, stämplade raster, flex, frånvaro och tidrapport per anställd. Tikkr redovisar timmar. Lönearter, OB och övertidsersättning regleras i kollektivavtal och hanteras i lönesystemet.`,
     },
     {
       q: "Går det att planera jobben i Tikkr?",

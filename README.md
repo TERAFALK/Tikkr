@@ -44,7 +44,7 @@ var för sig:
 
 | Modul | Innehåll | Pris/mån | Pris/år |
 |---|---|---|---|
-| **Löneunderlag** | Schema, raster, flex, komp och frånvaro | 499 kr | 4 990 kr |
+| **Löneunderlag** | Schema, raster, flex och frånvaro | 499 kr | 4 990 kr |
 | **Planering** | Stationer, veckovis tidslinje, planerat mot stämplat | 699 kr | 6 990 kr |
 
 Basen kostar 399 kr per aktiv stämplingsskärm och månad, 3 990 kr per år. Allt

@@ -33,6 +33,11 @@ export interface DatePresets {
    * knappen och filtret aldrig kan mena olika veckor.
    */
   lastWeek: DateRange;
+  /**
+   * Förra månaden, första till sista dagen. Samma skäl som `lastWeek`: den
+   * används av utskriften "Förra månaden per anställd" på Tidrapport.
+   */
+  lastMonth: DateRange;
 }
 
 export function datePresets(timeZone: string): DatePresets {
@@ -59,6 +64,11 @@ export function datePresets(timeZone: string): DatePresets {
     to: toDateInput(lastSunday, timeZone),
   };
 
+  const lastMonth = {
+    from: `${lastMonthEnd.getUTCFullYear()}-${pad(lastMonthEnd.getUTCMonth() + 1)}-01`,
+    to: iso(lastMonthEnd),
+  };
+
   return {
     presets: [
       { label: "Idag", from: today, to: today },
@@ -67,12 +77,9 @@ export function datePresets(timeZone: string): DatePresets {
       // man stämmer av på måndagen, och därmed det snabbval som används mest.
       { label: "Förra veckan", ...lastWeek },
       { label: "Denna månad", from: firstOfMonth, to: today },
-      {
-        label: "Förra månaden",
-        from: `${lastMonthEnd.getUTCFullYear()}-${pad(lastMonthEnd.getUTCMonth() + 1)}-01`,
-        to: iso(lastMonthEnd),
-      },
+      { label: "Förra månaden", ...lastMonth },
     ],
     lastWeek,
+    lastMonth,
   };
 }

@@ -8,11 +8,7 @@ import {
   getOpenBreak,
   autoCloseForgottenBreaks,
 } from "@/lib/breaks";
-import {
-  createDefaultAbsenceReasons,
-  markAbsence,
-  removeAbsence,
-} from "@/lib/absence";
+import { createDefaultAbsenceReasons, markAbsence } from "@/lib/absence";
 import { buildPayrollPeriod } from "@/lib/payroll";
 
 /**
@@ -36,7 +32,6 @@ let fräsning: string;
 let sjuk: string;
 let semester: string;
 let vab: string;
-let kompUttag: string;
 
 beforeEach(async () => {
   const unique = Math.random().toString(36).slice(2, 8);
@@ -93,7 +88,6 @@ beforeEach(async () => {
   sjuk = byName("Sjuk");
   semester = byName("Semester");
   vab = byName("Vård av barn");
-  kompUttag = byName("Uttagen komp");
 });
 
 afterEach(async () => {
@@ -278,13 +272,13 @@ describe("frånvaro", () => {
     const db = forCompany(companyId);
     const day = new Date("2026-09-20T22:00:00Z");
 
-    await markAbsence(db, companyId, TZ, {
+    await markAbsence(db, companyId, {
       employeeId: anna,
       date: day,
       reasonId: sjuk,
       byEmail: "admin@test.se",
     });
-    await markAbsence(db, companyId, TZ, {
+    await markAbsence(db, companyId, {
       employeeId: anna,
       date: day,
       reasonId: sjuk,
@@ -301,14 +295,14 @@ describe("frånvaro", () => {
     const db = forCompany(companyId);
     const day = new Date("2026-09-20T22:00:00Z");
 
-    await markAbsence(db, companyId, TZ, {
+    await markAbsence(db, companyId, {
       employeeId: anna,
       date: day,
       reasonId: semester,
       minutes: 240,
       byEmail: "admin@test.se",
     });
-    await markAbsence(db, companyId, TZ, {
+    await markAbsence(db, companyId, {
       employeeId: anna,
       date: day,
       reasonId: vab,
@@ -319,30 +313,7 @@ describe("frånvaro", () => {
     expect(await db.absence.findMany({ where: { employeeId: anna } })).toHaveLength(2);
   });
 
-  it("uttagen komp skriver en rad i komptidsboken och städar bort den igen", async () => {
-    const db = forCompany(companyId);
-    const day = new Date("2026-09-20T22:00:00Z");
-
-    await markAbsence(db, companyId, TZ, {
-      employeeId: anna,
-      date: day,
-      reasonId: kompUttag,
-      minutes: 480,
-      byEmail: "admin@test.se",
-    });
-
-    const comp = await db.compAdjustment.findMany({ where: { employeeId: anna } });
-    expect(comp).toHaveLength(1);
-    expect(comp[0].minutes).toBe(-480);
-
-    const absence = await db.absence.findFirst({ where: { employeeId: anna } });
-    await removeAbsence(db, absence!.id, "admin@test.se");
-
-    expect(await db.compAdjustment.findMany({ where: { employeeId: anna } })).toEqual([]);
-    expect(await db.absence.findMany({ where: { employeeId: anna } })).toEqual([]);
-  });
-
-  it("en ny arbetsyta får standardorsakerna, och en av dem drar på komptid", async () => {
+  it("en ny arbetsyta får standardorsakerna, och en av dem drar på flexen", async () => {
     const reasons = await unsafeGlobalPrisma.absenceReason.findMany({
       where: { companyId },
     });
@@ -350,9 +321,11 @@ describe("frånvaro", () => {
     expect(reasons.length).toBeGreaterThan(0);
     for (const reason of reasons) expect(reason.name.length).toBeGreaterThan(0);
 
-    // Precis en orsak ska dra på komptidssaldot. Två hade gjort att samma
-    // uttag räknades två gånger, ingen att saldot aldrig minskade.
-    expect(reasons.filter((reason) => reason.countsAsComp)).toHaveLength(1);
+    // Precis en orsak ska dra på flexsaldot, och det är Flexledig. Utan den
+    // går det inte att vara ledig på inarbetad tid utan att saldot står still.
+    expect(
+      reasons.filter((reason) => reason.countsAsComp).map((reason) => reason.name)
+    ).toEqual(["Flexledig"]);
   });
 
   it("en avaktiverad orsak går inte att registrera på", async () => {
@@ -364,7 +337,7 @@ describe("frånvaro", () => {
     });
 
     await expect(
-      markAbsence(db, companyId, TZ, {
+      markAbsence(db, companyId, {
         employeeId: anna,
         date: new Date("2026-09-20T22:00:00Z"),
         reasonId: sjuk,

@@ -13,7 +13,7 @@ import { addDaysInZone, dayNumberIn, startOfDayIn } from "./time-zone";
 /**
  * LÖNEUNDERLAGET — TIDRAPPORTEN PER ANSTÄLLD.
  *
- * Den enda platsen där flex och komptid räknas, av samma skäl som
+ * Den enda platsen där flexen räknas, av samma skäl som
  * `order-price.ts` äger prisräkningen: en siffra som räknas på två ställen
  * hinner alltid sluta stämma.
  *
@@ -30,18 +30,30 @@ import { addDaysInZone, dayNumberIn, startOfDayIn } from "./time-zone";
  *
  * ── FLEXFORMELN ──────────────────────────────────────────────────────────
  *
- *   flex(dag) = arbetad tid + frånvarotid − planerad tid − intjänad komp
+ *   flex(dag) = arbetad tid + frånvarotid − planerad tid − uttagen flex
  *
- * | Fall                             | Arb  | Frånv | Plan | Komp | Flex |
- * |----------------------------------|------|-------|------|------|------|
- * | Normal dag                       |  8,5 |     0 |  8,5 |    0 |    0 |
- * | Sjuk hel dag                     |    0 |   8,5 |  8,5 |    0 |    0 |
- * | Jobbat över, 2 h godkänd komp    | 10,5 |     0 |  8,5 |    2 |    0 |
- * | Tar ut komp hel dag              |    0 |   8,5 |  8,5 |    0 |    0 |
+ * | Fall                             | Arb  | Frånv | Plan | Uttag | Flex |
+ * |----------------------------------|------|-------|------|-------|------|
+ * | Normal dag                       |  8,5 |     0 |  8,5 |     0 |    0 |
+ * | Sjuk hel dag                     |    0 |   8,5 |  8,5 |     0 |    0 |
+ * | Jobbat över två timmar           | 10,5 |     0 |  8,5 |     0 |   +2 |
+ * | Flexledig hel dag                |    0 |   8,5 |  8,5 |   8,5 | −8,5 |
  *
  * Frånvaron TÄCKER den planerade tiden — annars skulle en sjukvecka ge minus
- * fyrtio timmar i flex. Intjänad komp DRAS BORT, annars skulle samma övertid
- * räknas två gånger: en gång som flex och en gång som komp.
+ * fyrtio timmar i flex. Frånvaro på en orsak som drar på flexen
+ * (`AbsenceReason.countsAsComp`) dras sedan bort igen: den som är flexledig
+ * tar ut timmar hen arbetat in, och de ska minska saldot.
+ *
+ * KOMPTID FINNS INTE (ändrat 2026-10-13, kundens begäran). Komptiden var ett
+ * eget saldo, och övertid flyttades dit för hand med en knapp per dag. Kunden
+ * skiljer inte på dem: övertid är flex, och ledighet för inarbetad tid är
+ * uttagen flex. Raderna i `comp_adjustments` läses inte längre.
+ *
+ * ── STARTDATUMET ─────────────────────────────────────────────────────────
+ *
+ * Flexen räknas från personens startdatum (`balanceOpeningDate`), eller från
+ * första stämplingen när inget datum är satt. Dagar före den har varken
+ * planerad tid eller flex. Se `balanceStart`.
  *
  * ── ARBETAD TID ÄR HUVUDSTÄMPLINGEN ──────────────────────────────────────
  *
@@ -84,12 +96,18 @@ export interface PayrollDay {
   date: Date;
   /** ISO-veckodag, 1 = måndag. */
   weekday: number;
+  /**
+   * Dagen ligger före personens startdatum. Den har då varken planerad tid
+   * eller flex, men stämplingar och frånvaro visas som vanligt.
+   */
+  beforeStart: boolean;
   plannedMinutes: number;
   /** Huvudstämplingen. Se `mainMinutes`. */
   workedMinutes: number;
   productiveMinutes: number;
   indirectMinutes: number;
   breakMinutes: number;
+  /** All frånvaro, även den som drar på flexen. */
   absenceMinutes: number;
   absences: {
     id: string;
@@ -97,22 +115,11 @@ export interface PayrollDay {
     reason: string;
     minutes: number;
     note: string | null;
+    /** Orsaken drar på flexen: personen är ledig på inarbetad tid. */
+    drawsOnFlex: boolean;
   }[];
-  compEarnedMinutes: number;
-  compTakenMinutes: number;
-  /**
-   * Dagens rader i komptidsboken, med tecken: plus är intjänat, minus uttaget.
-   *
-   * `absenceId` är satt på ett uttag som skrivits av en frånvaro märkt
-   * `countsAsComp`. Den raden tas bort med frånvaron och inte för sig, se
-   * removeCompAdjustment.
-   */
-  comp: {
-    id: string;
-    minutes: number;
-    note: string | null;
-    absenceId: string | null;
-  }[];
+  /** Den del av frånvaron som drar på flexen. */
+  flexTakenMinutes: number;
   flexMinutes: number;
   entries: PayrollEntryRow[];
   breaks: PayrollBreakRow[];
@@ -139,7 +146,7 @@ export interface PayrollPeriod {
     id: string;
     name: string;
     employeeNumber: string | null;
-    /** Timanställd: ingen planerad tid, inget flexsaldo, ingen komptid. */
+    /** Timanställd: ingen planerad tid och inget flexsaldo. */
     hourly: boolean;
   };
   from: Date;
@@ -152,7 +159,6 @@ export interface PayrollPeriod {
   /** Summerad frånvaro per orsak, mest först. */
   absenceByReason: { reason: string; minutes: number }[];
   flex: Balance;
-  comp: Balance & { earned: number; taken: number };
 }
 
 /**
@@ -177,7 +183,6 @@ export async function buildPayrollPeriod(
       name: true,
       employeeNumber: true,
       flexOpeningMinutes: true,
-      compOpeningMinutes: true,
       balanceOpeningDate: true,
       hourly: true,
     },
@@ -207,7 +212,7 @@ export async function buildPayrollPeriod(
   // 15:30 sista dagen ska med.
   const periodEnd = startOfDayIn(addDaysInZone(to, 1, timeZone), timeZone);
 
-  const [entries, breakEntries, absences, comp, schedules] = await Promise.all([
+  const [entries, breakEntries, absences, schedules, start] = await Promise.all([
     db.timeEntry.findMany({
       where: {
         employeeId,
@@ -247,18 +252,19 @@ export async function buildPayrollPeriod(
         date: true,
         minutes: true,
         note: true,
-        reason: { select: { name: true } },
+        reason: { select: { name: true, countsAsComp: true } },
       },
     }),
-    db.compAdjustment.findMany({
-      where: { employeeId, date: { gte: periodStart, lt: periodEnd } },
-      orderBy: [{ date: "asc" }, { id: "asc" }],
-      select: { id: true, date: true, minutes: true, note: true, absenceId: true },
-    }),
     schedulesForEmployees(db, [employeeId]),
+    balanceStart(db, employee, timeZone),
   ]);
 
   const schedule = schedules.get(employeeId) ?? null;
+
+  // Dagen flexen börjar räknas. Null betyder att personen varken har ett
+  // startdatum eller någon stämpling, och då räknas ingen dag alls — samma
+  // svar som currentFlexMinutes ger, som då visar det ingående saldot.
+  const startDay = start ? dayNumberIn(start, timeZone) : null;
 
   // Allt sorteras in på kalenderdag. dayNumberIn räknar på väggen, så en post
   // hamnar på den dag den gjordes på verkstadsgolvet.
@@ -288,14 +294,6 @@ export async function buildPayrollPeriod(
     absencesByDay.set(key, list);
   }
 
-  const compByDay = new Map<number, typeof comp>();
-  for (const row of comp) {
-    const key = dayKey(row.date);
-    const list = compByDay.get(key) ?? [];
-    list.push(row);
-    compByDay.set(key, list);
-  }
-
   const days: PayrollDay[] = [];
 
   for (const date of daysInPeriod(periodStart, to, timeZone)) {
@@ -305,9 +303,15 @@ export async function buildPayrollPeriod(
     const dayEntries = entriesByDay.get(key) ?? [];
     const dayBreaks = breaksByDay.get(key) ?? [];
     const dayAbsences = absencesByDay.get(key) ?? [];
-    const dayComp = compByDay.get(key) ?? [];
 
-    const plannedMinutes = plannedMinutesForDay(schedule, weekday);
+    // FÖRE STARTDATUMET FINNS INGEN PLANERAD TID. Personen var inte anställd,
+    // eller räknades inte i Tikkr, och en schemalagd dag utan stämpling hade
+    // annars blivit minus i flex för tid hen aldrig lovat.
+    const beforeStart = startDay === null || key < startDay;
+
+    const plannedMinutes = beforeStart
+      ? 0
+      : plannedMinutesForDay(schedule, weekday);
 
     // Huvudstämplingen. Ett sidojobb är inte en extra timme någon varit på
     // plats — det är samma timme, bokförd på en order till.
@@ -366,48 +370,48 @@ export async function buildPayrollPeriod(
     // Frånvaro utan angivet antal täcker hela den schemalagda dagen. Är dagen
     // inte schemalagd blir det noll, vilket är rätt: en sjukanmälan på en
     // lördag tar inte bort någon planerad tid.
-    const absenceMinutes = dayAbsences.reduce(
-      (sum, absence) => sum + (absence.minutes ?? plannedMinutes),
-      0
+    //
+    // Schemats dag och inte `plannedMinutes`, som är noll före startdatumet.
+    // En sjukdag där ska ändå stå med sina timmar i löneunderlaget; det är
+    // bara flexen som inte räknas.
+    const scheduledMinutes = plannedMinutesForDay(schedule, weekday);
+
+    const absenceRows = dayAbsences.map((absence) => ({
+      id: absence.id,
+      reason: absence.reason.name,
+      minutes: absence.minutes ?? scheduledMinutes,
+      note: absence.note,
+      drawsOnFlex: absence.reason.countsAsComp,
+    }));
+
+    const absenceMinutes = sum(absenceRows, (row) => row.minutes);
+    const flexTakenMinutes = sum(
+      absenceRows.filter((row) => row.drawsOnFlex),
+      (row) => row.minutes
     );
-
-    const compEarnedMinutes = dayComp
-      .filter((row) => row.minutes > 0)
-      .reduce((sum, row) => sum + row.minutes, 0);
-
-    const compTakenMinutes = dayComp
-      .filter((row) => row.minutes < 0)
-      .reduce((sum, row) => sum - row.minutes, 0);
 
     days.push({
       date,
       weekday,
+      beforeStart,
       plannedMinutes,
       workedMinutes,
       productiveMinutes,
       indirectMinutes,
       breakMinutes,
       absenceMinutes,
-      absences: dayAbsences.map((absence) => ({
-        id: absence.id,
-        reason: absence.reason.name,
-        minutes: absence.minutes ?? plannedMinutes,
-        note: absence.note,
-      })),
-      compEarnedMinutes,
-      compTakenMinutes,
-      comp: dayComp.map((row) => ({
-        id: row.id,
-        minutes: row.minutes,
-        note: row.note,
-        absenceId: row.absenceId,
-      })),
+      absences: absenceRows,
+      flexTakenMinutes,
       // TIMANSTÄLLD HAR INGEN FLEX. Utan schema är planerad tid noll, och
       // formeln hade då gjort varje arbetad timme till ett plus — ett saldo
       // som växer för den som inte har något att ta igen. Se Employee.hourly.
-      flexMinutes: employee.hourly
-        ? 0
-        : workedMinutes + absenceMinutes - plannedMinutes - compEarnedMinutes,
+      //
+      // Samma sak före startdatumet: tid som arbetats innan flexen började
+      // räknas ska inte bli ett plus.
+      flexMinutes:
+        employee.hourly || beforeStart
+          ? 0
+          : workedMinutes + absenceMinutes - plannedMinutes - flexTakenMinutes,
       entries: rows,
       breaks: breakRows,
     });
@@ -435,20 +439,18 @@ export async function buildPayrollPeriod(
     (row) => row.minutes
   ).map((row) => ({ reason: row.name, minutes: row.minutes }));
 
-  const [flexOpening, compOpening] = await openingBalances(
+  const flexOpening = await openingFlex(
     db,
     employee,
+    start,
     periodStart,
     timeZone
   );
 
-  const earned = sum(days, (d) => d.compEarnedMinutes);
-  const taken = sum(days, (d) => d.compTakenMinutes);
-
-  // En timanställd har varken flex eller komp, och saldona ska då stå på noll
-  // rakt igenom. Ett ingående saldo från tiden som fast anställd räknas inte
-  // med — det hör till ett annat anställningsförhållande, och visades det här
-  // skulle det se ut som ett saldo hen kan ta ut.
+  // En timanställd har ingen flex, och saldot ska då stå på noll rakt
+  // igenom. Ett ingående saldo från tiden som fast anställd räknas inte med —
+  // det hör till ett annat anställningsförhållande, och visades det här skulle
+  // det se ut som ett saldo hen kan ta ut.
   const zeroBalances = employee.hourly;
 
   return {
@@ -470,34 +472,21 @@ export async function buildPayrollPeriod(
       period: totals.flex,
       closing: zeroBalances ? 0 : flexOpening + totals.flex,
     },
-    comp: {
-      opening: zeroBalances ? 0 : compOpening,
-      earned: zeroBalances ? 0 : earned,
-      taken: zeroBalances ? 0 : taken,
-      period: zeroBalances ? 0 : earned - taken,
-      closing: zeroBalances ? 0 : compOpening + earned - taken,
-    },
   };
 }
 
 /**
- * Saldona vid periodens början.
- *
- * Ingående saldo på personen gäller från `balanceOpeningDate`. Allt som hänt
- * mellan den dagen och periodens början räknas på nytt här — flexsaldot lagras
- * alltså aldrig, utan härleds. Skälet är detsamma som gör att orderns
- * beräknade tid inte cachas: ett lagrat saldo och en uppsättning poster är två
- * ställen som säger samma sak, och de hinner alltid sluta göra det.
- *
- * Kostnaden är en extra fråga per uppslag. Den är liten: en anställd har
- * några hundra dagar per år, inte miljoner.
- */
-/**
  * DAGEN SALDOT RÄKNAS FRÅN.
  *
- * `balanceOpeningDate` när kunden flyttat in med befintliga timmar. Är den tom
- * räknas personen från sin FÖRSTA STÄMPLING, vilket är vad fältet säger i
- * schemat att tomt betyder.
+ * Personens STARTDATUM (`balanceOpeningDate`), som sätts under Anställda.
+ * Är det tomt räknas personen från sin FÖRSTA STÄMPLING, vilket är vad fältet
+ * säger i schemat att tomt betyder.
+ *
+ * Startdatumet sattes inte i panelen mellan 2026-10-10 och 2026-10-13, och
+ * första stämplingen var då enda vägen. Det räckte inte: den som börjar på en
+ * måndag men glömmer stämpla till onsdagen ska ha minus för måndag och
+ * tisdag, och den som tagits in i Tikkr mitt i en anställning ska inte räknas
+ * från dag ett.
  *
  * Funktionen finns för att de två vägarna in i saldot ska svara likadant.
  * Tidrapporten utelämnade all historik före perioden, och saldot blev då
@@ -514,7 +503,11 @@ async function balanceStart(
   employee: { id: string; balanceOpeningDate: Date | null },
   timeZone: string
 ): Promise<Date | null> {
-  if (employee.balanceOpeningDate) return employee.balanceOpeningDate;
+  // Dygnets början även här. Ett datum ur formuläret landar klockan 12, se
+  // parseLocalDate, och stämplingarna på förmiddagen ska räknas med.
+  if (employee.balanceOpeningDate) {
+    return startOfDayIn(employee.balanceOpeningDate, timeZone);
+  }
 
   const first = await db.timeEntry.findFirst({
     where: { employeeId: employee.id },
@@ -527,39 +520,43 @@ async function balanceStart(
   return first ? startOfDayIn(first.clockInAt, timeZone) : null;
 }
 
-async function openingBalances(
+/**
+ * Flexsaldot vid periodens början.
+ *
+ * Ingående saldo på personen gäller från startdatumet. Allt som hänt mellan
+ * den dagen och periodens början räknas på nytt här — flexsaldot lagras
+ * alltså aldrig, utan härleds. Skälet är detsamma som gör att orderns
+ * beräknade tid inte cachas: ett lagrat saldo och en uppsättning poster är två
+ * ställen som säger samma sak, och de hinner alltid sluta göra det.
+ *
+ * Kostnaden är en extra fråga per uppslag. Den är liten: en anställd har
+ * några hundra dagar per år, inte miljoner.
+ */
+async function openingFlex(
   db: CompanyDb,
-  employee: {
-    id: string;
-    flexOpeningMinutes: number;
-    compOpeningMinutes: number;
-    balanceOpeningDate: Date | null;
-  },
+  employee: { id: string; flexOpeningMinutes: number },
+  since: Date | null,
   periodStart: Date,
   timeZone: string
-): Promise<[number, number]> {
-  const since = await balanceStart(db, employee, timeZone);
-
-  // Ingen historik att räkna: antingen har personen aldrig stämplat, eller så
-  // börjar perioden på eller före startdagen.
-  if (!since || since >= periodStart) {
-    return [employee.flexOpeningMinutes, employee.compOpeningMinutes];
-  }
+): Promise<number> {
+  // Ingen historik att räkna: antingen har personen varken startdatum eller
+  // stämplingar, eller så börjar perioden på eller före startdagen.
+  if (!since || since >= periodStart) return employee.flexOpeningMinutes;
 
   const beforeStart = { gte: since, lt: periodStart };
 
-  const [entries, absences, comp, schedules] = await Promise.all([
+  const [entries, absences, schedules] = await Promise.all([
     db.timeEntry.findMany({
       where: { employeeId: employee.id, clockInAt: beforeStart },
       select: { clockInAt: true, clockOutAt: true },
     }),
     db.absence.findMany({
       where: { employeeId: employee.id, date: beforeStart },
-      select: { date: true, minutes: true },
-    }),
-    db.compAdjustment.findMany({
-      where: { employeeId: employee.id, date: beforeStart },
-      select: { minutes: true, date: true },
+      select: {
+        date: true,
+        minutes: true,
+        reason: { select: { countsAsComp: true } },
+      },
     }),
     schedulesForEmployees(db, [employee.id]),
   ]);
@@ -578,8 +575,13 @@ async function openingBalances(
     spansByDay.set(key, list);
   }
 
+  // Frånvaron per dag, med det som drar på flexen avräknat. Kvar blir den
+  // frånvaro som täcker planerad tid, och det är bara den som påverkar
+  // saldot. Samma räkning som dagarna i buildPayrollPeriod.
   const absenceByDay = new Map<number, number>();
   for (const absence of absences) {
+    if (absence.reason.countsAsComp) continue;
+
     const key = dayNumberIn(absence.date, timeZone);
     const planned = plannedMinutesForDay(
       schedule,
@@ -589,16 +591,6 @@ async function openingBalances(
       key,
       (absenceByDay.get(key) ?? 0) + (absence.minutes ?? planned)
     );
-  }
-
-  const compEarnedByDay = new Map<number, number>();
-  let compPeriod = 0;
-  for (const row of comp) {
-    compPeriod += row.minutes;
-    if (row.minutes > 0) {
-      const key = dayNumberIn(row.date, timeZone);
-      compEarnedByDay.set(key, (compEarnedByDay.get(key) ?? 0) + row.minutes);
-    }
   }
 
   let flex = employee.flexOpeningMinutes;
@@ -619,11 +611,10 @@ async function openingBalances(
     flex +=
       mainMinutes(spansByDay.get(key) ?? []) +
       (absenceByDay.get(key) ?? 0) -
-      planned -
-      (compEarnedByDay.get(key) ?? 0);
+      planned;
   }
 
-  return [flex, employee.compOpeningMinutes + compPeriod];
+  return flex;
 }
 
 /**
@@ -664,9 +655,10 @@ export async function currentFlexMinutes(
 
   const since = await balanceStart(db, employee, timeZone);
 
-  // Aldrig stämplat. Då finns ingen dag att räkna, och saldot är det
-  // ingående — noll för alla utom den som flyttat in med timmar.
-  if (!since) return employee.flexOpeningMinutes;
+  // Aldrig stämplat och inget startdatum, eller ett startdatum som inte
+  // kommit än. Då finns ingen dag att räkna, och saldot är det ingående —
+  // noll för alla utom den som flyttat in med timmar.
+  if (!since || since > now) return employee.flexOpeningMinutes;
 
   const period = await buildPayrollPeriod(db, timeZone, employeeId, since, now);
 

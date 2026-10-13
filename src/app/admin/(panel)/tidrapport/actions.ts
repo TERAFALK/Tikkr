@@ -4,13 +4,7 @@ import { revalidatePath } from "next/cache";
 import { assertWritable, requireAdmin } from "@/lib/admin-session";
 import { requireModule } from "@/lib/company-modules";
 import { unsafeGlobalPrisma } from "@/lib/db";
-import {
-  AbsenceError,
-  addCompEarned,
-  markAbsence,
-  removeAbsence,
-  removeCompAdjustment,
-} from "@/lib/absence";
+import { AbsenceError, markAbsence, removeAbsence } from "@/lib/absence";
 import { currentFlexMinutes } from "@/lib/payroll";
 import { parseLocalDate } from "@/lib/time-zone";
 import { auditEmployeeChange, employeeBefore } from "@/lib/audit";
@@ -93,7 +87,7 @@ export async function saveAbsence(
 
   try {
     for (const date of daysInPeriod(from, to, timeZone)) {
-      await markAbsence(db, companyId, timeZone, {
+      await markAbsence(db, companyId, {
         employeeId,
         date,
         reasonId,
@@ -122,63 +116,6 @@ export async function deleteAbsence(formData: FormData) {
   await removeAbsence(session.db, id, session.email);
   revalidatePath(PATH);
 }
-
-export async function saveCompEarned(
-  _previous: TimesheetState,
-  formData: FormData
-): Promise<TimesheetState> {
-  const session = await requireAdmin();
-  await assertWritable(session);
-  await requireModule(session, "PAYROLL");
-  const { db, companyId, email } = session;
-
-  const employeeId = String(formData.get("employeeId") ?? "");
-  if (!employeeId) return { error: "Ingen anställd vald." };
-
-  const timeZone = await timeZoneOf(companyId);
-  const date = parseLocalDate(String(formData.get("date") ?? ""), timeZone);
-  if (!date) return { error: "Ange ett datum." };
-
-  // TIMANSTÄLLD HAR INGEN KOMPTID. Knappen göms i panelen, men en
-  // serveråtgärd ska inte lita på att gränssnittet gömde den. Vakten sitter i
-  // addCompEarned, som är enda vägen in, och svarar med ett AbsenceError.
-
-  // Samma tolkning som frånvaron: godkänd komptid skrivs av från ett saldo
-  // som står i tim:min.
-  const minutes = parseAbsenceHours(formData.get("hours"));
-  if (minutes === "error" || minutes === null) {
-    return { error: "Skriv tiden som 2:00 eller 2,5." };
-  }
-
-  try {
-    await addCompEarned(db, companyId, {
-      employeeId,
-      date,
-      minutes,
-      note: String(formData.get("note") ?? ""),
-      byEmail: email,
-    });
-  } catch (error) {
-    if (error instanceof AbsenceError) return { error: error.message };
-    throw error;
-  }
-
-  revalidatePath(PATH);
-  return { savedAt: Date.now() };
-}
-
-export async function deleteCompEarned(formData: FormData) {
-  const session = await requireAdmin();
-  await assertWritable(session);
-  await requireModule(session, "PAYROLL");
-
-  const id = String(formData.get("id") ?? "");
-  if (!id) return;
-
-  await removeCompAdjustment(session.db, id, session.email);
-  revalidatePath(PATH);
-}
-
 
 /** Svaret från rutan som ändrar saldot. ActionDialog stänger på `ok`. */
 export interface BalanceState {

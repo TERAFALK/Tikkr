@@ -759,7 +759,7 @@ export function Documents() {
     {
       kicker: "Till lönen",
       title: "Tidrapport per anställd",
-      body: "Planerad tid mot närvaro, med flex, komp och frånvaro. Ingår i tillvalet Löneunderlag.",
+      body: "Planerad tid mot närvaro, med flex och frånvaro. Ingår i tillvalet Löneunderlag.",
       mockup: <TimesheetMockup className="h-full" />,
     },
   ];
@@ -899,7 +899,7 @@ export function Capabilities() {
         },
         {
           term: "Löneunderlag",
-          body: "Arbetstidsschema, stämplade raster, flex, komp och frånvaro.",
+          body: "Arbetstidsschema, stämplade raster, flex och frånvaro.",
           tillval: true,
         },
         {
@@ -1027,7 +1027,7 @@ export function Capabilities() {
  */
 const MODULE_COPY: Record<ModuleKey, string> = {
   PAYROLL:
-    "Arbetstidsschema, stämplade raster, flex, komp, frånvaro och tidrapport " +
+    "Arbetstidsschema, stämplade raster, flex, frånvaro och tidrapport " +
     "per anställd. Priset gäller hela företaget oavsett antal skärmar och " +
     "anställda.",
   PLANNING:

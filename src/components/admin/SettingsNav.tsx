@@ -87,7 +87,7 @@ const sections: SettingsSection[] = [
       {
         href: "/admin/installningar/franvaro",
         label: "Frånvaroorsaker",
-        description: "Sjuk, semester, komp",
+        description: "Sjuk, semester, flex",
         icon: IconCalendar,
       },
     ],

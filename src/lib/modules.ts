@@ -51,7 +51,7 @@ export const MODULES = {
   PAYROLL: {
     key: "PAYROLL",
     name: "Löneunderlag",
-    summary: "Schema, raster, flex, komp och frånvaro.",
+    summary: "Schema, raster, flex och frånvaro.",
 
     // Fast pris per företag, inte per skärm och inte per anställd.
     //

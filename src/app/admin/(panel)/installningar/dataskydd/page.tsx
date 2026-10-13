@@ -119,8 +119,8 @@ export default async function DataProtectionPage() {
           {payroll ? (
             <>
               <p>
-                Med löneunderlaget registreras även arbetstidsschema, raster,
-                frånvaro med orsak och komptid.
+                Med löneunderlaget registreras även arbetstidsschema, raster
+                och frånvaro med orsak.
               </p>
               <p>
                 Frånvaro med orsak kan vara en uppgift om hälsa eller familj.

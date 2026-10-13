@@ -50,14 +50,10 @@ export const RELEASES: Release[] = [
     title: "Tikkr i drift",
     added: [
       "Nyheter i menyn, med vad som ändrats i varje version.",
-      {
-        text: "Komptid beslutas per dag på tidrapporten, med en egen knapp bredvid Frånvaro.",
-        module: "PAYROLL",
-      },
     ],
     improved: [
       {
-        text: "Frånvaro och komptid tas bort i den utfällda dagen på tidrapporten.",
+        text: "Frånvaro tas bort i den utfällda dagen på tidrapporten.",
         module: "PAYROLL",
       },
     ],

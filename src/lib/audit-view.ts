@@ -51,7 +51,7 @@ const FIELD_LABELS: Record<string, string> = {
   active: "Aktiv",
   flexOpeningMinutes: "Ingående flexsaldo",
   compOpeningMinutes: "Ingående komptid",
-  balanceOpeningDate: "Saldon räknas från",
+  balanceOpeningDate: "Startdatum",
   date: "Datum",
   reasonId: "Orsak",
   minutes: "Tid",

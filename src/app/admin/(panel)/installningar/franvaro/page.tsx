@@ -78,11 +78,11 @@ export default async function AbsenceReasonsPage() {
         />
         <span>
           <span className="block font-medium text-neutral-900">
-            Drar på komptidssaldot
+            Drar på flexsaldot
           </span>
           <span className="block text-neutral-500">
-            För uttagen komp. Frånvaron skriver då också ett uttag i
-            komptidsboken
+            För flexledighet. Frånvaron minskar då flexsaldot i stället för
+            att täcka den planerade tiden
           </span>
         </span>
       </label>
@@ -106,7 +106,7 @@ export default async function AbsenceReasonsPage() {
               >
                 <p className="text-[13px] text-neutral-600">
                   Sjuk, vård av barn, semester, föräldraledig, tjänstledig,
-                  permission, uttagen komp och övrigt. Går att ändra efteråt.
+                  permission, flexledig och övrigt. Går att ändra efteråt.
                 </p>
               </SaveForm>
             }
@@ -134,7 +134,7 @@ export default async function AbsenceReasonsPage() {
                   <span className="font-medium">{reason.name}</span>
                   {reason.countsAsComp && (
                     <span className="ml-2">
-                      <Badge>Drar på komptid</Badge>
+                      <Badge>Drar på flexsaldot</Badge>
                     </span>
                   )}
                 </Td>

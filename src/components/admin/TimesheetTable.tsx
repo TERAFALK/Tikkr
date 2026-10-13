@@ -22,6 +22,8 @@ export interface TimesheetDayRow {
   date: string;
   dayLabel: string;
   weekday: number;
+  /** Före personens startdatum: ingen planerad tid och ingen flex. */
+  beforeStart: boolean;
   plannedMinutes: number;
   workedMinutes: number;
   productiveMinutes: number;
@@ -35,14 +37,7 @@ export interface TimesheetDayRow {
     reason: string;
     minutes: number;
     note: string | null;
-    /** Orsaken drar på komptiden, och uttaget tas bort med frånvaron. */
-    withdrawsComp: boolean;
   }[];
-  /**
-   * Komptid som registrerats för hand. Uttag som en frånvaro skrivit står
-   * inte här: de hör till frånvaron och tas bort med den.
-   */
-  comp: { id: string; minutes: number; note: string | null }[];
   entries: {
     id: string;
     from: string;
@@ -59,17 +54,12 @@ export interface TimesheetDayRow {
 export default function TimesheetTable({
   days,
   onMarkAbsence,
-  onAddComp,
   deleteAbsenceAction,
-  deleteCompAction,
 }: {
   days: TimesheetDayRow[];
   /** Öppnar frånvarorutan för en dag. */
   onMarkAbsence: (date: string) => void;
-  /** Öppnar komptidsrutan för en dag. Saknas för en timanställd. */
-  onAddComp?: (date: string) => void;
   deleteAbsenceAction: (formData: FormData) => Promise<void>;
-  deleteCompAction: (formData: FormData) => Promise<void>;
 }) {
   const [open, setOpen] = useState<Set<string>>(new Set());
 
@@ -103,13 +93,12 @@ export default function TimesheetTable({
           {days.map((day) => {
             const expanded = open.has(day.date);
             const restDay = day.plannedMinutes === 0;
-            // Frånvaron och komptiden räknas som detaljer, eftersom det är i
-            // den utfällda raden de går att ta bort.
+            // Frånvaron räknas som en detalj, eftersom det är i den utfällda
+            // raden den går att ta bort.
             const hasDetail =
               day.entries.length > 0 ||
               day.breaks.length > 0 ||
-              day.absences.length > 0 ||
-              day.comp.length > 0;
+              day.absences.length > 0;
 
             return [
               <Tr key={day.date} dimmed={restDay && day.workedMinutes === 0}>
@@ -130,11 +119,6 @@ export default function TimesheetTable({
                       <Badge tone="warning">{absence.reason}</Badge>
                     </span>
                   ))}
-                  {day.comp.length > 0 && (
-                    <span className="ml-2">
-                      <Badge tone="active">Komptid</Badge>
-                    </span>
-                  )}
                 </Td>
                 <Td numeric muted>
                   {day.plannedMinutes === 0 ? "—" : formatDuration(day.plannedMinutes)}
@@ -149,7 +133,13 @@ export default function TimesheetTable({
                   {day.absenceMinutes === 0 ? "—" : formatDuration(day.absenceMinutes)}
                 </Td>
                 <Td numeric>
-                  <Flex minutes={day.flexMinutes} />
+                  {/* Före startdatumet räknas ingen flex. Ett streck och inte
+                      0:00, som hade sett ut som en dag i jämvikt. */}
+                  {day.beforeStart ? (
+                    <span className="text-neutral-400">—</span>
+                  ) : (
+                    <Flex minutes={day.flexMinutes} />
+                  )}
                 </Td>
                 <Td>
                   <div className="flex justify-end gap-1">
@@ -160,15 +150,6 @@ export default function TimesheetTable({
                     >
                       Frånvaro
                     </Button>
-                    {onAddComp && (
-                      <Button
-                        type="button"
-                        tone="ghost"
-                        onClick={() => onAddComp(day.date)}
-                      >
-                        Komptid
-                      </Button>
-                    )}
                   </div>
                 </Td>
               </Tr>,
@@ -228,26 +209,7 @@ export default function TimesheetTable({
                           note={absence.note}
                           value={formatDuration(absence.minutes)}
                           action={deleteAbsenceAction}
-                          question={
-                            `Ta bort frånvaron ${absence.reason} ${day.dayLabel}?` +
-                            (absence.withdrawsComp
-                              ? " Uttaget ur komptiden tas också bort."
-                              : "")
-                          }
-                        />
-                      ))}
-
-                      {day.comp.map((row) => (
-                        <DetailRow
-                          key={row.id}
-                          id={row.id}
-                          label="Komptid"
-                          note={row.note}
-                          value={formatSignedDuration(row.minutes)}
-                          action={deleteCompAction}
-                          question={`Ta bort komptiden ${formatSignedDuration(
-                            row.minutes
-                          )} ${day.dayLabel}?`}
+                          question={`Ta bort frånvaron ${absence.reason} ${day.dayLabel}?`}
                         />
                       ))}
                     </ul>
@@ -263,8 +225,7 @@ export default function TimesheetTable({
 }
 
 /**
- * En frånvaropost eller komprad i den utfällda dagen, med knappen som tar
- * bort den.
+ * En frånvaropost i den utfällda dagen, med knappen som tar bort den.
  *
  * Rättelse sker genom att ta bort och lägga in på nytt. Frånvaron skriver
  * dessutom över sig själv: samma dag och orsak två gånger är en rättelse, se

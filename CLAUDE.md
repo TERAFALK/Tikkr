@@ -82,7 +82,7 @@ för, se § 3.1. Den gränsen är kommersiell och ligger utanpå den tekniska �
 den gör inget av det som står här mindre sant.
 
 **Gränsen går vid pengar till lön, inte vid tid.** Tikkr räknar timmar:
-planerad tid, närvarotid, flex, komp och frånvaro. Vad timmarna är värda i lön
+planerad tid, närvarotid, flex och frånvaro. Vad timmarna är värda i lön
 avgörs av kollektivavtalet, i lönesystemet. Lägg därför ALDRIG till lönearter,
 OB-tillägg, övertidsersättning, karensavdrag eller semesterlön — de reglerna
 ändras med varje avtalsrörelse, och ett system som har dem fel betalar fel lön
@@ -317,7 +317,7 @@ stripe_prices    — item, month_price_id, year_price_id, updated_by_email
    **Helgstämpling flaggas också** (tillagt 2026-10-01). En stämpling som görs
    på en lördag eller söndag går igenom precis som vanligt, men hamnar i
    granskningen. Helgtid är nästan alltid något som ska beslutas om innan den
-   faktureras eller blir komp, och en post som ingen tittat på hinner annars
+   faktureras eller blir flex, och en post som ingen tittat på hinner annars
    bli både faktura och lön. Veckodagen räknas i företagets tidszon, och både
    in- och utstämplingen prövas: ett pass som börjar fredag kväll och slutar på
    lördagen flaggas.
@@ -395,7 +395,7 @@ stripe_prices    — item, month_price_id, year_price_id, updated_by_email
 
    Systemet stoppar aldrig stämpling för att en beräkning överskrids.
 
-7. **Löneunderlaget: schema, raster, flex, komp och frånvaro**
+7. **Löneunderlaget: schema, raster, flex och frånvaro**
    (tillagt 2026-09-26).
 
    **Schemat ger PLANERAD tid**, netto efter schemats raster. Kundens vardag
@@ -422,7 +422,7 @@ stripe_prices    — item, month_price_id, year_price_id, updated_by_email
    kopplingen, samma princip som att raden ÄR tillståndet i § 3.1.
 
    **TIMANSTÄLLD MÄTS INTE MOT NÅGOT SCHEMA** (tillagt 2026-10-07).
-   `employees.hourly` stänger av planerad tid, flexsaldo och komptid för den
+   `employees.hourly` stänger av planerad tid och flexsaldo för den
    personen. Arbetad tid, raster och frånvaro registreras som för alla andra.
 
    Utan fältet föll en timanställd tillbaka på företagets standardschema, se
@@ -437,13 +437,12 @@ stripe_prices    — item, month_price_id, year_price_id, updated_by_email
    Krysset sitter i rutan under Anställda, före arbetstiderna, och gömmer dem
    — ett schemaformulär under krysset hade sett ut som att tiderna ändå
    gäller. Ett eget schema raderas när krysset sätts. Rutan som justerar
-   saldot och åtgärden för godkänd komptid avvisar personen på servern, inte
-   bara i menyn.
+   saldot avvisar personen på servern, inte bara i menyn.
 
    **ATF är inte byggt** (2026-10-07). Hur många timmar någon tjänar in står i
    kollektivavtalet, och det räknar Tikkr aldrig. Blir det aktuellt är formen
-   given av komptiden: ett saldo kontoret fyller på, och uttag genom en
-   frånvaroorsak som drar på det.
+   ett eget saldo kontoret fyller på, och uttag genom en frånvaroorsak som
+   drar på det, så som Flexledig drar på flexen.
 
    **Rasterna STÄMPLAS** (kundens val), och ett rasttryck stänger ALLA
    pågående jobb. Därmed faller rasten bort ur närvarotiden av sig själv, och
@@ -457,19 +456,19 @@ stripe_prices    — item, month_price_id, year_price_id, updated_by_email
    **Flexformeln, som bara räknas i `src/lib/payroll.ts`:**
 
    ```
-   flex(dag) = arbetad tid + frånvarotid − planerad tid − intjänad komp
+   flex(dag) = arbetad tid + frånvarotid − planerad tid − uttagen flex
    ```
 
-   | Fall | Arbetad | Frånvaro | Planerad | Komp | Flex |
+   | Fall | Arbetad | Frånvaro | Planerad | Uttagen flex | Flex |
    |---|---|---|---|---|---|
    | Normal dag | 8,5 | 0 | 8,5 | 0 | 0 |
    | Sjuk hel dag | 0 | 8,5 | 8,5 | 0 | 0 |
-   | Övertid, 2 h godkänd komp | 10,5 | 0 | 8,5 | 2 | 0 |
-   | Tar ut komp hel dag | 0 | 8,5 | 8,5 | 0 | 0 |
+   | Övertid två timmar | 10,5 | 0 | 8,5 | 0 | +2 |
+   | Flexledig hel dag | 0 | 8,5 | 8,5 | 8,5 | −8,5 |
 
    Frånvaron TÄCKER den planerade tiden — annars gav en sjukvecka minus
-   fyrtio timmar. Intjänad komp dras bort, annars räknades samma övertid två
-   gånger.
+   fyrtio timmar. Frånvaro på en orsak som drar på flexen dras sedan bort
+   igen: den som är flexledig tar ut timmar hen arbetat in.
 
    **Arbetad tid är HUVUDSTÄMPLINGEN** (`mainMinutes` i `spans.ts`), aldrig
    råsumman. Det är här de två underlagen skiljer sig, se avgränsningen överst.
@@ -484,8 +483,8 @@ stripe_prices    — item, month_price_id, year_price_id, updated_by_email
    Skickades de råa in i frågan föll halva första dagen bort. Samma vecka för
    samma person visade 6:51 när man kom in på sidan och 3:23 när man växlat
    vecka fram och tillbaka, eftersom förmiddagens stämplingar låg före gränsen
-   andra gången. Frånvaro och komprader, som dateras vid dygnets början,
-   försvann helt från första dagen.
+   andra gången. Frånvaro, som dateras vid dygnets början, försvann helt från
+   första dagen.
 
    Normaliseringen ligger i `buildPayrollPeriod` och inte hos anroparna: sidan,
    PDF:en och flexsaldot kallar alla dit, och en regel som varje anropare måste
@@ -522,24 +521,25 @@ stripe_prices    — item, month_price_id, year_price_id, updated_by_email
    vet inte att `spans.ts` finns. Ett belopp som redan fakturerats ska inte
    ändras av att löneunderlaget räknar jämna minuter.
 
-   **Intjänad komp uppstår aldrig av sig själv.** Tid utöver schemat är flex
-   till dess att en människa beslutat att den är övertid. Uttagen komp är en
-   frånvaroorsak som också drar på komptidssaldot.
+   **KOMPTID FINNS INTE, BARA FLEX** (beslutat 2026-10-13, kundens begäran).
+   Komptiden var ett eget saldo: övertid flyttades dit med en knapp Komptid
+   på varje dag i tidrapporten, och "Uttagen komp" drog på det. Kunden
+   skiljer inte på dem, och två saldon för samma timmar var ett tal för
+   mycket. Nu är tid utöver schemat flex, och ledighet på inarbetad tid är
+   frånvaro på en orsak som drar på flexen. Standardorsaken heter
+   **Flexledig**. Knappen och rutan är borttagna, och ordet komp står
+   ingenstans kunden ser.
 
-   **Beslutet fattas på tidrapporten, per dag** (tillagt 2026-10-10). Varje
-   dag har en knapp Komptid bredvid Frånvaro, och raden dateras på dagen
-   övertiden gjordes, eftersom det är den dagens flex som ska minska.
-   Åtgärderna fanns från 2026-09-26 men hade ingen knapp, och saldot kunde
-   därför aldrig öka. Frånvaro och komptid tas bort i den utfällda dagen. Ett
-   uttag som en frånvaro skrivit har ingen egen knapp: det tas bort med
-   frånvaron, annars stod ledigheten kvar utan att komptiden minskat.
+   `comp_adjustments` och `employees.comp_opening_minutes` läses inte längre
+   men ligger kvar (§ 0 punkt 7). Registerutdraget lämnar ut dem så länge de
+   har innehåll, och anonymiseringen raderar dem. De tas bort i en senare
+   release. En arbetsyta som redan har orsaken "Uttagen komp" behåller
+   namnet, men orsaken drar nu på flexen; den byter namn under Inställningar.
 
-   **Ingående komptid och startdatumet för saldot sätts inte i panelen**
-   (beslutat 2026-10-10). `saveOpeningBalances` skrev alla tre ingående
-   värdena rakt av och hade aldrig en knapp; den togs bort. Ingående flex
-   sätts med Justera flexsaldo, och ett tomt startdatum betyder första
-   stämplingen, vilket är rätt för den som flyttar in. Fälten finns kvar i
-   databasen.
+   **Startdatumet sätts under Anställda** (ändrat 2026-10-13, var borttaget
+   ur panelen 2026-10-10). Det ligger i `balance_opening_date`, och flexen
+   räknas från och med den dagen. Ingående flex sätts fortfarande med
+   Justera flexsaldo. Ingående komptid sätts inte, se ovan.
 
    **Frånvaroorsakerna är kundens egna rader** (ändrat 2026-10-01), i
    `absence_reasons`, och läggs upp under Inställningar. Var en enum i koden,
@@ -547,12 +547,12 @@ stripe_prices    — item, month_price_id, year_price_id, updated_by_email
    driftsättning. Orsakerna följer deras verksamhet och deras kollektivavtal,
    inte vår kod.
 
-   Den enda av dem som betyder något för räkningen är `counts_as_comp`: står
-   den ikryssad skriver frånvaron samtidigt ett uttag i komptidsboken. Utan
-   den kopplingen räknades en uttagen komptimme två gånger, en gång som
-   frånvaro och en gång som ett saldo som aldrig minskade. Alla övriga orsaker
-   är etiketter, och `payroll.ts` summerar dem per namn utan att veta vad de
-   heter.
+   Den enda av dem som betyder något för räkningen är `counts_as_comp`, som i
+   panelen heter **Drar på flexsaldot**: frånvaro på en sådan orsak täcker
+   inte den planerade tiden, utan minskar flexen. Kolumnen behåller sitt namn
+   från komptiden, eftersom ett namnbyte kräver en migration i två steg och
+   ingenting kunden ser ändras. Alla övriga orsaker är etiketter, och
+   `payroll.ts` summerar dem per namn utan att veta vad de heter.
 
    En orsak RADERAS aldrig, den avaktiveras. En post från i mars ska gå att
    läsa i oktober, och databasen vägrar dessutom (`onDelete: Restrict`). Samma
@@ -572,8 +572,8 @@ stripe_prices    — item, month_price_id, year_price_id, updated_by_email
    skickas aldrig in från rutan — ett tal webbläsaren räknat på hinner bli
    gammalt medan rutan står öppen.
 
-   **Saldot räknas från `balance_opening_date`, och är den tom från personens
-   FÖRSTA STÄMPLING** (tillagt 2026-10-01). Dagen avgörs på ett ställe,
+   **Saldot räknas från STARTDATUMET (`balance_opening_date`), och är det tomt
+   från personens FÖRSTA STÄMPLING** (tillagt 2026-10-01). Dagen avgörs på ett ställe,
    `balanceStart` i `payroll.ts`, eftersom två vägar in i samma saldo hann
    säga olika saker: tidrapporten utelämnade all historik före perioden, så
    saldot blev periodens egen flex, medan stämplingsskärmen räknade ett år
@@ -583,6 +583,16 @@ stripe_prices    — item, month_price_id, year_price_id, updated_by_email
 
    Den som aldrig stämplat har inget härlett saldo. Då står det ingående
    ensamt, vilket är noll för alla utom den som flyttat in med timmar.
+
+   **Dagar före startdatumet har varken planerad tid eller flex** (tillagt
+   2026-10-13), även i tidrapporten för en period som börjar tidigare. Till
+   dess räknade tidrapporten varje schemalagd dag i perioden, medan
+   stämplingsskärmen började vid startdagen, och en vecka där någon börjat på
+   onsdagen gav minus för måndag och tisdag på det ena stället men inte på det
+   andra. Stämplingar och frånvaro före startdatumet visas som vanligt, och en
+   heldagsfrånvaro där står med schemats timmar: löneunderlaget behöver dem
+   även när flexen inte räknas. Utan startdatum och utan stämplingar räknas
+   ingen dag alls.
 
    **Den anställde ser sitt eget saldo på stämplingsskärmen** (tillagt
    2026-10-01), efter att ha angett en personlig kod som administratören satt
@@ -928,8 +938,7 @@ Periodens totaler står på förstasidan.
 
 **Knappen är tillbaka, och hämtar nu TIDRAPPORTEN** (ändrat 2026-10-08).
 Den togs bort dagen innan på kundens begäran, och kunden ändrade sig: utskriften
-behövdes, men med summeringen per person — planerad tid, närvarotid, flex och
-komp.
+behövdes, men med summeringen per person — planerad tid, närvarotid och flex.
 
 Den summeringen är löneunderlagets, och `report-pdf.ts` får aldrig läsa
 löneunderlaget. Utskriften kan alltså inte vara stämplingslistan med en
@@ -940,6 +949,17 @@ pekas ut, en per sida, så bytet var en adress och inte en ny PDF.
 Konsekvensen är att knappen hör till lönemodulen. Den sitter på Tidrapport,
 som redan är grindad, och inte på Rapporter. En kund utan löneunderlaget har
 ingen summering att skriva ut.
+
+**Förra månaden per anställd: samma papper med bara frånvaron** (tillagt
+2026-10-13, kundens begäran). Knappen bredvid veckans går till lönen. Raderna
+visar frånvaron dag för dag, utan stämplingar och raster, och summan under
+dem är frånvarons. Summeringen längst ner är densamma som i veckans. En månad
+av stämplingar per person är flera sidor som lönen inte läser, och det lönen
+behöver ur raderna är just frånvaron.
+
+Det är samma rutt och samma PDF med `rader=franvaro`, inte ett eget
+dokument. Två utskrifter av samma tidrapport som byggs var för sig hinner
+alltid börja räkna olika.
 
 **Underlaget och efterkalkylen finns BARA som PDF** (ändrat 2026-10-01). Båda
 fanns också som Excel-ark, och kunden använde dem inte: det ena bifogas en

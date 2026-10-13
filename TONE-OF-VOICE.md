@@ -115,7 +115,8 @@ Det här är den ordlista som gäller. Byt inte synonym för variationens skull.
 | **tillval** | modul (mot kunden), add-on, paket | *Modul* är kodens ord. Kunden ser *tillval*. |
 | **påslag** | marginal, uppräkning | Faktor från kostnad till pris. |
 | **granskning** | kontroll, attestering | Sidan där flaggade poster rättas. |
-| **flexsaldo**, **komptid**, **frånvaro** | — | Löneunderlagets ord. Håll dem där. |
+| **flexsaldo**, **frånvaro** | — | Löneunderlagets ord. Håll dem där. |
+| **flex**, **flextid**, **flexledig** | komp, komptid, kompledig | Kunden skiljer inte på dem: övertid är flex. Komptiden togs bort 2026-10-13. |
 
 **Rapport och tidrapport är två olika dokument.** Rapporten svarar på hur
 mycket kunden ska faktureras. Tidrapporten svarar på hur mycket en person har
