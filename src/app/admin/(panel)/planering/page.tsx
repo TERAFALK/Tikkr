@@ -10,11 +10,18 @@ import {
   unplacedWork,
 } from "@/lib/planning";
 import {
+  PLANNING_MODES,
   PLANNING_VIEWS,
   pickView,
   viewsFor,
   type PlanningView,
 } from "@/lib/planning-modes";
+import {
+  staffBlocksInWeek,
+  staffFor,
+  staffingOf,
+  type StaffBlock,
+} from "@/lib/staff-planning";
 import { isoWeekNumber } from "@/lib/week";
 import {
   addDaysInZone,
@@ -26,7 +33,8 @@ import { formatDate } from "@/lib/format";
 import { ButtonLink, EmptyState, PageHeader } from "@/components/ui";
 import PlanBoard, {
   type BoardBlock,
-  type BoardStation,
+  type BoardLane,
+  type BoardStaffing,
   type BoardUnplaced,
 } from "@/components/admin/PlanBoard";
 
@@ -45,6 +53,10 @@ import PlanBoard, {
  * verkstad har Stationer och Personal, ett tjänsteföretag bara Personal. Se
  * lib/planning-modes.ts. Vyn står i adressfältet som `vy`, så att veckopilarna
  * och ett bokmärke behåller den.
+ *
+ * Personalvyn har en rad per aktiv anställd. I läget Tjänst placeras passen
+ * från Oplacerat; i läget Produktion är de bemanning, och läggs från
+ * stationsrutans dialog med knappen Bemanna (fas 2, 2026-10-14).
  *
  * Sidan hämtar, mappar och lämnar över. Dragandet och det levande lagret bor i
  * PlanBoard, som är en klientkomponent: servern kan inte räkna om en rutas
@@ -80,26 +92,16 @@ export default async function PlanningPage({
   const picked = params.v ? parseLocalDate(params.v, timeZone) : null;
   const monday = startOfWeekIn(picked ?? new Date(), timeZone);
 
-  // Stationsvyns data hämtas bara när den visas. Personalvyn har ingen
-  // användning för stationerna, och Oplacerat räknas där mot personalens pass.
-  const [stations, blocks, unplaced] =
+  // Bara en resurs räknar av orderns beräknade tid, och Oplacerat visas bara
+  // på dess vy. Se lib/planning-modes.ts.
+  const counts = PLANNING_MODES[mode].countsBudget;
+  const placesFromUnplaced = counts === view;
+
+  // Bara den visade vyns data hämtas.
+  const board =
     view === "stations"
-      ? await Promise.all([
-          stationsFor(db, timeZone),
-          blocksInWeek(db, monday, timeZone),
-          unplacedWork(db),
-        ])
-      : [[], [], []];
-
-  const open = stations.filter((station) => station.active);
-
-  // I vilken ordning varje orders moment ska göras. Bara för de ordrar som
-  // faktiskt har en ruta i veckan — tavlan ritar pilar mellan dem, och en
-  // order utan rutor har inget att peka på.
-  const sequences = await orderSequences(
-    db,
-    blocks.map((block) => block.orderId)
-  );
+      ? await loadStationView(db, monday, timeZone, views.includes("staff"))
+      : await loadStaffView(db, monday, timeZone, placesFromUnplaced);
 
   /** Adressen till tavlan, med vyn kvar. Förvald vy skrivs inte ut. */
   const href = (week: string | null, to: PlanningView = view) => {
@@ -186,33 +188,168 @@ export default async function PlanningPage({
         )}
       </div>
 
-      {view === "staff" ? (
-        <EmptyState title="Inga planerade pass" />
-      ) : open.length === 0 ? (
-        <EmptyState
-          title="Inga stationer upplagda"
-          description="En station är en maskin eller arbetsplats som kör ett arbetsmoment."
-          action={
-            <ButtonLink href="/admin/installningar/stationer">
-              Lägg upp stationer
-            </ButtonLink>
-          }
-        />
+      {board.lanes.length === 0 ? (
+        view === "staff" ? (
+          <EmptyState
+            title="Inga anställda upplagda"
+            action={
+              <ButtonLink href="/admin/anstallda">Lägg upp anställda</ButtonLink>
+            }
+          />
+        ) : (
+          <EmptyState
+            title="Inga stationer upplagda"
+            description="En station är en maskin eller arbetsplats som kör ett arbetsmoment."
+            action={
+              <ButtonLink href="/admin/installningar/stationer">
+                Lägg upp stationer
+              </ButtonLink>
+            }
+          />
+        )
       ) : (
         <PlanBoard
-          stations={open.map(toBoardStation)}
-          blocks={blocks.map(toBoardBlock)}
-          unplaced={unplaced.map(toBoardUnplaced)}
+          key={view}
+          kind={view}
+          lanes={board.lanes}
+          blocks={board.blocks}
+          unplaced={board.unplaced}
+          placesFromUnplaced={placesFromUnplaced}
+          employees={board.employees}
+          staffing={board.staffing}
           monday={monday.toISOString()}
           weekNumber={isoWeekNumber(monday, timeZone)}
           timeZone={timeZone}
-          sequences={sequences}
+          sequences={board.sequences}
           isCurrentWeek={isCurrentWeek}
           readOnly={Boolean(session.support)}
         />
       )}
     </>
   );
+}
+
+/* --- Vyernas data --------------------------------------------------------- */
+
+interface BoardData {
+  lanes: BoardLane[];
+  blocks: BoardBlock[];
+  unplaced: BoardUnplaced[];
+  sequences: Record<string, string[]>;
+  employees?: { id: string; name: string }[];
+  staffing?: Record<string, BoardStaffing[]>;
+}
+
+type Db = Awaited<ReturnType<typeof requireAdmin>>["db"];
+
+/**
+ * Stationerna, deras rutor och Oplacerat. När läget har personal hämtas också
+ * de anställda och rutornas bemanning, så att rutans dialog kan bemanna.
+ */
+async function loadStationView(
+  db: Db,
+  monday: Date,
+  timeZone: string,
+  withStaffing: boolean
+): Promise<BoardData> {
+  const [stations, blocks, unplaced, staff] = await Promise.all([
+    stationsFor(db, timeZone),
+    blocksInWeek(db, monday, timeZone),
+    unplacedWork(db, "stations"),
+    withStaffing ? staffFor(db) : Promise.resolve(null),
+  ]);
+
+  // I vilken ordning varje orders moment ska göras. Bara för de ordrar som
+  // faktiskt har en ruta i veckan — tavlan ritar pilar mellan dem, och en
+  // order utan rutor har inget att peka på.
+  const [sequences, staffing] = await Promise.all([
+    orderSequences(
+      db,
+      blocks.map((block) => block.orderId)
+    ),
+    withStaffing
+      ? staffingOf(
+          db,
+          blocks.map((block) => block.id)
+        )
+      : Promise.resolve<Record<string, StaffBlock[]>>({}),
+  ]);
+
+  return {
+    lanes: stations
+      .filter((station) => station.active)
+      .map((station) => ({
+        id: station.id,
+        name: station.name,
+        detail: station.momentName,
+        momentId: station.momentId,
+        hours: station.hours,
+      })),
+    blocks: blocks.map((block) => ({
+      id: block.id,
+      laneId: block.stationId,
+      orderId: block.orderId,
+      orderNumber: block.orderNumber,
+      customerName: block.customerName,
+      momentId: block.momentId,
+      momentName: block.momentName,
+      startsAt: block.startsAt.toISOString(),
+      minutes: block.minutes,
+      note: block.note,
+      context: null,
+    })),
+    unplaced: unplaced.map(toBoardUnplaced),
+    sequences,
+    employees: staff?.map((member) => ({ id: member.id, name: member.name })),
+    staffing: Object.fromEntries(
+      Object.entries(staffing).map(([blockId, passes]) => [
+        blockId,
+        passes.map((pass) => ({
+          id: pass.id,
+          employeeName: pass.employeeName,
+          startsAt: pass.startsAt.toISOString(),
+          minutes: pass.minutes,
+        })),
+      ])
+    ),
+  };
+}
+
+/**
+ * De anställda och deras pass. Oplacerat hämtas bara när personalen räknar av
+ * beräkningen, alltså i läget Tjänst.
+ */
+async function loadStaffView(
+  db: Db,
+  monday: Date,
+  timeZone: string,
+  withUnplaced: boolean
+): Promise<BoardData> {
+  const [staff, passes, unplaced] = await Promise.all([
+    staffFor(db),
+    staffBlocksInWeek(db, monday, timeZone),
+    withUnplaced ? unplacedWork(db, "staff") : Promise.resolve([]),
+  ]);
+
+  const sequences = withUnplaced
+    ? await orderSequences(
+        db,
+        passes.map((pass) => pass.orderId)
+      )
+    : {};
+
+  return {
+    lanes: staff.map((member) => ({
+      id: member.id,
+      name: member.name,
+      detail: member.employeeNumber,
+      momentId: null,
+      hours: null,
+    })),
+    blocks: passes.map(toStaffBoardBlock),
+    unplaced: unplaced.map(toBoardUnplaced),
+    sequences,
+  };
 }
 
 /* --- Översättning till tavlans egen form ----------------------------------
@@ -222,40 +359,20 @@ export default async function PlanningPage({
  * och den är värd att betala: en klientkomponent som importerar databaslagret
  * är ett steg från att använda det. Samma uppdelning som kiosken har. */
 
-function toBoardStation(station: {
-  id: string;
-  name: string;
-  momentId: string;
-  momentName: string;
-  hours: {
-    weekday: number;
-    startMinute: number;
-    endMinute: number;
-    breaks: { startMinute: number; endMinute: number }[];
-  }[];
-}): BoardStation {
+function toStaffBoardBlock(pass: StaffBlock): BoardBlock {
   return {
-    id: station.id,
-    name: station.name,
-    momentId: station.momentId,
-    momentName: station.momentName,
-    hours: station.hours,
+    id: pass.id,
+    laneId: pass.employeeId,
+    orderId: pass.orderId,
+    orderNumber: pass.orderNumber,
+    customerName: pass.customerName,
+    momentId: pass.momentId,
+    momentName: pass.momentName,
+    startsAt: pass.startsAt.toISOString(),
+    minutes: pass.minutes,
+    note: pass.note,
+    context: pass.stationName,
   };
-}
-
-function toBoardBlock(block: {
-  id: string;
-  stationId: string;
-  orderId: string;
-  orderNumber: string;
-  customerName: string | null;
-  momentId: string;
-  momentName: string;
-  startsAt: Date;
-  minutes: number;
-  note: string | null;
-}): BoardBlock {
-  return { ...block, startsAt: block.startsAt.toISOString() };
 }
 
 function toBoardUnplaced(row: {

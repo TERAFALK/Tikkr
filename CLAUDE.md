@@ -268,6 +268,9 @@ station_days     — id, company_id, station_id, weekday, start_minute,
 station_breaks   — id, company_id, station_day_id, start_minute, end_minute
 planned_blocks   — id, company_id, station_id, order_id, moment_id,
                    starts_at, minutes, note, created_by_email
+staff_blocks     — id, company_id, employee_id, order_id, moment_id,
+                   planned_block_id?, starts_at, minutes, note,
+                   created_by_email
 
   — tillvalen, se § 3.1 —
 company_modules  — id, company_id, module, source, stripe_item_id,
@@ -827,7 +830,8 @@ stripe_prices    — item, month_price_id, year_price_id, updated_by_email
    som brådskar, och Oplacerat har ingen annan ordning än ordernummer.
 
    **Planerade rutor är inte personuppgifter.** En ruta bär station, order,
-   arbetsmoment och tid — ingen person. Vem som körde jobbet framgår bara av
+   arbetsmoment och tid — ingen person. Personalpassen gör det, se
+   planeringsläget nedan. Vem som körde jobbet framgår bara av
    stämplingarna, som redan har sin GDPR-väg. Anonymiseringen i § 4 punkt 8
    behöver därför inte röras, till skillnad från löneunderlagets poster.
 
@@ -865,11 +869,36 @@ stripe_prices    — item, month_price_id, year_price_id, updated_by_email
    löneunderlagets scheman, av samma skäl som stationernas öppettider har
    egna tabeller. Den som har båda tillvalen skriver in dem två gånger.
 
-   Byggs i faser. Fas 1 (läget, vyerna) är gjord; personalpassen, deras
-   tillgänglighet och utfallet mot stämplingen kommer i egna PR:er. **Ett
-   personalpass bär en person och är därför en personuppgift**, till skillnad
-   från en stationsruta, och ska med i anonymiseringen och registerutdraget
-   när tabellen läggs till.
+   Byggs i faser: läget och vyerna (fas 1), personalpassen (fas 2),
+   personalens arbetstider och tillgänglighet (fas 3) och passen mot
+   stämplingen (fas 4). Fas 1 och 2 är gjorda.
+
+   **PERSONALPASSEN** (tillagt 2026-10-14, fas 2). Ett pass är en anställd på
+   en order och ett arbetsmoment, med start och längd, i `staff_blocks`. Enda
+   vägen in är `src/lib/staff-planning.ts`. Tavlan är densamma som för
+   stationerna, med en rad per aktiv anställd: `PlanBoard` ritar "resurser",
+   där en station kör ett moment och en anställd tar vilket som helst.
+
+   - **I Tjänst** placeras passen från Oplacerat, med samma två tryck som
+     stationernas rutor, och räknar av orderns beräknade tid.
+   - **I Produktion** är passen bemanning. De läggs från stationsrutans dialog
+     med knappen **Bemanna**, bär rutans id (`planned_block_id`), och start
+     och längd föreslås ur rutan men går att ändra. De räknas inte mot
+     beräkningen.
+   - **Flyttas stationsrutan följer bemanningen med**, lika långt, i samma
+     transaktion (`moveBlock`). Bemanningen hör till körningen.
+   - **Tas stationsrutan bort ligger passet kvar** utan koppling
+     (`onDelete: SetNull`). En persons planerade dag ska inte försvinna för att
+     maskinplanen ändrades.
+   - **Två pass samtidigt för samma person varnas i gult**, avvisas inte. En
+     operatör kör ibland två maskiner (regel 2).
+   - Till fas 3 har en anställd inga arbetstider på tavlan: passet räknas i
+     väggklockans minuter, utan raster, och kapas vid midnatt.
+
+   **ETT PERSONALPASS ÄR EN PERSONUPPGIFT**, till skillnad från en
+   stationsruta: det säger var en namngiven person ska vara och när.
+   Anonymiseringen raderar passen och registerutdraget lämnar ut dem, även när
+   planeringen är avstängd, av samma skäl som frånvaron (§ 3.1).
 
 
 Multi-tenant-isolering byggs i appens kod: **varje databasfråga går via ett

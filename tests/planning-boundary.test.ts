@@ -42,6 +42,7 @@ const PLANNING_MODULES = [
   "plan-calendar",
   "plan-live",
   "planning-modes",
+  "staff-planning",
 ];
 
 /** Lönemodulens. Speglar payroll-boundary.test.ts. */
@@ -256,3 +257,37 @@ describe("planeringen skriver aldrig en stämpling", () => {
     );
   });
 });
+
+describe("personalpassen är personuppgifter", () => {
+  // Ett pass säger var en namngiven person ska vara och när. Till skillnad
+  // från en stationsruta ska det därför bort vid anonymisering och med i
+  // registerutdraget — även när planeringen är avstängd, av samma skäl som
+  // frånvaron (CLAUDE.md § 3.1). Testet läser källtexten, eftersom båda
+  // vägarna kräver en inloggad session att köra.
+
+  it("anonymiseringen raderar personens pass", () => {
+    const source = read("app/admin/(panel)/installningar/actions.ts");
+
+    expect(
+      source,
+      "anonymizeEmployee raderar inte personens planerade pass. De bär en " +
+        "person och ska bort när hen ber om att bli glömd."
+    ).toMatch(
+      /tx\.staffBlock\.deleteMany\(\{\s*where:\s*\{\s*employeeId:\s*id\s*\}\s*\}\)/
+    );
+  });
+
+  it("registerutdraget lämnar ut personens pass", () => {
+    const source = read("lib/person-export.ts");
+
+    expect(source).toMatch(/db\.staffBlock\.findMany\(\{\s*where:\s*\{\s*employeeId\s*\}/);
+    expect(source).toContain('addWorksheet("Planerade pass")');
+  });
+
+  it("registerutdraget frågar inte om modulen", () => {
+    // Ett utdrag som hoppade över passen för en kund som stängt av
+    // planeringen vore ett ofullständigt utdrag.
+    expect(read("lib/person-export.ts")).not.toMatch(/hasModule|requireModule/);
+  });
+});
+

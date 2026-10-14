@@ -66,7 +66,7 @@ export async function buildPersonExport(
 
   if (!employee) return null;
 
-  const [entries, breaks, absences, comp, events] = await Promise.all([
+  const [entries, breaks, absences, comp, passes, events] = await Promise.all([
     db.timeEntry.findMany({
       where: { employeeId },
       orderBy: { clockInAt: "asc" },
@@ -90,6 +90,17 @@ export async function buildPersonExport(
     db.compAdjustment.findMany({
       where: { employeeId },
       orderBy: { date: "asc" },
+    }),
+    // Planerade pass säger var personen skulle vara och när, och är därför
+    // personens uppgifter. Läses även när planeringen är avstängd, av samma
+    // skäl som frånvaron: en avstängd modul får inte göra uppgifter oåtkomliga.
+    db.staffBlock.findMany({
+      where: { employeeId },
+      orderBy: { startsAt: "asc" },
+      include: {
+        order: { select: { orderNumber: true } },
+        moment: { select: { name: true } },
+      },
     }),
     db.auditEvent.findMany({
       where: { subjectEmployeeId: employeeId },
@@ -240,6 +251,29 @@ export async function buildPersonExport(
       sheet.addRow({
         date: formatDate(row.date, timeZone),
         duration: formatSignedDuration(row.minutes),
+        note: row.note ?? "",
+        by: row.createdByEmail,
+      });
+    }
+  }
+
+  if (passes.length > 0) {
+    const sheet = workbook.addWorksheet("Planerade pass");
+    sheet.columns = [
+      { header: "Start", key: "start", width: 18 },
+      { header: "Order", key: "order", width: 14 },
+      { header: "Arbetsmoment", key: "moment", width: 20 },
+      { header: "Tid (timmar)", key: "duration", width: 14 },
+      { header: "Anteckning", key: "note", width: 40 },
+      { header: "Planerad av", key: "by", width: 28 },
+    ];
+
+    for (const row of passes) {
+      sheet.addRow({
+        start: formatDateTime(row.startsAt, timeZone),
+        order: row.order.orderNumber,
+        moment: row.moment.name,
+        duration: formatDuration(row.minutes),
         note: row.note ?? "",
         by: row.createdByEmail,
       });

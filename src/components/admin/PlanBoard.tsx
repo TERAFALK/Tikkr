@@ -21,27 +21,52 @@ import {
 } from "@/lib/plan-calendar";
 import type { BlockProgress } from "@/lib/plan-live";
 import { formatDuration } from "@/lib/format";
+import { instantFromWallTime, wallTimeIn } from "@/lib/time-zone";
 import {
   Alert,
   Button,
   Field,
   Input,
+  Select,
   Textarea,
   dialogSurface,
 } from "@/components/ui";
 import {
   moveBlockAction,
+  moveStaffBlockAction,
   noteBlockAction,
+  noteStaffBlockAction,
   placeBlockAction,
+  placeStaffBlockAction,
   removeBlockAction,
+  removeStaffBlockAction,
   resizeBlockAction,
+  resizeStaffBlockAction,
 } from "@/app/admin/(panel)/planering/actions";
 
 /**
  * TAVLAN.
  *
- * En rad per station, dagarna åt höger, och rutor som hämtar sin tid ur
+ * En rad per resurs, dagarna åt höger, och rutor som hämtar sin tid ur
  * orderns beräkning.
+ *
+ * ── TVÅ SORTERS RADER (ändrat 2026-10-14, fas 2 av issue #21) ───────────
+ *
+ * En rad är en STATION eller en ANSTÄLLD, och samma tavla ritar båda. En
+ * kopia för personalen hade varit tvåtusen rader som gled isär vid första
+ * ändringen.
+ *
+ * Skillnaderna är tre, och de bärs av raden och inte av villkor i koden:
+ *
+ *   MOMENTET. En station kör ett arbetsmoment och tar bara emot det. En
+ *   anställd har `momentId: null` och tar vilket som helst.
+ *
+ *   TIDERNA. En station har öppettider och raster. En anställd har inga än
+ *   (fas 3), `hours: null`, och då ritas dagen vit, utan stängd tid, och
+ *   varnas bara för pass som ligger i varandra.
+ *
+ *   ÅTGÄRDERNA. Stationens rutor och personalens pass skrivs genom var sin
+ *   uppsättning serveråtgärder, med samma form.
  *
  * ── ATT PLACERA ETT JOBB SKA VARA TVÅ TRYCK ──────────────────────────────
  *
@@ -79,17 +104,39 @@ import {
 /* Formen                                                                      */
 /* -------------------------------------------------------------------------- */
 
-export interface BoardStation {
+/** Vad raderna är. Avgör åtgärderna och texterna. */
+export type LaneKind = "stations" | "staff";
+
+/** En rad på tavlan: en station eller en anställd. */
+export interface BoardLane {
   id: string;
   name: string;
-  momentId: string;
-  momentName: string;
-  hours: StationHours[];
+  /** Raden under namnet: stationens arbetsmoment, eller tomt. */
+  detail: string | null;
+  /** Momentet raden tar emot. Null betyder vilket som helst. */
+  momentId: string | null;
+  /** Öppettiderna per veckodag. Null när raden inte har några tider. */
+  hours: StationHours[] | null;
+}
+
+/** En anställd att bemanna en stationsruta med. */
+export interface BoardEmployee {
+  id: string;
+  name: string;
+}
+
+/** Ett pass som bemannar en stationsruta, som rutans dialog visar det. */
+export interface BoardStaffing {
+  id: string;
+  employeeName: string;
+  startsAt: string;
+  minutes: number;
 }
 
 export interface BoardBlock {
   id: string;
-  stationId: string;
+  /** Raden rutan ligger på: stationens eller den anställdas id. */
+  laneId: string;
   orderId: string;
   orderNumber: string;
   customerName: string | null;
@@ -98,6 +145,8 @@ export interface BoardBlock {
   startsAt: string;
   minutes: number;
   note: string | null;
+  /** Stationen ett pass bemannar. Null för stationsrutor och fria pass. */
+  context: string | null;
 }
 
 export interface BoardUnplaced {
@@ -164,12 +213,32 @@ const DAY_SHORT = ["Mån", "Tis", "Ons", "Tors", "Fre", "Lör", "Sön"];
 
 const MS_PER_MINUTE = 60_000;
 
+/**
+ * Serveråtgärderna per sorts rad. Samma form, så att tavlan inte behöver veta
+ * vilken den talar med utöver fältet som pekar ut raden.
+ */
+const STATION_ACTIONS = {
+  place: placeBlockAction,
+  move: moveBlockAction,
+  resize: resizeBlockAction,
+  note: noteBlockAction,
+  remove: removeBlockAction,
+};
+
+const STAFF_ACTIONS = {
+  place: placeStaffBlockAction,
+  move: moveStaffBlockAction,
+  resize: resizeStaffBlockAction,
+  note: noteStaffBlockAction,
+  remove: removeStaffBlockAction,
+};
+
 /* -------------------------------------------------------------------------- */
 /* Dragningens tillstånd                                                       */
 /* -------------------------------------------------------------------------- */
 
 interface Slot {
-  stationId: string;
+  laneId: string;
   dayIndex: number;
   /** Starttiden pekaren svarar mot, redan snäppt. */
   startsAt: Date;
@@ -204,9 +273,13 @@ type Drag =
 /* -------------------------------------------------------------------------- */
 
 export default function PlanBoard({
-  stations,
+  kind,
+  lanes,
   blocks: initialBlocks,
   unplaced: initialUnplaced,
+  placesFromUnplaced,
+  employees,
+  staffing = {},
   monday,
   weekNumber,
   timeZone,
@@ -214,9 +287,23 @@ export default function PlanBoard({
   sequences,
   readOnly,
 }: {
-  stations: BoardStation[];
+  kind: LaneKind;
+  lanes: BoardLane[];
   blocks: BoardBlock[];
   unplaced: BoardUnplaced[];
+  /**
+   * Om raderna räknar av orderns beräknade tid, och Oplacerat därför visas.
+   * Personalen i en verkstad är bemanning och gör det inte, se
+   * lib/planning-modes.ts.
+   */
+  placesFromUnplaced: boolean;
+  /**
+   * Anställda att bemanna stationsrutor med. Utelämnat när raderna inte är
+   * stationer, och då har rutans dialog ingen bemanning.
+   */
+  employees?: BoardEmployee[];
+  /** Bemanningen per stationsruta. */
+  staffing?: Record<string, BoardStaffing[]>;
   /** Måndagens dygnsbörjan, som ISO. */
   monday: string;
   weekNumber: number;
@@ -233,6 +320,10 @@ export default function PlanBoard({
   readOnly: boolean;
 }) {
   const router = useRouter();
+
+  const isStaff = kind === "staff";
+  const laneField = isStaff ? "employeeId" : "stationId";
+  const actions = isStaff ? STAFF_ACTIONS : STATION_ACTIONS;
 
   const [blocks, setBlocks] = useState(initialBlocks);
   const [drag, setDrag] = useState<Drag | null>(null);
@@ -300,7 +391,10 @@ export default function PlanBoard({
   useEffect(() => {
     // INGEN POLLNING I EN VECKA SOM INTE PÅGÅR. I en vecka som varit eller
     // inte börjat finns ingenting levande att hämta.
-    if (!isCurrentWeek) {
+    //
+    // Inte heller för personalens pass: utfallet räknas per stationsruta, och
+    // pass mot stämpling är fas 4.
+    if (!isCurrentWeek || isStaff) {
       setProgress({});
       setNow(null);
       return;
@@ -319,29 +413,29 @@ export default function PlanBoard({
       document.removeEventListener("visibilitychange", onWake);
       window.removeEventListener("focus", onWake);
     };
-  }, [isCurrentWeek, syncProgress]);
+  }, [isCurrentWeek, isStaff, syncProgress]);
 
   /* --- Måtten ------------------------------------------------------------ */
 
   const hoursFor = useCallback(
-    (stationId: string, dayIndex: number): StationHours | null => {
-      const station = stations.find((item) => item.id === stationId);
-      if (!station) return null;
+    (laneId: string, dayIndex: number): StationHours | null => {
+      const lane = lanes.find((item) => item.id === laneId);
+      if (!lane?.hours) return null;
 
-      return station.hours.find((day) => day.weekday === dayIndex + 1) ?? null;
+      return lane.hours.find((day) => day.weekday === dayIndex + 1) ?? null;
     },
-    [stations]
+    [lanes]
   );
 
-  /** Vilka dagar som ritas. Helg visas när någon station går eller något ligger där. */
+  /** Vilka dagar som ritas. Helg visas när någon rad går eller något ligger där. */
   const visibleDays = useMemo(() => {
     const shown: number[] = [];
 
     for (let index = 0; index < 7; index++) {
       const weekend = index >= 5;
 
-      const open = stations.some((station) =>
-        station.hours.some((day) => day.weekday === index + 1)
+      const open = lanes.some((lane) =>
+        lane.hours?.some((day) => day.weekday === index + 1)
       );
 
       const used = blocks.some(
@@ -352,7 +446,7 @@ export default function PlanBoard({
     }
 
     return shown;
-  }, [blocks, days, stations]);
+  }, [blocks, days, lanes]);
 
   /**
    * Tidsaxeln per dag.
@@ -372,16 +466,16 @@ export default function PlanBoard({
         .map((block) => ({
           startsAt: new Date(block.startsAt),
           minutes: block.minutes,
-          hours: hoursFor(block.stationId, index),
+          hours: hoursFor(block.laneId, index),
         }));
 
-      const hours = stations.map((station) => hoursFor(station.id, index));
+      const hours = lanes.map((lane) => hoursFor(lane.id, index));
 
       result.set(index, dayWindow(hours, spans, days[index], timeZone));
     }
 
     return result;
-  }, [days, hoursFor, initialBlocks, stations, timeZone, visibleDays]);
+  }, [days, hoursFor, initialBlocks, lanes, timeZone, visibleDays]);
 
   /**
    * Skalan: pixlar per minut.
@@ -448,7 +542,7 @@ export default function PlanBoard({
       const rect = body.getBoundingClientRect();
 
       const row = Math.floor((clientY - rect.top) / ROW_HEIGHT);
-      if (row < 0 || row >= stations.length) return null;
+      if (row < 0 || row >= lanes.length) return null;
 
       let x = clientX - rect.left - STATION_COLUMN;
       if (x < 0) return null;
@@ -464,7 +558,7 @@ export default function PlanBoard({
           const snapped = Math.round(minute / SNAP_MINUTES) * SNAP_MINUTES;
 
           return {
-            stationId: stations[row].id,
+            laneId: lanes[row].id,
             dayIndex,
             startsAt: new Date(
               days[dayIndex].getTime() + Math.max(0, snapped) * MS_PER_MINUTE
@@ -477,7 +571,7 @@ export default function PlanBoard({
 
       return null;
     },
-    [days, pxPerMinute, stations, visibleDays, widthOf, windows]
+    [days, lanes, pxPerMinute, visibleDays, widthOf, windows]
   );
 
   /** Pixlar från tavlans vänsterkant till en dags början. */
@@ -525,15 +619,15 @@ export default function PlanBoard({
 
   const place = useCallback(
     async (row: BoardUnplaced, slot: Slot) => {
-      const station = stations.find((item) => item.id === slot.stationId);
-      if (!station) return;
+      const lane = lanes.find((item) => item.id === slot.laneId);
+      if (!lane) return;
 
-      if (station.momentId !== row.momentId) {
-        setError(`${station.name} kör inte ${row.momentName}.`);
+      if (lane.momentId !== null && lane.momentId !== row.momentId) {
+        setError(`${lane.name} kör inte ${row.momentName}.`);
         return;
       }
 
-      const hours = hoursFor(station.id, slot.dayIndex);
+      const hours = hoursFor(lane.id, slot.dayIndex);
       const room = fitsFrom(hours, slot.startsAt, timeZone);
 
       if (room < 1) {
@@ -549,7 +643,7 @@ export default function PlanBoard({
       // Tillfälligt id. Ersätts av serverns när sidan ritas om.
       const draft: BoardBlock = {
         id: `ny-${Date.now()}`,
-        stationId: station.id,
+        laneId: lane.id,
         orderId: row.orderId,
         orderNumber: row.orderNumber,
         customerName: row.customerName,
@@ -558,6 +652,7 @@ export default function PlanBoard({
         startsAt: slot.startsAt.toISOString(),
         minutes,
         note: null,
+        context: null,
       };
 
       setArmed(null);
@@ -569,23 +664,23 @@ export default function PlanBoard({
           const data = new FormData();
           data.set("orderId", row.orderId);
           data.set("momentId", row.momentId);
-          data.set("stationId", station.id);
+          data.set(laneField, lane.id);
           data.set("startsAt", slot.startsAt.toISOString());
           data.set("minutes", String(minutes));
-          return placeBlockAction({}, data);
+          return actions.place({}, data);
         }
       );
     },
-    [blocks, hoursFor, run, stations, timeZone]
+    [actions, blocks, hoursFor, laneField, lanes, run, timeZone]
   );
 
   const moveTo = useCallback(
     async (block: BoardBlock, slot: Slot) => {
-      const station = stations.find((item) => item.id === slot.stationId);
-      if (!station) return;
+      const lane = lanes.find((item) => item.id === slot.laneId);
+      if (!lane) return;
 
-      if (station.momentId !== block.momentId) {
-        setError(`${station.name} kör inte ${block.momentName}.`);
+      if (lane.momentId !== null && lane.momentId !== block.momentId) {
+        setError(`${lane.name} kör inte ${block.momentName}.`);
         return;
       }
 
@@ -597,7 +692,7 @@ export default function PlanBoard({
               item.id === block.id
                 ? {
                     ...item,
-                    stationId: station.id,
+                    laneId: lane.id,
                     startsAt: slot.startsAt.toISOString(),
                   }
                 : item
@@ -606,13 +701,13 @@ export default function PlanBoard({
         () => {
           const data = new FormData();
           data.set("blockId", block.id);
-          data.set("stationId", station.id);
+          data.set(laneField, lane.id);
           data.set("startsAt", slot.startsAt.toISOString());
-          return moveBlockAction({}, data);
+          return actions.move({}, data);
         }
       );
     },
-    [blocks, run, stations]
+    [actions, blocks, laneField, lanes, run]
   );
 
   const resize = useCallback(
@@ -631,11 +726,11 @@ export default function PlanBoard({
           const data = new FormData();
           data.set("blockId", block.id);
           data.set("minutes", String(minutes));
-          return resizeBlockAction({}, data);
+          return actions.resize({}, data);
         }
       );
     },
-    [blocks, run]
+    [actions, blocks, run]
   );
 
   const saveNote = useCallback(
@@ -656,11 +751,11 @@ export default function PlanBoard({
           const data = new FormData();
           data.set("blockId", block.id);
           data.set("note", note);
-          return noteBlockAction({}, data);
+          return actions.note({}, data);
         }
       );
     },
-    [blocks, run]
+    [actions, blocks, run]
   );
 
   const remove = useCallback(
@@ -674,11 +769,55 @@ export default function PlanBoard({
         () => {
           const data = new FormData();
           data.set("blockId", block.id);
-          return removeBlockAction({}, data);
+          return actions.remove({}, data);
         }
       );
     },
-    [blocks, run]
+    [actions, blocks, run]
+  );
+
+  /**
+   * Bemannar en stationsruta: ett pass för en anställd, kopplat till rutan.
+   *
+   * Svarar med felet i stället för att lägga det överst på tavlan. Dialogen
+   * ligger över tavlan, och ett fel bakom den hade ingen sett.
+   */
+  const staff = useCallback(
+    async (
+      block: BoardBlock,
+      employeeId: string,
+      startsAt: Date,
+      minutes: number
+    ): Promise<string | null> => {
+      const data = new FormData();
+      data.set("employeeId", employeeId);
+      data.set("orderId", block.orderId);
+      data.set("momentId", block.momentId);
+      data.set("plannedBlockId", block.id);
+      data.set("startsAt", startsAt.toISOString());
+      data.set("minutes", String(minutes));
+
+      const result = await placeStaffBlockAction({}, data);
+      if (result.error) return result.error;
+
+      router.refresh();
+      return null;
+    },
+    [router]
+  );
+
+  const unstaff = useCallback(
+    async (id: string): Promise<string | null> => {
+      const data = new FormData();
+      data.set("blockId", id);
+
+      const result = await removeStaffBlockAction({}, data);
+      if (result.error) return result.error;
+
+      router.refresh();
+      return null;
+    },
+    [router]
   );
 
   /* --- Pekaren ----------------------------------------------------------- */
@@ -861,12 +1000,12 @@ export default function PlanBoard({
     }
 
     if (drag.kind === "move" && drag.slot) {
-      const { stationId, startsAt } = drag.slot;
+      const { laneId, startsAt } = drag.slot;
       const moving = drag.block.id;
 
       return blocks.map((block) =>
         block.id === moving
-          ? { ...block, stationId, startsAt: startsAt.toISOString() }
+          ? { ...block, laneId, startsAt: startsAt.toISOString() }
           : block
       );
     }
@@ -954,7 +1093,12 @@ export default function PlanBoard({
    * är okänd då, men att en fräsning delats på två dagar vet vi ändå.
    */
   const arrows = useMemo(() => {
-    const rows = new Map(stations.map((station, index) => [station.id, index]));
+    // Bara där raderna räknar av beräkningen. Bemanningen i en verkstad följer
+    // stationens rutor, och samma pilar en gång till på personalens rader
+    // säger ingenting nytt.
+    if (!placesFromUnplaced) return [];
+
+    const rows = new Map(lanes.map((lane, index) => [lane.id, index]));
 
     const found: {
       key: string;
@@ -1051,7 +1195,7 @@ export default function PlanBoard({
 
       const axis = windows.get(dayIndex);
       const base = dayOffset(dayIndex);
-      const row = rows.get(block.stationId);
+      const row = rows.get(block.laneId);
 
       if (!axis || base === null || row === undefined) return null;
 
@@ -1070,10 +1214,11 @@ export default function PlanBoard({
     dayOffset,
     days,
     hoursFor,
+    lanes,
+    placesFromUnplaced,
     pxPerMinute,
     sequences,
     shown,
-    stations,
     timeZone,
     windows,
   ]);
@@ -1092,12 +1237,15 @@ export default function PlanBoard({
     >
       {error && <Alert>{error}</Alert>}
 
-      <UnplacedStrip
-        rows={unplaced}
-        armed={armed}
-        readOnly={readOnly}
-        onPointerDownRow={beginNew}
-      />
+      {placesFromUnplaced && (
+        <UnplacedStrip
+          kind={kind}
+          rows={unplaced}
+          armed={armed}
+          readOnly={readOnly}
+          onPointerDownRow={beginNew}
+        />
+      )}
 
       <div className="flex items-center justify-between gap-3">
         <p className="text-[13px] text-neutral-500">
@@ -1133,14 +1281,16 @@ export default function PlanBoard({
         </div>
       </div>
 
-      {stations.length === 0 ? (
+      {lanes.length === 0 ? (
         <div className="rounded-lg border border-dashed border-neutral-200 bg-neutral-50/50 px-6 py-14 text-center">
           <p className="text-sm font-medium text-neutral-900">
-            Inga öppna stationer
+            {isStaff ? "Inga aktiva anställda" : "Inga öppna stationer"}
           </p>
-          <p className="mx-auto mt-1 max-w-md text-[13px] text-neutral-500">
-            Lägg upp stationerna innan du planerar.
-          </p>
+          {!isStaff && (
+            <p className="mx-auto mt-1 max-w-md text-[13px] text-neutral-500">
+              Lägg upp stationerna innan du planerar.
+            </p>
+          )}
         </div>
       ) : (
         <div
@@ -1154,7 +1304,7 @@ export default function PlanBoard({
                 style={{ width: STATION_COLUMN }}
                 className="sticky left-0 z-20 shrink-0 border-r border-neutral-200 bg-neutral-50 px-3 py-2 text-[11px] font-semibold uppercase tracking-wider text-neutral-400"
               >
-                Station
+                {isStaff ? "Anställd" : "Station"}
               </div>
 
               {visibleDays.map((index) => (
@@ -1190,7 +1340,7 @@ export default function PlanBoard({
                 <svg
                   className="pointer-events-none absolute left-0 top-0 z-[15]"
                   width={contentWidth}
-                  height={stations.length * ROW_HEIGHT}
+                  height={lanes.length * ROW_HEIGHT}
                   aria-hidden="true"
                 >
                   <defs>
@@ -1224,13 +1374,15 @@ export default function PlanBoard({
                 </svg>
               )}
 
-              {stations.map((station) => {
-                const dim = seeking !== null && seeking !== station.momentId;
-                const target = seeking !== null && seeking === station.momentId;
+              {lanes.map((lane) => {
+                const takes =
+                  lane.momentId === null || lane.momentId === seeking;
+                const dim = seeking !== null && !takes;
+                const target = seeking !== null && takes;
 
                 return (
                   <div
-                    key={station.id}
+                    key={lane.id}
                     className={`flex border-b border-neutral-100 last:border-b-0 ${ROW_CLASS} ${
                       dim ? "opacity-40" : ""
                     }`}
@@ -1242,17 +1394,20 @@ export default function PlanBoard({
                       }`}
                     >
                       <p className="truncate text-[13px] font-medium text-neutral-900">
-                        {station.name}
+                        {lane.name}
                       </p>
-                      <p className="truncate text-[11px] text-neutral-400">
-                        {station.momentName}
-                      </p>
+                      {lane.detail && (
+                        <p className="truncate text-[11px] text-neutral-400">
+                          {lane.detail}
+                        </p>
+                      )}
                     </div>
 
                     {visibleDays.map((dayIndex) => (
                       <DayCell
                         key={dayIndex}
-                        stationName={station.name}
+                        laneName={lane.name}
+                        hoursKnown={lane.hours !== null}
                         day={days[dayIndex]}
                         days={days}
                         dayIndex={dayIndex}
@@ -1260,17 +1415,17 @@ export default function PlanBoard({
                         width={widthOf(dayIndex)}
                         pxPerMinute={pxPerMinute}
                         timeZone={timeZone}
-                        hours={hoursFor(station.id, dayIndex)}
+                        hours={hoursFor(lane.id, dayIndex)}
                         blocks={shown.filter(
                           (block) =>
-                            block.stationId === station.id &&
+                            block.laneId === lane.id &&
                             dayIndexOf(new Date(block.startsAt), days) ===
                               dayIndex
                         )}
                         progress={progress}
                         now={now}
                         highlight={
-                          dropSlot?.stationId === station.id &&
+                          dropSlot?.laneId === lane.id &&
                           dropSlot.dayIndex === dayIndex
                         }
                         draggedBlockId={draggedBlockId}
@@ -1288,7 +1443,7 @@ export default function PlanBoard({
         </div>
       )}
 
-      <Legend armed={armed} />
+      <Legend kind={kind} armed={armed} placing={placesFromUnplaced} />
 
       {/* SPÖKET SOM FÖLJER PEKAREN under en dragning från Oplacerat.
           Utan det ser en dragning ut som att ingenting händer, vilket var en
@@ -1317,6 +1472,12 @@ export default function PlanBoard({
           progress={progress[editing.id]}
           timeZone={timeZone}
           readOnly={readOnly}
+          employees={employees}
+          staffing={staffing[editing.id] ?? []}
+          onStaff={(employeeId, startsAt, minutes) =>
+            staff(editing, employeeId, startsAt, minutes)
+          }
+          onUnstaff={unstaff}
           onClose={() => setEditing(null)}
           onRemove={() => void remove(editing)}
           onSave={(minutes, note) => {
@@ -1348,11 +1509,13 @@ export default function PlanBoard({
  * nedåt trycker ned tavlan, och tavlan ska ligga still.
  */
 function UnplacedStrip({
+  kind,
   rows,
   armed,
   readOnly,
   onPointerDownRow,
 }: {
+  kind: LaneKind;
   rows: BoardUnplaced[];
   armed: BoardUnplaced | null;
   readOnly: boolean;
@@ -1377,7 +1540,8 @@ function UnplacedStrip({
 
         {armed && (
           <span className="ml-auto truncate text-[12px] font-medium text-tick-deep">
-            Tryck på en station för att placera {armed.orderNumber}
+            Tryck på {kind === "staff" ? "en anställd" : "en station"} för att
+            placera {armed.orderNumber}
           </span>
         )}
       </div>
@@ -1395,6 +1559,7 @@ function UnplacedStrip({
           {plannable.map((row) => (
             <Chip
               key={`${row.orderId}:${row.momentId}`}
+              kind={kind}
               row={row}
               armed={
                 armed?.orderId === row.orderId &&
@@ -1408,6 +1573,7 @@ function UnplacedStrip({
           {blocked.map((row) => (
             <Chip
               key={`${row.orderId}:${row.momentId}`}
+              kind={kind}
               row={row}
               armed={false}
               readOnly
@@ -1421,12 +1587,14 @@ function UnplacedStrip({
 }
 
 function Chip({
+  kind,
   row,
   armed,
   readOnly,
   blocked = false,
   onPointerDown,
 }: {
+  kind: LaneKind;
   row: BoardUnplaced;
   armed: boolean;
   readOnly: boolean;
@@ -1440,7 +1608,9 @@ function Chip({
       onPointerDown={onPointerDown}
       title={
         blocked
-          ? `Ingen station kör ${row.momentName}`
+          ? kind === "staff"
+            ? "Inga aktiva anställda"
+            : `Ingen station kör ${row.momentName}`
           : `${row.orderNumber} · ${row.momentName}`
       }
       className={`w-44 shrink-0 rounded-md border px-2.5 py-2 ${
@@ -1474,7 +1644,9 @@ function Chip({
 
       <p className="truncate text-[11px] text-neutral-400">
         {blocked
-          ? "Ingen station"
+          ? kind === "staff"
+            ? "Ingen anställd"
+            : "Ingen station"
           : row.budgetMinutes === null
             ? "Ingen beräkning"
             : over
@@ -1492,7 +1664,8 @@ function Chip({
 /* -------------------------------------------------------------------------- */
 
 function DayCell({
-  stationName,
+  laneName,
+  hoursKnown,
   day,
   days,
   dayIndex,
@@ -1511,7 +1684,13 @@ function DayCell({
   onBlockPointerDown,
   onResizeStart,
 }: {
-  stationName: string;
+  laneName: string;
+  /**
+   * false för en rad utan arbetstider, som en anställd i fas 2. Dagen ritas
+   * då vit, och bara pass som ligger i varandra varnas för: utan tider finns
+   * ingen dag att överboka.
+   */
+  hoursKnown: boolean;
   day: Date;
   days: Date[];
   dayIndex: number;
@@ -1547,7 +1726,9 @@ function DayCell({
     timeZone
   );
 
-  const over = load.overlaps || load.plannedMinutes > load.capacityMinutes;
+  const over =
+    load.overlaps ||
+    (hoursKnown && load.plannedMinutes > load.capacityMinutes);
 
   return (
     <div
@@ -1557,10 +1738,12 @@ function DayCell({
       } ${pickable ? "cursor-copy" : ""}`}
     >
       <div className="relative h-full">
-        {/* Stängd tid och raster i grått, det öppna vitt. */}
-        <div className="absolute inset-0 bg-neutral-100/70" />
+        {/* Stängd tid och raster i grått, det öppna vitt. En rad utan tider
+            har ingen stängd tid. */}
+        {hoursKnown && <div className="absolute inset-0 bg-neutral-100/70" />}
 
         {axis &&
+          hoursKnown &&
           workingWindows(hours, day, timeZone).map((span, index) => (
             <div
               key={index}
@@ -1613,10 +1796,12 @@ function DayCell({
           className="absolute right-1 top-1 z-20 rounded bg-amber-100 px-1 text-[10px] font-semibold text-amber-800"
           title={
             load.overlaps
-              ? "Två jobb ligger i varandra"
+              ? hoursKnown
+                ? "Två jobb ligger i varandra"
+                : `${laneName} har två pass samtidigt`
               : `${formatDuration(
                   load.plannedMinutes - load.capacityMinutes
-                )} mer än ${stationName} hinner`
+                )} mer än ${laneName} hinner`
           }
         >
           {load.overlaps ? "krock" : "över"}
@@ -1784,27 +1969,44 @@ function hourTicks(
   return ticks;
 }
 
-function Legend({ armed }: { armed: BoardUnplaced | null }) {
+function Legend({
+  kind,
+  armed,
+  placing,
+}: {
+  kind: LaneKind;
+  armed: BoardUnplaced | null;
+  /** Om jobb placeras från Oplacerat. Annars finns ingen instruktion att ge. */
+  placing: boolean;
+}) {
+  const target = kind === "staff" ? "en anställd" : "en station";
+
   return (
     <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-neutral-500">
       <span className="flex items-center gap-1.5">
         <span className="h-2.5 w-4 rounded-sm bg-fjord" />
         Planerat
       </span>
-      <span className="flex items-center gap-1.5">
-        <span className="h-2.5 w-4 rounded-sm bg-tick-deep" />
-        Stämplat
-      </span>
-      <span className="flex items-center gap-1.5">
-        <span className="h-2.5 w-4 rounded-sm bg-neutral-200" />
-        Stängt eller rast
-      </span>
+      {kind === "stations" && (
+        <>
+          <span className="flex items-center gap-1.5">
+            <span className="h-2.5 w-4 rounded-sm bg-tick-deep" />
+            Stämplat
+          </span>
+          <span className="flex items-center gap-1.5">
+            <span className="h-2.5 w-4 rounded-sm bg-neutral-200" />
+            Stängt eller rast
+          </span>
+        </>
+      )}
 
-      <span className="ml-auto text-neutral-400">
-        {armed
-          ? "Tryck på en station, eller Esc för att avbryta"
-          : "Tryck på ett jobb i Oplacerat, sedan på en station"}
-      </span>
+      {placing && (
+        <span className="ml-auto text-neutral-400">
+          {armed
+            ? `Tryck på ${target}, eller Esc för att avbryta`
+            : `Tryck på ett jobb i Oplacerat, sedan på ${target}`}
+        </span>
+      )}
     </div>
   );
 }
@@ -1819,6 +2021,10 @@ function BlockDialog({
   progress,
   timeZone,
   readOnly,
+  employees,
+  staffing,
+  onStaff,
+  onUnstaff,
   onClose,
   onRemove,
   onSave,
@@ -1828,6 +2034,15 @@ function BlockDialog({
   progress?: BlockProgress;
   timeZone: string;
   readOnly: boolean;
+  /** Utelämnat när rutan inte är en stationsruta. Då visas ingen bemanning. */
+  employees?: BoardEmployee[];
+  staffing: BoardStaffing[];
+  onStaff: (
+    employeeId: string,
+    startsAt: Date,
+    minutes: number
+  ) => Promise<string | null>;
+  onUnstaff: (id: string) => Promise<string | null>;
   onClose: () => void;
   onRemove: () => void;
   onSave: (minutes: number, note: string) => void;
@@ -1854,6 +2069,7 @@ function BlockDialog({
           {clockText(new Date(block.startsAt), timeZone)} till{" "}
           {clockText(end, timeZone)}
           {block.customerName ? ` · ${block.customerName}` : ""}
+          {block.context ? ` · ${block.context}` : ""}
         </p>
       </div>
 
@@ -1887,6 +2103,18 @@ function BlockDialog({
             disabled={readOnly}
           />
         </Field>
+
+        {employees && (
+          <Staffing
+            block={block}
+            timeZone={timeZone}
+            readOnly={readOnly}
+            employees={employees}
+            staffing={staffing}
+            onStaff={onStaff}
+            onUnstaff={onUnstaff}
+          />
+        )}
       </div>
 
       <div className="flex items-center justify-between gap-2 border-t border-neutral-200 bg-neutral-50 px-5 py-3">
@@ -1928,6 +2156,135 @@ function BlockDialog({
   );
 }
 
+/**
+ * BEMANNINGEN AV EN STATIONSRUTA.
+ *
+ * Vem som står vid maskinen, och när. Start och längd föreslås ur rutan men
+ * går att ändra: en CNC som kör sex timmar obemannad behöver en timmes
+ * ställtid, inte sex timmars operatör. Passen räknas inte mot orderns
+ * beräkning, se lib/planning-modes.ts.
+ */
+function Staffing({
+  block,
+  timeZone,
+  readOnly,
+  employees,
+  staffing,
+  onStaff,
+  onUnstaff,
+}: {
+  block: BoardBlock;
+  timeZone: string;
+  readOnly: boolean;
+  employees: BoardEmployee[];
+  staffing: BoardStaffing[];
+  onStaff: (
+    employeeId: string,
+    startsAt: Date,
+    minutes: number
+  ) => Promise<string | null>;
+  onUnstaff: (id: string) => Promise<string | null>;
+}) {
+  const [employeeId, setEmployeeId] = useState("");
+  const [start, setStart] = useState(() =>
+    clockText(new Date(block.startsAt), timeZone)
+  );
+  const [hours, setHours] = useState(() => formatDuration(block.minutes));
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  async function submit() {
+    const minutes = parseHourText(hours);
+    const startsAt = parseClockOnDay(start, new Date(block.startsAt), timeZone);
+
+    if (!employeeId) return setError("Välj en anställd.");
+    if (startsAt === null) return setError("Ange starttid, t.ex. 07:00.");
+    if (minutes === null) return setError("Ange planerad tid, t.ex. 1,5.");
+
+    setBusy(true);
+    const failed = await onStaff(employeeId, startsAt, minutes);
+    setBusy(false);
+
+    setError(failed);
+    if (!failed) setEmployeeId("");
+  }
+
+  async function remove(id: string) {
+    setBusy(true);
+    setError(await onUnstaff(id));
+    setBusy(false);
+  }
+
+  return (
+    <div className="space-y-3 border-t border-neutral-200 pt-4">
+      <h3 className="text-[13px] font-semibold text-neutral-900">Bemanning</h3>
+
+      {error && <Alert>{error}</Alert>}
+
+      {staffing.length > 0 && (
+        <ul className="divide-y divide-neutral-100 rounded-md border border-neutral-200">
+          {staffing.map((pass) => (
+            <li
+              key={pass.id}
+              className="flex items-center justify-between gap-2 px-3 py-2 text-[13px]"
+            >
+              <span className="min-w-0 truncate text-neutral-900">
+                {pass.employeeName}
+              </span>
+              <span className="flex shrink-0 items-center gap-3 tabular-nums text-neutral-500">
+                {clockText(new Date(pass.startsAt), timeZone)} ·{" "}
+                {formatDuration(pass.minutes)}
+                {!readOnly && (
+                  <button
+                    type="button"
+                    onClick={() => void remove(pass.id)}
+                    disabled={busy}
+                    className="text-[12px] font-medium text-red-700 hover:underline"
+                  >
+                    Ta bort
+                  </button>
+                )}
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      {!readOnly && (
+        <div className="grid gap-3 sm:grid-cols-[1fr_5.5rem_5.5rem_auto] sm:items-end">
+          <Field label="Anställd">
+            <Select
+              value={employeeId}
+              onChange={(event) => setEmployeeId(event.target.value)}
+            >
+              <option value="">Välj…</option>
+              {employees.map((employee) => (
+                <option key={employee.id} value={employee.id}>
+                  {employee.name}
+                </option>
+              ))}
+            </Select>
+          </Field>
+          <Field label="Start">
+            <Input value={start} onChange={(event) => setStart(event.target.value)} />
+          </Field>
+          <Field label="Tid">
+            <Input value={hours} onChange={(event) => setHours(event.target.value)} />
+          </Field>
+          <Button
+            type="button"
+            tone="secondary"
+            onClick={() => void submit()}
+            disabled={busy}
+          >
+            Bemanna
+          </Button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 /* -------------------------------------------------------------------------- */
 /* Räknehjälp                                                                  */
 /* -------------------------------------------------------------------------- */
@@ -1961,23 +2318,23 @@ function arrowPath(arrow: {
 /** Rutans slut som millisekunder. Används av pilarna. */
 function endMs(
   block: BoardBlock,
-  hoursFor: (stationId: string, dayIndex: number) => StationHours | null,
+  hoursFor: (laneId: string, dayIndex: number) => StationHours | null,
   days: Date[],
   timeZone: string
 ): number {
   return endOf(block, hoursFor, days, timeZone).getTime();
 }
 
-/** Rutans slut på väggen, givet stationernas tider. */
+/** Rutans slut på väggen, givet radernas tider. */
 function endOf(
   block: BoardBlock,
-  hoursFor: (stationId: string, dayIndex: number) => StationHours | null,
+  hoursFor: (laneId: string, dayIndex: number) => StationHours | null,
   days: Date[],
   timeZone: string
 ): Date {
   const startsAt = new Date(block.startsAt);
   const index = dayIndexOf(startsAt, days);
-  const hours = index === null ? null : hoursFor(block.stationId, index);
+  const hours = index === null ? null : hoursFor(block.laneId, index);
 
   return blockEnd(hours, startsAt, block.minutes, timeZone);
 }
@@ -2119,4 +2476,26 @@ function parseHourText(raw: string): number | null {
   if (!Number.isFinite(value) || value <= 0) return null;
 
   return snap(Math.round(value * 60));
+}
+
+/**
+ * "07:00" som en tidpunkt samma dag på väggen som `day`.
+ *
+ * Bara kolon, eftersom det är ett klockslag och inte en längd (CLAUDE.md
+ * § 7.1 punkt 8). "7" godtas som 07:00, som de flesta skriver det.
+ */
+function parseClockOnDay(
+  raw: string,
+  day: Date,
+  timeZone: string
+): Date | null {
+  const match = raw.trim().match(/^(\d{1,2})(?::(\d{2}))?$/);
+  if (!match) return null;
+
+  const hour = Number(match[1]);
+  const minute = Number(match[2] ?? "0");
+  if (hour > 23 || minute > 59) return null;
+
+  const wall = wallTimeIn(day, timeZone);
+  return instantFromWallTime({ ...wall, hour, minute }, timeZone);
 }

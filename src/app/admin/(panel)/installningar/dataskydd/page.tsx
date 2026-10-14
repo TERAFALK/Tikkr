@@ -22,6 +22,9 @@ export default async function DataProtectionPage() {
   // Med löneunderlaget registreras frånvaro med orsak, vilket kan vara en
   // uppgift om hälsa. Utan det finns ingen sådan uppgift i systemet alls.
   const payroll = await hasModule(companyId, "PAYROLL");
+  // Planeringens pass bär en person. Texten nämner dem bara när de kan finnas,
+  // av samma skäl som löneunderlagets rader ovan.
+  const planning = await hasModule(companyId, "PLANNING");
 
   const employees = await db.employee.findMany({
     orderBy: { name: "asc" },
@@ -132,6 +135,12 @@ export default async function DataProtectionPage() {
           ) : (
             <p>
               Ingen löneinformation, frånvaro eller sjukdom registreras.
+            </p>
+          )}
+          {planning && (
+            <p>
+              Med planeringen registreras planerade pass per anställd: order,
+              arbetsmoment och tid.
             </p>
           )}
           <p>
