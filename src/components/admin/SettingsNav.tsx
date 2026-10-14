@@ -4,13 +4,17 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { ModuleKey } from "@/lib/modules";
 import {
+  IconBroom,
   IconBuilding,
   IconCalendar,
   IconClock,
+  IconDevice,
   IconHistory,
+  IconMoment,
   IconPeople,
   IconReport,
   IconShield,
+  IconStation,
   IconTag,
   IconTimeline,
 } from "@/components/ui/icons";
@@ -21,14 +25,15 @@ import {
  * En enda lång inställningssida gör att man måste läsa allt för att hitta det
  * man söker. Uppdelat efter vad man faktiskt kom hit för att göra.
  *
- * GRUPPERAD I TRE AVSNITT, av samma skäl som vänstermenyn är det: åtta
+ * GRUPPERAD I AVSNITT, av samma skäl som vänstermenyn är det: åtta
  * likvärdiga länkar i rad tvingar ögat att läsa alla varje gång. Avsnitten
- * svarar på tre olika frågor — hur arbetsytan är satt upp, hur tiden räknas
- * till lön, och vem som kommer in och vad som hänt.
+ * svarar på olika frågor — hur arbetsytan är satt upp, vad som går att
+ * stämpla och var, hur tavlan och tiden till lön räknas, och vem som kommer
+ * in och vad som hänt.
  *
- * Löneunderlagets två sidor ligger i ett EGET avsnitt och inte utspridda
- * bland de andra. Hela avsnittet faller bort med tillvalet, och det som står
- * kvar är då inte en lista med hål i.
+ * Varje tillvals sidor ligger i ett EGET avsnitt och inte utspridda bland de
+ * andra. Hela avsnittet faller bort med tillvalet, och det som står kvar är
+ * då inte en lista med hål i.
  *
  * Det egna kontot ligger INTE här. Namn, telefonnummer och lösenord är den
  * inloggades egna uppgifter och inte inställningar för arbetsytan, se
@@ -72,6 +77,44 @@ const sections: SettingsSection[] = [
         label: "Prenumeration",
         description: "Betalning och skärmar",
         icon: IconTag,
+      },
+    ],
+  },
+  {
+    // Register som sätts upp en gång och sedan står. De låg i vänstermenyn
+    // till 2026-10-14 (issue #17), bredvid ordrarna och kunderna som ändras
+    // varje vecka.
+    label: "Stämpling",
+    pages: [
+      {
+        href: "/admin/installningar/arbetsmoment",
+        label: "Arbetsmoment",
+        description: "Moment och timkostnad",
+        icon: IconMoment,
+      },
+      {
+        href: "/admin/installningar/improduktivt",
+        label: "Improduktiv tid",
+        description: "Städning, möten, underhåll",
+        icon: IconBroom,
+      },
+      {
+        href: "/admin/installningar/skarmar",
+        label: "Stämplingsskärmar",
+        description: "Koppla och styr skärmar",
+        icon: IconDevice,
+      },
+    ],
+  },
+  {
+    label: "Planering",
+    module: "PLANNING",
+    pages: [
+      {
+        href: "/admin/installningar/stationer",
+        label: "Stationer",
+        description: "Maskiner och öppettider",
+        icon: IconStation,
       },
     ],
   },

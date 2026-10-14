@@ -1,6 +1,8 @@
 import { requireAdmin } from "@/lib/admin-session";
 import FormDialog from "@/components/admin/FormDialog";
+import ConfirmButton from "@/components/admin/ConfirmButton";
 import {
+  Alert,
   Badge,
   Button,
   Card,
@@ -8,74 +10,77 @@ import {
   EmptyState,
   Field,
   Input,
-  PageHeader,
   Table,
   Td,
   Th,
   Tr,
 } from "@/components/ui";
-import { formatCurrency } from "@/lib/money";
-import { createMoment, renameMoment, toggleMoment } from "./actions";
-
-/** Hjälptexten är densamma i båda rutorna, så den står på ett ställe. */
-/** Samma text i båda rutorna, därför på ett ställe. */
-const COST_HINT = "Kronor per timme. Gäller tid som registreras framöver";
+import {
+  createIndirectMoment,
+  deleteIndirectMoment,
+  renameIndirectMoment,
+  toggleIndirectMoment,
+} from "./actions";
 
 export const dynamic = "force-dynamic";
 
-export default async function MomentsPage() {
+export default async function IndirectMomentsPage() {
   const { db } = await requireAdmin();
 
-  const moments = await db.workMoment.findMany({
+  const moments = await db.indirectMoment.findMany({
     orderBy: [{ active: "desc" }, { name: "asc" }],
     select: {
       id: true,
       name: true,
       active: true,
-      costRateOre: true,
       _count: { select: { timeEntries: true } },
     },
   });
 
   const newMoment = (
     <FormDialog
-      trigger="Nytt arbetsmoment"
-      title="Lägg till arbetsmoment"
-      action={createMoment}
+      trigger="Nytt improduktivt moment"
+      title="Lägg till improduktivt moment"
+      action={createIndirectMoment}
       submitLabel="Lägg till"
     >
       <Field label="Namn">
-        <Input name="name" placeholder="Svetsning" required autoFocus />
-      </Field>
-      <Field label="Timkostnad" hint={COST_HINT}>
-        <Input name="costRate" inputMode="decimal" placeholder="180" />
+        <Input name="name" placeholder="Städning" required autoFocus />
       </Field>
     </FormDialog>
   );
 
   return (
     <>
-      <PageHeader
-        title="Arbetsmoment"
-        help="arbetsmoment"
-        action={newMoment}
-      />
+      <div className="mb-4">
+        <Alert tone="info">
+          Tid som stämplas här kommer aldrig med i ett orderunderlag eller en
+          efterkalkyl. Den syns i rapporterna.
+        </Alert>
+      </div>
 
-      {moments.length === 0 ? (
-        <EmptyState
-          title="Inga arbetsmoment upplagda"
+      {/* Ett kort och ingen egen sidrubrik, som de andra sidorna under
+          Inställningar (issue #17). */}
+      <Card>
+        <CardHeader
+          title="Improduktiv tid"
+          help="improduktiv-tid"
+          description="Tid som inte hör till en kundorder."
           action={newMoment}
         />
-      ) : (
-        <Card>
-          <CardHeader
-            title={`${moments.length} moment`}
-          />
+
+        {moments.length === 0 ? (
+          <div className="p-5">
+            <EmptyState
+              title="Inga improduktiva moment upplagda"
+              action={newMoment}
+            />
+          </div>
+        ) : (
           <Table>
             <thead>
               <tr>
                 <Th>Namn</Th>
-                <Th numeric>Timkostnad</Th>
                 <Th>Status</Th>
                 <Th numeric>Stämplingar</Th>
                 <Th>
@@ -88,11 +93,6 @@ export default async function MomentsPage() {
                 <Tr key={moment.id} dimmed={!moment.active}>
                   <Td>
                     <span className="font-medium">{moment.name}</span>
-                  </Td>
-                  <Td numeric muted={moment.costRateOre === null}>
-                    {moment.costRateOre === null
-                      ? "—"
-                      : `${formatCurrency(moment.costRateOre)}/tim`}
                   </Td>
                   <Td>
                     {moment.active ? (
@@ -109,8 +109,8 @@ export default async function MomentsPage() {
                       <FormDialog
                         trigger="Ändra"
                         triggerTone="ghost"
-                        title="Ändra arbetsmoment"
-                        action={renameMoment}
+                        title="Ändra improduktivt moment"
+                        action={renameIndirectMoment}
                         submitLabel="Spara"
                       >
                         <input type="hidden" name="id" value={moment.id} />
@@ -122,24 +122,9 @@ export default async function MomentsPage() {
                             autoFocus
                           />
                         </Field>
-                        <Field label="Timkostnad" hint={COST_HINT}>
-                          <Input
-                            name="costRate"
-                            inputMode="decimal"
-                            placeholder="180"
-                            defaultValue={
-                              moment.costRateOre === null
-                                ? ""
-                                : String(moment.costRateOre / 100).replace(
-                                    ".",
-                                    ","
-                                  )
-                            }
-                          />
-                        </Field>
                       </FormDialog>
 
-                      <form action={toggleMoment}>
+                      <form action={toggleIndirectMoment}>
                         <input type="hidden" name="id" value={moment.id} />
                         <input
                           type="hidden"
@@ -150,14 +135,32 @@ export default async function MomentsPage() {
                           {moment.active ? "Avaktivera" : "Återaktivera"}
                         </Button>
                       </form>
+
+                      {/* TA BORT finns bara för moment som aldrig stämplats
+                          på. Ett moment med registrerad tid avaktiveras, för
+                          tiden är underlag för en lön och en post vars moment
+                          försvunnit går inte att förklara. Se
+                          deleteIndirectMoment. */}
+                      {moment._count.timeEntries === 0 && (
+                        <form action={deleteIndirectMoment}>
+                          <input type="hidden" name="id" value={moment.id} />
+                          <ConfirmButton
+                            type="submit"
+                            tone="danger"
+                            question={`Ta bort ${moment.name}? Kan inte ångras.`}
+                          >
+                            Ta bort
+                          </ConfirmButton>
+                        </form>
+                      )}
                     </div>
                   </Td>
                 </Tr>
               ))}
             </tbody>
           </Table>
-        </Card>
-      )}
+        )}
+      </Card>
     </>
   );
 }

@@ -39,12 +39,12 @@ export function isHelpAreaKey(value: string): value is HelpAreaKey {
  */
 const AREA_BY_PATH: readonly (readonly [string, HelpAreaKey])[] = [
   ["/admin/kom-igang", "START"],
-  ["/admin/skarmar", "KIOSK"],
+  ["/admin/installningar/skarmar", "KIOSK"],
   ["/admin/ordrar", "REGISTERS"],
   ["/admin/kunder", "REGISTERS"],
   ["/admin/anstallda", "REGISTERS"],
-  ["/admin/moment", "REGISTERS"],
-  ["/admin/improduktivt", "REGISTERS"],
+  ["/admin/installningar/arbetsmoment", "REGISTERS"],
+  ["/admin/installningar/improduktivt", "REGISTERS"],
   ["/admin/granskning", "DOCUMENTS"],
   ["/admin/stamplingar", "DOCUMENTS"],
   ["/admin/rapporter", "DOCUMENTS"],
@@ -54,6 +54,7 @@ const AREA_BY_PATH: readonly (readonly [string, HelpAreaKey])[] = [
   ["/admin/installningar/schema", "PAYROLL"],
   ["/admin/installningar/franvaro", "PAYROLL"],
   ["/admin/planering", "PLANNING"],
+  ["/admin/installningar/stationer", "PLANNING"],
   ["/admin/konto", "ACCOUNT"],
   ["/admin/installningar/prenumeration", "ACCOUNT"],
   ["/admin/installningar/anvandare", "ACCOUNT"],

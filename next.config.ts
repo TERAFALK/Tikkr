@@ -62,6 +62,23 @@ const nextConfig: NextConfig = {
       },
     ];
   },
+
+  /**
+   * GAMLA ADRESSER I PANELEN.
+   *
+   * Registren som sätts upp en gång flyttades till Inställningar 2026-10-14
+   * (issue #17). Bokmärken, öppna flikar och länkar i gamla mejl ska fortsätta
+   * fungera. Inte permanenta: en 308 sparas av webbläsaren, och skulle en sida
+   * flytta igen hade den gamla omdirigeringen stått kvar hos varje kund.
+   */
+  async redirects() {
+    return [
+      ["/admin/moment", "/admin/installningar/arbetsmoment"],
+      ["/admin/improduktivt", "/admin/installningar/improduktivt"],
+      ["/admin/skarmar", "/admin/installningar/skarmar"],
+      ["/admin/planering/stationer", "/admin/installningar/stationer"],
+    ].map(([source, destination]) => ({ source, destination, permanent: false }));
+  },
 };
 
 export default nextConfig;

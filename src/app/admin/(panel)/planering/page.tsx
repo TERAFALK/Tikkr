@@ -113,7 +113,7 @@ export default async function PlanningPage({
             >
               ›
             </Link>
-            <ButtonLink href="/admin/planering/stationer" tone="secondary">
+            <ButtonLink href="/admin/installningar/stationer" tone="secondary">
               Stationer
             </ButtonLink>
           </div>
@@ -129,7 +129,7 @@ export default async function PlanningPage({
           title="Inga stationer upplagda"
           description="En station är en maskin eller arbetsplats som kör ett arbetsmoment."
           action={
-            <ButtonLink href="/admin/planering/stationer">
+            <ButtonLink href="/admin/installningar/stationer">
               Lägg upp stationer
             </ButtonLink>
           }

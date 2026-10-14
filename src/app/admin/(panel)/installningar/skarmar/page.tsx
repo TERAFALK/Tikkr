@@ -11,7 +11,6 @@ import {
   EmptyState,
   Field,
   Input,
-  PageHeader,
   Table,
   Td,
   Th,
@@ -72,14 +71,9 @@ export default async function DevicesPage() {
   );
 
   return (
-    <>
-      <PageHeader
-        title="Stämplingsskärmar"
-        help="koppla-skarm"
-        description={`${devices.length} av ${licenses.total} licenser används.`}
-        action={newDevice}
-      />
-
+    // Ett kort och ingen egen sidrubrik, som de andra sidorna under
+    // Inställningar (issue #17).
+    <div className="space-y-4">
       {/* Antalet licenser kan sänkas hos betaltjänsten under antalet upplagda
           skärmar. Ingen skärm slutar fungera för det; vilken som ska bort är
           kundens beslut. */}
@@ -113,16 +107,19 @@ export default async function DevicesPage() {
         )
       )}
 
-      {devices.length === 0 ? (
-        <EmptyState
-          title="Inga skärmar upplagda"
+      <Card>
+        <CardHeader
+          title="Stämplingsskärmar"
+          help="koppla-skarm"
+          description={`${devices.length} av ${licenses.total} licenser används.`}
           action={newDevice}
         />
-      ) : (
-        <Card>
-          <CardHeader
-            title={`${devices.length} ${devices.length === 1 ? "skärm" : "skärmar"}`}
-          />
+
+        {devices.length === 0 ? (
+          <div className="p-5">
+            <EmptyState title="Inga skärmar upplagda" action={newDevice} />
+          </div>
+        ) : (
           <Table>
             <thead>
               <tr>
@@ -256,8 +253,8 @@ export default async function DevicesPage() {
               })}
             </tbody>
           </Table>
-        </Card>
-      )}
-    </>
+        )}
+      </Card>
+    </div>
   );
 }

@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { assertWritable, requireAdmin } from "@/lib/admin-session";
 
-const PATH = "/admin/improduktivt";
+const PATH = "/admin/installningar/improduktivt";
 
 /**
  * Improduktiv tid: städning, möten, underhåll.

@@ -160,6 +160,18 @@ Administratör loggar in separat i en adminpanel, hanterar anställda/ordrar/
 moment och tar ut rapporter (tid per order, person, moment) med export till
 Excel/PDF.
 
+**Menyn bär det man arbetar i, Inställningar det man sätter upp** (beslutat
+2026-10-14, issue #17). Vänstermenyn har två avsnitt: **Dagligen** (Översikt,
+Granskning, Stämplingar, Veckovy, Planering, Tidrapport, Rapporter) och
+**Register** (Ordrar, Kunder, Anställda). Arbetsmoment, Improduktiv tid,
+Stämplingsskärmar och Stationer låg också under Register, och menyn hade
+fjorton punkter. De sätts upp en gång och står sedan, och ligger nu under
+Inställningar, i avsnitten Stämpling och Planering. De gamla adresserna
+skickas vidare i `next.config.ts`, så att bokmärken fortsätter fungera.
+
+Frågan för en ny sida är alltså hur ofta den öppnas: varje dag eller vecka
+hör den till menyn, en gång och sedan sällan hör den till Inställningar.
+
 ### Multi-tenant
 
 Flera kundföretag delar samma app-instans, men deras data är **helt isolerad**
