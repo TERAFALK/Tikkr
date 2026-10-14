@@ -285,7 +285,7 @@ export default async function TimesheetPage({
               submitLabel="Spara"
             >
               <input type="hidden" name="employeeId" value={employeeId} />
-              <Field label="Nytt saldo" hint="Tim:min, t.ex. 2:15 eller −0:45">
+              <Field label="Nytt saldo" hint="Timmar, t.ex. 2,25 eller −0,75">
                 <Input
                   name="flex"
                   inputMode="decimal"
@@ -341,12 +341,12 @@ export default async function TimesheetPage({
         <Stat
           label="Planerad tid"
           value={formatDuration(period.totals.planned)}
-          hint="tim:min"
+          hint="timmar"
         />
         <Stat
           label="Närvarotid"
           value={formatDuration(period.totals.worked)}
-          hint="tim:min"
+          hint="timmar"
         />
         {/* FLEXEN GÖMS FÖR EN TIMANSTÄLLD. Hen mäts inte mot något schema,
             så det finns ingen planerad tid att ligga över eller under. En ruta

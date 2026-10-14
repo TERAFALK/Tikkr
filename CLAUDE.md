@@ -1490,32 +1490,45 @@ HÄR först, och filen följer efter.
    Knappar är verb i imperativ: "Lägg till", "Spara", "Koppla om".
 
 6. **Fälthjälp bara vid format eller konsekvens**, i en kort mening utan
-   punkt om den är ofullständig: "Tim:min, t.ex. 7:30", "Minst 10 tecken",
+   punkt om den är ofullständig: "Timmar, t.ex. 7,5", "Minst 10 tecken",
    "Kan inte ångras". Inte varför fältet finns.
 
 7. **Felmeddelanden säger vad som är fel och vad som rättar det.** Ett led,
    inte tre.
 
-8. **TID SKRIVS ALLTID SOM TIM:MIN** (bestämt 2026-10-01). "8:30", aldrig
-   "8,50". Gäller varje yta kunden ser: panelen, kioskskärmen och varenda
-   PDF. Saldon får sitt tecken utskrivet: "+2:15", "−0:45", "0:00".
+8. **TID SKRIVS ALLTID SOM DECIMALTIMMAR** (ändrat 2026-10-14, ersätter
+   "tid skrivs alltid som tim:min" från 2026-10-01). "8,5", aldrig "8:30".
+   Nollor i slutet faller bort, så "8" är åtta timmar och 33,75 sticker ut
+   bland en spalt runda tal. Saldon får sitt tecken utskrivet: "+2,25",
+   "−0,75", "0".
 
-   Decimaltimmar finns kvar, men BARA i Excel-arket. En kolumn som ska
-   summeras eller multipliceras med en timpeng kan inte stå i tim:min, och
-   arket finns just för att räkna vidare i. Där står båda formaten bredvid
-   varandra, tim:min först.
+   Gäller varje yta kunden ser: panelen, kioskskärmen, varenda PDF,
+   Excel-arket och säljsidans produktbilder.
 
-   Skälet är en bugg: tidrapporten stod i decimaltimmar medan tabellen under
-   den stod i tim:min, på samma sida om samma dag, och "1,99" lästes som 1:59
-   — fyra minuter fel. Flexsaldot gick dessutom inte att justera, eftersom
-   rutan visade ett format och räknade i ett annat.
+   Kunden bad om det, och skälet är deras eget: lönekörningen och de
+   efterkalkyler de räknat på i tio år står i decimaltimmar. Den som läste ett
+   tal i panelen för att skriva in det någon annanstans räknade om varje gång,
+   och en omräkning i huvudet är en felkälla systemet lagt dit själv.
 
-   Fälten där tid skrivs in tar BÅDA formen, så att ingen behöver räkna om
-   det hen just läst: "7:30" och "7,5" ger samma sak. Bara kolon skiljer
-   timmar från minuter — "7.30" är sju timmar och arton minuter.
+   **DET ÄR NU ETT FORMAT OCH INTE TVÅ, och det är hela vinsten.** Buggen som
+   gav tim:min sin regel var inte att decimaltimmar är svårlästa, utan att två
+   format stod på samma sida om samma dag: tidrapporten i decimaltimmar,
+   tabellen under den i tim:min, och "1,99" lästes som 1:59 — fyra minuter
+   fel. Med ett enda format finns ingenting att läsa fel, och Excel-arkets
+   dubbla tidkolumn kunde tas bort: en text att jämföra med skärmen och ett
+   tal att summera är samma tal nu, och talet är det som står kvar.
 
-   `src/lib/format.ts` äger båda formaten, och
-   `tests/format.test.ts` fäller en ny sida som visar decimaltimmar.
+   **ETT KLOCKSLAG ÄR INTE EN LÄNGD.** En in- och utstämpling, en rast
+   11:30–12:15, schemats dag och en beräknad sluttid är klockslag och skrivs
+   med kolon. Bara tid som RÄKNAS är decimal. Den som blandar ihop det gör
+   tabellen obegriplig åt andra hållet.
+
+   Fälten där tid skrivs in tar BÅDA formen, så att "7:30" på ett gammalt
+   papper går att skriva av: "7,5" och "7:30" ger samma sak. Bara kolon
+   skiljer timmar från minuter — "7.30" är sju timmar och arton minuter.
+
+   `src/lib/format.ts` äger formatet, och `tests/format.test.ts` fäller en ny
+   sida som visar tim:min.
 
 Där något verkligen är svårt — GDPR-radering, fast pris kontra påslag — får
 en mening stå kvar. Den ska då vara skriven för en verkstadschef, inte för en

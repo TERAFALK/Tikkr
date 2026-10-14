@@ -9,7 +9,7 @@ import { findAgreement } from "./collective-agreements";
  *
  * Loggen sparar id:n och råa värden, med flit: ett ordernummer som ändras
  * senare ska inte skriva om historiken. Den här filen översätter till det en
- * administratör läser — namn i stället för id, tim:min i stället för minuter,
+ * administratör läser — namn i stället för id, timmar i stället för minuter,
  * datum i företagets tidszon.
  *
  * Namnen slås upp när loggen visas och inte när den skrivs. En anonymiserad

@@ -284,7 +284,7 @@ export default async function ReportsPage({
         <Stat
           label="Total tid"
           value={formatDuration(report.totalMinutes)}
-          hint="tim:min"
+          hint="timmar"
         />
         <Stat label="Stämplingar" value={report.rows.length} />
         <Stat
@@ -332,7 +332,7 @@ export default async function ReportsPage({
                     <tr>
                       <Th>Kund</Th>
                       <Th numeric>Stämplingar</Th>
-                      <Th numeric>Tid (tim:min)</Th>
+                      <Th numeric>Tid (timmar)</Th>
                     </tr>
                   </thead>
                   <tbody>
@@ -369,7 +369,7 @@ export default async function ReportsPage({
                   <tr>
                     <Th>Anställd</Th>
                     <Th numeric>Stämplingar</Th>
-                    <Th numeric>Tid (tim:min)</Th>
+                    <Th numeric>Tid (timmar)</Th>
                   </tr>
                 </thead>
                 <tbody>
@@ -414,7 +414,7 @@ export default async function ReportsPage({
                         <Th>Moment</Th>
                         <Th>In</Th>
                         <Th>Ut</Th>
-                        <Th numeric>Tid (tim:min)</Th>
+                        <Th numeric>Tid (timmar)</Th>
                       </tr>
                     </thead>
                     <tbody>
@@ -443,7 +443,7 @@ export default async function ReportsPage({
                   <Th>Moment</Th>
                   <Th>In</Th>
                   <Th>Ut</Th>
-                  <Th numeric>Tid (tim:min)</Th>
+                  <Th numeric>Tid (timmar)</Th>
                 </tr>
               </thead>
               <tbody>

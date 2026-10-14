@@ -3,7 +3,7 @@ import ExcelJS from "exceljs";
 import { requireAdmin } from "@/lib/admin-session";
 import { lockedExportResponse } from "@/lib/export-access";
 import { buildReport, type ReportGroup } from "@/lib/report";
-import { formatDate, formatDuration, toDecimalHours } from "@/lib/format";
+import { formatDate, toDecimalHours } from "@/lib/format";
 import { unsafeGlobalPrisma } from "@/lib/db";
 import {
   endOfDayIn,
@@ -111,12 +111,14 @@ export async function GET(request: NextRequest) {
     { header: "Arbetsmoment", key: "moment", width: 20 },
     { header: "Instämplad", key: "in", width: 20 },
     { header: "Utstämplad", key: "out", width: 20 },
-    // BÅDA FORMATEN, och tim:min först. Det är formatet hela systemet visar,
-    // och den som jämför arket mot en skärm ska hitta samma tal utan att
-    // räkna om. Decimalkolumnen står bredvid för den som ska summera eller
-    // multiplicera med en timpeng, vilket inte går i tim:min.
-    { header: "Tid (tim:min)", key: "duration", width: 14 },
-    { header: "Timmar (decimal)", key: "hours", width: 16 },
+    // ETT TAL, OCH DET ÄR ETT TAL. Arket hade till 2026-10-14 tiden två
+    // gånger: en textkolumn i tim:min för den som jämförde mot skärmen, och
+    // en decimalkolumn för den som skulle summera. Nu visar skärmen samma
+    // decimaltimmar, och två kolumner med samma innehåll är en för mycket.
+    //
+    // Den som står kvar är TALET och inte texten — arket finns för att räknas
+    // vidare i, och en textcell går inte att summera.
+    { header: "Tid (timmar)", key: "hours", width: 14 },
     { header: "Anmärkning", key: "note", width: 28 },
   ];
 
@@ -136,7 +138,6 @@ export async function GET(request: NextRequest) {
       // därför i UTC: två timmar fel på sommaren.
       in: excelWallTime(row.clockInAt, timeZone),
       out: row.clockOutAt ? excelWallTime(row.clockOutAt, timeZone) : "",
-      duration: formatDuration(row.minutes),
       hours: toDecimalHours(row.minutes),
       note: notes.join(". "),
     });
@@ -222,8 +223,7 @@ function addSummarySheet(
       ? [{ header: "Kund", key: "sublabel", width: 26 }]
       : []),
     { header: "Stämplingar", key: "entries", width: 14 },
-    { header: "Tid (tim:min)", key: "duration", width: 14 },
-    { header: "Timmar (decimal)", key: "hours", width: 16 },
+    { header: "Tid (timmar)", key: "hours", width: 14 },
   ];
 
   for (const group of groups) {
@@ -231,7 +231,6 @@ function addSummarySheet(
       label: group.label,
       sublabel: group.sublabel ?? "",
       entries: group.entries,
-      duration: formatDuration(group.minutes),
       hours: toDecimalHours(group.minutes),
     });
   }
@@ -244,7 +243,6 @@ function addSummarySheet(
     const total = sheet.addRow({
       label: "TOTALT",
       entries: groups.reduce((sum, group) => sum + group.entries, 0),
-      duration: formatDuration(totalMinutes),
       hours: toDecimalHours(totalMinutes),
     });
     total.font = { bold: true };

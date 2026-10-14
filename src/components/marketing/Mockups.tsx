@@ -16,9 +16,8 @@
  * ritades som rutnätet fastän knappsatsen är första vyn sedan 2026-10-01,
  * granskningen hade två knappar där produkten har ett fält och en, panelen
  * visade tre nyckeltal av fyra, rapporten ett stapeldiagram som inte finns,
- * och två dokument stod i decimaltimmar fastän tid skrivs tim:min sedan
- * 2026-10-01. En säljsida som visar en äldre version är en besvikelse som
- * kommer fram först efter köpet.
+ * och två dokument stod i ett annat tidformat än produkten. En säljsida som
+ * visar en äldre version är en besvikelse som kommer fram först efter köpet.
  *
  * DÄRFÖR GÄLLER: ÄNDRAS EN YTA I PRODUKTEN ÄNDRAS BILDEN I SAMMA GREN.
  * Kolumnrubriker, knapptexter och format skrivs av ur produktens egen kod och
@@ -27,9 +26,13 @@
  * En bild vars tal inte stämmer läses av precis den sortens köpare som räknar
  * efter.
  *
- * TIDEN SKRIVS TIM:MIN, ALDRIG DECIMALT. Samma regel som i panelen, kiosken
- * och varje PDF, se CLAUDE.md § 7.1 punkt 8. Decimaltimmar finns bara i
- * Excel-arket, och säljsidan visar inget Excel-ark.
+ * TIDEN SKRIVS SOM DECIMALTIMMAR: "8,5", aldrig "8:30". Samma format som i
+ * panelen, kiosken och varje PDF, se CLAUDE.md § 7.1 punkt 8. Bilderna stod i
+ * tim:min till 2026-10-14, eftersom produkten gjorde det.
+ *
+ * KLOCKSLAG ÄR INTE TID SOM RÄKNAS. Ett pass som börjar "07:00" och en
+ * beräknad sluttid "18:00" står kvar som klockslag — det är vad produkten
+ * skriver. Bara LÄNGDER är decimala.
  *
  * RAMEN HAR INGA FÖNSTERKNAPPAR. Tre färgade prickar i hörnet härmar ett
  * operativsystem produkten inte körs i. En etikettrad som säger vad man tittar
@@ -647,35 +650,35 @@ const ROWS = [
     order: "2601",
     customer: "Volvo Lastvagnar",
     moment: "Svetsning",
-    time: "2:15",
+    time: "2,25",
   },
   {
     name: "Anna Andersson",
     order: "2604",
     customer: "Sandvik Coromant",
     moment: "Fräsning",
-    time: "1:40",
+    time: "1,67",
   },
   {
     name: "Carina Cederlund",
     order: "2603",
     customer: "Atlas Copco",
     moment: "Montering",
-    time: "0:48",
+    time: "0,8",
   },
   {
     name: "Erik Ek",
     order: "2601",
     customer: "Volvo Lastvagnar",
     moment: "Fräsning",
-    time: "3:05",
+    time: "3,08",
   },
   {
     name: "Gustav Gran",
     order: null,
     customer: null,
     moment: "Städning",
-    time: "0:25",
+    time: "0,42",
   },
 ];
 
@@ -693,7 +696,7 @@ export function AdminMockup({ className = "" }: { className?: string }) {
               hint="5 pågående jobb"
               tone="emerald"
             />
-            <Stat label="Registrerat idag" value="18:30" />
+            <Stat label="Registrerat idag" value="18,5" />
             <Stat label="Att granska" value="1" tone="amber" />
             <Stat label="Öppna ordrar" value="4" />
           </div>
@@ -819,9 +822,9 @@ function Stat({
  * Utskriftsknappen finns på underlagen och på tidrapporten, inte här.
  */
 const REPORT = [
-  { order: "2601", customer: "Volvo Lastvagnar", hours: "42:15" },
-  { order: "2603", customer: "Atlas Copco", hours: "28:00" },
-  { order: "2604", customer: "Sandvik Coromant", hours: "14:15" },
+  { order: "2601", customer: "Volvo Lastvagnar", hours: "42,25" },
+  { order: "2603", customer: "Atlas Copco", hours: "28" },
+  { order: "2604", customer: "Sandvik Coromant", hours: "14,25" },
 ];
 
 export function ReportMockup({ className = "" }: { className?: string }) {
@@ -855,7 +858,7 @@ export function ReportMockup({ className = "" }: { className?: string }) {
           </div>
 
           <div className="mb-2.5 grid grid-cols-2 gap-2 sm:grid-cols-4">
-            <Stat label="Total tid" value="84:30" hint="tim:min" />
+            <Stat label="Total tid" value="84,5" hint="tim:min" />
             <Stat label="Stämplingar" value="37" />
             <Stat label="Pågår just nu" value="4" tone="emerald" />
             <Stat label="Ogranskade" value="1" tone="amber" />
@@ -941,7 +944,7 @@ export function ReviewMockup({ className = "" }: { className?: string }) {
               </span>
               <span className="shrink-0 text-right">
                 <span className="rounded bg-amber-50 px-1.5 py-0.5 text-[10px] font-medium tabular-nums text-amber-700 ring-1 ring-inset ring-amber-200">
-                  10:48
+                  10,8
                 </span>
                 <span className="mt-1 block text-[8px] text-neutral-400">
                   beräknad till 18:00
@@ -981,11 +984,8 @@ export function ReviewMockup({ className = "" }: { className?: string }) {
  * Logotypsrutan överst är med avsikt. Det är den detalj som gör skillnaden
  * mellan en systemutskrift och ett dokument från leverantören.
  *
- * TIM:MIN OCH INTE DECIMALTIMMAR. Raderna stod som "7,50" och summan som
- * "22,75 timmar", vilket är det format som bara hör i Excel-arket. Tid som ska
- * LÄSAS skrivs tim:min, och "7,50" lästes dessutom som 7:50 av precis den
- * sortens läsare dokumentet är till för. Kolumnrubriken bär enheten, som i
- * dokumentet.
+ * DECIMALTIMMAR, som dokumentet. Kolumnrubriken bär enheten, också som i
+ * dokumentet: "Tid (timmar)".
  *
  * Kundens adress och organisationsnummer står under namnet. De skrevs för hand
  * varje gång innan kundregistret fanns, och att de står där är skälet att
@@ -997,10 +997,10 @@ export function ReviewMockup({ className = "" }: { className?: string }) {
  */
 export function ExportMockup({ className = "" }: { className?: string }) {
   const rows = [
-    ["Anna Andersson", "Svetsning", "7:30"],
-    ["Erik Ek", "Fräsning", "8:00"],
-    ["Carina Cederlund", "Montering", "4:15"],
-    ["Anna Andersson", "Kvalitetskontroll", "3:00"],
+    ["Anna Andersson", "Svetsning", "7,5"],
+    ["Erik Ek", "Fräsning", "8"],
+    ["Carina Cederlund", "Montering", "4,25"],
+    ["Anna Andersson", "Kvalitetskontroll", "3"],
   ];
 
   return (
@@ -1036,7 +1036,7 @@ export function ExportMockup({ className = "" }: { className?: string }) {
               <th className="px-2 py-1 text-left font-medium">Anställd</th>
               <th className="px-2 py-1 text-left font-medium">Arbetsmoment</th>
               <th className="px-2 py-1 text-right font-medium">
-                Tid (tim:min)
+                Tid (timmar)
               </th>
             </tr>
           </thead>
@@ -1065,14 +1065,14 @@ export function ExportMockup({ className = "" }: { className?: string }) {
             TOTALT
           </span>
           <span className="text-[10px] font-semibold tabular-nums text-neutral-900">
-            22:45
+            22,75
           </span>
         </div>
 
         {/* Jämförelsen med den beräknade tiden står direkt under totalen,
             eftersom det är där den görs. */}
         <p className="mt-1 text-[8px] text-neutral-500">
-          Beräknad tid 24:00. Upparbetat 95 %.
+          Beräknad tid 24. Upparbetat 95 %.
         </p>
       </div>
     </Frame>
@@ -1107,9 +1107,9 @@ export function ExportMockup({ className = "" }: { className?: string }) {
  */
 export function CalcMockup({ className = "" }: { className?: string }) {
   const rows = [
-    ["Svetsning", "12:30", "10 625,00 kr"],
-    ["Fräsning", "8:00", "7 200,00 kr"],
-    ["Montering", "4:15", "2 550,00 kr"],
+    ["Svetsning", "12,5", "10 625,00 kr"],
+    ["Fräsning", "8", "7 200,00 kr"],
+    ["Montering", "4,25", "2 550,00 kr"],
   ];
 
   return (
@@ -1137,7 +1137,7 @@ export function CalcMockup({ className = "" }: { className?: string }) {
           <thead>
             <tr className="border-b border-neutral-200 text-neutral-500">
               <th className="py-1 text-left font-medium">Arbetsmoment</th>
-              <th className="py-1 text-right font-medium">Tid (tim:min)</th>
+              <th className="py-1 text-right font-medium">Tid (timmar)</th>
               <th className="py-1 text-right font-medium">Kostnad</th>
             </tr>
           </thead>
@@ -1157,7 +1157,7 @@ export function CalcMockup({ className = "" }: { className?: string }) {
         </table>
 
         <dl className="mt-2.5 space-y-1 text-[10px]">
-          <Line label="Total operationstid (tim:min)" value="24:45" />
+          <Line label="Total operationstid (timmar)" value="24,75" />
           <Line label="Total operationskostnad" value="20 375,00 kr" />
           <Line label="Påslag ×1,40 (kundens)" value="8 150,00 kr" />
           <Line label="Rabatt 5 % (kundens)" value="−1 426,25 kr" muted />
@@ -1206,14 +1206,11 @@ function Line({
  * och en fet dagssumma avslutar dagen. Frånvaro står som en egen rad i gult,
  * raster i grått.
  *
- * TIM:MIN OCH INTE DECIMALTIMMAR. "8,50" och "+0,75" stod här tidigare. Det
- * är felet som gav regeln: tidrapporten stod i decimaltimmar medan tabellen
- * under den stod i tim:min, på samma sida om samma dag, och "1,99" lästes som
- * 1:59 — fyra minuter fel. Saldon får sitt tecken utskrivet.
+ * DECIMALTIMMAR, som dokumentet. Saldon får sitt tecken utskrivet: "+0,25".
  *
  * SAMMANSTÄLLNINGEN ÄR KUNDENS EGEN ORDNING, två kolumner i tre rader, och
  * talen går ihop enligt flexformeln i CLAUDE.md § 3 regel 7: arbetad tid plus
- * frånvaro minus planerad tid minus uttagen flex. 32:15 + 8:00 − 40:00 = +0:15.
+ * frånvaro minus planerad tid minus uttagen flex. 32,25 + 8 − 40 = +0,25.
  *
  * UNDERSKRIFTSRADEN ÄR MED. Den är raden förmannen skriver på, och fälten är
  * kundens egna från blanketten de använt i tio år.
@@ -1239,24 +1236,24 @@ const DAYS: TimesheetEntry[] = [
   {
     day: "Må 2026-04-13",
     rows: [
-      { what: "2601 · Svetsning", from: "07:00", to: "11:30", time: "4:30" },
-      { what: "2604 · Fräsning", from: "12:15", to: "16:00", time: "3:45" },
+      { what: "2601 · Svetsning", from: "07:00", to: "11:30", time: "4,5" },
+      { what: "2604 · Fräsning", from: "12:15", to: "16:00", time: "3,75" },
     ],
-    rest: { what: "Lunch", from: "11:30", to: "12:15", time: "0:45" },
-    sum: "8:15",
+    rest: { what: "Lunch", from: "11:30", to: "12:15", time: "0,75" },
+    sum: "8,25",
   },
   {
     day: "Ti 2026-04-14",
-    absence: { what: "Sjuk", time: "8:00" },
+    absence: { what: "Sjuk", time: "8" },
     rows: [],
   },
   {
     day: "On 2026-04-15",
     rows: [
-      { what: "2603 · Montering", from: "07:00", to: "15:45", time: "8:00" },
+      { what: "2603 · Montering", from: "07:00", to: "15:45", time: "8" },
     ],
-    rest: { what: "Lunch", from: "11:30", to: "12:15", time: "0:45" },
-    sum: "8:00",
+    rest: { what: "Lunch", from: "11:30", to: "12:15", time: "0,75" },
+    sum: "8",
   },
 ];
 
@@ -1311,17 +1308,17 @@ export function TimesheetMockup({ className = "" }: { className?: string }) {
             Totalt för perioden
           </span>
           <span className="text-[10px] font-semibold tabular-nums text-neutral-900">
-            32:15
+            32,25
           </span>
         </div>
 
         <dl className="mt-2 grid grid-cols-2 gap-x-3 rounded bg-neutral-100 px-2 py-2 text-[9px]">
-          <Line label="Planerad tid" value="40:00" />
-          <Line label="Närvarotid" value="32:15" />
-          <Line label="Frånvaro" value="8:00" />
-          <Line label="Rast" value="3:00" />
-          <Line label="Flextid, perioden" value="+0:15" />
-          <Line label="Flexsaldo" value="+2:30" />
+          <Line label="Planerad tid" value="40" />
+          <Line label="Närvarotid" value="32,25" />
+          <Line label="Frånvaro" value="8" />
+          <Line label="Rast" value="3" />
+          <Line label="Flextid, perioden" value="+0,25" />
+          <Line label="Flexsaldo" value="+2,5" />
         </dl>
 
         {/* Underskriftsfälten, kundens egna. Ritas alltid i dokumentet. */}

@@ -262,7 +262,7 @@ export default async function CustomerPage({
                 <thead>
                   <tr>
                     <Th>Arbetsmoment</Th>
-                    <Th numeric>Tid (tim:min)</Th>
+                    <Th numeric>Tid (timmar)</Th>
                     <Th numeric>Andel</Th>
                   </tr>
                 </thead>

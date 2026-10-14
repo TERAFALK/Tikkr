@@ -55,17 +55,25 @@ amerikansk startup översatt till svenska.
    verb i imperativ: "Lägg till", "Spara", "Koppla om".
 
 6. **Fälthjälp bara vid format eller konsekvens**, i en kort mening utan punkt
-   om den är ofullständig: "Tim:min, t.ex. 7:30", "Minst 10 tecken", "Kan inte
+   om den är ofullständig: "Timmar, t.ex. 7,5", "Minst 10 tecken", "Kan inte
    ångras". Inte varför fältet finns.
 
 7. **Felmeddelanden säger vad som är fel och vad som rättar det. Ett led, inte
    tre.** Och aldrig teknisk jargong: "Felet står i serverloggen" hjälper
    ingen som inte har en server.
 
-8. **Tid skrivs alltid som tim:min.** "8:30", aldrig "8,50". Saldon får sitt
-   tecken utskrivet: "+2:15", "−0:45", "0:00". Decimaltimmar finns bara i
-   Excel-arket, som är till för att räkna vidare i, och står där bredvid
-   tim:min. `src/lib/format.ts` äger båda formaten.
+8. **Tid skrivs alltid som decimaltimmar.** "8,5", aldrig "8:30". Nollor i
+   slutet faller bort, så "8" är åtta timmar. Saldon får sitt tecken
+   utskrivet: "+2,25", "−0,75", "0". Gäller varje yta kunden ser — panelen,
+   kiosken, varje PDF, Excel-arket och säljsidans produktbilder.
+
+   **Ett klockslag är inte en längd.** Ett pass som börjar "07:00", en rast
+   "11:30–12:15" och en beräknad sluttid skrivs som klockslag, med kolon och
+   två siffror. Bara TID SOM RÄKNAS är decimal.
+
+   Fälten där tid skrivs in tar båda formen, så att "7:30" på ett gammalt
+   papper går att skriva av: "7,5" och "7:30" ger samma sak.
+   `src/lib/format.ts` äger formatet.
 
 Där något verkligen är svårt — GDPR-radering, fast pris kontra påslag — får en
 mening stå kvar. Den ska då vara skriven för en verkstadschef.
@@ -158,7 +166,7 @@ En fråga, sedan konsekvensen. Verbet i knappen säger vad som händer.
 > finns kvar.
 
 ### Fälthjälp
-> Tim:min, t.ex. 7:30 · Minst 10 tecken · Faktor, t.ex. 1,4. Tomt ger
+> Timmar, t.ex. 7,5 · Minst 10 tecken · Faktor, t.ex. 1,4. Tomt ger
 > företagets standard · Valfritt. Läggs till arbetsmomentets kostnad
 
 ### Fel
@@ -216,7 +224,7 @@ Delar av det här går att mäta, och mäts:
 | Test | Fäller |
 |---|---|
 | `tests/ui-text.test.ts` | Tankstreck i texten användaren ser — i panelen, kiosken, hjälpcentret, de fyra PDF-filerna, exportrutterna, granskningsnoterna och mejlen |
-| `tests/format.test.ts` | En ny sida som visar decimaltimmar |
+| `tests/format.test.ts` | En ny sida som visar tim:min |
 | `tests/brand.test.ts` | En färg utanför paletten, och ordmärket satt som text |
 
 Resten är omdöme, och omdöme går inte att mäta med ett reguljärt uttryck.

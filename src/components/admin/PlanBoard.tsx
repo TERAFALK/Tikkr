@@ -1870,7 +1870,7 @@ function BlockDialog({
           </p>
         )}
 
-        <Field label="Planerad tid" hint="Tim:min, t.ex. 4:30">
+        <Field label="Planerad tid" hint="Timmar, t.ex. 4,5">
           <Input
             value={hours}
             onChange={(event) => setHours(event.target.value)}
@@ -2098,8 +2098,8 @@ function toDateParam(day: Date, timeZone: string): string {
  * "4:30" eller "4,5" till minuter.
  *
  * Tar båda formerna, av samma skäl som orderns beräkningsfält gör det:
- * systemet visar tim:min överallt, och det vore oanständigt att kräva att man
- * räknar om det till decimaltimmar för att skriva tillbaka samma tal.
+ * systemet visar decimaltimmar, och den som har "4:30" på ett papper ska inte
+ * behöva räkna om det för att skriva in samma tid.
  */
 function parseHourText(raw: string): number | null {
   const text = raw.trim();

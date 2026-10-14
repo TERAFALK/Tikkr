@@ -58,7 +58,7 @@ const COLUMNS = [
   { label: "Datum", width: 78, align: "left" as const },
   { label: "Start", width: 52, align: "left" as const },
   { label: "Stopp", width: 52, align: "left" as const },
-  { label: "Tid (tim:min)", width: 78, align: "right" as const },
+  { label: "Tid (timmar)", width: 78, align: "right" as const },
   { label: "Kostnad", width: 85, align: "right" as const },
 ];
 
@@ -193,7 +193,7 @@ function renderCalc(
   y = drawSumLine(
     doc,
     y,
-    "Total operationstid (tim:min)",
+    "Total operationstid (timmar)",
     formatDuration(order.totalMinutes)
   );
   y = drawSumLine(
@@ -272,7 +272,7 @@ function renderCalc(
 
   if (order.minutesWithoutRate > 0) {
     notes.push(
-      `${formatDuration(order.minutesWithoutRate)} (tim:min) saknar ` +
+      `${formatDuration(order.minutesWithoutRate)} timmar saknar ` +
         `timkostnad och ingår inte i summan`
     );
   }
