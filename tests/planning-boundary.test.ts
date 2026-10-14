@@ -37,7 +37,12 @@ const ROOT = path.resolve(__dirname, "..");
 const SRC = path.join(ROOT, "src");
 
 /** Planeringens bibliotek. */
-const PLANNING_MODULES = ["planning", "plan-calendar", "plan-live"];
+const PLANNING_MODULES = [
+  "planning",
+  "plan-calendar",
+  "plan-live",
+  "planning-modes",
+];
 
 /** Lönemodulens. Speglar payroll-boundary.test.ts. */
 const PAYROLL_MODULES = [

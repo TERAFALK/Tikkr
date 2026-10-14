@@ -111,6 +111,12 @@ const sections: SettingsSection[] = [
     module: "PLANNING",
     pages: [
       {
+        href: "/admin/installningar/planering",
+        label: "Planeringsläge",
+        description: "Stationer eller personal",
+        icon: IconTimeline,
+      },
+      {
         href: "/admin/installningar/stationer",
         label: "Stationer",
         description: "Maskiner och öppettider",

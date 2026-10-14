@@ -660,7 +660,7 @@ export const GUIDES = [
     summary:
       "Orderns arbetsmoment placeras ut på en veckovis tidslinje, en rad per station.",
     module: "PLANNING",
-    keywords: ["planera", "tidslinje", "station", "maskin", "oplacerat", "whiteboard", "leveransdatum"],
+    keywords: ["planera", "tidslinje", "station", "maskin", "oplacerat", "whiteboard", "leveransdatum", "planeringsläge", "personal", "tjänst"],
     steps: [
       {
         title: "Lägg upp stationerna",
@@ -680,6 +680,7 @@ export const GUIDES = [
       },
     ],
     notes: [
+      "Under Inställningar, Planeringsläge, väljs Produktion eller Tjänst. Tjänst planerar personal, utan stationer.",
       "Överbokning tillåts och markeras i gult.",
       "En ruta som någon står instämplad på visas som pågående.",
       "Planerad tid är en avsikt. Den faktureras aldrig och räknas inte som arbetad tid.",

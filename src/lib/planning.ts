@@ -1,4 +1,10 @@
 import type { CompanyDb } from "./tenant";
+import { unsafeGlobalPrisma } from "./db";
+import {
+  DEFAULT_PLANNING_MODE,
+  isPlanningMode,
+  type PlanningModeKey,
+} from "./planning-modes";
 import {
   fitsFrom,
   snap,
@@ -120,6 +126,26 @@ export interface UnplacedRow {
 /* -------------------------------------------------------------------------- */
 /* Läsning                                                                     */
 /* -------------------------------------------------------------------------- */
+
+/**
+ * Företagets planeringsläge, se planning-modes.ts.
+ *
+ * Via `unsafeGlobalPrisma` med uttryckligt id, som allt annat som läses ur
+ * `companies` — tabellen bär company_id och har inget att filtrera på. Ett
+ * värde registret inte känner igen ger förvalet hellre än ett fel: tavlan ska
+ * gå att öppna även om en äldre version skrivit något annat.
+ */
+export async function planningModeOf(
+  companyId: string
+): Promise<PlanningModeKey> {
+  const company = await unsafeGlobalPrisma.company.findUnique({
+    where: { id: companyId },
+    select: { planningMode: true },
+  });
+
+  const mode = company?.planningMode;
+  return isPlanningMode(mode) ? mode : DEFAULT_PLANNING_MODE;
+}
 
 /**
  * Stationerna med sina öppettider.
