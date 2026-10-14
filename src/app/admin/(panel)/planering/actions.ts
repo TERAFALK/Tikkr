@@ -16,6 +16,13 @@ import {
   saveStation,
   setStationActive,
 } from "@/lib/planning";
+import {
+  moveStaffBlock,
+  noteStaffBlock,
+  placeStaffBlock,
+  removeStaffBlock,
+  resizeStaffBlock,
+} from "@/lib/staff-planning";
 
 /**
  * PLANERINGENS SERVERÅTGÄRDER.
@@ -329,4 +336,142 @@ export async function moveStationAction(
 
   revalidatePlanning();
   return { ok: "Ordningen är ändrad." };
+}
+
+/* -------------------------------------------------------------------------- */
+/* Personalens pass                                                            */
+/* -------------------------------------------------------------------------- */
+
+/*
+ * Samma form som rutornas åtgärder, med en anställd där rutan har en station.
+ * Villkoren ligger i lib/staff-planning.ts.
+ */
+
+export async function placeStaffBlockAction(
+  _previous: BlockState,
+  formData: FormData
+): Promise<BlockState> {
+  const session = await requireAdmin();
+  await assertWritable(session);
+  await requireModule(session, "PLANNING");
+
+  const employeeId = String(formData.get("employeeId") ?? "");
+  const orderId = String(formData.get("orderId") ?? "");
+  const momentId = String(formData.get("momentId") ?? "");
+  const plannedBlockId = String(formData.get("plannedBlockId") ?? "") || null;
+  const startsAt = readInstant(formData, "startsAt");
+  const minutes = readNumber(formData, "minutes");
+
+  if (!employeeId || !orderId || !momentId || !startsAt || minutes === null) {
+    return { error: "Något saknades i passet. Försök igen." };
+  }
+
+  const timeZone = await companyTimeZone(session.companyId);
+
+  const result = await placeStaffBlock(session.db, session.companyId, timeZone, {
+    employeeId,
+    orderId,
+    momentId,
+    plannedBlockId,
+    startsAt,
+    minutes,
+    note: String(formData.get("note") ?? ""),
+    byEmail: session.email,
+  });
+
+  if (result.error) return { error: result.error };
+
+  revalidatePlanning();
+  return { ok: "Passet är planerat.", id: result.id };
+}
+
+export async function moveStaffBlockAction(
+  _previous: BlockState,
+  formData: FormData
+): Promise<BlockState> {
+  const session = await requireAdmin();
+  await assertWritable(session);
+  await requireModule(session, "PLANNING");
+
+  const blockId = String(formData.get("blockId") ?? "");
+  const employeeId = String(formData.get("employeeId") ?? "");
+  const startsAt = readInstant(formData, "startsAt");
+
+  if (!blockId || !employeeId || !startsAt) {
+    return { error: "Något saknades i flytten. Försök igen." };
+  }
+
+  const timeZone = await companyTimeZone(session.companyId);
+
+  const result = await moveStaffBlock(
+    session.db,
+    timeZone,
+    blockId,
+    employeeId,
+    startsAt
+  );
+
+  if (result.error) return { error: result.error };
+
+  revalidatePlanning();
+  return { ok: "Passet är flyttat." };
+}
+
+export async function resizeStaffBlockAction(
+  _previous: BlockState,
+  formData: FormData
+): Promise<BlockState> {
+  const session = await requireAdmin();
+  await assertWritable(session);
+  await requireModule(session, "PLANNING");
+
+  const blockId = String(formData.get("blockId") ?? "");
+  const minutes = readNumber(formData, "minutes");
+
+  if (!blockId || minutes === null || minutes < 1) {
+    return { error: "Ange en tid." };
+  }
+
+  const timeZone = await companyTimeZone(session.companyId);
+
+  const result = await resizeStaffBlock(session.db, timeZone, blockId, minutes);
+
+  if (result.error) return { error: result.error };
+
+  revalidatePlanning();
+  return { ok: "Sparat." };
+}
+
+export async function noteStaffBlockAction(
+  _previous: BlockState,
+  formData: FormData
+): Promise<BlockState> {
+  const session = await requireAdmin();
+  await assertWritable(session);
+  await requireModule(session, "PLANNING");
+
+  const blockId = String(formData.get("blockId") ?? "");
+  if (!blockId) return { error: "Passet finns inte." };
+
+  await noteStaffBlock(session.db, blockId, String(formData.get("note") ?? ""));
+
+  revalidatePlanning();
+  return { ok: "Sparat." };
+}
+
+export async function removeStaffBlockAction(
+  _previous: BlockState,
+  formData: FormData
+): Promise<BlockState> {
+  const session = await requireAdmin();
+  await assertWritable(session);
+  await requireModule(session, "PLANNING");
+
+  const blockId = String(formData.get("blockId") ?? "");
+  if (!blockId) return { error: "Passet finns inte." };
+
+  await removeStaffBlock(session.db, blockId);
+
+  revalidatePlanning();
+  return { ok: "Passet är borttaget." };
 }

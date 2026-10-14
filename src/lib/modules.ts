@@ -67,7 +67,7 @@ export const MODULES = {
   PLANNING: {
     key: "PLANNING",
     name: "Planering",
-    summary: "Stationer, veckovis tidslinje och planerade jobb mot stämpling.",
+    summary: "Stationer, personal, veckovis tidslinje och planerade jobb mot stämpling.",
 
     // Dyrare än löneunderlaget, och fast per företag av samma skäl.
     //

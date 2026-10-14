@@ -208,6 +208,7 @@ model Company {
   stationDays   StationDay[]
   stationBreaks StationBreak[]
   plannedBlocks PlannedBlock[]
+  staffBlocks   StaffBlock[]
 
   modules CompanyModule[]
 
@@ -329,6 +330,9 @@ model Employee {
   breakEntries    BreakEntry[]
   absences        Absence[]
   compAdjustments CompAdjustment[]
+
+  /// Planerade personalpass. Se StaffBlock.
+  staffBlocks StaffBlock[]
 
   // Numret är unikt per företag, inte globalt. Två olika kunder ska kunna ha
   // varsin anställd med nummer 1 utan att krocka. Flera personer utan nummer
@@ -470,6 +474,9 @@ model Order {
   /// Planerade rutor på tavlan. Se PlannedBlock.
   plannedBlocks PlannedBlock[]
 
+  /// Planerade personalpass. Se StaffBlock.
+  staffBlocks StaffBlock[]
+
   // Restrict och inte Cascade: en kund med ordrar ska inte gå att radera, bara
   // avaktiveras. Samma regel som redan gäller ordrar och arbetsmoment med
   // registrerad tid — underlaget får inte försvinna under händerna på någon.
@@ -513,6 +520,7 @@ model WorkMoment {
   /// Stationerna som kör det här momentet. Se Station.
   stations      Station[]
   plannedBlocks PlannedBlock[]
+  staffBlocks   StaffBlock[]
 
   @@unique([companyId, name])
   @@index([companyId, active])
@@ -1828,10 +1836,71 @@ model PlannedBlock {
   station Station    @relation(fields: [stationId], references: [id], onDelete: Cascade)
   moment  WorkMoment @relation(fields: [momentId], references: [id], onDelete: Restrict)
 
+  /// Bemanningen: personalpassen som är kopplade till rutan. Se StaffBlock.
+  staffBlocks StaffBlock[]
+
   @@index([companyId, stationId, startsAt])
   @@index([companyId, orderId])
   @@index([companyId, startsAt])
   @@map("planned_blocks")
+}
+
+/// ETT PERSONALPASS (tillagt 2026-10-14, fas 2 av issue #21).
+///
+/// En anställd planerad på en order och ett arbetsmoment. Samma slags avsikt
+/// som en stationsruta: varken arbetad eller fakturerbar tid, och den når
+/// aldrig ett underlag. Allt som skriver går genom src/lib/staff-planning.ts.
+///
+/// I läget Tjänst räknar passen av orderns beräknade tid. I läget Produktion
+/// är de BEMANNING och räknas inte: stationens rutor gör det, och maskinens
+/// körtid och operatörens arbetstid skiljer sig. Se src/lib/planning-modes.ts.
+///
+/// TILL SKILLNAD FRÅN EN STATIONSRUTA ÄR PASSET EN PERSONUPPGIFT. Det säger
+/// var en namngiven person ska vara och när. Det raderas därför vid
+/// anonymisering och följer med i registerutdraget.
+model StaffBlock {
+  id         String @id @default(cuid())
+  companyId  String @map("company_id")
+  employeeId String @map("employee_id")
+  orderId    String @map("order_id")
+  momentId   String @map("moment_id")
+
+  /// Stationsrutan passet bemannar, i läget Produktion. Tomt för ett fritt
+  /// pass, och för ett vars ruta tagits bort.
+  plannedBlockId String? @map("planned_block_id")
+
+  startsAt DateTime @map("starts_at")
+
+  /// Planerad tid i minuter. Alltid större än noll.
+  minutes Int
+
+  note String?
+
+  /// Vem som la passet. Samma spår som stationsrutorna bär.
+  createdByEmail String @map("created_by_email")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  // Cascade från personen och ordern: utan dem är passet meningslöst.
+  employee Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  order    Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  // Restrict från momentet, som överallt annars.
+  moment WorkMoment @relation(fields: [momentId], references: [id], onDelete: Restrict)
+
+  // SetNull från stationsrutan: tas körningen bort ligger personens pass kvar,
+  // utan koppling. En persons planerade dag ska inte försvinna för att
+  // maskinplanen ändrades.
+  plannedBlock PlannedBlock? @relation(fields: [plannedBlockId], references: [id], onDelete: SetNull)
+
+  @@index([companyId, employeeId, startsAt])
+  @@index([companyId, orderId])
+  @@index([companyId, startsAt])
+  @@index([plannedBlockId])
+  @@map("staff_blocks")
 }
 
 // ---------------------------------------------------------------------------

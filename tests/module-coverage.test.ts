@@ -149,8 +149,20 @@ const MODULE_SURFACES: Record<string, ModuleSurface> = {
   },
 
   PLANNING: {
-    libs: ["planning", "plan-calendar", "plan-live", "planning-modes"],
-    models: ["station", "stationDay", "stationBreak", "plannedBlock"],
+    libs: [
+      "planning",
+      "plan-calendar",
+      "plan-live",
+      "planning-modes",
+      "staff-planning",
+    ],
+    models: [
+      "station",
+      "stationDay",
+      "stationBreak",
+      "plannedBlock",
+      "staffBlock",
+    ],
     surface: [
       "app/admin/(panel)/planering/page.tsx",
       "app/admin/(panel)/planering/actions.ts",
@@ -179,7 +191,15 @@ const MODULE_SURFACES: Record<string, ModuleSurface> = {
     // planeringens bibliotek eller dess tabeller. Formuläret läser
     // lib/weekly-hours.ts, som är neutral och delas med lönemodulens
     // schemasidor.
-    noGuard: ["components/admin/PlanBoard.tsx"],
+    //
+    // installningar/actions.ts: GDPR-anonymiseringen raderar personens
+    // planerade pass, och måste göra det ÄVEN när planeringen är avstängd.
+    // Samma skäl som för löneunderlagets frånvaro ovan: en avstängd modul får
+    // inte vara ett sätt att göra personuppgifter oåtkomliga.
+    noGuard: [
+      "components/admin/PlanBoard.tsx",
+      "app/admin/(panel)/installningar/actions.ts",
+    ],
   },
 };
 
@@ -413,6 +433,7 @@ describe("registret och schemat säger samma sak", () => {
       "StationDay",
       "StationBreak",
       "PlannedBlock",
+      "StaffBlock",
     ];
 
     for (const model of required) {

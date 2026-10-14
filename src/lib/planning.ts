@@ -4,6 +4,7 @@ import {
   DEFAULT_PLANNING_MODE,
   isPlanningMode,
   type PlanningModeKey,
+  type PlanningView,
 } from "./planning-modes";
 import {
   fitsFrom,
@@ -111,7 +112,10 @@ export interface UnplacedRow {
   placedMinutes: number;
   /** Beräknat minus placerat. Negativt betyder planerat över beräkningen. */
   remainingMinutes: number;
-  /** false när ingen aktiv station kan göra momentet. */
+  /**
+   * false när ingen resurs kan ta jobbet: ingen aktiv station kör momentet,
+   * eller, när personalen räknar av beräkningen, ingen anställd är aktiv.
+   */
   plannable: boolean;
   /**
    * Momentets plats i orderns egen ordning. Noll först.
@@ -334,9 +338,19 @@ function toPlannedBlock(row: {
  *
  * Stängda ordrar tas inte med. Är jobbet klart finns ingenting kvar att
  * planera, och raden skulle bara skymma det som är ogjort.
+ *
+ * RÄKNAS MOT EN RESURS, den läget anger (planning-modes.ts `countsBudget`):
+ * stationernas rutor i en verkstad, personalens pass i ett tjänsteföretag.
+ * Aldrig båda. Räknade båda skulle samma timme planeras två gånger, och
+ * Oplacerat visa för lite. Bemanningen i en verkstad räknas därför inte.
  */
-export async function unplacedWork(db: CompanyDb): Promise<UnplacedRow[]> {
-  const [orders, blocks, stations] = await Promise.all([
+export async function unplacedWork(
+  db: CompanyDb,
+  countedBy: PlanningView = "stations"
+): Promise<UnplacedRow[]> {
+  const byStaff = countedBy === "staff";
+
+  const [orders, blocks, resources] = await Promise.all([
     db.order.findMany({
       where: { status: "OPEN" },
       select: {
@@ -355,21 +369,37 @@ export async function unplacedWork(db: CompanyDb): Promise<UnplacedRow[]> {
         },
       },
     }),
-    db.plannedBlock.findMany({
-      select: {
-        orderId: true,
-        momentId: true,
-        minutes: true,
-        moment: { select: { name: true } },
-      },
-    }),
-    db.station.findMany({
-      where: { active: true },
-      select: { momentId: true },
-    }),
+    byStaff
+      ? db.staffBlock.findMany({
+          select: {
+            orderId: true,
+            momentId: true,
+            minutes: true,
+            moment: { select: { name: true } },
+          },
+        })
+      : db.plannedBlock.findMany({
+          select: {
+            orderId: true,
+            momentId: true,
+            minutes: true,
+            moment: { select: { name: true } },
+          },
+        }),
+    byStaff
+      ? db.employee.count({ where: { active: true } })
+      : db.station.findMany({
+          where: { active: true },
+          select: { momentId: true },
+        }),
   ]);
 
-  const canDo = new Set(stations.map((station) => station.momentId));
+  // En station kör ett moment. En person tar vilket moment som helst, så där
+  // räcker det att någon finns.
+  const canDo = (momentId: string) =>
+    typeof resources === "number"
+      ? resources > 0
+      : resources.some((station) => station.momentId === momentId);
 
   /** Placerade minuter per order och moment. */
   const placed = new Map<string, number>();
@@ -406,7 +436,7 @@ export async function unplacedWork(db: CompanyDb): Promise<UnplacedRow[]> {
         budgetMinutes: budget.minutes,
         placedMinutes,
         remainingMinutes: budget.minutes - placedMinutes,
-        plannable: canDo.has(budget.momentId),
+        plannable: canDo(budget.momentId),
         sequence: budget.sortOrder,
       });
     }
@@ -427,7 +457,7 @@ export async function unplacedWork(db: CompanyDb): Promise<UnplacedRow[]> {
         budgetMinutes: null,
         placedMinutes: placed.get(`${order.id}:${momentId}`) ?? 0,
         remainingMinutes: 0,
-        plannable: canDo.has(momentId),
+        plannable: canDo(momentId),
         // Sist. Momentet står inte i beräkningen och har därför ingen plats i
         // ordningen; att ge det noll hade lagt det först, före det som faktiskt
         // är planerat att göras först.
@@ -624,6 +654,11 @@ export async function placeBlock(
  *
  * Minuterna kapas mot det nya dygnet. Flyttas en ruta sent på kvällen krymper
  * den, och återstoden hamnar i Oplacerat av sig själv — ingenting faller bort.
+ *
+ * Bemanningen flyttas med, se nedan. Krymps eller tas rutan bort rörs den
+ * däremot inte: ett pass som bemannade en borttagen ruta ligger kvar utan
+ * koppling (onDelete: SetNull), eftersom en persons planerade dag inte ska
+ * försvinna för att maskinplanen ändrades.
  */
 export async function moveBlock(
   db: CompanyDb,
@@ -634,7 +669,7 @@ export async function moveBlock(
 ): Promise<PlanResult> {
   const block = await db.plannedBlock.findFirst({
     where: { id: blockId },
-    select: { id: true, momentId: true, minutes: true },
+    select: { id: true, momentId: true, minutes: true, startsAt: true },
   });
 
   if (!block) return { error: "Rutan finns inte." };
@@ -656,13 +691,38 @@ export async function moveBlock(
     return { error: "Starttiden ligger för sent på dygnet." };
   }
 
-  await db.plannedBlock.updateMany({
-    where: { id: blockId },
-    data: {
-      stationId: station.id,
-      startsAt: snapped,
-      minutes: Math.min(block.minutes, room),
-    },
+  // BEMANNINGEN FÖLJER MED, lika långt (beslutat 2026-10-14). Passen hör
+  // till körningen: flyttas fräsningen till tisdag ska operatören inte stå
+  // kvar vid en tom maskin på måndagen. Varje pass behåller sitt avstånd till
+  // rutans start, och kapas vid midnatt som när det lades.
+  const shift = snapped.getTime() - block.startsAt.getTime();
+
+  await db.$transaction(async (tx) => {
+    await tx.plannedBlock.updateMany({
+      where: { id: blockId },
+      data: {
+        stationId: station.id,
+        startsAt: snapped,
+        minutes: Math.min(block.minutes, room),
+      },
+    });
+
+    if (shift === 0) return;
+
+    const staffing = await tx.staffBlock.findMany({
+      where: { plannedBlockId: blockId },
+      select: { id: true, startsAt: true, minutes: true },
+    });
+
+    for (const pass of staffing) {
+      const startsAt = new Date(pass.startsAt.getTime() + shift);
+      const left = fitsFrom(null, startsAt, timeZone);
+
+      await tx.staffBlock.updateMany({
+        where: { id: pass.id },
+        data: { startsAt, minutes: Math.max(1, Math.min(pass.minutes, left)) },
+      });
+    }
   });
 
   return { id: blockId };

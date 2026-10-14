@@ -337,6 +337,12 @@ export async function anonymizeEmployee(
     await tx.compAdjustment.deleteMany({ where: { employeeId: id } });
     await tx.absence.deleteMany({ where: { employeeId: id } });
 
+    // PLANERADE PASS RADERAS OCKSÅ. De är en avsikt och inget underlag mot
+    // någon, och de säger var en namngiven person skulle vara och när. Raderas
+    // även när planeringen är avstängd, av samma skäl som frånvaron. Ett pass
+    // som bemannade en stationsruta lämnar rutan orörd.
+    await tx.staffBlock.deleteMany({ where: { employeeId: id } });
+
     // Ändringsloggens rader om frånvaron och komptiden följer med ut. De bär
     // samma uppgifter som posterna själva, och en anonymisering som lämnar
     // kvar en kopia i loggen har inte anonymiserat något.
