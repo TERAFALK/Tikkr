@@ -28,18 +28,14 @@ import { DOC } from "./brand";
  * dokument, men utan stämplingar och raster: lönen behöver frånvaron dag för
  * dag och summeringen längst ner, inte en månad av stämplingar. Se `rows`.
  *
- * TID SKRIVS SOM TIM:MIN (33:45), som i hela resten av applikationen. Se
- * `format.ts`: det som ska läsas skrivs tim:min, det som ska räknas skrivs
- * decimalt och bara i Excel-arket.
+ * TID SKRIVS SOM DECIMALTIMMAR (33,75), som i hela resten av applikationen.
+ * Se `format.ts`. Det är kundens format: lönen räknar vidare på
+ * sammanställningen, och ett tal som ska räknas med ska inte stå i tim:min.
  *
- * Stod i decimaltimmar till 2026-10-01, med skälet att kunden summerade
- * vidare på sammanställningen. Det vägde lättare än att samma tal såg olika
- * ut på skärmen och på pappret: "1,99" lästes som 1:59, vilket är fyra
- * minuter fel, och den som jämförde fick räkna om i huvudet.
- *
- * Klockslagen i raderna skrivs som klockslag och inte som "6,23" — den gamla
- * rapportens sätt att skriva 06:23 som ett decimaltal är en fälla som inte
- * ska ärvas.
+ * KLOCKSLAGEN ÄR KLOCKSLAG. Ett pass börjar "06:23" och inte "6,38". Att
+ * längderna är decimala gör skillnaden viktigare och inte mindre viktig: den
+ * gamla rapportens sätt att skriva 06:23 som "6,23" är en fälla som inte ska
+ * ärvas.
  *
  * INGA BELOPP. Varken timkostnad, lön eller lönearter. Tikkr räknar tid; vad
  * tiden är värd avgörs av kollektivavtalet i lönesystemet.
@@ -419,7 +415,7 @@ function drawRowHeader(
   }
 
   // Enheten i rubriken och inte i en fotnot, precis som i pdf.ts.
-  doc.text("Tid (tim:min)", A4_WIDTH - MARGIN - 74, y, {
+  doc.text("Tid (timmar)", A4_WIDTH - MARGIN - 74, y, {
     width: 70,
     align: "right",
     lineBreak: false,

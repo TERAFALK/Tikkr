@@ -121,7 +121,7 @@ export default async function ReviewPage() {
               <tr>
                 <Th>Anställd och jobb</Th>
                 <Th>Instämplad</Th>
-                <Th numeric>Beräknad tid (tim:min)</Th>
+                <Th numeric>Beräknad tid (timmar)</Th>
                 <Th>Sluttid</Th>
               </tr>
             </thead>

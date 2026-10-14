@@ -215,9 +215,9 @@ export default function BudgetMoments({
               ))}
             </Select>
 
-            {/* Fältet tar både "7:30" och "7,5". Tim:min står förifyllt,
-                eftersom det är formatet den beräknade tiden visas i på
-                orderlistan och i underlaget. */}
+            {/* Fältet tar både "7,5" och "7:30". Decimalformen står
+                förifylld, eftersom det är formatet den beräknade tiden visas i
+                på orderlistan och i underlaget. */}
             <div className="relative w-24 shrink-0">
               <input
                 name={BUDGET_HOURS_FIELD}
@@ -226,7 +226,7 @@ export default function BudgetMoments({
                   update(row.key, { hours: event.target.value })
                 }
                 inputMode="text"
-                placeholder="8:00"
+                placeholder="8"
                 aria-label="Beräknad tid"
                 // HÅLLER LÖSENORDSHANTERARE BORTA FRÅN FÄLTET.
                 //

@@ -41,7 +41,7 @@ export interface ReportPdfOptions {
   view: ReportView;
 }
 
-// Bredderna styrs av RUBRIKERNA, inte av värdena: "Tid (tim:min)" är bredare
+// Bredderna styrs av RUBRIKERNA, inte av värdena: "Tid (timmar)" är bredare
 // än någon siffra den rymmer. Kolumnerna har lineBreak: false, så för smalt
 // klipper texten utan att det syns. Summan måste bli CONTENT_WIDTH.
 const DETAIL_COLUMNS = [
@@ -50,7 +50,7 @@ const DETAIL_COLUMNS = [
   { label: "Instämplad", width: 105, align: "left" as const },
   // Bara klockslaget — datumet står redan i kolumnen före.
   { label: "Slut", width: 50, align: "left" as const },
-  { label: "Tid (tim:min)", width: 75, align: "right" as const },
+  { label: "Tid (timmar)", width: 75, align: "right" as const },
 ];
 
 // Varje stämpling, men utan kolumnen Anställd: namnet står i rubriken över
@@ -60,13 +60,13 @@ const EMPLOYEE_DETAIL_COLUMNS = [
   { label: "Vad", width: 250, align: "left" as const },
   { label: "Instämplad", width: 120, align: "left" as const },
   { label: "Slut", width: 55, align: "left" as const },
-  { label: "Tid (tim:min)", width: 70, align: "right" as const },
+  { label: "Tid (timmar)", width: 70, align: "right" as const },
 ];
 
 const PERSON_COLUMNS = [
   { label: "Anställd", width: 270, align: "left" as const },
   { label: "Stämplingar", width: 110, align: "right" as const },
-  { label: "Tid (tim:min)", width: 115, align: "right" as const },
+  { label: "Tid (timmar)", width: 115, align: "right" as const },
 ];
 
 export function buildReportPdf(

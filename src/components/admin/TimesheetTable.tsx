@@ -12,10 +12,8 @@ import ConfirmButton from "./ConfirmButton";
  * med trettio stämplingar är oläslig om allt står utskrivet, och den fråga man
  * kommer med är nästan alltid "stämmer dagarna", inte "vad gjorde hen 09:13".
  *
- * Tiden visas som DECIMALTIMMAR i summeringen och som tim:min i raderna. Det
- * är inte en inkonsekvens: kundens gamla rapport skriver decimaltimmar i
- * sammanställningen, och det är den siffran de känner igen och räknar vidare
- * på. En enskild dag läses däremot lättare som 8:30 än som 8,50.
+ * Tiden står i decimaltimmar, i summeringen och i raderna, som överallt
+ * annars. Det är kundens gamla rapports format, och det de räknar vidare på.
  */
 
 export interface TimesheetDayRow {

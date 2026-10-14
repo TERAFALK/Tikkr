@@ -15,7 +15,7 @@ import type { HelpAreaKey } from "./areas";
  *
  * SAMMA REGLER SOM I PANELEN. Knapparnas namn skrivs exakt som de står på
  * skärmen, så att den som letar efter "Ny skärm" hittar just "Ny skärm".
- * Tid skrivs som tim:min, och tankstreck i löptext fälls av
+ * Tid skrivs som decimaltimmar, och tankstreck i löptext fälls av
  * tests/ui-text.test.ts. Se TONE-OF-VOICE.md.
  *
  * `slug` är adressen, /support/<slug>, och det namn panelens hjälplänkar pekar
@@ -317,7 +317,7 @@ export const GUIDES = [
       },
       {
         title: "Lägg till beräknad tid per arbetsmoment",
-        body: "En rad per moment. Tim:min, t.ex. 7:30. Orderns totala beräkning är summan av raderna.",
+        body: "En rad per moment. Timmar, t.ex. 7,5. Orderns totala beräkning är summan av raderna.",
       },
       {
         title: "Fyll i påslag eller fast kundpris vid behov",
@@ -541,7 +541,7 @@ export const GUIDES = [
       },
       {
         title: "Tryck Excel för att räkna vidare",
-        body: "Arket har tid både som tim:min och som decimaltimmar.",
+        body: "Arket har tiden som ett tal, så att den går att summera.",
       },
     ],
     notes: [

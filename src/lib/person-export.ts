@@ -154,10 +154,9 @@ export async function buildPersonExport(
   punches.columns = [
     { header: "Instämplad", key: "in", width: 18 },
     { header: "Utstämplad", key: "out", width: 18 },
-    // Bara tim:min. Utdraget är till för att LÄSAS av den som begärt det, inte
-    // för att räkna vidare i — därför ingen decimalkolumn, till skillnad från
-    // rapportens ark. Se tests/format.test.ts.
-    { header: "Tid (tim:min)", key: "duration", width: 14 },
+    // Tiden står som TEXT här och som ett tal i rapportens ark. Utdraget är
+    // till för att LÄSAS av den som begärt det, inte för att räknas vidare i.
+    { header: "Tid (timmar)", key: "duration", width: 14 },
     { header: "Jobb", key: "job", width: 32 },
     { header: "Kund", key: "customer", width: 24 },
     { header: "Källa", key: "source", width: 28 },
@@ -192,7 +191,7 @@ export async function buildPersonExport(
       { header: "Rast", key: "type", width: 16 },
       { header: "Började", key: "start", width: 18 },
       { header: "Slutade", key: "end", width: 18 },
-      { header: "Tid (tim:min)", key: "duration", width: 14 },
+      { header: "Tid (timmar)", key: "duration", width: 14 },
       { header: "Källa", key: "source", width: 28 },
     ];
 
@@ -212,7 +211,7 @@ export async function buildPersonExport(
     sheet.columns = [
       { header: "Datum", key: "date", width: 12 },
       { header: "Orsak", key: "reason", width: 20 },
-      { header: "Tid (tim:min)", key: "duration", width: 14 },
+      { header: "Tid (timmar)", key: "duration", width: 14 },
       { header: "Anteckning", key: "note", width: 40 },
       { header: "Registrerad av", key: "by", width: 28 },
     ];
@@ -232,7 +231,7 @@ export async function buildPersonExport(
     const sheet = workbook.addWorksheet("Komptid");
     sheet.columns = [
       { header: "Datum", key: "date", width: 12 },
-      { header: "Tid (tim:min)", key: "duration", width: 14 },
+      { header: "Tid (timmar)", key: "duration", width: 14 },
       { header: "Anteckning", key: "note", width: 40 },
       { header: "Registrerad av", key: "by", width: 28 },
     ];

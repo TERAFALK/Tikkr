@@ -332,7 +332,7 @@ export default async function EntriesPage({
                 <Th>Order och moment</Th>
                 <Th>Instämplad</Th>
                 <Th>Utstämplad</Th>
-                <Th numeric>Längd (tim:min)</Th>
+                <Th numeric>Längd (timmar)</Th>
                 <Th>
                   <span className="sr-only">Åtgärder</span>
                 </Th>
