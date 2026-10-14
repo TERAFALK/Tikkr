@@ -99,7 +99,7 @@ export const GUIDES = [
     keywords: ["kiosk", "surfplatta", "pekskärm", "kod", "enhet", "terminal", "koppla om"],
     steps: [
       {
-        title: "Öppna Stämplingsskärmar och tryck Ny skärm",
+        title: "Öppna Inställningar, Stämplingsskärmar och tryck Ny skärm",
         body: "Ge skärmen ett namn efter var den sitter, t.ex. Monteringen, och tryck Skapa kod.",
       },
       {
@@ -228,7 +228,7 @@ export const GUIDES = [
     steps: [
       {
         title: "Lägg upp de improduktiva momenten",
-        body: "Under Improduktiv tid i panelen, tryck Nytt improduktivt moment.",
+        body: "Under Inställningar, Improduktiv tid, tryck Nytt improduktivt moment.",
       },
       {
         title: "Tryck Improduktiv tid på stämplingsskärmen",
@@ -368,7 +368,7 @@ export const GUIDES = [
     keywords: ["moment", "maskin", "operation", "timpris", "maskinkostnad", "självkostnad"],
     steps: [
       {
-        title: "Öppna Arbetsmoment och tryck Nytt arbetsmoment",
+        title: "Öppna Inställningar, Arbetsmoment och tryck Nytt arbetsmoment",
       },
       {
         title: "Skriv namn och timkostnad",
@@ -664,7 +664,7 @@ export const GUIDES = [
     steps: [
       {
         title: "Lägg upp stationerna",
-        body: "Under Stationer, tryck Ny station. En station gör ett arbetsmoment.",
+        body: "Under Inställningar, Stationer, tryck Ny station. En station gör ett arbetsmoment.",
       },
       {
         title: "Ge ordern beräknad tid per arbetsmoment",

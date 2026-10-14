@@ -14,7 +14,6 @@ import {
   Card,
   CardHeader,
   EmptyState,
-  PageHeader,
   Table,
   Td,
   Th,
@@ -25,7 +24,7 @@ import {
   moveStationAction,
   saveStationAction,
   toggleStationAction,
-} from "../actions";
+} from "@/app/admin/(panel)/planering/actions";
 
 /**
  * STATIONSREGISTRET.
@@ -93,8 +92,10 @@ export default async function StationsPage() {
   }
 
   return (
-    <>
-      <PageHeader
+    // Ett kort och ingen egen sidrubrik, som de andra sidorna under
+    // Inställningar (issue #17).
+    <Card>
+      <CardHeader
         title="Stationer"
         help="planering"
         action={
@@ -108,22 +109,22 @@ export default async function StationsPage() {
       />
 
       {activeMoments.length === 0 ? (
-        <EmptyState
-          title="Inga arbetsmoment upplagda"
-          description="En station kör ett arbetsmoment. Lägg upp momenten först."
-          action={
-            <ButtonLink href="/admin/moment">Till arbetsmoment</ButtonLink>
-          }
-        />
-      ) : stations.length === 0 ? (
-        <EmptyState title="Inga stationer upplagda" action={newStation} />
-      ) : (
-        <Card>
-          <CardHeader
-            title={`${stations.length} ${
-              stations.length === 1 ? "station" : "stationer"
-            }`}
+        <div className="p-5">
+          <EmptyState
+            title="Inga arbetsmoment upplagda"
+            description="En station kör ett arbetsmoment. Lägg upp momenten först."
+            action={
+              <ButtonLink href="/admin/installningar/arbetsmoment">
+                Till arbetsmoment
+              </ButtonLink>
+            }
           />
+        </div>
+      ) : stations.length === 0 ? (
+        <div className="p-5">
+          <EmptyState title="Inga stationer upplagda" action={newStation} />
+        </div>
+      ) : (
           <Table>
             <thead>
               <tr>
@@ -198,9 +199,8 @@ export default async function StationsPage() {
               })}
             </tbody>
           </Table>
-        </Card>
       )}
-    </>
+    </Card>
   );
 }
 

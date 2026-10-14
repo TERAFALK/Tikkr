@@ -111,14 +111,6 @@ function ContactCard() {
             </dd>
           </div>
         )}
-        {/* Rutan i panelen. Ingen länk: den öppnas av en knapp och inte av
-            en adress, och hjälpcentret ligger på säljsidan. */}
-        <div>
-          <dt className="text-neutral-500">Fel och förslag</dt>
-          <dd className="mt-0.5 text-neutral-700">
-            Pratbubblan längst ner i panelens meny
-          </dd>
-        </div>
       </dl>
 
       <p className="mt-5 text-[13px] text-neutral-500">

@@ -5,7 +5,7 @@ import { assertWritable, requireAdmin } from "@/lib/admin-session";
 import { createKioskDevice, startPairing } from "@/lib/kiosk-auth";
 import { assertLicenseAvailable, LicenseError } from "@/lib/licenses";
 
-const PATH = "/admin/skarmar";
+const PATH = "/admin/installningar/skarmar";
 
 export interface PairingFormState {
   error?: string;

@@ -5,13 +5,10 @@ import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { logout } from "@/app/admin/actions";
 import {
-  IconBroom,
   IconBuilding,
   IconClock,
-  IconDevice,
   IconHelp,
   IconLogout,
-  IconMoment,
   IconOrder,
   IconOverview,
   IconPeople,
@@ -19,7 +16,6 @@ import {
   IconReview,
   IconSettings,
   IconSparkle,
-  IconStation,
   IconTimeline,
   IconUser,
 } from "@/components/ui/icons";
@@ -32,9 +28,10 @@ import { LogoMark, WordmarkOnly } from "@/components/ui/Logo";
  * Vänsternavigeringen.
  *
  * Grupperad i två sektioner, eftersom det speglar hur arbetet faktiskt ser ut:
- * "Dagligen" är det man öppnar varje morgon, "Register" är sådant man ändrar
- * någon gång i månaden. En platt lista med åtta likvärdiga länkar tvingar
- * ögat att läsa alla varje gång.
+ * "Dagligen" är det man öppnar varje morgon, "Register" är det man lägger
+ * till i varje vecka. Det som sätts upp en gång och sedan står ligger under
+ * Inställningar. En platt lista med åtta likvärdiga länkar tvingar ögat att
+ * läsa alla varje gång.
  *
  * Antalet ogranskade poster visas som siffra direkt i menyn — det är det enda
  * i systemet som kräver att någon gör något, och då ska det synas utan att man
@@ -64,54 +61,39 @@ const sections: { label: string; links: NavLink[] }[] = [
     label: "Dagligen",
     links: [
       { href: "/admin", label: "Översikt", icon: IconOverview, exact: true },
-      { href: "/admin/rapporter", label: "Rapporter", icon: IconReport },
+      // Granskning direkt under Översikt: den enda punkten som kräver att
+      // någon gör något, och därför den som ska hittas först.
+      { href: "/admin/granskning", label: "Granskning", icon: IconReview, badge: true },
+      { href: "/admin/stamplingar", label: "Stämplingar", icon: IconClock },
       { href: "/admin/vecka", label: "Veckovy", icon: IconClock },
-      {
-        href: "/admin/tidrapport",
-        label: "Tidrapport",
-        icon: IconPeople,
-        module: "PAYROLL",
-      },
       {
         href: "/admin/planering",
         label: "Planering",
         icon: IconTimeline,
         // Tavlan ligger under Dagligen och inte under Register: den öppnas
         // varje morgon, inte någon gång i månaden. Stationerna, som är ett
-        // register, ligger längre ner.
-        //
-        // `exact` eftersom stationssidan ligger under samma adress och har en
-        // egen menypunkt. Utan den skulle båda markeras som aktiva samtidigt.
-        exact: true,
+        // register, ligger under Inställningar.
         module: "PLANNING",
       },
-      { href: "/admin/granskning", label: "Granskning", icon: IconReview, badge: true },
-      { href: "/admin/stamplingar", label: "Stämplingar", icon: IconClock },
+      {
+        href: "/admin/tidrapport",
+        label: "Tidrapport",
+        icon: IconPeople,
+        module: "PAYROLL",
+      },
+      { href: "/admin/rapporter", label: "Rapporter", icon: IconReport },
     ],
   },
   {
+    // BARA DET SOM ÄNDRAS VARJE VECKA (ändrat 2026-10-14, issue #17).
+    // Arbetsmoment, improduktiv tid, stämplingsskärmar och stationer låg
+    // också här, och menyn hade fjorton punkter. De sätts upp en gång och
+    // ligger nu under Inställningar, se SettingsNav.
     label: "Register",
     links: [
-      { href: "/admin/kunder", label: "Kunder", icon: IconBuilding },
       { href: "/admin/ordrar", label: "Ordrar", icon: IconOrder },
+      { href: "/admin/kunder", label: "Kunder", icon: IconBuilding },
       { href: "/admin/anstallda", label: "Anställda", icon: IconPeople },
-      { href: "/admin/moment", label: "Arbetsmoment", icon: IconMoment },
-      {
-        href: "/admin/improduktivt",
-        label: "Improduktiv tid",
-        icon: IconBroom,
-      },
-      {
-        href: "/admin/planering/stationer",
-        label: "Stationer",
-        icon: IconStation,
-        module: "PLANNING",
-      },
-      {
-        href: "/admin/skarmar",
-        label: "Stämplingsskärmar",
-        icon: IconDevice,
-      },
     ],
   },
 ];

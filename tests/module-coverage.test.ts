@@ -154,7 +154,7 @@ const MODULE_SURFACES: Record<string, ModuleSurface> = {
     surface: [
       "app/admin/(panel)/planering/page.tsx",
       "app/admin/(panel)/planering/actions.ts",
-      "app/admin/(panel)/planering/stationer/page.tsx",
+      "app/admin/(panel)/installningar/stationer/page.tsx",
       "app/api/admin/plan/live/route.ts",
     ],
 

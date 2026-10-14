@@ -168,7 +168,7 @@ export default async function OnboardingPage() {
           <ChipList
             label={`${moments.length} upplagda`}
             items={moments.map((moment) => moment.name)}
-            href="/admin/moment"
+            href="/admin/installningar/arbetsmoment"
           />
         )}
       </StepCard>
@@ -220,7 +220,7 @@ export default async function OnboardingPage() {
         done={state.steps[3].done}
         last
       >
-        <ButtonLink href="/admin/skarmar">
+        <ButtonLink href="/admin/installningar/skarmar">
           {state.steps[3].done ? "Hantera skärmar" : "Skapa skärm"}
         </ButtonLink>
       </StepCard>

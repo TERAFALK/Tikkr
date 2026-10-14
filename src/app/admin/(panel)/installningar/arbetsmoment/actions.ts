@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { assertWritable, requireAdmin } from "@/lib/admin-session";
 import { parseOre } from "@/lib/money";
 
-const PATH = "/admin/moment";
+const PATH = "/admin/installningar/arbetsmoment";
 
 export async function createMoment(formData: FormData) {
   const session = await requireAdmin();

@@ -44,7 +44,7 @@ const PATH = "/admin/planering";
 
 function revalidatePlanning() {
   revalidatePath(PATH);
-  revalidatePath("/admin/planering/stationer");
+  revalidatePath("/admin/installningar/stationer");
 }
 
 /* -------------------------------------------------------------------------- */

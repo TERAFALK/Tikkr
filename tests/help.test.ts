@@ -150,7 +150,7 @@ describe("sökningen", () => {
 describe("området för en sida i panelen", () => {
   it("förväljer rätt område, även på en undersida", () => {
     expect(areaForPath("/admin/planering")).toBe("PLANNING");
-    expect(areaForPath("/admin/planering/stationer")).toBe("PLANNING");
+    expect(areaForPath("/admin/installningar/stationer")).toBe("PLANNING");
     expect(areaForPath("/admin/installningar/franvaro")).toBe("PAYROLL");
     expect(areaForPath("/admin/installningar/prenumeration")).toBe("ACCOUNT");
   });

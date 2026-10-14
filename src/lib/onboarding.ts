@@ -123,7 +123,7 @@ export async function getOnboardingState(
       key: "device",
       title: "Koppla en stämplingsskärm",
       description: "Lägg upp skärmen och knappa in koden på enheten.",
-      href: "/admin/skarmar",
+      href: "/admin/installningar/skarmar",
       done: devices > 0,
     },
   ];
@@ -143,7 +143,7 @@ export async function getOnboardingState(
       title: "Sätt timkostnad på arbetsmomenten",
       description:
         "Utan den saknar efterkalkylen underlag och tiden redovisas utan belopp.",
-      href: "/admin/moment",
+      href: "/admin/installningar/arbetsmoment",
       action: "Till arbetsmoment",
       done: momentsWithRate > 0,
     },
@@ -152,7 +152,7 @@ export async function getOnboardingState(
       title: "Lägg upp improduktiv tid",
       description:
         "Städning, möten och underhåll. Registreras skilt från ordrarna och faktureras aldrig.",
-      href: "/admin/improduktivt",
+      href: "/admin/installningar/improduktivt",
       action: "Till improduktiv tid",
       done: indirect > 0,
     },
