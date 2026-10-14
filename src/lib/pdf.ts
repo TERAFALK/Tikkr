@@ -49,10 +49,10 @@ const COLUMNS = [
   { key: "moment", label: "Arbetsmoment", width: 105, align: "left" as const },
   { key: "in", label: "Instämplad", width: 95, align: "left" as const },
   { key: "out", label: "Utstämplad", width: 95, align: "left" as const },
-  // Bredden styrs av RUBRIKEN, inte av värdena: "312:45" är kort, men
-  // "Tid (tim:min)" behöver sina punkter. Kolumnen har lineBreak: false, så
-  // för smalt hade klippt texten utan att det syntes.
-  { key: "hours", label: "Tid (tim:min)", width: 80, align: "right" as const },
+  // Bredden styrs av RUBRIKEN, inte av värdena: "312,75" är kort, men
+  // "Tid (timmar)" är bredare än någon siffra kolumnen rymmer. Kolumnen har
+  // lineBreak: false, så för smalt hade klippt texten utan att det syntes.
+  { key: "hours", label: "Tid (timmar)", width: 80, align: "right" as const },
 ];
 
 export function buildOrderPdf(

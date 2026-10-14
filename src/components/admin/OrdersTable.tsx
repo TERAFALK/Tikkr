@@ -268,7 +268,7 @@ export default function OrdersTable({
             {!hideCustomer && <Th>Kund</Th>}
             <Th>Status</Th>
             <Th numeric>Stämplingar</Th>
-            <Th numeric>Upparbetad tid (tim:min)</Th>
+            <Th numeric>Upparbetad tid (timmar)</Th>
             <Th>Mot beräknad tid</Th>
           </tr>
         </thead>

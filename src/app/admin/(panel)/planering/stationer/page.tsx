@@ -129,7 +129,7 @@ export default async function StationsPage() {
               <tr>
                 <Th>Station</Th>
                 <Th>Öppettider</Th>
-                <Th numeric>Per vecka (tim:min)</Th>
+                <Th numeric>Per vecka (timmar)</Th>
                 <Th>Status</Th>
                 <Th>
                   <span className="sr-only">Åtgärder</span>

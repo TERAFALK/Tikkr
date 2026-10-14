@@ -130,12 +130,12 @@ export default function AbsenceDialog({
 
           <Field
             label="Antal timmar"
-            hint="Tim:min, t.ex. 4:00. Tomt ger hela den schemalagda dagen"
+            hint="Timmar, t.ex. 4. Tomt ger hela den schemalagda dagen"
           >
             <Input
               name="hours"
               inputMode="decimal"
-              placeholder="4:00"
+              placeholder="4"
               autoComplete="off"
             />
           </Field>

@@ -39,10 +39,10 @@ export const BUDGET_HOURS_FIELD = "budgetHours";
  *
  * Administratören tänker i timmar, systemet räknar i minuter.
  *
- * TAR BÅDA FORMEN: "7:30" och "7,5". Systemet VISAR tim:min överallt, och det
- * vore oanständigt att kräva att man räknar om det till decimaltimmar för att
- * skriva tillbaka samma tal. Decimalformen står kvar eftersom en rund siffra
- * är enklare att skriva: "8" är åtta timmar.
+ * TAR BÅDA FORMEN: "7,5" och "7:30". Systemet VISAR decimaltimmar, så det är
+ * den formen man skriver tillbaka samma tal i, och en rund siffra är enkel:
+ * "8" är åtta timmar. Tim:min står kvar eftersom den som har "7:30" på ett
+ * gammalt papper inte ska behöva räkna om det.
  *
  * Både punkt och komma godtas som decimaltecken — ett svenskt tangentbord ger
  * komma. Bara kolon skiljer timmar från minuter, så "7.30" är sju timmar och
