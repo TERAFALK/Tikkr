@@ -87,9 +87,14 @@ export type ModuleKey = keyof typeof MODULES;
 
 export const MODULE_KEYS = Object.keys(MODULES) as ModuleKey[];
 
-/** true när strängen är en nyckel vi känner igen. För data utifrån. */
+/**
+ * true när strängen är en nyckel vi känner igen. För data utifrån.
+ *
+ * Egna nycklar och inte `in`: "toString" finns på varje objekt, och ett
+ * formulär som skickade det hade annars godtagits som ett tillval.
+ */
 export function isModuleKey(value: unknown): value is ModuleKey {
-  return typeof value === "string" && value in MODULES;
+  return typeof value === "string" && Object.hasOwn(MODULES, value);
 }
 
 export function moduleName(key: ModuleKey): string {
