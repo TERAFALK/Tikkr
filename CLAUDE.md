@@ -215,7 +215,8 @@ admin-UI m.m.). Kraftfullt, men det motsäger målet om *ett* enkelt paket.
 ## 3. Datamodell
 
 ```
-companies      — id, name, subscription_status, created_at, atf_agreement?
+companies      — id, name, subscription_status, created_at, atf_agreement?,
+                 planning_mode
 employees      — id, company_id, name, active, cost_rate_ore,
                  schedule_id?, flex_opening_minutes, flex_code_hash?, hourly,
                  balance_opening_date?, atf_work_form?
@@ -831,6 +832,44 @@ stripe_prices    — item, month_price_id, year_price_id, updated_by_email
    behöver därför inte röras, till skillnad från löneunderlagets poster.
 
    Kiosken är **orörd**. Ett tryck ska räcka.
+
+   **PLANERINGSLÄGET: PRODUKTION ELLER TJÄNST** (beslutat 2026-10-14,
+   issue #21, produktägarens val). Planeringen passade bara verkstäder, och en
+   elfirma som planerar människor på jobb hade inga stationer att lägga något
+   på. Läget väljs per företag under Inställningar, Planeringsläge, och ligger
+   i `companies.planning_mode`. Det är ETT tillval och inte två: det kunden
+   betalar för är detsamma, att lägga ordrarnas beräknade tid ut i veckan.
+
+   | Läge | Vyer på tavlan | Räknar av beräkningen |
+   |---|---|---|
+   | Produktion (förval) | Stationer, Personal | stationernas rutor |
+   | Tjänst | Personal | personalens pass |
+
+   **Exakt EN resurs räknar av orderns beräknade tid.** Räknade både stationen
+   och personen av samma timme vore den planerad två gånger, och regeln att
+   ingen tid får falla bort vore bruten. I Produktion är personalen därför
+   bemanning på stationens rutor, och dess pass räknas inte mot beräkningen:
+   maskinens körtid och operatörens arbetstid skiljer sig, som när en CNC kör
+   sex timmar obemannad på en timmes ställtid.
+
+   **Förvalet är Produktion**, så att varje befintlig kund har kvar det
+   planeringen alltid varit. Att byta läge rör ingen planerad tid: stationerna
+   och rutorna står kvar och syns igen om läget byts tillbaka.
+
+   Lägena står i `src/lib/planning-modes.ts`, som inte har några importer. En
+   ny verksamhetstyp är ett värde i enumen `PlanningMode` och en rad där.
+   `tests/planning-modes.test.ts` fäller ett register och ett schema som
+   glidit isär.
+
+   **Personalens arbetstider blir planeringens egna** och läses inte ur
+   löneunderlagets scheman, av samma skäl som stationernas öppettider har
+   egna tabeller. Den som har båda tillvalen skriver in dem två gånger.
+
+   Byggs i faser. Fas 1 (läget, vyerna) är gjord; personalpassen, deras
+   tillgänglighet och utfallet mot stämplingen kommer i egna PR:er. **Ett
+   personalpass bär en person och är därför en personuppgift**, till skillnad
+   från en stationsruta, och ska med i anonymiseringen och registerutdraget
+   när tabellen läggs till.
 
 
 Multi-tenant-isolering byggs i appens kod: **varje databasfråga går via ett

@@ -149,12 +149,14 @@ const MODULE_SURFACES: Record<string, ModuleSurface> = {
   },
 
   PLANNING: {
-    libs: ["planning", "plan-calendar", "plan-live"],
+    libs: ["planning", "plan-calendar", "plan-live", "planning-modes"],
     models: ["station", "stationDay", "stationBreak", "plannedBlock"],
     surface: [
       "app/admin/(panel)/planering/page.tsx",
       "app/admin/(panel)/planering/actions.ts",
       "app/admin/(panel)/installningar/stationer/page.tsx",
+      "app/admin/(panel)/installningar/planering/page.tsx",
+      "app/admin/(panel)/installningar/planering/actions.ts",
       "app/api/admin/plan/live/route.ts",
     ],
 

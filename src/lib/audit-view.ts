@@ -3,6 +3,7 @@ import type { CompanyDb } from "./tenant";
 import { formatDate, formatDateTime, formatDuration, formatSignedDuration } from "./format";
 import { formatCurrency, formatMarkup } from "./money";
 import { findAgreement } from "./collective-agreements";
+import { isPlanningMode, planningModeName } from "./planning-modes";
 
 /**
  * ÄNDRINGSLOGGEN SOM TEXT.
@@ -67,6 +68,7 @@ const FIELD_LABELS: Record<string, string> = {
   name: "Namn",
   atfAgreement: "Kollektivavtal för ATF",
   atfWorkForm: "Arbetstidsform för ATF",
+  planningMode: "Planeringsläge",
 };
 
 const SOURCE_LABELS: Record<string, string> = {
@@ -198,6 +200,8 @@ export async function describeAuditEvents(
         return value ? "Ja" : "Nej";
       case "atfAgreement":
         return findAgreement(String(value))?.name ?? String(value);
+      case "planningMode":
+        return isPlanningMode(value) ? planningModeName(value) : String(value);
       default:
         return String(value);
     }

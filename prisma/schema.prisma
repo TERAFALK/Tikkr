@@ -45,6 +45,20 @@ enum ModuleSource {
   MANUAL
 }
 
+/// PLANERINGSLÄGET (tillagt 2026-10-14, issue #21). Avgör vilka vyer
+/// planeringen har och vilken resurs som räknar av orderns beräknade tid.
+/// Registret med namn och vyer är src/lib/planning-modes.ts, som koden läser.
+///
+/// Ett nytt värde här är en additiv ändring, och en ny verksamhetstyp är ett
+/// nytt värde och en rad i registret.
+enum PlanningMode {
+  /// Verkstad: ordrar på stationer, och personal på jobben. Förvalet, så att
+  /// kunderna som redan planerar på stationer har kvar precis det de hade.
+  PRODUCTION
+  /// Tjänsteföretag, till exempel en elfirma: personal på jobb, utan stationer.
+  SERVICE
+}
+
 /// Vad en stämpling avser. Se TimeEntry.kind.
 enum TimeEntryKind {
   /// Tid som ska faktureras en kundorder.
@@ -128,6 +142,11 @@ model Company {
   /// Text och inte en enum: ett nytt avtal är en rad i registret, inte en
   /// migration. Värdet prövas mot registret när det sparas.
   atfAgreement String? @map("atf_agreement")
+
+  /// PLANERINGSLÄGET, se enumen PlanningMode. Läses bara när företaget har
+  /// planeringen. Förvalet PRODUCTION ger varje befintligt företag det läge
+  /// planeringen alltid haft, utan att någon rad behöver skrivas om.
+  planningMode PlanningMode @default(PRODUCTION) @map("planning_mode")
 
   /// Påslag på självkostnaden i kalkylen, i PROCENT. 140 betyder ×1,40.
   ///
