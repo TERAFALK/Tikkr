@@ -391,7 +391,10 @@ export default async function CompanyPage({
         </Section>
 
         <Section title="Åtkomst">
-          <div className="grid items-start gap-4 lg:grid-cols-2">
+          {/* Under varandra och inte bredvid: administratörerna har fem
+              kolumner och en knapp, och i en halv bredd bröts telefonnumren
+              på fyra rader och knappen hamnade utanför rutan (issue #20). */}
+          <div className="space-y-4">
             <Card>
               <CardHeader title="Administratörer" />
               <Table>
@@ -424,7 +427,7 @@ export default async function CompanyPage({
                         {admin.phone ? (
                           <a
                             href={`tel:${admin.phone}`}
-                            className="hover:underline"
+                            className="whitespace-nowrap hover:underline"
                           >
                             {formatPhone(admin.phone)}
                           </a>
@@ -457,7 +460,11 @@ export default async function CompanyPage({
                           )}
                         </span>
                       </Td>
-                      <Td muted>{formatDate(admin.createdAt)}</Td>
+                      <Td muted>
+                        <span className="whitespace-nowrap">
+                          {formatDate(admin.createdAt)}
+                        </span>
+                      </Td>
                     </Tr>
                   ))}
                 </tbody>
