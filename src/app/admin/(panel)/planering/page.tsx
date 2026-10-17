@@ -230,25 +230,38 @@ export default async function PlanningPage({
           />
         )
       ) : (
-        <PlanBoard
-          key={view}
-          kind={view}
-          lanes={board.lanes}
-          blocks={board.blocks}
-          unplaced={board.unplaced}
-          placesFromUnplaced={placesFromUnplaced}
-          employees={board.employees}
-          staffing={board.staffing}
-          monday={monday.toISOString()}
-          weekNumber={isoWeekNumber(monday, timeZone)}
-          timeZone={timeZone}
-          sequences={board.sequences}
-          isCurrentWeek={isCurrentWeek}
-          today={toDateInput(new Date(), timeZone)}
-          focusDay={focus ? toDateInput(focus, timeZone) : null}
-          showWeekend={showWeekend}
-          readOnly={Boolean(session.support)}
-        />
+        <>
+          {board.hoursMissing && (
+            <p className="mb-3 text-[13px] text-neutral-600">
+              Personalen har inga arbetstider.{" "}
+              <Link
+                href="/admin/installningar/arbetstider"
+                className="font-medium text-tick-deep hover:underline"
+              >
+                Lägg in arbetstider
+              </Link>
+            </p>
+          )}
+          <PlanBoard
+            key={view}
+            kind={view}
+            lanes={board.lanes}
+            blocks={board.blocks}
+            unplaced={board.unplaced}
+            placesFromUnplaced={placesFromUnplaced}
+            employees={board.employees}
+            staffing={board.staffing}
+            monday={monday.toISOString()}
+            weekNumber={isoWeekNumber(monday, timeZone)}
+            timeZone={timeZone}
+            sequences={board.sequences}
+            isCurrentWeek={isCurrentWeek}
+            today={toDateInput(new Date(), timeZone)}
+            focusDay={focus ? toDateInput(focus, timeZone) : null}
+            showWeekend={showWeekend}
+            readOnly={Boolean(session.support)}
+          />
+        </>
       )}
     </>
   );
@@ -263,6 +276,12 @@ interface BoardData {
   sequences: Record<string, string[]>;
   employees?: { id: string; name: string }[];
   staffing?: Record<string, BoardStaffing[]>;
+  /**
+   * Ingen i personalen har några arbetstider, varken egna eller företagets.
+   * Tavlan ritar då hela dagen vit, och utan ett besked såg det ut som att
+   * tiderna inte fungerade.
+   */
+  hoursMissing?: boolean;
 }
 
 type Db = Awaited<ReturnType<typeof requireAdmin>>["db"];
@@ -388,6 +407,7 @@ async function loadStaffView(
     blocks: passes.map(toStaffBoardBlock),
     unplaced: unplaced.map(toBoardUnplaced),
     sequences,
+    hoursMissing: hours.standard.length === 0 && hours.own.size === 0,
   };
 }
 

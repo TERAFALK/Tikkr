@@ -19,7 +19,7 @@ import {
   workingWindows,
   type StationHours,
 } from "@/lib/plan-calendar";
-import type { BlockProgress } from "@/lib/plan-live";
+import { laneTotals, type BlockProgress } from "@/lib/plan-live";
 import { formatDuration } from "@/lib/format";
 import {
   addDaysInZone,
@@ -164,6 +164,8 @@ export interface BoardStaffing {
   outsideHours: boolean;
   /** Personen har ett annat pass samtidigt. */
   overlaps: boolean;
+  /** Stämplat inom passet. Saknas innan utfallet hämtats. */
+  clockedMinutes?: number;
 }
 
 export interface BoardBlock {
@@ -227,6 +229,17 @@ const DAY_LONG = [
 const DAY_SHORT = ["Mån", "Tis", "Ons", "Tors", "Fre", "Lör", "Sön"];
 
 const MS_PER_MINUTE = 60_000;
+
+/**
+ * STÄNGD TID OCH RASTER: ytan utanför arbetstiden, och förklaringens ruta.
+ *
+ * Ett enda klassnamn för båda (ändrat 2026-10-17). Cellerna ritades med
+ * `neutral-100` på 70 procent, nästan vitt mot vitt, medan förklaringen visade
+ * Lav. Det gick inte att se vilka tider en person arbetade, och rutan
+ * "Stängt eller rast" stämde inte med det som ritades. Lav är guidens färg för
+ * tysta ytor.
+ */
+const CLOSED_CLASS = "bg-neutral-200/80";
 
 /**
  * Serveråtgärderna per sorts rad. Samma form, så att tavlan inte behöver veta
@@ -356,6 +369,12 @@ export default function PlanBoard({
   const [armed, setArmed] = useState<BoardUnplaced | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [progress, setProgress] = useState<Record<string, BlockProgress>>({});
+  /** Om utfallet hämtats för veckan. Noll stämplat är ett svar, inget svar är inget. */
+  const [liveLoaded, setLiveLoaded] = useState(false);
+  /** Utfallet för bemanningen av stationsrutorna, per pass. */
+  const [staffingProgress, setStaffingProgress] = useState<
+    Record<string, BlockProgress>
+  >({});
   const [now, setNow] = useState<number | null>(null);
   const [editing, setEditing] = useState<BoardBlock | null>(null);
   const [boardWidth, setBoardWidth] = useState(0);
@@ -475,7 +494,9 @@ export default function PlanBoard({
   const syncProgress = useCallback(async () => {
     try {
       const response = await fetch(
-        `/api/admin/plan/live?v=${toDateParam(mondayStart, timeZone)}`,
+        `/api/admin/plan/live?v=${toDateParam(mondayStart, timeZone)}${
+          isStaff ? "&vy=personal" : ""
+        }`,
         { cache: "no-store" }
       );
 
@@ -483,22 +504,29 @@ export default function PlanBoard({
 
       const data = (await response.json()) as {
         progress: Record<string, BlockProgress>;
+        staffing?: Record<string, BlockProgress>;
       };
 
       setProgress(data.progress);
+      setStaffingProgress(data.staffing ?? {});
+      setLiveLoaded(true);
     } catch {
       // Nätet glappade. Behåll det vi vet i stället för att tömma vyn.
     }
-  }, [mondayStart, timeZone]);
+  }, [isStaff, mondayStart, timeZone]);
 
   useEffect(() => {
-    // INGEN POLLNING I EN VECKA SOM INTE PÅGÅR. I en vecka som varit eller
-    // inte börjat finns ingenting levande att hämta.
-    //
-    // Inte heller för personalens pass: utfallet räknas per stationsruta, och
-    // pass mot stämpling är fas 4.
-    if (!isCurrentWeek || isStaff) {
+    // INGEN POLLNING I EN VECKA SOM INTE PÅGÅR. I en vecka som varit finns
+    // ingenting levande att hämta, men utfallet hämtas EN gång: planerat mot
+    // stämplat är lika mycket värt i efterhand (fas 4, 2026-10-17). En vecka
+    // som inte börjat har inget utfall alls.
+    setLiveLoaded(false);
+
+    if (!isCurrentWeek) {
       setProgress({});
+      setStaffingProgress({});
+
+      if (mondayStart.getTime() < Date.now()) void syncProgress();
       return;
     }
 
@@ -515,7 +543,7 @@ export default function PlanBoard({
       document.removeEventListener("visibilitychange", onWake);
       window.removeEventListener("focus", onWake);
     };
-  }, [isCurrentWeek, isStaff, syncProgress]);
+  }, [isCurrentWeek, mondayStart, syncProgress]);
 
   /* --- Måtten ------------------------------------------------------------ */
 
@@ -1135,6 +1163,12 @@ export default function PlanBoard({
   const contentWidth = STATION_COLUMN + layoutWidth(columns);
 
   /**
+   * Veckans planerade och stämplade tid per anställd. Står under namnet i
+   * personalvyn, se laneTotals i lib/plan-live.ts.
+   */
+  const totals = useMemo(() => laneTotals(blocks, progress), [blocks, progress]);
+
+  /**
    * PILARNA SOM VISAR FÖLJDEN I ETT JOBB.
    *
    * Två sorter, och båda betyder "det här kommer efter det där":
@@ -1556,6 +1590,16 @@ export default function PlanBoard({
                           {lane.detail}
                         </p>
                       )}
+                      {isStaff && totals.has(lane.id) && (
+                        <p className="truncate text-[11px] tabular-nums text-neutral-500">
+                          Planerat{" "}
+                          {formatDuration(totals.get(lane.id)!.plannedMinutes)}
+                          {liveLoaded &&
+                            ` · Stämplat ${formatDuration(
+                              totals.get(lane.id)!.clockedMinutes
+                            )}`}
+                        </p>
+                      )}
                     </div>
 
                     {columns.map((column) => {
@@ -1632,7 +1676,12 @@ export default function PlanBoard({
           timeZone={timeZone}
           readOnly={readOnly}
           employees={employees}
-          staffing={staffing[editing.id] ?? []}
+          staffing={(staffing[editing.id] ?? []).map((pass) => ({
+            ...pass,
+            clockedMinutes: liveLoaded
+              ? (staffingProgress[pass.id]?.clockedMinutes ?? 0)
+              : undefined,
+          }))}
           onStaff={(employeeId, startsAt, minutes) =>
             staff(editing, employeeId, startsAt, minutes)
           }
@@ -1899,7 +1948,7 @@ function DayCell({
       <div className="relative h-full">
         {/* Stängd tid och raster i grått, det öppna vitt. En rad utan tider
             har ingen stängd tid. */}
-        {hoursKnown && <div className="absolute inset-0 bg-neutral-100/70" />}
+        {hoursKnown && <div className={`absolute inset-0 ${CLOSED_CLASS}`} />}
 
         {axis &&
           hoursKnown &&
@@ -2119,18 +2168,14 @@ function Legend({
         <span className="h-2.5 w-4 rounded-sm bg-fjord" />
         Planerat
       </span>
-      {kind === "stations" && (
-        <>
-          <span className="flex items-center gap-1.5">
-            <span className="h-2.5 w-4 rounded-sm bg-tick-deep" />
-            Stämplat
-          </span>
-          <span className="flex items-center gap-1.5">
-            <span className="h-2.5 w-4 rounded-sm bg-neutral-200" />
-            Stängt eller rast
-          </span>
-        </>
-      )}
+      <span className="flex items-center gap-1.5">
+        <span className="h-2.5 w-4 rounded-sm bg-tick-deep" />
+        Stämplat
+      </span>
+      <span className="flex items-center gap-1.5">
+        <span className={`h-2.5 w-4 rounded-sm ${CLOSED_CLASS}`} />
+        Stängt eller rast
+      </span>
 
       {placing && (
         <span className="ml-auto text-neutral-400">
@@ -2378,6 +2423,8 @@ function Staffing({
               <span className="flex shrink-0 items-center gap-3 tabular-nums text-neutral-500">
                 {clockText(new Date(pass.startsAt), timeZone)} ·{" "}
                 {formatDuration(pass.minutes)}
+                {pass.clockedMinutes !== undefined &&
+                  ` · stämplat ${formatDuration(pass.clockedMinutes)}`}
                 {!readOnly && (
                   <button
                     type="button"
