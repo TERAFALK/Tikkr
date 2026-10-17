@@ -124,11 +124,18 @@ describe("varje läge går att planera i", () => {
     expect(PLANNING_MODES.SERVICE.countsBudget).toBe("staff");
   });
 
-  it("Produktion räknar inte personalens pass mot beräkningen", () => {
-    // Maskinens körtid och operatörens arbetstid skiljer sig. Räknade båda
-    // skulle samma timme planeras två gånger.
-    expect(viewsFor("PRODUCTION")).toContain("staff");
+  it("Produktion har bara stationer på tavlan", () => {
+    // Fliken Personal togs bort ur Produktion 2026-10-17, produktägarens
+    // beslut. Ett pass gick inte att planera där, bara se.
+    expect(viewsFor("PRODUCTION")).toEqual(["stations"]);
     expect(PLANNING_MODES.PRODUCTION.countsBudget).toBe("stations");
+  });
+
+  it("bemanning finns i Produktion, inte i Tjänst", () => {
+    // Bemanna i stationsrutan är kvar i Produktion. Tjänst har inga
+    // stationsrutor att bemanna.
+    expect(PLANNING_MODES.PRODUCTION.staffsStations).toBe(true);
+    expect(PLANNING_MODES.SERVICE.staffsStations).toBe(false);
   });
 
   it("vyernas adresser är unika", () => {
@@ -145,7 +152,7 @@ describe("vyn ur adressfältet", () => {
   });
 
   it("en vy läget har väljs", () => {
-    expect(pickView("PRODUCTION", "personal")).toBe("staff");
+    expect(pickView("SERVICE", "personal")).toBe("staff");
     expect(pickView("PRODUCTION", "stationer")).toBe("stations");
   });
 
@@ -153,6 +160,9 @@ describe("vyn ur adressfältet", () => {
     // Ett bokmärke till Stationer hos ett företag som bytt till Tjänst.
     expect(pickView("SERVICE", "stationer")).toBe("staff");
     expect(pickView("PRODUCTION", "nagot-annat")).toBe("stations");
+
+    // Ett bokmärke till Personal från tiden då Produktion hade fliken.
+    expect(pickView("PRODUCTION", "personal")).toBe("stations");
   });
 
   it("nyckeln i koden duger inte som adress", () => {

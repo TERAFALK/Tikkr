@@ -25,6 +25,13 @@
  *     timmes ställtid. Personalen är då bemanning på stationens rutor, och
  *     dess pass räknas inte mot beräkningen.
  *
+ * ── PRODUKTION HAR INGEN PERSONALFLIK (ändrat 2026-10-17) ────────────────
+ *
+ * Produktion hade både Stationer och Personal. I Personal-vyn gick det inte
+ * att planera något, bara att se och flytta den bemanning som lagts med
+ * Bemanna i en stationsruta, och fliken togs bort på produktägarens beslut.
+ * Bemanningen finns kvar i stationsrutans dialog (`staffsStations`).
+ *
  * ── EN NY VERKSAMHETSTYP ─────────────────────────────────────────────────
  *
  * Ett värde i enumen `PlanningMode` i schemat och en rad här. Vyerna och
@@ -60,15 +67,18 @@ export interface PlanningModeDefinition {
   views: readonly PlanningView[];
   /** Resursen vars pass räknar av orderns beräknade tid. Se toppkommentaren. */
   countsBudget: PlanningView;
+  /** Om stationsrutans dialog har Bemanna, där en anställd läggs på körningen. */
+  staffsStations: boolean;
 }
 
 export const PLANNING_MODES = {
   PRODUCTION: {
     key: "PRODUCTION",
     name: "Produktion",
-    summary: "Ordrar på stationer, och personal på jobben",
-    views: ["stations", "staff"],
+    summary: "Ordrar på stationer",
+    views: ["stations"],
     countsBudget: "stations",
+    staffsStations: true,
   },
 
   SERVICE: {
@@ -77,6 +87,7 @@ export const PLANNING_MODES = {
     summary: "Personal på jobb, utan stationer",
     views: ["staff"],
     countsBudget: "staff",
+    staffsStations: false,
   },
 } as const satisfies Record<string, PlanningModeDefinition>;
 
