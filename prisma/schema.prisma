@@ -209,8 +209,6 @@ model Company {
   stationBreaks StationBreak[]
   plannedBlocks PlannedBlock[]
   staffBlocks   StaffBlock[]
-  staffDays     StaffDay[]
-  staffBreaks   StaffBreak[]
 
   modules CompanyModule[]
 
@@ -335,9 +333,6 @@ model Employee {
 
   /// Planerade personalpass. Se StaffBlock.
   staffBlocks StaffBlock[]
-
-  /// Egna arbetstider i planeringen. Se StaffDay.
-  staffDays StaffDay[]
 
   // Numret är unikt per företag, inte globalt. Två olika kunder ska kunna ha
   // varsin anställd med nummer 1 utan att krocka. Flera personer utan nummer
@@ -2012,62 +2007,4 @@ model AuditEvent {
   @@index([companyId, createdAt])
   @@index([companyId, subjectEmployeeId])
   @@map("audit_events")
-}
-
-/// PERSONALENS ARBETSTIDER I PLANERINGEN (tillagt 2026-10-17, fas 3 av
-/// issue #21). En rad per veckodag, med raster i StaffBreak.
-///
-/// UTAN ANSTÄLLD ÄR RADEN FÖRETAGETS STANDARD. Med en anställd är det hens
-/// egna tider, och de gäller då i stället för standarden, hela veckan. Ett eget
-/// schema utan dagar finns inte: tas de egna tiderna bort gäller standarden
-/// igen, samma princip som löneunderlagets egna scheman (CLAUDE.md § 3 regel 7).
-///
-/// EGNA TABELLER OCH INTE work_schedules, av samma skäl som stationerna har
-/// sina: modulerna säljs var för sig, och planeringen och löneunderlaget delar
-/// ingen kod. Den som har båda skriver in arbetstiderna två gånger.
-///
-/// Skrivs bara genom src/lib/staff-hours.ts, som också vaktar att en anställd
-/// har högst en rad per veckodag och företaget högst en standard per veckodag.
-/// Databasen kan inte uttrycka det: Postgres räknar inte två tomma
-/// employee_id som samma värde i en unik nyckel.
-model StaffDay {
-  id        String @id @default(cuid())
-  companyId String @map("company_id")
-
-  /// Tomt betyder företagets standard.
-  employeeId String? @map("employee_id")
-
-  weekday Int
-
-  startMinute Int @map("start_minute")
-  endMinute   Int @map("end_minute")
-
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
-
-  company  Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  employee Employee? @relation(fields: [employeeId], references: [id], onDelete: Cascade)
-
-  breaks StaffBreak[]
-
-  @@index([companyId, employeeId])
-  @@map("staff_days")
-}
-
-model StaffBreak {
-  id         String @id @default(cuid())
-  companyId  String @map("company_id")
-  staffDayId String @map("staff_day_id")
-
-  startMinute Int @map("start_minute")
-  endMinute   Int @map("end_minute")
-
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
-
-  company  Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  staffDay StaffDay @relation(fields: [staffDayId], references: [id], onDelete: Cascade)
-
-  @@index([companyId, staffDayId])
-  @@map("staff_breaks")
 }

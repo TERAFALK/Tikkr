@@ -2,7 +2,7 @@
 
 import { useActionState } from "react";
 import { useFormStatus } from "react-dom";
-import type { ScheduleFormState } from "@/app/admin/(panel)/installningar/schema/actions";
+import type { ScheduleFormState } from "@/app/admin/(panel)/installningar/arbetstider/actions";
 import { Alert, Button, Card, CardHeader } from "@/components/ui";
 import { SavedNote } from "@/components/admin/SaveForm";
 import ScheduleDays, {

@@ -343,10 +343,6 @@ export async function anonymizeEmployee(
     // som bemannade en stationsruta lämnar rutan orörd.
     await tx.staffBlock.deleteMany({ where: { employeeId: id } });
 
-    // Egna arbetstider i planeringen säger när en namngiven person arbetar,
-    // och raderas av samma skäl. Företagets standard bär ingen person.
-    await tx.staffDay.deleteMany({ where: { employeeId: id } });
-
     // Ändringsloggens rader om frånvaron och komptiden följer med ut. De bär
     // samma uppgifter som posterna själva, och en anonymisering som lämnar
     // kvar en kopia i loggen har inte anonymiserat något.
