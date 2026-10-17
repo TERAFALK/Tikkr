@@ -10,6 +10,7 @@ import {
   layoutWidth,
   minuteX,
   plannedDays,
+  stepDays,
   type DayAxis,
 } from "@/lib/plan-geometry";
 
@@ -28,14 +29,48 @@ const WEEKDAYS = [0, 1, 2, 3, 4].map((index) => ({ index }));
 const WEEK = [0, 1, 2, 3, 4, 5, 6].map((index) => ({ index }));
 
 describe("vilka dagar som ritas", () => {
-  it("alla sju, som hela dagar", () => {
-    // En tom helgdag stod som en smal kolumn utan tidslinje, och såg avkapad
-    // ut bredvid en hel dag (ändrat 2026-10-17).
-    expect(plannedDays(null)).toEqual(WEEK);
+  it("helgen är dold som standard", () => {
+    // Produktägarens val 2026-10-17: en knapp visar och döljer helgen, och
+    // utan den syns måndag till fredag.
+    expect(plannedDays(null, false)).toEqual(WEEKDAYS);
   });
 
-  it("dagvyn visar bara den valda dagen", () => {
-    expect(plannedDays(6)).toEqual([{ index: 6 }]);
+  it("alla sju, som hela dagar, när helgen visas", () => {
+    // En tom helgdag stod en kort tid som en smal kolumn utan tidslinje, och
+    // såg avkapad ut bredvid en hel dag.
+    expect(plannedDays(null, true)).toEqual(WEEK);
+  });
+
+  it("dagvyn visar den valda dagen, även en helgdag när helgen är dold", () => {
+    expect(plannedDays(6, false)).toEqual([{ index: 6 }]);
+    expect(plannedDays(2, true)).toEqual([{ index: 2 }]);
+  });
+});
+
+describe("dagvyns pilar", () => {
+  it("hoppar över helgen när den är dold", () => {
+    // Fredag och nästa dag är måndag, tre dagar fram.
+    expect(stepDays(4, 1, false)).toBe(3);
+    // Måndag och föregående dag är fredag, tre dagar bak.
+    expect(stepDays(0, -1, false)).toBe(-3);
+  });
+
+  it("går en dag i taget när helgen visas", () => {
+    expect(stepDays(4, 1, true)).toBe(1);
+    expect(stepDays(0, -1, true)).toBe(-1);
+  });
+
+  it("går en dag i taget mitt i veckan", () => {
+    expect(stepDays(1, 1, false)).toBe(1);
+    expect(stepDays(3, -1, false)).toBe(-1);
+  });
+
+  it("lämnar en helgdag åt rätt håll när helgen är dold", () => {
+    // Den som öppnat en lördag i dagvyn och går framåt ska till måndag,
+    // och bakåt till fredag.
+    expect(stepDays(5, 1, false)).toBe(2);
+    expect(stepDays(5, -1, false)).toBe(-1);
+    expect(stepDays(6, -1, false)).toBe(-2);
   });
 });
 

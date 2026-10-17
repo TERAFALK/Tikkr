@@ -911,10 +911,14 @@ stripe_prices    — item, month_price_id, year_price_id, updated_by_email
    - **Axeln visar alltid minst 06–18** och en timme kring resursernas tider
      (`dayWindow`). Den slutade där stationen stängde, och då gick det inte att
      trycka in ett jobb 17:00, fast överbokning är tillåten.
-   - **Alla sju dagar visas, alltid som hela dagar.** Helgen doldes när den
-     var tom, och en vecka som pågick en lördag visade varken dagen eller
-     linjen för nu. En kort tid stod en tom helgdag som en smal kolumn utan
-     tidslinje, och den såg avkapad ut bredvid en hel dag.
+   - **Helgen är dold som standard och visas med knappen Visa helg**
+     (beslutat 2026-10-17, produktägarens val). Valet står i adressfältet som
+     `helg=visa`, följer med mellan veckor och dagar, och är borta nästa gång
+     tavlan öppnas. Inte i en kaka: integritetspolicyn räknar upp systemets
+     kakor, och ett visningsval hör inte dit. Är något planerat i en dold helg
+     står antalet i gult på knappen. Dagvyns pilar hoppar över en dold helg.
+   - **En helg som visas är hela dagar**, med tidslinje. En tom helgdag stod en
+     kort tid som en smal kolumn, och den såg avkapad ut bredvid en hel dag.
    - **Vecka och Dag ersätter zoomknapparna.** Dag lägger en dag i full bredd
      och står i adressfältet som `dag`. Ett tryck på en dag i rubriken öppnar
      den, och pilarna går över veckans kant.

@@ -685,6 +685,7 @@ export const GUIDES = [
       "Tjänst: tryck på ett jobb i Oplacerat och sedan på en anställd.",
       "En anställd med två pass samtidigt markeras i gult.",
       "Vecka och Dag växlar mellan hela veckan och en dag i taget. Tryck på en dag i rubriken för att öppna den.",
+      "Helgen är dold. Visa helg tar fram lördag och söndag, och en siffra på knappen visar hur mycket som är planerat där.",
       "Överbokning tillåts och markeras i gult.",
       "En ruta som någon står instämplad på visas som pågående.",
       "Planerad tid är en avsikt. Den faktureras aldrig och räknas inte som arbetad tid.",
