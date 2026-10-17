@@ -1830,6 +1830,7 @@ och `bg-sky-600` ser lika rimlig ut i en kodgranskning som `bg-blue-600`.
 
 **399 kr per aktiv stämplingsskärm och månad, exkl. moms.** Ingen grundavgift,
 inget tak på anställda, ordrar eller stämplingar. **Ingen bindningstid.**
+När appen finns räknas den som en skärm, se Appen är en stämplingsplats nedan.
 
 **Årsbetalning: 3 990 kr per skärm och år** — tio månaders pris för tolv
 månader. Frivilligt alternativ, inte bindning: kunden väljer själv och får
@@ -1891,6 +1892,63 @@ Numret kontrolleras mot Stripe när det sparas: att artikeln finns, att den är
 återkommande, och att intervallet stämmer med fältet. Ett årspris i
 månadsfältet ger en faktura tolv gånger för dyr, och det ska inte gå att
 spara.
+
+### Appen är en stämplingsplats (beslutat 2026-10-17, issue #19)
+
+Appen är inte byggd. Beslutet tas före den, så att säljsidan och villkoren
+inte lovar något som blir fel den dag den kommer, och så att ingen kund får
+ett högre pris i efterhand.
+
+**399 kr per STÄMPLINGSPLATS och månad, och en plats är en skärm eller
+appen.** Appen kostar som en skärm, en gång per företag, för hela personalen.
+Årsbetalning 3 990 kr, som skärmen. Tillvalen är oförändrade, 499 och 699 kr.
+
+| Kund | Per månad |
+|---|---|
+| 1 skärm | 399 |
+| Bara appen | 399 |
+| 2 skärmar och appen | 1 197 |
+| Appen och planeringen | 1 098 |
+
+Skälet är kunden som inte har någon skärm. En elfirma i planeringsläget
+Tjänst (§ 3 regel 8) står inte vid en skärm i en verkstad, och med ett pris
+per skärm gick den kunden inte att ta betalt av alls. Att appen kostar som en
+skärm gör att det fortfarande är ett pris att förklara.
+
+**Prenumerationen kräver minst en plats: en skärm eller appen.** Det är
+prenumerationens status som släpper in kunden (`subscription.ts`), inte
+skärmen. Men betalningskoden förutsätter i dag minst en skärm, och fyra
+ställen ändras i samma gren som appen:
+
+- Kassan i `billing.ts` tar bara med skärmraden när kunden valt skärmar.
+- `assertLicenseCount` tillåter noll skärmar när appen är på, och den första
+  skärmen på en prenumeration utan skärm blir en ny rad hos Stripe.
+- `screenItemOf` i `stripe.ts` tar aldrig en modulrad. Den faller i dag
+  tillbaka på första raden, för prenumerationer från tiden före modulerna, och
+  hade då skrivit appens antal som en skärmlicens. `tests/stripe-items.test.ts`
+  får fallet "bara appen".
+- Webhooken skriver noll skärmar när raden saknas.
+
+**Stämplingen i appen slutar aldrig fungera**, lika lite som på skärmen. En
+obetald faktura låser panelen och ger en varning i appen, men tiden
+registreras (se Provperiod nedan).
+
+Övervägt och bortvalt samma dag:
+
+- **Storleksnivåer efter antal aktiva anställda**, med skärmar och app
+  inkluderade. Det är pris per anställd i trappsteg, och skälet mot det står
+  under Pris ovan.
+- **Paket** (Start, Pro, Komplett, som bygger på varandra). Tillvalen är
+  fristående i koden, och planeringen hade inte längre gått att köpa utan
+  löneunderlaget.
+- **Ett lägre pris på planeringen.** Ingen kund har köpt den än, och ett pris
+  som är för högt syns på att kunderna provar och väljer bort den. Då går det
+  att sänka, men ett höjt pris går inte att ta tillbaka. Följ hur många som
+  slår på den under provperioden och behåller den efteråt.
+
+Väntar tills en kund frågar: rabatt för båda tillvalen och ett lägre pris
+från den femte skärmen. Båda går att lägga till utan att någon får ett högre
+pris.
 
 ### Avtalat pris per kund (tillagt 2026-10-08)
 
