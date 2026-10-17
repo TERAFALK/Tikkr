@@ -142,18 +142,45 @@ export function fitScale(input: {
  *
  * AVRUNDAS NEDÅT. Uppåt gav upp till en pixel för mycket per dag, och veckan
  * blev några pixlar bredare än skärmen, med en rullningslist som följd.
+ *
+ * DET SOM BLIR ÖVER DELAS UT (ändrat 2026-10-17). Nedåt gav i stället upp
+ * till en pixel för lite per dag, och raderna slutade före tavlans kant med en
+ * vit strimma efter söndagen. Med `available` får de öppna dagarna en pixel
+ * var, från måndag, tills bredden är fylld. Ryms veckan inte alls, under
+ * golvet, finns ingenting över och ingenting delas ut.
  */
 export function layoutDays(
   plans: DayPlan[],
   axisOf: (index: number) => DayAxis,
-  pxPerMinute: number
+  pxPerMinute: number,
+  available?: number
 ): DayColumn[] {
+  const widths = plans.map((plan) =>
+    plan.collapsed
+      ? COLLAPSED_DAY_WIDTH
+      : Math.floor(axisMinutes(axisOf(plan.index)) * pxPerMinute)
+  );
+
+  const used =
+    widths.reduce((total, width) => total + width, 0) +
+    plans.length * DAY_BORDER;
+
+  let spare = available === undefined ? 0 : available - used;
+  const open = plans.filter((plan) => !plan.collapsed).length;
+
+  // Bara avrundningens rester, aldrig mer än en pixel per dag. Något större
+  // vore ett fel i skalan, och då ska det synas i stället för att smetas ut.
+  if (spare < 0 || spare > open) spare = 0;
+
   let x = 0;
 
-  return plans.map((plan) => {
-    const width = plan.collapsed
-      ? COLLAPSED_DAY_WIDTH
-      : Math.floor(axisMinutes(axisOf(plan.index)) * pxPerMinute);
+  return plans.map((plan, index) => {
+    let width = widths[index];
+
+    if (!plan.collapsed && spare > 0) {
+      width += 1;
+      spare -= 1;
+    }
 
     x += DAY_BORDER;
     const column = { ...plan, width, left: x };

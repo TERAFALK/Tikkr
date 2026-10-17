@@ -119,11 +119,35 @@ describe("var dagarna ligger", () => {
 
     for (const available of [701, 913, 1037, 1281, 1499]) {
       const scale = fitScale({ available, plans, axisOf, floor: 0.01 });
-      const width = layoutWidth(layoutDays(plans, axisOf, scale));
+      const width = layoutWidth(layoutDays(plans, axisOf, scale, available));
 
       expect(width).toBeLessThanOrEqual(available);
-      expect(width).toBeGreaterThan(available - plans.length);
     }
+  });
+
+  it("veckan fyller bredden exakt, utan vit rand i kanten", () => {
+    // Nedåt avrundat blev det upp till en pixel över per dag, och raderna
+    // slutade före tavlans kant med en vit strimma efter söndagen. Pixlarna
+    // som blir över delas ut på dagarna, en var.
+    const plans = [...WEEKDAYS, { index: 5, collapsed: false }, { index: 6, collapsed: true }];
+
+    for (const available of [701, 913, 1037, 1281, 1499]) {
+      const scale = fitScale({ available, plans, axisOf, floor: 0.01 });
+      const columns = layoutDays(plans, axisOf, scale, available);
+
+      expect(layoutWidth(columns)).toBe(available);
+      // Ingen dag får mer än en pixel extra.
+      const widths = columns.filter((column) => !column.collapsed).map((column) => column.width);
+      expect(Math.max(...widths) - Math.min(...widths)).toBeLessThanOrEqual(1);
+    }
+  });
+
+  it("en vecka som inte ryms fylls inte ut", () => {
+    // Under golvet rullar tavlan, och då finns inga pixlar över att dela ut.
+    const scale = fitScale({ available: 300, plans: WEEKDAYS, axisOf, floor: 0.25 });
+    const columns = layoutDays(WEEKDAYS, axisOf, scale, 300);
+
+    expect(columns.every((column) => column.width === 180)).toBe(true);
   });
 
   it("skalan går aldrig under golvet", () => {

@@ -581,8 +581,14 @@ export default function PlanBoard({
 
   /** Var varje dag ligger. Rubriken, rutnätet och träffytan läser härifrån. */
   const columns = useMemo(
-    () => layoutDays(plans, axisOf, pxPerMinute),
-    [axisOf, plans, pxPerMinute]
+    () =>
+      layoutDays(
+        plans,
+        axisOf,
+        pxPerMinute,
+        boardWidth === 0 ? undefined : boardWidth - STATION_COLUMN
+      ),
+    [axisOf, boardWidth, plans, pxPerMinute]
   );
 
   /* --- Träffytan --------------------------------------------------------- */
@@ -1376,8 +1382,13 @@ export default function PlanBoard({
           className="overflow-x-auto rounded-lg border border-neutral-200 bg-white"
         >
           <div className="inline-block min-w-full">
-            {/* Dagrubrikerna */}
-            <div className="flex border-b border-neutral-200 bg-neutral-50">
+            {/* Dagrubrikerna.
+
+                FÖRSTA DAGENS SKILJELINJE ÄR GENOMSKINLIG, här och i varje rad.
+                Den låg bredvid stationskolumnens kant och blev en dubbel linje.
+                Den finns kvar som bredd, så att måtten i lib/plan-geometry.ts
+                gäller varje dag lika. */}
+            <div className="flex border-b border-neutral-200 bg-neutral-50 [&>*:nth-child(2)]:border-l-transparent">
               <div
                 style={{ width: STATION_COLUMN }}
                 className="sticky left-0 z-20 shrink-0 border-r border-neutral-200 bg-neutral-50 px-3 py-2 text-[11px] font-semibold uppercase tracking-wider text-neutral-400"
@@ -1503,7 +1514,7 @@ export default function PlanBoard({
                 return (
                   <div
                     key={lane.id}
-                    className={`flex border-b border-neutral-100 last:border-b-0 ${ROW_CLASS} ${
+                    className={`flex border-b border-neutral-100 last:border-b-0 [&>*:nth-child(2)]:border-l-transparent ${ROW_CLASS} ${
                       dim ? "opacity-40" : ""
                     }`}
                   >
