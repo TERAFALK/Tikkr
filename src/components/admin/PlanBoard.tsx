@@ -231,6 +231,17 @@ const DAY_SHORT = ["Mån", "Tis", "Ons", "Tors", "Fre", "Lör", "Sön"];
 const MS_PER_MINUTE = 60_000;
 
 /**
+ * STÄNGD TID OCH RASTER: ytan utanför arbetstiden, och förklaringens ruta.
+ *
+ * Ett enda klassnamn för båda (ändrat 2026-10-17). Cellerna ritades med
+ * `neutral-100` på 70 procent, nästan vitt mot vitt, medan förklaringen visade
+ * Lav. Det gick inte att se vilka tider en person arbetade, och rutan
+ * "Stängt eller rast" stämde inte med det som ritades. Lav är guidens färg för
+ * tysta ytor.
+ */
+const CLOSED_CLASS = "bg-neutral-200/80";
+
+/**
  * Serveråtgärderna per sorts rad. Samma form, så att tavlan inte behöver veta
  * vilken den talar med utöver fältet som pekar ut raden.
  */
@@ -1937,7 +1948,7 @@ function DayCell({
       <div className="relative h-full">
         {/* Stängd tid och raster i grått, det öppna vitt. En rad utan tider
             har ingen stängd tid. */}
-        {hoursKnown && <div className="absolute inset-0 bg-neutral-100/70" />}
+        {hoursKnown && <div className={`absolute inset-0 ${CLOSED_CLASS}`} />}
 
         {axis &&
           hoursKnown &&
@@ -2162,7 +2173,7 @@ function Legend({
         Stämplat
       </span>
       <span className="flex items-center gap-1.5">
-        <span className="h-2.5 w-4 rounded-sm bg-neutral-200" />
+        <span className={`h-2.5 w-4 rounded-sm ${CLOSED_CLASS}`} />
         Stängt eller rast
       </span>
 
