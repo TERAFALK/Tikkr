@@ -79,8 +79,13 @@ export interface StationHours {
  */
 export const SNAP_MINUTES = 15;
 
-/** Tidsaxelns golv när ingen station har några tider alls. */
-const FALLBACK_WINDOW = { startMinute: 6 * 60, endMinute: 18 * 60 };
+/**
+ * Det minsta tidsaxeln visar, varje dag. Se `dayWindow`.
+ */
+const MIN_WINDOW = { startMinute: 6 * 60, endMinute: 18 * 60 };
+
+/** Marginalen kring stationernas tider, i minuter. */
+const WINDOW_MARGIN = 60;
 
 const MS_PER_MINUTE = 60_000;
 
@@ -312,8 +317,11 @@ export interface PlannedSpan {
  * Rutorna sträcker ut den. En överbokad ruta som går till 20:00 måste synas,
  * annars är varningen om överbokning det enda man ser av den.
  *
- * Utan både tider och rutor gäller 06:00–18:00. En tom tavla ska se ut som en
- * arbetsdag och inte som en nollbred kolumn.
+ * ALLTID MINST 06–18, OCH EN TIMME KRING TIDERNA (ändrat 2026-10-17). Axeln
+ * slutade där stationerna stängde, och då fanns ingen plats att trycka på för
+ * den som ville lägga ett jobb 17:00 — fast överbokning är tillåten och tid
+ * utanför öppettiderna räknas som arbete. Stängd tid ritas grå, så att det
+ * syns att den är stängd.
  */
 export function dayWindow(
   hours: (StationHours | null | undefined)[],
@@ -321,13 +329,13 @@ export function dayWindow(
   day: Date,
   timeZone: string
 ): { startMinute: number; endMinute: number } {
-  let start = Number.POSITIVE_INFINITY;
-  let end = Number.NEGATIVE_INFINITY;
+  let start = MIN_WINDOW.startMinute;
+  let end = MIN_WINDOW.endMinute;
 
   for (const station of hours) {
     if (!station || station.endMinute <= station.startMinute) continue;
-    start = Math.min(start, station.startMinute);
-    end = Math.max(end, station.endMinute);
+    start = Math.min(start, station.startMinute - WINDOW_MARGIN);
+    end = Math.max(end, station.endMinute + WINDOW_MARGIN);
   }
 
   const dayStart = startOfDayIn(day, timeZone).getTime();
@@ -341,10 +349,6 @@ export function dayWindow(
 
     start = Math.min(start, Math.floor((from - dayStart) / MS_PER_MINUTE));
     end = Math.max(end, Math.ceil((to.getTime() - dayStart) / MS_PER_MINUTE));
-  }
-
-  if (!Number.isFinite(start) || !Number.isFinite(end) || end <= start) {
-    return { ...FALLBACK_WINDOW };
   }
 
   // Avrundas utåt till hel timme, så att axelns etiketter blir hela klockslag.

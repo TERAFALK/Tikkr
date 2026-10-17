@@ -43,6 +43,7 @@ const PLANNING_MODULES = [
   "plan-live",
   "planning-modes",
   "staff-planning",
+  "plan-geometry",
 ];
 
 /** Lönemodulens. Speglar payroll-boundary.test.ts. */
