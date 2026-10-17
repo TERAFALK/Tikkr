@@ -269,31 +269,62 @@ describe("tidsaxeln en dag ritas på", () => {
     breaks: [],
   };
 
-  it("är den vidaste av stationernas tider", () => {
-    // Varje rad med sin egen skala vore oläsbart: två rutor på samma klockslag
-    // skulle ligga på olika x-läge.
+  const TIDIG: StationHours = {
+    weekday: 2,
+    startMinute: 5 * 60,
+    endMinute: 14 * 60,
+    breaks: [],
+  };
+
+  it("visar alltid minst 06–18", () => {
+    // Stationen går 07–16, men ett jobb ska gå att lägga 17:00. Överbokning
+    // är tillåten, och en axel som slutar där stationen stänger gav ingen
+    // plats att trycka på (ändrat 2026-10-17).
+    expect(dayWindow([FRAS], [], at(0), SE)).toEqual({
+      startMinute: 6 * 60,
+      endMinute: 18 * 60,
+    });
+  });
+
+  it("ger stationernas tider en timmes marginal åt var håll", () => {
+    // Den vidaste av stationernas tider, så att två rutor på samma klockslag
+    // ligger på samma x-läge på varje rad.
     expect(dayWindow([FRAS, KVALL], [], at(0), SE)).toEqual({
-      startMinute: 7 * 60,
-      endMinute: 20 * 60,
+      startMinute: 6 * 60,
+      endMinute: 21 * 60,
+    });
+    expect(dayWindow([TIDIG], [], at(0), SE)).toEqual({
+      startMinute: 4 * 60,
+      endMinute: 18 * 60,
     });
   });
 
   it("sträcks ut av en överbokad ruta", () => {
-    // En ruta som går till 21:00 måste synas, annars är varningen om
+    // En ruta som går till 22:00 måste synas, annars är varningen om
     // överbokning det enda man ser av den.
     const window = dayWindow(
       [FRAS],
-      [{ startsAt: at(15), minutes: 360, hours: FRAS }],
+      [{ startsAt: at(16), minutes: 360, hours: FRAS }],
       at(0),
       SE
     );
 
-    expect(window.startMinute).toBe(7 * 60);
-    expect(window.endMinute).toBe(21 * 60);
+    expect(window.startMinute).toBe(6 * 60);
+    expect(window.endMinute).toBe(22 * 60);
   });
 
-  it("faller tillbaka på en arbetsdag när ingenting finns", () => {
-    // En tom tavla ska se ut som en arbetsdag och inte som en nollbred kolumn.
+  it("går aldrig utanför dygnet", () => {
+    const window = dayWindow(
+      [{ weekday: 2, startMinute: 0, endMinute: 24 * 60, breaks: [] }],
+      [],
+      at(0),
+      SE
+    );
+
+    expect(window).toEqual({ startMinute: 0, endMinute: 24 * 60 });
+  });
+
+  it("är 06–18 när ingenting finns", () => {
     expect(dayWindow([], [], at(0), SE)).toEqual({
       startMinute: 6 * 60,
       endMinute: 18 * 60,
@@ -312,7 +343,7 @@ describe("tidsaxeln en dag ritas på", () => {
       SE
     );
 
-    expect(window.endMinute).toBe(16 * 60);
+    expect(window.endMinute).toBe(18 * 60);
   });
 });
 

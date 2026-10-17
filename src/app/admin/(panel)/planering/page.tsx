@@ -68,7 +68,7 @@ export const dynamic = "force-dynamic";
 export default async function PlanningPage({
   searchParams,
 }: {
-  searchParams: Promise<{ v?: string; vy?: string }>;
+  searchParams: Promise<{ v?: string; vy?: string; dag?: string }>;
 }) {
   const session = await requireAdmin();
   await requireModule(session, "PLANNING");
@@ -89,8 +89,12 @@ export default async function PlanningPage({
 
   // Ett ogiltigt värde i adressfältet ger denna vecka i stället för ett fel.
   // Samma hållning som veckovyn: tavlan är till för att arbeta i.
+  //
+  // `dag` är dagvyn och går före veckan: veckan är den dagen ligger i, så att
+  // pilarna i dagvyn kan gå över veckans kant med bara ett datum.
+  const focus = params.dag ? parseLocalDate(params.dag, timeZone) : null;
   const picked = params.v ? parseLocalDate(params.v, timeZone) : null;
-  const monday = startOfWeekIn(picked ?? new Date(), timeZone);
+  const monday = startOfWeekIn(focus ?? picked ?? new Date(), timeZone);
 
   // Bara en resurs räknar av orderns beräknade tid, och Oplacerat visas bara
   // på dess vy. Se lib/planning-modes.ts.
@@ -222,6 +226,8 @@ export default async function PlanningPage({
           timeZone={timeZone}
           sequences={board.sequences}
           isCurrentWeek={isCurrentWeek}
+          today={toDateInput(new Date(), timeZone)}
+          focusDay={focus ? toDateInput(focus, timeZone) : null}
           readOnly={Boolean(session.support)}
         />
       )}

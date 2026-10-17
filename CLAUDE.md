@@ -895,6 +895,25 @@ stripe_prices    — item, month_price_id, year_price_id, updated_by_email
    - Till fas 3 har en anställd inga arbetstider på tavlan: passet räknas i
      väggklockans minuter, utan raster, och kapas vid midnatt.
 
+   **TIDSLINJEN** (ändrat 2026-10-17). Var dagarna ligger, vad ett tryck
+   träffar och var klockslagen står räknas på ETT ställe,
+   `src/lib/plan-geometry.ts`, för rubriken, rutnätet och träffytan. De räknade
+   var för sig förut: klockslagen stod bredvid sina linjer, och slutet av varje
+   dag kapades eftersom skiljelinjen räknades utanför dagen men ritades
+   innanför. `tests/plan-geometry.test.ts` fäller det.
+
+   - **Axeln visar alltid minst 06–18** och en timme kring resursernas tider
+     (`dayWindow`). Den slutade där stationen stängde, och då gick det inte att
+     trycka in ett jobb 17:00, fast överbokning är tillåten.
+   - **Helgen är alltid med**, hopfälld när den är tom, och utfälld när något
+     ligger där, någon har tider där eller det är den dagen. En vecka som
+     pågick en lördag visade varken dagen eller linjen för nu.
+   - **Vecka och Dag ersätter zoomknapparna.** Dag lägger en dag i full bredd
+     och står i adressfältet som `dag`. Ett tryck på en dag i rubriken öppnar
+     den, och pilarna går över veckans kant.
+   - **Linjen för nu går på webbläsarens klocka**, och syns därför i båda
+     vyerna och för personalen.
+
    **ETT PERSONALPASS ÄR EN PERSONUPPGIFT**, till skillnad från en
    stationsruta: det säger var en namngiven person ska vara och när.
    Anonymiseringen raderar passen och registerutdraget lämnar ut dem, även när

@@ -155,6 +155,7 @@ const MODULE_SURFACES: Record<string, ModuleSurface> = {
       "plan-live",
       "planning-modes",
       "staff-planning",
+      "plan-geometry",
     ],
     models: [
       "station",

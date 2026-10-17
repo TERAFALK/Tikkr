@@ -8,7 +8,7 @@ import {
   useState,
   type PointerEvent as ReactPointerEvent,
 } from "react";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
   SNAP_MINUTES,
   blockEnd,
@@ -21,7 +21,22 @@ import {
 } from "@/lib/plan-calendar";
 import type { BlockProgress } from "@/lib/plan-live";
 import { formatDuration } from "@/lib/format";
-import { instantFromWallTime, wallTimeIn } from "@/lib/time-zone";
+import {
+  addDaysInZone,
+  instantFromWallTime,
+  wallTimeIn,
+} from "@/lib/time-zone";
+import {
+  DAY_BORDER,
+  axisLabels,
+  dayAt,
+  fitScale,
+  hourLines,
+  layoutDays,
+  layoutWidth,
+  plannedDays,
+  type DayAxis,
+} from "@/lib/plan-geometry";
 import {
   Alert,
   Button,
@@ -93,6 +108,18 @@ import {
  * Vilken station och vilket klockslag pekaren står på räknas fram ur ETT mått
  * på radernas behållare. Raderna är lika höga och dagarnas bredder är kända,
  * så svaret är ren aritmetik. Det går inte sönder av en omrendering.
+ *
+ * ── VECKA OCH DAG (ändrat 2026-10-17) ────────────────────────────────────
+ *
+ * Vecka lägger hela veckan i den bredd som finns, med helgen hopfälld när den
+ * är tom. Dag lägger en dag i full bredd, och är vägen till läsbara timmar och
+ * till en tavla som går att använda på en telefon. Den valda dagen står i
+ * adressfältet som `dag`, så att den överlever en omritning och ett bokmärke.
+ * Dagen ersatte zoomknapparna, som förstorade hela veckan och lämnade resten
+ * av den utanför kanten.
+ *
+ * Var dagarna ligger, vad ett tryck träffar och var klockslagen står räknas i
+ * lib/plan-geometry.ts, en gång, för rubriken, rutnätet och träffytan.
  *
  * ── OPLACERAT LIGGER ÖVER, INTE BREDVID ──────────────────────────────────
  *
@@ -171,23 +198,12 @@ export interface BoardUnplaced {
 /** Hur ofta utfallet hämtas. Tio sekunder känns samtidigt utan att märkas. */
 const LIVE_MS = 10_000;
 
-/**
- * Zoomstegen är MULTIPLIKATORER av "hela veckan syns", inte pixlar per minut.
- *
- * Ett fast tal gav en vecka dubbelt så bred som fönstret, och tavlan öppnade
- * på måndag förmiddag med resten utanför kanten.
- */
-const ZOOM = [1, 1.75, 3];
-
 /** Stationskolumnens bredd. Används både för att rita och för att räkna. */
 const STATION_COLUMN = 160;
 
 /** Radhöjden. MÅSTE stämma med klassen nedan — träffytan räknar med den. */
 const ROW_HEIGHT = 72;
 const ROW_CLASS = "h-[72px]";
-
-/** Linjen mellan två dagar. Räknas med i träffytan. */
-const DAY_BORDER = 2;
 
 /**
  * Minsta läsbara skala.
@@ -284,6 +300,8 @@ export default function PlanBoard({
   weekNumber,
   timeZone,
   isCurrentWeek,
+  today,
+  focusDay,
   sequences,
   readOnly,
 }: {
@@ -309,6 +327,10 @@ export default function PlanBoard({
   weekNumber: number;
   timeZone: string;
   isCurrentWeek: boolean;
+  /** Dagens datum, "ÅÅÅÅ-MM-DD", i företagets tidszon. */
+  today: string;
+  /** Den valda dagen i dagvyn, "ÅÅÅÅ-MM-DD". Null betyder veckovyn. */
+  focusDay: string | null;
   /**
    * I vilken ordning varje orders moment ska göras, som moment-id per order.
    *
@@ -320,6 +342,8 @@ export default function PlanBoard({
   readOnly: boolean;
 }) {
   const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
 
   const isStaff = kind === "staff";
   const laneField = isStaff ? "employeeId" : "stationId";
@@ -329,7 +353,6 @@ export default function PlanBoard({
   const [drag, setDrag] = useState<Drag | null>(null);
   const [armed, setArmed] = useState<BoardUnplaced | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [zoom, setZoom] = useState(0);
   const [progress, setProgress] = useState<Record<string, BlockProgress>>({});
   const [now, setNow] = useState<number | null>(null);
   const [editing, setEditing] = useState<BoardBlock | null>(null);
@@ -365,6 +388,68 @@ export default function PlanBoard({
     [mondayStart, timeZone]
   );
 
+  /** Veckans dagar som "ÅÅÅÅ-MM-DD". Samma form som adressfältet. */
+  const dayKeys = useMemo(
+    () => days.map((day) => toDateParam(day, timeZone)),
+    [days, timeZone]
+  );
+
+  const todayIndex = indexOrNull(dayKeys.indexOf(today));
+  const focusIndex = focusDay ? indexOrNull(dayKeys.indexOf(focusDay)) : null;
+  const isDay = focusIndex !== null;
+
+  // LINJEN FÖR NU går på webbläsarens klocka och flyttas varje halvminut.
+  // Den hämtades tidigare med utfallet, och syntes därför bara i stationsvyn.
+  useEffect(() => {
+    if (!isCurrentWeek) {
+      setNow(null);
+      return;
+    }
+
+    setNow(Date.now());
+    const timer = setInterval(() => setNow(Date.now()), 30_000);
+
+    return () => clearInterval(timer);
+  }, [isCurrentWeek]);
+
+  /**
+   * Till en dag i dagvyn, eller tillbaka till veckan.
+   *
+   * Genom adressfältet och inte ett lokalt läge: sidan hämtar veckan ur
+   * datumet, så en dag i nästa vecka är bara ett annat datum.
+   */
+  const show = useCallback(
+    (day: string | null) => {
+      const query = new URLSearchParams(searchParams.toString());
+
+      if (day) {
+        query.set("dag", day);
+        query.delete("v");
+      } else {
+        query.delete("dag");
+        query.set("v", dayKeys[0]);
+      }
+
+      router.push(`${pathname}?${query.toString()}`);
+    },
+    [dayKeys, pathname, router, searchParams]
+  );
+
+  /** Dagen före eller efter den valda, även över veckans kant. */
+  const step = useCallback(
+    (direction: -1 | 1) => {
+      if (focusIndex === null) return;
+
+      const target = focusIndex + direction;
+      show(
+        target >= 0 && target < 7
+          ? dayKeys[target]
+          : toDateParam(addDaysInZone(days[focusIndex], direction, timeZone), timeZone)
+      );
+    },
+    [dayKeys, days, focusIndex, show, timeZone]
+  );
+
   /* --- Utfallet ---------------------------------------------------------- */
 
   const syncProgress = useCallback(async () => {
@@ -377,12 +462,10 @@ export default function PlanBoard({
       if (!response.ok) return;
 
       const data = (await response.json()) as {
-        now: string;
         progress: Record<string, BlockProgress>;
       };
 
       setProgress(data.progress);
-      setNow(new Date(data.now).getTime());
     } catch {
       // Nätet glappade. Behåll det vi vet i stället för att tömma vyn.
     }
@@ -396,7 +479,6 @@ export default function PlanBoard({
     // pass mot stämpling är fas 4.
     if (!isCurrentWeek || isStaff) {
       setProgress({});
-      setNow(null);
       return;
     }
 
@@ -427,26 +509,27 @@ export default function PlanBoard({
     [lanes]
   );
 
-  /** Vilka dagar som ritas. Helg visas när någon rad går eller något ligger där. */
-  const visibleDays = useMemo(() => {
-    const shown: number[] = [];
+  /**
+   * Vilka dagar som ritas. Hela veckan, med helgen hopfälld när den är tom, eller
+   * bara den valda dagen. Se plannedDays i lib/plan-geometry.ts.
+   */
+  const plans = useMemo(() => {
+    const open = [0, 1, 2, 3, 4, 5, 6].map((index) =>
+      lanes.some((lane) => lane.hours?.some((day) => day.weekday === index + 1))
+    );
 
-    for (let index = 0; index < 7; index++) {
-      const weekend = index >= 5;
+    const used = [0, 1, 2, 3, 4, 5, 6].map((index) =>
+      blocks.some((block) => dayIndexOf(new Date(block.startsAt), days) === index)
+    );
 
-      const open = lanes.some((lane) =>
-        lane.hours?.some((day) => day.weekday === index + 1)
-      );
+    return plannedDays({ open, used, todayIndex, focus: focusIndex });
+  }, [blocks, days, focusIndex, lanes, todayIndex]);
 
-      const used = blocks.some(
-        (block) => dayIndexOf(new Date(block.startsAt), days) === index
-      );
-
-      if (!weekend || open || used) shown.push(index);
-    }
-
-    return shown;
-  }, [blocks, days, lanes]);
+  /** De dagar som har en tidslinje. */
+  const visibleDays = useMemo(
+    () => plans.filter((plan) => !plan.collapsed).map((plan) => plan.index),
+    [plans]
+  );
 
   /**
    * Tidsaxeln per dag.
@@ -458,7 +541,7 @@ export default function PlanBoard({
    * när servern svarat, i stället för två gånger varav en under handen.
    */
   const windows = useMemo(() => {
-    const result = new Map<number, { startMinute: number; endMinute: number }>();
+    const result = new Map<number, DayAxis>();
 
     for (const index of visibleDays) {
       const spans = initialBlocks
@@ -477,46 +560,35 @@ export default function PlanBoard({
     return result;
   }, [days, hoursFor, initialBlocks, lanes, timeZone, visibleDays]);
 
-  /**
-   * Skalan: pixlar per minut.
-   *
-   * Steg ett lägger hela veckan i den bredd som finns. Måtten är kända först
-   * när dagfönstren räknats, eftersom en fredag som slutar 13:00 är smalare
-   * än en måndag som slutar 16:00.
-   */
-  const pxPerMinute = useMemo(() => {
-    const minutes = visibleDays.reduce((total, index) => {
-      const axis = windows.get(index);
-      return total + (axis ? axis.endMinute - axis.startMinute : 0);
-    }, 0);
-
-    if (boardWidth === 0 || minutes === 0) return 0.5 * ZOOM[zoom];
-
-    const usable =
-      boardWidth - STATION_COLUMN - visibleDays.length * DAY_BORDER;
-
-    return Math.max(MIN_PX_PER_MINUTE, usable / minutes) * ZOOM[zoom];
-  }, [boardWidth, visibleDays, windows, zoom]);
+  const axisOf = useCallback(
+    (index: number): DayAxis =>
+      windows.get(index) ?? { startMinute: 0, endMinute: 0 },
+    [windows]
+  );
 
   /**
-   * En dags bredd i HELA pixlar.
+   * Skalan: pixlar per minut, så att de dagar som ritas fyller bredden.
    *
-   * Avrundningen är inte kosmetik. Med bruten bredd hamnar kolumnlinjen,
-   * timlinjerna och rutornas kanter på var sin sida om samma halva pixel, och
-   * webbläsaren väljer olika håll beroende på var i kolumnen de ligger. Det
-   * syns som att saker byter storlek med en pixel när något annat ändras, och
-   * det är precis den sortens vaghet som får en vy att kännas opålitlig.
-   *
-   * Träffytan använder samma funktion, så det pekaren pekar på är det som
-   * ritats.
+   * Måtten är kända först när dagfönstren räknats, eftersom en dag med en
+   * station som går till 20:00 är bredare än en som slutar 16:00.
    */
-  const widthOf = useCallback(
-    (dayIndex: number) => {
-      const axis = windows.get(dayIndex);
-      if (!axis) return 0;
-      return Math.round((axis.endMinute - axis.startMinute) * pxPerMinute);
-    },
-    [pxPerMinute, windows]
+  const pxPerMinute = useMemo(
+    () =>
+      boardWidth === 0
+        ? 0.5
+        : fitScale({
+            available: boardWidth - STATION_COLUMN,
+            plans,
+            axisOf,
+            floor: MIN_PX_PER_MINUTE,
+          }),
+    [axisOf, boardWidth, plans]
+  );
+
+  /** Var varje dag ligger. Rubriken, rutnätet och träffytan läser härifrån. */
+  const columns = useMemo(
+    () => layoutDays(plans, axisOf, pxPerMinute),
+    [axisOf, plans, pxPerMinute]
   );
 
   /* --- Träffytan --------------------------------------------------------- */
@@ -544,49 +616,34 @@ export default function PlanBoard({
       const row = Math.floor((clientY - rect.top) / ROW_HEIGHT);
       if (row < 0 || row >= lanes.length) return null;
 
-      let x = clientX - rect.left - STATION_COLUMN;
-      if (x < 0) return null;
+      const hit = dayAt(
+        columns,
+        clientX - rect.left - STATION_COLUMN,
+        axisOf,
+        pxPerMinute,
+        SNAP_MINUTES
+      );
 
-      for (const dayIndex of visibleDays) {
-        const width = widthOf(dayIndex);
+      if (!hit) return null;
 
-        if (x <= width) {
-          const axis = windows.get(dayIndex);
-          if (!axis) return null;
-
-          const minute = axis.startMinute + x / Math.max(pxPerMinute, 0.01);
-          const snapped = Math.round(minute / SNAP_MINUTES) * SNAP_MINUTES;
-
-          return {
-            laneId: lanes[row].id,
-            dayIndex,
-            startsAt: new Date(
-              days[dayIndex].getTime() + Math.max(0, snapped) * MS_PER_MINUTE
-            ),
-          };
-        }
-
-        x -= width + DAY_BORDER;
-      }
-
-      return null;
+      return {
+        laneId: lanes[row].id,
+        dayIndex: hit.index,
+        startsAt: new Date(days[hit.index].getTime() + hit.minute * MS_PER_MINUTE),
+      };
     },
-    [days, lanes, pxPerMinute, visibleDays, widthOf, windows]
+    [axisOf, columns, days, lanes, pxPerMinute]
   );
 
-  /** Pixlar från tavlans vänsterkant till en dags början. */
+  /** Pixlar från tavlans vänsterkant till innehållet i en dag. */
   const dayOffset = useCallback(
     (dayIndex: number) => {
-      let x = STATION_COLUMN;
-
-      for (const index of visibleDays) {
-        if (index === dayIndex) return x;
-        x += widthOf(index) + DAY_BORDER;
-      }
-
-      return null;
+      const column = columns.find(
+        (item) => item.index === dayIndex && !item.collapsed
+      );
+      return column ? STATION_COLUMN + column.left : null;
     },
-    [visibleDays, widthOf]
+    [columns]
   );
 
   /* --- Skrivningarna ----------------------------------------------------- */
@@ -1051,14 +1108,7 @@ export default function PlanBoard({
   const dropSlot = drag && drag.kind !== "resize" ? drag.slot : null;
 
   /** Tavlans hela bredd. Pilarnas lager spänner över den. */
-  const contentWidth = useMemo(
-    () =>
-      visibleDays.reduce(
-        (total, index) => total + widthOf(index) + DAY_BORDER,
-        STATION_COLUMN
-      ),
-    [visibleDays, widthOf]
-  );
+  const contentWidth = STATION_COLUMN + layoutWidth(columns);
 
   /**
    * PILARNA SOM VISAR FÖLJDEN I ETT JOBB.
@@ -1257,27 +1307,61 @@ export default function PlanBoard({
           )}
         </p>
 
-        <div className="flex items-center gap-1">
-          <Button
-            type="button"
-            tone="ghost"
-            onClick={() => setZoom((value) => Math.max(0, value - 1))}
-            disabled={zoom === 0}
-            aria-label="Zooma ut"
-          >
-            −
-          </Button>
-          <Button
-            type="button"
-            tone="ghost"
-            onClick={() =>
-              setZoom((value) => Math.min(ZOOM.length - 1, value + 1))
-            }
-            disabled={zoom === ZOOM.length - 1}
-            aria-label="Zooma in"
-          >
-            +
-          </Button>
+        <div className="flex flex-wrap items-center gap-2">
+          {focusIndex !== null && (
+            <div className="flex items-center gap-1">
+              <button
+                type="button"
+                onClick={() => step(-1)}
+                aria-label="Föregående dag"
+                className="inline-flex h-7 w-7 items-center justify-center rounded-md text-neutral-600 hover:bg-neutral-100"
+              >
+                ‹
+              </button>
+              <span
+                className={`min-w-[8.5rem] text-center text-[13px] font-medium ${
+                  focusIndex === todayIndex ? "text-tick-deep" : "text-neutral-900"
+                }`}
+              >
+                {DAY_LONG[focusIndex]} {dayLabel(days[focusIndex], timeZone)}
+              </span>
+              <button
+                type="button"
+                onClick={() => step(1)}
+                aria-label="Nästa dag"
+                className="inline-flex h-7 w-7 items-center justify-center rounded-md text-neutral-600 hover:bg-neutral-100"
+              >
+                ›
+              </button>
+            </div>
+          )}
+
+          <div role="group" aria-label="Visa" className="flex gap-1">
+            {(
+              [
+                ["Vecka", false],
+                ["Dag", true],
+              ] as const
+            ).map(([label, day]) => (
+              <button
+                key={label}
+                type="button"
+                aria-pressed={isDay === day}
+                onClick={() =>
+                  isDay === day
+                    ? undefined
+                    : show(day ? dayKeys[todayIndex ?? 0] : null)
+                }
+                className={`rounded-md px-2.5 py-1 text-[13px] font-medium transition-colors ${
+                  isDay === day
+                    ? "bg-fjord text-white"
+                    : "text-neutral-600 hover:bg-neutral-100"
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 
@@ -1307,21 +1391,63 @@ export default function PlanBoard({
                 {isStaff ? "Anställd" : "Station"}
               </div>
 
-              {visibleDays.map((index) => (
-                <div
-                  key={index}
-                  style={{ width: widthOf(index) }}
-                  className="shrink-0 border-l-2 border-neutral-200 px-2 py-2 first:border-l-0"
-                >
-                  <p className="truncate text-[13px] font-medium text-neutral-900">
-                    {widthOf(index) > 160 ? DAY_LONG[index] : DAY_SHORT[index]}{" "}
-                    <span className="font-normal text-neutral-400">
-                      {dayLabel(days[index], timeZone)}
+              {/* VARJE KOLUMN ÄR SKILJELINJEN PLUS INNEHÅLLET, och bredden
+                  sätts till båda. Klockslagen räknas från innehållets kant,
+                  precis som rutnätet under, se lib/plan-geometry.ts. */}
+              {columns.map((column) => {
+                const isToday = column.index === todayIndex;
+
+                return column.collapsed ? (
+                  <button
+                    key={column.index}
+                    type="button"
+                    onClick={() => show(dayKeys[column.index])}
+                    style={{ width: column.width + DAY_BORDER }}
+                    className="shrink-0 border-l-2 border-neutral-200 py-2 text-center hover:bg-neutral-100"
+                  >
+                    <span
+                      className={`block text-[13px] font-medium ${
+                        isToday ? "text-tick-deep" : "text-neutral-900"
+                      }`}
+                    >
+                      {DAY_SHORT[column.index]}
                     </span>
-                  </p>
-                  <Axis axis={windows.get(index)} pxPerMinute={pxPerMinute} />
-                </div>
-              ))}
+                    <span className="block text-[11px] text-neutral-400">
+                      {dayLabel(days[column.index], timeZone)}
+                    </span>
+                  </button>
+                ) : (
+                  <div
+                    key={column.index}
+                    style={{ width: column.width + DAY_BORDER }}
+                    className="shrink-0 border-l-2 border-neutral-200 py-2"
+                  >
+                    <button
+                      type="button"
+                      onClick={() => show(dayKeys[column.index])}
+                      disabled={isDay}
+                      className={`block max-w-full truncate px-2 text-left text-[13px] font-medium enabled:hover:underline ${
+                        isToday ? "text-tick-deep" : "text-neutral-900"
+                      }`}
+                    >
+                      {column.width > 160
+                        ? DAY_LONG[column.index]
+                        : DAY_SHORT[column.index]}{" "}
+                      <span
+                        className={`font-normal ${
+                          isToday ? "text-tick-deep" : "text-neutral-400"
+                        }`}
+                      >
+                        {dayLabel(days[column.index], timeZone)}
+                      </span>
+                    </button>
+                    <Axis
+                      axis={windows.get(column.index)}
+                      pxPerMinute={pxPerMinute}
+                    />
+                  </div>
+                );
+              })}
             </div>
 
             {/* Raderna. Enda måttet träffytan räknas ur. */}
@@ -1403,7 +1529,24 @@ export default function PlanBoard({
                       )}
                     </div>
 
-                    {visibleDays.map((dayIndex) => (
+                    {columns.map((column) => {
+                      const dayIndex = column.index;
+
+                      if (column.collapsed) {
+                        // En hopfälld helgdag. Ett tryck öppnar dagen, som
+                        // rubriken ovanför gör.
+                        return (
+                          <div
+                            key={dayIndex}
+                            aria-hidden="true"
+                            onClick={() => show(dayKeys[dayIndex])}
+                            style={{ width: column.width + DAY_BORDER }}
+                            className="shrink-0 cursor-pointer border-l-2 border-neutral-200 bg-neutral-100/70"
+                          />
+                        );
+                      }
+
+                      return (
                       <DayCell
                         key={dayIndex}
                         laneName={lane.name}
@@ -1412,7 +1555,7 @@ export default function PlanBoard({
                         days={days}
                         dayIndex={dayIndex}
                         axis={windows.get(dayIndex)}
-                        width={widthOf(dayIndex)}
+                        width={column.width}
                         pxPerMinute={pxPerMinute}
                         timeZone={timeZone}
                         hours={hoursFor(lane.id, dayIndex)}
@@ -1434,7 +1577,8 @@ export default function PlanBoard({
                         onBlockPointerDown={beginMove}
                         onResizeStart={beginResize}
                       />
-                    ))}
+                      );
+                    })}
                   </div>
                 );
               })}
@@ -1732,8 +1876,8 @@ function DayCell({
 
   return (
     <div
-      style={{ width }}
-      className={`relative shrink-0 border-l-2 border-neutral-200 first:border-l-0 ${
+      style={{ width: width + DAY_BORDER }}
+      className={`relative shrink-0 border-l-2 border-neutral-200 ${
         highlight ? "bg-blue-100" : ""
       } ${pickable ? "cursor-copy" : ""}`}
     >
@@ -1757,7 +1901,7 @@ function DayCell({
 
         {/* Timlinjer, så att ytan läses som en tidslinje och inte som en ruta. */}
         {axis &&
-          hourTicks(axis).map((minute) => (
+          hourLines(axis).map((minute) => (
             <div
               key={minute}
               className="absolute inset-y-0 w-px bg-neutral-200/70"
@@ -1911,62 +2055,35 @@ function BlockBox({
   );
 }
 
-/** Klockslagen under dagrubriken. */
+/**
+ * Klockslagen under dagrubriken.
+ *
+ * Utan inre marginal, och varje siffra MITT PÅ SIN LINJE. Rubriken hade en
+ * marginal som rutnätet under inte hade, och "09" stod till höger om
+ * 09-linjen. Bara klockslag som ryms inom dagen tas med, se axisLabels.
+ */
 function Axis({
   axis,
   pxPerMinute,
 }: {
-  axis?: { startMinute: number; endMinute: number };
+  axis?: DayAxis;
   pxPerMinute: number;
 }) {
   if (!axis) return null;
 
   return (
     <div className="relative mt-0.5 h-3">
-      {hourTicks(axis, pxPerMinute).map((minute) => (
+      {axisLabels(axis, pxPerMinute).map((label) => (
         <span
-          key={minute}
-          className="absolute top-0 text-[10px] tabular-nums text-neutral-400"
-          style={{ left: (minute - axis.startMinute) * pxPerMinute }}
+          key={label.minute}
+          className="absolute top-0 -translate-x-1/2 text-[10px] tabular-nums text-neutral-400"
+          style={{ left: label.x }}
         >
-          {String(Math.floor(minute / 60)).padStart(2, "0")}
+          {String(Math.floor(label.minute / 60)).padStart(2, "0")}
         </span>
       ))}
     </div>
   );
-}
-
-/**
- * Klockslagen som får plats.
- *
- * Utan pixelmåttet ges varje hel timme, vilket är rätt för linjerna i
- * bakgrunden. Med måttet glesas de ut så att etiketterna inte skriver över
- * varandra.
- */
-function hourTicks(
-  axis: { startMinute: number; endMinute: number },
-  pxPerMinute?: number
-): number[] {
-  const step =
-    pxPerMinute === undefined
-      ? 60
-      : pxPerMinute < 0.35
-        ? 180
-        : pxPerMinute < 0.7
-          ? 120
-          : 60;
-
-  const ticks: number[] = [];
-
-  for (
-    let minute = Math.ceil(axis.startMinute / step) * step;
-    minute < axis.endMinute;
-    minute += step
-  ) {
-    ticks.push(minute);
-  }
-
-  return ticks;
 }
 
 function Legend({
@@ -2000,12 +2117,21 @@ function Legend({
         </>
       )}
 
-      {placing && (
+      {placing ? (
         <span className="ml-auto text-neutral-400">
           {armed
             ? `Tryck på ${target}, eller Esc för att avbryta`
             : `Tryck på ett jobb i Oplacerat, sedan på ${target}`}
         </span>
+      ) : (
+        kind === "staff" && (
+          // Personalen i en verkstad räknar inte av beräkningen, och har därför
+          // inget Oplacerat. Utan den här raden fanns ingen väg att se var
+          // ett pass läggs.
+          <span className="ml-auto text-neutral-400">
+            Pass läggs med Bemanna i en stationsruta
+          </span>
+        )
       )}
     </div>
   );
@@ -2498,4 +2624,9 @@ function parseClockOnDay(
 
   const wall = wallTimeIn(day, timeZone);
   return instantFromWallTime({ ...wall, hour, minute }, timeZone);
+}
+
+/** -1 från indexOf som null. */
+function indexOrNull(index: number): number | null {
+  return index < 0 ? null : index;
 }
