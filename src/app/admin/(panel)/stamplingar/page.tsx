@@ -33,23 +33,28 @@ import { datePresets } from "@/lib/date-presets";
 import { weekStep } from "@/lib/week-nav";
 import WeekStepper from "@/components/admin/WeekStepper";
 import ConfirmButton from "@/components/admin/ConfirmButton";
+import Pager from "@/components/platform/Pager";
+import { paging } from "@/lib/paging";
 import { deleteEntry, editEntry, type EditEntryState } from "./actions";
 
 export const dynamic = "force-dynamic";
 
 /**
- * Hur många poster listan visar innan den slutar.
+ * EN SIDA I TAGET (ändrat 2026-10-17, issue #24).
  *
- * Taket ersätter det datum som tidigare stod förifyllt i "Från och med".
- * Skillnaden är att ett tak syns: raden under rubriken säger att listan är
- * kapad, och då vet man att det finns mer att filtrera fram.
+ * Listan visade de 200 senaste avslutade och slutade där, med en rad som bad
+ * om ett datum för äldre. Varje rad bär en ruta för att ändra posten, och 200
+ * sådana gjorde sidan långsam att öppna. Nu visas 50, och äldre poster nås med
+ * Föregående och Nästa i stället för att behöva filtreras fram.
+ *
+ * Bläddringen sker i databasen: bara sidans rader hämtas, och antalet räknas.
  */
-const PAGE_SIZE = 200;
 
 interface SearchParams {
   employeeId?: string;
   from?: string;
   to?: string;
+  sida?: string;
 }
 
 export default async function EntriesPage({
@@ -130,6 +135,12 @@ export default async function EntriesPage({
     indirectMoment: { select: { name: true } },
   } as const;
 
+  const finishedFilter = { ...entryFilter, clockOutAt: { not: null } };
+
+  // Antalet först, så att ett sidnummer bortom slutet kan visa sista sidan.
+  const finishedTotal = await db.timeEntry.count({ where: finishedFilter });
+  const page = paging(finishedTotal, params.sida);
+
   const [employees, orders, moments, indirectMoments, ongoing, finished] =
     await Promise.all([
       db.employee.findMany({
@@ -152,28 +163,44 @@ export default async function EntriesPage({
         orderBy: [{ active: "desc" }, { name: "asc" }],
         select: { id: true, name: true, active: true },
       }),
-      // PÅGÅENDE FÖRST, och utan tak.
+      // PÅGÅENDE FÖRST, utan tak, och bara på första sidan.
       //
       // De är det man letar efter: någon som står instämplad och inte borde
-      // göra det. Låg de i samma fråga som resten kunde de trilla utanför de
-      // 200 senaste så fort en dag varit full av stämplingar, och då syns
-      // just det man kom för att leta efter inte alls.
+      // göra det. Låg de i samma fråga som resten kunde de trilla utanför
+      // första sidan så fort en dag varit full av stämplingar, och då syns
+      // just det man kom för att leta efter inte alls. På sida två och framåt
+      // har man redan sett dem, och där vore de bara i vägen. De hämtas ändå,
+      // eftersom de räknas i rubrikens antal; de är högst några per person.
       db.timeEntry.findMany({
         where: { ...entryFilter, clockOutAt: null },
         orderBy: [{ clockInAt: "desc" }, { id: "asc" }],
         select: entrySelect,
       }),
       db.timeEntry.findMany({
-        where: { ...entryFilter, clockOutAt: { not: null } },
+        where: finishedFilter,
         orderBy: [{ clockInAt: "desc" }, { id: "asc" }],
-        take: PAGE_SIZE,
+        skip: page.skip,
+        take: page.take,
         select: entrySelect,
       }),
     ]);
 
-  // Pågående överst, resten under. Båda listorna är redan sorterade med
-  // senaste först.
-  const entries = [...ongoing, ...finished];
+  // Pågående överst på första sidan, resten under. Båda listorna är redan
+  // sorterade med senaste först.
+  const entries = page.page === 1 ? [...ongoing, ...finished] : finished;
+  const total = ongoing.length + finishedTotal;
+
+  // Filtren följer med mellan sidorna. Sidan ett står inte i adressen, så att
+  // den orörda listan har samma adress som förut.
+  const pageHref = (target: number) => {
+    const search = new URLSearchParams();
+    if (params.from) search.set("from", params.from);
+    if (params.to) search.set("to", params.to);
+    if (params.employeeId) search.set("employeeId", params.employeeId);
+    if (target > 1) search.set("sida", String(target));
+    const query = search.toString();
+    return query ? `/admin/stamplingar?${query}` : "/admin/stamplingar";
+  };
 
   // Vilka av raderna som har ändrats. De får en länk till sin historik; en
   // länk på varje rad vore brus, eftersom de flesta aldrig rörts.
@@ -311,19 +338,14 @@ export default async function EntriesPage({
         </FilterForm>
       </Card>
 
-      {entries.length === 0 ? (
+      {total === 0 ? (
         <EmptyState
           title="Inga stämplingar"
         />
       ) : (
         <Card>
           <CardHeader
-            title={`${entries.length} ${entries.length === 1 ? "post" : "poster"}`}
-            description={
-              finished.length === PAGE_SIZE
-                ? `Listan visar de ${PAGE_SIZE} senaste avslutade. Välj datum för äldre.`
-                : undefined
-            }
+            title={`${total.toLocaleString("sv-SE")} ${total === 1 ? "post" : "poster"}`}
           />
           <Table>
             <thead>
@@ -528,6 +550,14 @@ export default async function EntriesPage({
               })}
             </tbody>
           </Table>
+
+          <Pager
+            page={page.page}
+            pageCount={page.pageCount}
+            total={finishedTotal}
+            unit="avslutade"
+            hrefFor={pageHref}
+          />
         </Card>
       )}
     </>

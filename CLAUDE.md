@@ -172,6 +172,16 @@ skickas vidare i `next.config.ts`, så att bokmärken fortsätter fungera.
 Frågan för en ny sida är alltså hur ofta den öppnas: varje dag eller vecka
 hör den till menyn, en gång och sedan sällan hör den till Inställningar.
 
+**Stämplingar och Rapporter visar 50 rader i taget** (beslutat 2026-10-17,
+issue #24), med Föregående och Nästa. Båda ritade varje rad i urvalet, och en
+rapport utan datum var då varje stämpling arbetsytan gjort: sidan blev
+långsammare för varje vecka kunden använde systemet. **Bara listan delas
+upp.** Rapportens total, grupper och uttag räknas på hela urvalet som förut,
+och en grupp som delas mellan två sidor behåller sin egen summa
+(`src/lib/paging.ts`). Stämplingar bläddrar i databasen; Rapporter hämtar
+hela urvalet, eftersom summorna behöver det. Pågående stämplingar står
+överst på första sidan. Sidnumret följer inte med när perioden byts.
+
 ### Multi-tenant
 
 Flera kundföretag delar samma app-instans, men deras data är **helt isolerad**
