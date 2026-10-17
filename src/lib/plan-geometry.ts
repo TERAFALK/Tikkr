@@ -34,6 +34,17 @@ export const DAY_BORDER = 2;
  */
 export const COLLAPSED_DAY_WIDTH = 56;
 
+/**
+ * Minsta skalan, i pixlar per minut. Under den rullar tavlan i sidled.
+ *
+ * LÅGT MED FLIT (ändrat 2026-10-17, var 0,25). Veckovyn är till för att se
+ * hela veckan, och den som behöver läsa en timme byter till Dag. Med axeln
+ * 06–18 och en utfälld helgdag behövde veckan 1 300 pixlar vid 0,25, och på en
+ * vanlig skärm hamnade söndagen utanför kanten. Vid 0,12 ryms sju hela dagar
+ * på drygt 900 pixlar; en telefon rullar fortfarande, och har dagvyn.
+ */
+export const WEEK_SCALE_FLOOR = 0.12;
+
 /** Minsta avstånd från ett klockslags mitt till dagens kant, i pixlar. */
 const LABEL_HALF_WIDTH = 10;
 
@@ -128,6 +139,9 @@ export function fitScale(input: {
  * Var varje dag ligger. Bredderna är HELA pixlar: med bruten bredd hamnar
  * kolumnlinjen, timlinjerna och rutornas kanter på var sin sida om samma halva
  * pixel, och saker byter storlek med en pixel när något annat ändras.
+ *
+ * AVRUNDAS NEDÅT. Uppåt gav upp till en pixel för mycket per dag, och veckan
+ * blev några pixlar bredare än skärmen, med en rullningslist som följd.
  */
 export function layoutDays(
   plans: DayPlan[],
@@ -139,7 +153,7 @@ export function layoutDays(
   return plans.map((plan) => {
     const width = plan.collapsed
       ? COLLAPSED_DAY_WIDTH
-      : Math.round(axisMinutes(axisOf(plan.index)) * pxPerMinute);
+      : Math.floor(axisMinutes(axisOf(plan.index)) * pxPerMinute);
 
     x += DAY_BORDER;
     const column = { ...plan, width, left: x };

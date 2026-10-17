@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   COLLAPSED_DAY_WIDTH,
   DAY_BORDER,
+  WEEK_SCALE_FLOOR,
   axisLabels,
   dayAt,
   fitScale,
@@ -97,7 +98,32 @@ describe("var dagarna ligger", () => {
 
     const scale = fitScale({ available, plans, axisOf, floor: 0.1 });
     expect(scale).toBeCloseTo(0.5);
-    expect(layoutWidth(layoutDays(plans, axisOf, scale))).toBe(available);
+    expect(layoutWidth(layoutDays(plans, axisOf, scale))).toBeLessThanOrEqual(available);
+  });
+
+  it("en hel vecka ryms på en vanlig skärm, utan rullning", () => {
+    // Felet 2026-10-17: med axeln 06–18 och lördagen utfälld blev veckan
+    // bredare än skärmen, golvet slog till, och söndagen hamnade utanför
+    // kanten. En tavla på 1100 pixlar, varav 160 är namnkolumnen.
+    const available = 1100 - 160;
+    const allDays = [0, 1, 2, 3, 4, 5, 6].map((index) => ({ index, collapsed: false }));
+
+    const scale = fitScale({ available, plans: allDays, axisOf, floor: WEEK_SCALE_FLOOR });
+    expect(layoutWidth(layoutDays(allDays, axisOf, scale))).toBeLessThanOrEqual(available);
+  });
+
+  it("avrundningen gör aldrig veckan bredare än bredden", () => {
+    // Varje dag avrundad uppåt gav upp till en pixel för mycket per dag, och
+    // en rullningslist för fem pixlar.
+    const plans = [...WEEKDAYS, { index: 5, collapsed: true }, { index: 6, collapsed: true }];
+
+    for (const available of [701, 913, 1037, 1281, 1499]) {
+      const scale = fitScale({ available, plans, axisOf, floor: 0.01 });
+      const width = layoutWidth(layoutDays(plans, axisOf, scale));
+
+      expect(width).toBeLessThanOrEqual(available);
+      expect(width).toBeGreaterThan(available - plans.length);
+    }
   });
 
   it("skalan går aldrig under golvet", () => {

@@ -28,6 +28,7 @@ import {
 } from "@/lib/time-zone";
 import {
   DAY_BORDER,
+  WEEK_SCALE_FLOOR,
   axisLabels,
   dayAt,
   fitScale,
@@ -205,13 +206,6 @@ const STATION_COLUMN = 160;
 const ROW_HEIGHT = 72;
 const ROW_CLASS = "h-[72px]";
 
-/**
- * Minsta läsbara skala.
- *
- * Under det blir en timme smalare än ett ordernummer, och då är en
- * rullningslist bättre än rutor som inte går att skilja åt.
- */
-const MIN_PX_PER_MINUTE = 0.25;
 
 /** Hur långt pekaren får röra sig och ändå räknas som ett tryck. */
 const CLICK_SLOP = 5;
@@ -580,7 +574,7 @@ export default function PlanBoard({
             available: boardWidth - STATION_COLUMN,
             plans,
             axisOf,
-            floor: MIN_PX_PER_MINUTE,
+            floor: WEEK_SCALE_FLOOR,
           }),
     [axisOf, boardWidth, plans]
   );

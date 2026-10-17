@@ -913,6 +913,11 @@ stripe_prices    — item, month_price_id, year_price_id, updated_by_email
      den, och pilarna går över veckans kant.
    - **Linjen för nu går på webbläsarens klocka**, och syns därför i båda
      vyerna och för personalen.
+   - **Veckan ryms i skärmens bredd.** Golvet för skalan är lågt
+     (`WEEK_SCALE_FLOOR`, 0,12 pixlar per minut) och dagarnas bredder avrundas
+     nedåt. Med 0,25 behövde en vecka med axeln 06–18 och en utfälld lördag
+     1 300 pixlar, och söndagen hamnade utanför kanten. Den som behöver läsa
+     timmarna byter till Dag.
 
    **ETT PERSONALPASS ÄR EN PERSONUPPGIFT**, till skillnad från en
    stationsruta: det säger var en namngiven person ska vara och när.
