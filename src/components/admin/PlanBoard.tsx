@@ -160,6 +160,10 @@ export interface BoardStaffing {
   employeeName: string;
   startsAt: string;
   minutes: number;
+  /** Passet ligger utanför personens arbetstid. */
+  outsideHours: boolean;
+  /** Personen har ett annat pass samtidigt. */
+  overlaps: boolean;
 }
 
 export interface BoardBlock {
@@ -2356,8 +2360,20 @@ function Staffing({
               key={pass.id}
               className="flex items-center justify-between gap-2 px-3 py-2 text-[13px]"
             >
-              <span className="min-w-0 truncate text-neutral-900">
-                {pass.employeeName}
+              <span className="min-w-0">
+                <span className="block truncate text-neutral-900">
+                  {pass.employeeName}
+                </span>
+                {(pass.outsideHours || pass.overlaps) && (
+                  <span className="block text-[12px] text-amber-700">
+                    {[
+                      pass.outsideHours ? "Utanför arbetstid" : null,
+                      pass.overlaps ? "Dubbelbokad" : null,
+                    ]
+                      .filter(Boolean)
+                      .join(" · ")}
+                  </span>
+                )}
               </span>
               <span className="flex shrink-0 items-center gap-3 tabular-nums text-neutral-500">
                 {clockText(new Date(pass.startsAt), timeZone)} ·{" "}

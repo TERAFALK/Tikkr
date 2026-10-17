@@ -44,6 +44,7 @@ const PLANNING_MODULES = [
   "planning-modes",
   "staff-planning",
   "plan-geometry",
+  "staff-hours",
 ];
 
 /** Lönemodulens. Speglar payroll-boundary.test.ts. */
@@ -292,3 +293,59 @@ describe("personalpassen är personuppgifter", () => {
   });
 });
 
+describe("arbetstiderna läses på ett ställe", () => {
+  // ARBETSTIDERNA ÄR ARBETSYTANS (beslutat 2026-10-17). Löneunderlaget mäter
+  // flexen mot dem och planeringen gråmarkerar efter dem, och båda läser dem
+  // genom work-hours.ts. Två läsare av samma tabeller hade börjat tolka dem
+  // olika vid första ändringen, och det hade synts först som ett felaktigt
+  // saldo eller en tavla som visar fel tider.
+
+  const SCHEDULE_TABLES = /\.(workSchedule|scheduleDay|scheduleBreak)\./;
+
+  it("work-hours.ts är neutral och känner ingen av modulerna", () => {
+    const forbidden = importsOf("lib/work-hours.ts").filter(
+      (specifier) =>
+        pointsAt(specifier, PAYROLL_MODULES) ||
+        pointsAt(specifier, PLANNING_MODULES)
+    );
+
+    expect(
+      forbidden,
+      "src/lib/work-hours.ts måste förbli neutral. Den läses av både " +
+        "lönemodulen och planeringen."
+    ).toEqual([]);
+  });
+
+  it("inget annat bibliotek läser schemats tabeller", () => {
+    // onboarding.ts räknar om ett standardschema finns, för introduktionens
+    // lista. Den läser ingen tid och tolkar ingenting.
+    const allowed = ["lib/work-hours.ts", "lib/onboarding.ts"];
+
+    const offenders = walk(path.join(SRC, "lib"))
+      .map(relative)
+      .filter((file) => !allowed.includes(file))
+      .filter((file) => SCHEDULE_TABLES.test(read(file)));
+
+    expect(
+      offenders,
+      "Dessa filer läser workSchedule, scheduleDay eller scheduleBreak " +
+        "direkt. Läs arbetstiderna genom src/lib/work-hours.ts."
+    ).toEqual([]);
+  });
+
+  it("planeringen och löneunderlaget läser båda genom work-hours.ts", () => {
+    expect(importsOf("lib/staff-hours.ts")).toContain("./work-hours");
+    expect(importsOf("lib/schedule.ts")).toContain("./work-hours");
+  });
+
+  it("planeringen läser aldrig frånvaron", () => {
+    // Frånvaro är känsliga uppgifter och hör till löneunderlaget. Tavlan visar
+    // tider, aldrig varför någon är borta.
+    for (const name of PLANNING_MODULES) {
+      const file = `lib/${name}.ts`;
+      if (!exists(file)) continue;
+
+      expect(read(file), file).not.toMatch(/\.(absence|absenceReason)\./);
+    }
+  });
+});

@@ -1,5 +1,5 @@
 import { requireAdmin } from "@/lib/admin-session";
-import { hasModule } from "@/lib/company-modules";
+import { hasModule, hasWorkHours } from "@/lib/company-modules";
 import { companyTimeZone } from "@/lib/company";
 import { toDateInput } from "@/lib/time-zone";
 import { unsafeGlobalPrisma } from "@/lib/db";
@@ -37,8 +37,10 @@ export const dynamic = "force-dynamic";
  * öppnar rutan har ett ärende dit. Samma hållning som att kiosken aldrig visar
  * belopp.
  *
- * Arbetstiderna i ändra-rutan hör till lönemodulen och visas bara för den som
- * har den. Grinden är `hasModule` och inte bara en dold kryssruta: sidan och
+ * Arbetstiderna i ändra-rutan visas för den som har löneunderlaget eller
+ * planeringen (ändrat 2026-10-17, se work-hours.ts), och resten av
+ * lönefälten bara med löneunderlaget. Grinden är `hasModule` och
+ * `hasWorkHours` och inte bara en dold kryssruta: sidan och
  * åtgärden är samma väg in, och en gömd ruta är ingen spärr. Se
  * lib/company-modules.ts och tests/module-coverage.test.ts.
  */
@@ -47,6 +49,9 @@ export default async function EmployeesPage() {
   const { db, companyId } = session;
 
   const payroll = await hasModule(companyId, "PAYROLL");
+  // De egna arbetstiderna finns med löneunderlaget ELLER planeringen, som
+  // båda läser dem (ändrat 2026-10-17). Se work-hours.ts.
+  const workHours = await hasWorkHours(companyId);
   const timeZone = await companyTimeZone(companyId);
 
   // Arbetstidsformerna i företagets avtal, för valet i rutan. Utan avtal, eller
@@ -87,7 +92,7 @@ export default async function EmployeesPage() {
 
   // Hämtas i EN fråga för hela listan och inte en per person. Tjugo anställda
   // hade annars blivit tjugo uppslag för fält som oftast är tomma.
-  const schedules: Map<string, ScheduleDayInput[]> = payroll
+  const schedules: Map<string, ScheduleDayInput[]> = workHours
     ? await ownScheduleDays(
         db,
         employees.map((employee) => employee.id)
@@ -101,6 +106,7 @@ export default async function EmployeesPage() {
       action={createEmployee}
       submitLabel="Lägg till"
       payroll={payroll}
+      workHours={workHours}
       atfForms={atfForms}
     />
   );
@@ -195,6 +201,7 @@ export default async function EmployeesPage() {
                           atfWorkForm: employee.atfWorkForm,
                         }}
                         payroll={payroll}
+                        workHours={workHours}
                         atfForms={atfForms}
                         scheduleDays={toDayValues(schedules.get(employee.id))}
                       />

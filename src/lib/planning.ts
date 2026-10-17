@@ -1,5 +1,6 @@
 import type { CompanyDb } from "./tenant";
 import { unsafeGlobalPrisma } from "./db";
+import { hoursForEmployee, hoursOnDay, loadStaffHours } from "./staff-hours";
 import {
   DEFAULT_PLANNING_MODE,
   isPlanningMode,
@@ -711,12 +712,19 @@ export async function moveBlock(
 
     const staffing = await tx.staffBlock.findMany({
       where: { plannedBlockId: blockId },
-      select: { id: true, startsAt: true, minutes: true },
+      select: { id: true, employeeId: true, startsAt: true, minutes: true },
     });
+
+    // Personernas tider, så att ett flyttat pass kapas mot dagen med
+    // personens raster som när det lades. Se staff-hours.ts.
+    const hours = staffing.length > 0 ? await loadStaffHours(db) : null;
 
     for (const pass of staffing) {
       const startsAt = new Date(pass.startsAt.getTime() + shift);
-      const left = fitsFrom(null, startsAt, timeZone);
+      const day = hours
+        ? (hoursOnDay(hoursForEmployee(hours, pass.employeeId), startsAt, timeZone) ?? null)
+        : null;
+      const left = fitsFrom(day, startsAt, timeZone);
 
       await tx.staffBlock.updateMany({
         where: { id: pass.id },

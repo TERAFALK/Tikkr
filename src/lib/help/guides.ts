@@ -267,7 +267,7 @@ export const GUIDES = [
       },
     ],
     notes: [
-      "Rasttyperna läggs upp under Inställningar, Arbetstider, med Ny rast.",
+      "Rasttyperna läggs upp under Inställningar, Raster, med Ny rast.",
       "Rasten räknas inte som arbetad tid och kan inte faktureras.",
     ],
     related: ["arbetstider", "tidrapport"],
@@ -570,8 +570,8 @@ export const GUIDES = [
         body: "Planerad tid räknas netto efter schemats raster.",
       },
       {
-        title: "Lägg upp rasttyperna med Ny rast",
-        body: "De visas som val när någon trycker Rast på stämplingsskärmen.",
+        title: "Lägg upp rasttyperna under Inställningar, Raster",
+        body: "Tryck Ny rast. De visas som val när någon trycker Rast på stämplingsskärmen.",
       },
       {
         title: "Ge en anställd egna tider vid behov",
@@ -684,6 +684,7 @@ export const GUIDES = [
       "Produktion: öppna en ruta och tryck Bemanna för att planera en anställd på jobbet. Passet räknas inte mot beräknad tid.",
       "Tjänst: tryck på ett jobb i Oplacerat och sedan på en anställd.",
       "En anställd med två pass samtidigt markeras i gult.",
+      "Personalens tider är desamma som löneunderlagets: företagets under Inställningar, Arbetstider, och egna under Anställda. Pass hoppar över rasterna, och Bemanna markerar pass utanför arbetstid.",
       "Vecka och Dag växlar mellan hela veckan och en dag i taget. Tryck på en dag i rubriken för att öppna den.",
       "Helgen är dold. Visa helg tar fram lördag och söndag, och en siffra på knappen visar hur mycket som är planerat där.",
       "Överbokning tillåts och markeras i gult.",

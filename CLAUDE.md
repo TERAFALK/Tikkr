@@ -256,10 +256,12 @@ support_visits — id, company_id, email, started_at, last_seen_at
 feedback_messages — id, company_id, author_user_id?, author_email, author_name?,
                  kind, area?, page?, body, done_at?, done_note?, done_by_email?
 
-  — löneunderlaget, se regel 7 —
+  — arbetstiderna, arbetsytans sedan 2026-10-17, se regel 8 —
 work_schedules   — id, company_id, name, is_default
 schedule_days    — id, company_id, schedule_id, weekday, start_minute, end_minute
 schedule_breaks  — id, company_id, schedule_day_id, start_minute, end_minute
+
+  — löneunderlaget, se regel 7 —
 break_types      — id, company_id, name, active, sort_order
 break_entries    — id, company_id, employee_id, break_type_id,
                    started_at, ended_at, source, needs_review
@@ -875,13 +877,36 @@ stripe_prices    — item, month_price_id, year_price_id, updated_by_email
    `tests/planning-modes.test.ts` fäller ett register och ett schema som
    glidit isär.
 
-   **Personalens arbetstider blir planeringens egna** och läses inte ur
-   löneunderlagets scheman, av samma skäl som stationernas öppettider har
-   egna tabeller. Den som har båda tillvalen skriver in dem två gånger.
+   **ARBETSTIDERNA ÄR ARBETSYTANS, INTE ETT TILLVALS** (beslutat 2026-10-17,
+   produktägarens val, ersätter "personalens arbetstider blir planeringens
+   egna" från 2026-10-14). Löneunderlaget mäter flexen mot dem och planeringen
+   gråmarkerar och varnar efter dem, och båda läser SAMMA tider. Planeringen
+   fick under en dag en egen uppsättning, och samma människors tider på två
+   ställen blev rörigt.
+
+   - **Företagets tider** står under Inställningar, Arbetsytan, **Arbetstider**,
+     och **egna tider** under Anställda, i personens ruta. Båda syns med
+     löneunderlaget eller planeringen, eller båda (`WORK_HOURS_MODULES` i
+     `modules.ts`, `requireWorkHours` i `company-modules.ts`). Rasttyperna för
+     stämplingsskärmen är löneunderlagets och står kvar där, under **Raster**.
+   - **En enda läsare**, `src/lib/work-hours.ts`, som är neutral som
+     `weekly-hours.ts`. `schedule.ts` och `staff-hours.ts` läser båda därifrån,
+     och `tests/planning-boundary.test.ts` fäller ett annat bibliotek som
+     läser tabellerna direkt. Gränsen mellan tillvalen står kvar: planeringen
+     importerar ingenting från löneunderlaget.
+   - **Bara regeln om den timanställda skiljer.** I löneunderlaget har hen
+     inget schema. I planeringen får hen företagets tider, så att tavlan visar
+     när verkstaden är öppen.
+   - **Frånvaro syns inte i planeringen.** Den är känslig och löneunderlagets.
+   - Tabellerna `staff_days` och `staff_breaks` från fas 3 togs bort i samma
+     PR, innan de nått `dev`: migrationen som skapade dem står kvar och nästa
+     tar bort dem, så att labbets historik stämmer.
+   - **Stationernas öppettider är kvar i egna tabeller.** En maskin är ingen
+     anställd.
 
    Byggs i faser: läget och vyerna (fas 1), personalpassen (fas 2),
    personalens arbetstider och tillgänglighet (fas 3) och passen mot
-   stämplingen (fas 4). Fas 1 och 2 är gjorda.
+   stämplingen (fas 4). Fas 1, 2 och 3 är gjorda.
 
    **PERSONALPASSEN** (tillagt 2026-10-14, fas 2). Ett pass är en anställd på
    en order och ett arbetsmoment, med start och längd, i `staff_blocks`. Enda
@@ -905,11 +930,26 @@ stripe_prices    — item, month_price_id, year_price_id, updated_by_email
    - **Tas stationsrutan bort ligger passet kvar** utan koppling
      (`onDelete: SetNull`). En persons planerade dag ska inte försvinna för att
      maskinplanen ändrades.
-   - **Två pass samtidigt för samma person varnas i gult** på personalvyn i
-     Tjänst, och avvisas inte. En operatör kör ibland två maskiner (regel 2).
-     I Produktion finns ingen personalvy, och dubbelbokningen syns inte.
-   - Till fas 3 har en anställd inga arbetstider på tavlan: passet räknas i
-     väggklockans minuter, utan raster, och kapas vid midnatt.
+   - **Två pass samtidigt för samma person varnas i gult**, och avvisas inte.
+     En operatör kör ibland två maskiner (regel 2). I Tjänst syns det på
+     personalvyn, i Produktion i Bemanna, se arbetstiderna nedan.
+
+   **PERSONALENS TILLGÄNGLIGHET** (tillagt 2026-10-17, fas 3). Vems tider som
+   gäller och vad som ligger utanför dem räknas i `src/lib/staff-hours.ts`,
+   med tiderna ur `work-hours.ts`, se arbetstiderna ovan.
+
+   - **Egna tider går före företagets**, hela veckan. Saknas båda finns inga
+     tider, och då gäller väggklockan och dagen ritas vit. Tavlan säger då
+     "Personalen har inga arbetstider", med en länk till Arbetstider. "Inga
+     tider" och "ledig den dagen" är olika svar.
+   - **Ett pass räknas i arbetsminuter**, som en stationsruta: personens
+     raster hoppas över, och passet kapas vid midnatt med dem inräknade.
+   - **I Tjänst ritar tavlan personens tider**: stängd tid och raster i Lav
+     (`CLOSED_CLASS` i `PlanBoard`, samma som förklaringen), och gult "över"
+     när mer är planerat än dagen rymmer.
+   - **I Produktion varnar Bemanna** för pass utanför arbetstid och för pass
+     som ligger i ett annat av personens pass, även på en annan station
+     (`passWarnings`). Varningar, aldrig hinder.
 
    **TIDSLINJEN** (ändrat 2026-10-17). Var dagarna ligger, vad ett tryck
    träffar och var klockslagen står räknas på ETT ställe,

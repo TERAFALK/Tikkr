@@ -94,9 +94,9 @@ const MODULE_SURFACES: Record<string, ModuleSurface> = {
       "absence",
       "absenceReason",
       "compAdjustment",
-      "workSchedule",
-      "scheduleDay",
-      "scheduleBreak",
+      // workSchedule, scheduleDay och scheduleBreak stod här till 2026-10-17.
+      // Arbetstiderna är arbetsytans sedan dess, och läses av planeringen
+      // också. De har ett eget skyddsnät längre ner i filen.
       "holiday",
     ],
     surface: [
@@ -156,6 +156,7 @@ const MODULE_SURFACES: Record<string, ModuleSurface> = {
       "planning-modes",
       "staff-planning",
       "plan-geometry",
+      "staff-hours",
     ],
     models: [
       "station",
@@ -443,5 +444,79 @@ describe("registret och schemat säger samma sak", () => {
         `${model} saknas i TENANT_SCOPED_MODELS i src/lib/tenant.ts.`
       ).toContain(model as never);
     }
+  });
+});
+
+describe("arbetstiderna är grindade", () => {
+  // ARBETSTIDERNA ÄR ARBETSYTANS (beslutat 2026-10-17), men bara till nytta
+  // med löneunderlaget eller planeringen. Varje sida och åtgärd som rör dem
+  // ska fråga om företaget har något av tillvalen, och den här kontrollen
+  // härleder vilka filer det är, ur importen av work-hours.ts och
+  // tabellnamnen, på samma sätt som kontrollerna per modul ovan.
+  const WORK_HOURS_GUARD =
+    /await (requireWorkHours|hasWorkHours|requireModule|hasModule)\(/;
+
+  const touchesWorkHours = (source: string) =>
+    /from\s+["'](@\/lib\/work-hours|\.\/work-hours)["']/.test(source) ||
+    /\b(db|tx)\.(workSchedule|scheduleDay|scheduleBreak)\b/.test(source);
+
+  const files = [
+    ...walk(path.join(SRC, "app")),
+    ...walk(path.join(SRC, "components")),
+  ]
+    .map((full) => ({ file: relative(full), source: readFileSync(full, "utf8") }))
+    .filter(({ source }) => touchesWorkHours(source));
+
+  it("hittar sidan med företagets arbetstider", () => {
+    // Försvinner den ur listan har testet slutat granska något, och ska säga
+    // det i stället för att tystna.
+    expect(files.map(({ file }) => file)).toEqual(
+      expect.arrayContaining([
+        "app/admin/(panel)/installningar/arbetstider/page.tsx",
+        "app/admin/(panel)/installningar/arbetstider/actions.ts",
+      ])
+    );
+  });
+
+  it("varje fil som rör arbetstiderna har en vakt", () => {
+    const unguarded = files
+      .filter(({ source }) => !WORK_HOURS_GUARD.test(source))
+      .map(({ file }) => file);
+
+    expect(
+      unguarded,
+      "Dessa filer rör arbetstiderna utan att fråga om företaget har " +
+        "löneunderlaget eller planeringen. Lägg till requireWorkHours(session)."
+    ).toEqual([]);
+  });
+
+  it("varje åtgärd för arbetstiderna har vakten i samma funktion", () => {
+    const unguarded: string[] = [];
+
+    for (const { file, source } of files) {
+      if (!file.endsWith("actions.ts")) continue;
+
+      for (const block of source.split(/^export async function /m).slice(1)) {
+        const name = block.slice(0, block.indexOf("(")).trim();
+
+        if (!/await requireAdmin\(\)/.test(block)) continue;
+        if (WORK_HOURS_GUARD.test(block)) continue;
+
+        unguarded.push(`${file}: ${name}`);
+      }
+    }
+
+    expect(unguarded).toEqual([]);
+  });
+
+  it("vakten och menyn läser samma lista över tillval", () => {
+    // Menyn kör i webbläsaren och grinden på servern. Står listan på två
+    // ställen hinner de börja visa och spärra olika saker.
+    const nav = read("components/admin/SettingsNav.tsx");
+    const guard = read("lib/company-modules.ts");
+
+    expect(nav).toMatch(/WORK_HOURS_MODULES/);
+    expect(guard).toMatch(/WORK_HOURS_MODULES/);
+    expect(guard).not.toMatch(/\[\s*"PAYROLL",\s*"PLANNING"\s*\]/);
   });
 });

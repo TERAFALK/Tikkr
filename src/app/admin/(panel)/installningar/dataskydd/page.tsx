@@ -139,8 +139,8 @@ export default async function DataProtectionPage() {
           )}
           {planning && (
             <p>
-              Med planeringen registreras planerade pass per anställd: order,
-              arbetsmoment och tid.
+              Med planeringen registreras planerade pass per anställd, med
+              order, arbetsmoment och tid, och anställdas egna arbetstider.
             </p>
           )}
           <p>

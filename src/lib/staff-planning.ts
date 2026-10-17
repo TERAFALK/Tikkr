@@ -1,6 +1,13 @@
 import type { CompanyDb } from "./tenant";
 import { fitsFrom, snap, snapInstant } from "./plan-calendar";
 import { addDaysInZone, startOfWeekIn } from "./time-zone";
+import {
+  hoursForEmployee,
+  hoursOnDay,
+  loadStaffHours,
+  outsideHours,
+  overlappingPasses,
+} from "./staff-hours";
 
 /**
  * PERSONALPASSEN (tillagt 2026-10-14, fas 2 av issue #21).
@@ -36,11 +43,13 @@ import { addDaysInZone, startOfWeekIn } from "./time-zone";
  * maskiner (CLAUDE.md § 3 regel 2), och en plan som vägrar är en plan man
  * slutar använda. Tavlan varnar i gult.
  *
- * ── INGA ARBETSTIDER ÄN ──────────────────────────────────────────────────
+ * ── PERSONENS ARBETSTIDER (fas 3, 2026-10-17) ────────────────────────────
  *
- * Personalens arbetstider är fas 3. Till dess räknas ett pass i väggklockans
- * minuter, utan raster att hoppa över, och kapas vid midnatt som en
- * stationsruta. Ingen rast i passet är ett försiktigare fel än en påhittad.
+ * Ett pass räknas i ARBETSMINUTER, som en stationsruta: personens egna raster
+ * hoppas över, se staff-hours.ts. Fyra timmar som börjar 10:00 för den som har
+ * lunch 12:00–12:40 slutar 14:40. Har personen inga tider alls, varken egna
+ * eller företagets, räknas passet i väggklockans minuter. Passet kapas vid
+ * midnatt i båda fallen.
  *
  * ── ETT PASS ÄR EN PERSONUPPGIFT ─────────────────────────────────────────
  *
@@ -75,6 +84,20 @@ export interface StaffBlock {
 export interface StaffResult {
   error?: string;
   id?: string;
+}
+
+/**
+ * Personens tider den dag ett pass börjar, i den form kalendern räknar med:
+ * null när det inte finns några raster att hoppa över.
+ */
+async function dayHoursOf(
+  db: CompanyDb,
+  employeeId: string,
+  instant: Date,
+  timeZone: string
+) {
+  const set = await loadStaffHours(db);
+  return hoursOnDay(hoursForEmployee(set, employeeId), instant, timeZone) ?? null;
 }
 
 /* -------------------------------------------------------------------------- */
@@ -278,7 +301,11 @@ export async function placeStaffBlock(
   }
 
   const startsAt = snapInstant(input.startsAt, timeZone);
-  const room = fitsFrom(null, startsAt, timeZone);
+  const room = fitsFrom(
+    await dayHoursOf(db, employee.id, startsAt, timeZone),
+    startsAt,
+    timeZone
+  );
 
   if (room < 1) return { error: "Starttiden ligger för sent på dygnet." };
 
@@ -332,7 +359,11 @@ export async function moveStaffBlock(
   if (!employee.active) return { error: "Den anställda är avaktiverad." };
 
   const snapped = snapInstant(startsAt, timeZone);
-  const room = fitsFrom(null, snapped, timeZone);
+  const room = fitsFrom(
+    await dayHoursOf(db, employee.id, snapped, timeZone),
+    snapped,
+    timeZone
+  );
 
   if (room < 1) return { error: "Starttiden ligger för sent på dygnet." };
 
@@ -348,7 +379,7 @@ export async function moveStaffBlock(
   return { id: blockId };
 }
 
-/** Ändrar ett pass längd, kapad vid midnatt. */
+/** Ändrar ett pass längd, kapad vid midnatt. Rasterna räknas inte. */
 export async function resizeStaffBlock(
   db: CompanyDb,
   timeZone: string,
@@ -357,12 +388,16 @@ export async function resizeStaffBlock(
 ): Promise<StaffResult> {
   const block = await db.staffBlock.findFirst({
     where: { id: blockId },
-    select: { id: true, startsAt: true },
+    select: { id: true, employeeId: true, startsAt: true },
   });
 
   if (!block) return { error: "Passet finns inte." };
 
-  const room = fitsFrom(null, block.startsAt, timeZone);
+  const room = fitsFrom(
+    await dayHoursOf(db, block.employeeId, block.startsAt, timeZone),
+    block.startsAt,
+    timeZone
+  );
 
   await db.staffBlock.updateMany({
     where: { id: blockId },
@@ -397,4 +432,70 @@ export async function removeStaffBlock(
 ): Promise<StaffResult> {
   await db.staffBlock.deleteMany({ where: { id: blockId } });
   return {};
+}
+
+/* -------------------------------------------------------------------------- */
+/* Varningar                                                                   */
+/* -------------------------------------------------------------------------- */
+
+export interface PassWarnings {
+  /** Passet ligger, helt eller delvis, utanför personens arbetstid. */
+  outsideHours: boolean;
+  /** Personen har ett annat pass samtidigt. */
+  overlaps: boolean;
+}
+
+/**
+ * Varningarna för en uppsättning pass, per passets id.
+ *
+ * Krockar räknas mot ALLA personens pass som kan överlappa, inte bara de som
+ * skickats in: bemanningen av en stationsruta krockar lika mycket med ett pass
+ * på en annan station som med ett på samma.
+ *
+ * Bara varningar. Systemet stoppar aldrig planering för att någon jobbar över
+ * eller kör två maskiner, se CLAUDE.md § 3 regel 8.
+ */
+export async function passWarnings(
+  db: CompanyDb,
+  passes: StaffBlock[],
+  timeZone: string
+): Promise<Record<string, PassWarnings>> {
+  if (passes.length === 0) return {};
+
+  const from = new Date(Math.min(...passes.map((pass) => pass.startsAt.getTime())));
+  const to = new Date(Math.max(...passes.map((pass) => pass.startsAt.getTime())));
+
+  // Ett pass börjar och slutar samma dygn, så ett dygn åt var håll räcker för
+  // att få med varje pass som kan ligga i ett av dem.
+  const [set, neighbours] = await Promise.all([
+    loadStaffHours(db),
+    db.staffBlock.findMany({
+      where: {
+        employeeId: { in: [...new Set(passes.map((pass) => pass.employeeId))] },
+        startsAt: {
+          gte: addDaysInZone(from, -1, timeZone),
+          lt: addDaysInZone(to, 1, timeZone),
+        },
+      },
+      select: { id: true, employeeId: true, startsAt: true, minutes: true },
+    }),
+  ]);
+
+  const hoursOf = (employeeId: string) => hoursForEmployee(set, employeeId);
+  const overlapping = overlappingPasses(neighbours, hoursOf, timeZone);
+
+  return Object.fromEntries(
+    passes.map((pass) => [
+      pass.id,
+      {
+        outsideHours: outsideHours(
+          hoursOf(pass.employeeId),
+          pass.startsAt,
+          pass.minutes,
+          timeZone
+        ),
+        overlaps: overlapping.has(pass.id),
+      },
+    ])
+  );
 }
