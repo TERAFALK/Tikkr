@@ -30,6 +30,8 @@ import { formatDateTime, formatDuration } from "@/lib/format";
 import { datePresets } from "@/lib/date-presets";
 import { weekStep } from "@/lib/week-nav";
 import WeekStepper from "@/components/admin/WeekStepper";
+import Pager from "@/components/platform/Pager";
+import { pageGroups, pageRows, paging } from "@/lib/paging";
 import { customerOptions } from "@/lib/customers";
 import type { ReportResult, ReportRow } from "@/lib/report";
 import type { ReportView } from "@/lib/report-pdf";
@@ -47,6 +49,7 @@ interface SearchParams {
   kind?: string;
   /** "detalj" (standard) eller "person". */
   visning?: string;
+  sida?: string;
 }
 
 export default async function ReportsPage({
@@ -126,11 +129,39 @@ export default async function ReportsPage({
   const employeeGroups =
     view === "persondetalj" ? groupByEmployee(report.rows) : [];
 
+  // EN SIDA RADER I TAGET (ändrat 2026-10-17, issue #24). En rapport utan
+  // datum är varje stämpling arbetsytan gjort, och att rita dem alla gjorde
+  // sidan långsammare för varje vecka den användes.
+  //
+  // Bara LISTAN delas upp. Rapporten hämtas hel, och totalen, grupperna och
+  // uttaget räknas på alla rader precis som förut: en summa som ändrades av
+  // att man bläddrade vore ett fakturaunderlag ingen kunde lita på. Därför
+  // sker bläddringen här och inte i frågan i report.ts.
+  const page = paging(report.rows.length, params.sida);
+  const pageOfRows = pageRows(report.rows, page);
+  const pageOfGroups = pageGroups(employeeGroups, page);
+
+  const pageHref = (target: number) => {
+    const search = new URLSearchParams(
+      Object.entries(params).filter(
+        ([key, value]) => value && key !== "sida"
+      ) as [string, string][]
+    );
+    if (target > 1) search.set("sida", String(target));
+    const query = search.toString();
+    return query ? `/admin/rapporter?${query}` : "/admin/rapporter";
+  };
+
   // Uttaget ska innehålla det skärmen visar. Valet skrivs därför alltid ut,
   // även när det inte står i adressen — annars hade en export gjord på en
   // orörd sida saknat den improduktiva tiden som syns i tabellen.
+  //
+  // Sidnumret följer INTE med. Uttaget är hela rapporten, inte sidan man
+  // råkade stå på.
   const exportParams = new URLSearchParams(
-    Object.entries(params).filter(([, value]) => value) as [string, string][]
+    Object.entries(params).filter(
+      ([key, value]) => value && key !== "sida"
+    ) as [string, string][]
   );
   exportParams.set("kind", kind);
 
@@ -394,12 +425,14 @@ export default async function ReportsPage({
             </Card>
           ) : view === "persondetalj" ? (
             <div className="space-y-4">
-              {employeeGroups.map((group) => (
+              {pageOfGroups.map((group) => (
                 <Card key={group.heading}>
                   <CardHeader
                     title={group.heading}
-                    description={`${group.rows.length} ${
-                      group.rows.length === 1 ? "stämpling" : "stämplingar"
+                    // Hela personens antal och tid, även när bara en del av
+                    // raderna ryms på sidan. Se pageGroups.
+                    description={`${group.entries} ${
+                      group.entries === 1 ? "stämpling" : "stämplingar"
                     }`}
                     action={
                       <span className="text-[13px] font-medium tabular-nums text-neutral-900">
@@ -429,6 +462,18 @@ export default async function ReportsPage({
                   </Table>
                 </Card>
               ))}
+
+              {page.pageCount > 1 && (
+                <Card>
+                  <Pager
+                    page={page.page}
+                    pageCount={page.pageCount}
+                    total={report.rows.length}
+                    unit="stämplingar"
+                    hrefFor={pageHref}
+                  />
+                </Card>
+              )}
             </div>
           ) : (
           <Card>
@@ -447,7 +492,7 @@ export default async function ReportsPage({
                 </tr>
               </thead>
               <tbody>
-                {report.rows.map((row) => (
+                {pageOfRows.map((row) => (
                   <EntryRow
                     key={row.id}
                     row={row}
@@ -457,6 +502,14 @@ export default async function ReportsPage({
                 ))}
               </tbody>
             </Table>
+
+            <Pager
+              page={page.page}
+              pageCount={page.pageCount}
+              total={report.rows.length}
+              unit="stämplingar"
+              hrefFor={pageHref}
+            />
           </Card>
           )}
         </>
@@ -566,7 +619,7 @@ function EntryRow({
  */
 function groupByEmployee(
   rows: ReportResult["rows"]
-): { heading: string; rows: ReportRow[]; minutes: number }[] {
+): { heading: string; rows: ReportRow[]; minutes: number; entries: number }[] {
   const byEmployee = new Map<string, ReportRow[]>();
 
   for (const row of rows) {
@@ -589,5 +642,8 @@ function groupByEmployee(
         (a, b) => a.clockInAt.getTime() - b.clockInAt.getTime()
       ),
       minutes: grouped.reduce((total, row) => total + row.minutes, 0),
+      // Antalet sparas för sig. Raderna kapas till sidans, men rubriken ska
+      // fortsätta säga hur många personen har i hela urvalet.
+      entries: grouped.length,
     }));
 }

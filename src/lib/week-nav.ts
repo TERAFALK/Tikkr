@@ -56,9 +56,13 @@ export function weekStep(
   const href = (days: number) => {
     const next = new URLSearchParams();
 
+    // Sidnumret följer inte med (issue #24). Sida 4 av förra veckan säger
+    // ingenting om nästa, och följde det med hamnade man mitt i en lista.
     for (const key of Object.keys(values)) {
       const value = text(key);
-      if (value && key !== "from" && key !== "to") next.set(key, value);
+      if (value && key !== "from" && key !== "to" && key !== "sida") {
+        next.set(key, value);
+      }
     }
 
     next.set("from", shift(from, days, timeZone));
