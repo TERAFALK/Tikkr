@@ -64,6 +64,8 @@ export const TENANT_SCOPED_MODELS = [
   "StationBreak",
   "PlannedBlock",
   "StaffBlock",
+  "StaffDay",
+  "StaffBreak",
   // Tillvalen. Se company-modules.ts — skrivningarna sker via
   // unsafeGlobalPrisma, men raderna hör till kunden och filtreras därför här.
   "CompanyModule",

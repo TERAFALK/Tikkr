@@ -684,6 +684,7 @@ export const GUIDES = [
       "Produktion: öppna en ruta och tryck Bemanna för att planera en anställd på jobbet. Passet räknas inte mot beräknad tid.",
       "Tjänst: tryck på ett jobb i Oplacerat och sedan på en anställd.",
       "En anställd med två pass samtidigt markeras i gult.",
+      "Under Inställningar, Personalens arbetstider, sätts företagets tider och egna tider per anställd. Pass hoppar över rasterna, och Bemanna markerar pass utanför arbetstid.",
       "Vecka och Dag växlar mellan hela veckan och en dag i taget. Tryck på en dag i rubriken för att öppna den.",
       "Helgen är dold. Visa helg tar fram lördag och söndag, och en siffra på knappen visar hur mycket som är planerat där.",
       "Överbokning tillåts och markeras i gult.",

@@ -156,6 +156,7 @@ const MODULE_SURFACES: Record<string, ModuleSurface> = {
       "planning-modes",
       "staff-planning",
       "plan-geometry",
+      "staff-hours",
     ],
     models: [
       "station",
@@ -163,6 +164,8 @@ const MODULE_SURFACES: Record<string, ModuleSurface> = {
       "stationBreak",
       "plannedBlock",
       "staffBlock",
+      "staffDay",
+      "staffBreak",
     ],
     surface: [
       "app/admin/(panel)/planering/page.tsx",
@@ -170,6 +173,8 @@ const MODULE_SURFACES: Record<string, ModuleSurface> = {
       "app/admin/(panel)/installningar/stationer/page.tsx",
       "app/admin/(panel)/installningar/planering/page.tsx",
       "app/admin/(panel)/installningar/planering/actions.ts",
+      "app/admin/(panel)/installningar/personaltider/page.tsx",
+      "app/admin/(panel)/installningar/personaltider/actions.ts",
       "app/api/admin/plan/live/route.ts",
     ],
 
@@ -435,6 +440,8 @@ describe("registret och schemat säger samma sak", () => {
       "StationBreak",
       "PlannedBlock",
       "StaffBlock",
+      "StaffDay",
+      "StaffBreak",
     ];
 
     for (const model of required) {

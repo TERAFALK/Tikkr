@@ -122,6 +122,12 @@ const sections: SettingsSection[] = [
         description: "Maskiner och öppettider",
         icon: IconStation,
       },
+      {
+        href: "/admin/installningar/personaltider",
+        label: "Personalens arbetstider",
+        description: "Standard och egna tider",
+        icon: IconPeople,
+      },
     ],
   },
   {

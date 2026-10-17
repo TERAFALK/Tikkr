@@ -20,8 +20,10 @@ import {
   staffBlocksInWeek,
   staffFor,
   staffingOf,
+  passWarnings,
   type StaffBlock,
 } from "@/lib/staff-planning";
+import { hoursForEmployee, loadStaffHours } from "@/lib/staff-hours";
 import { isoWeekNumber } from "@/lib/week";
 import {
   addDaysInZone,
@@ -298,6 +300,15 @@ async function loadStationView(
       : Promise.resolve<Record<string, StaffBlock[]>>({}),
   ]);
 
+  // Utanför arbetstid och dubbelbokad, per bemannat pass. Personal-fliken som
+  // visade det togs bort ur Produktion, och varningarna står nu där passet
+  // läggs.
+  const warnings = await passWarnings(
+    db,
+    Object.values(staffing).flat(),
+    timeZone
+  );
+
   return {
     lanes: stations
       .filter((station) => station.active)
@@ -332,6 +343,8 @@ async function loadStationView(
           employeeName: pass.employeeName,
           startsAt: pass.startsAt.toISOString(),
           minutes: pass.minutes,
+          outsideHours: warnings[pass.id]?.outsideHours ?? false,
+          overlaps: warnings[pass.id]?.overlaps ?? false,
         })),
       ])
     ),
@@ -348,10 +361,11 @@ async function loadStaffView(
   timeZone: string,
   withUnplaced: boolean
 ): Promise<BoardData> {
-  const [staff, passes, unplaced] = await Promise.all([
+  const [staff, passes, unplaced, hours] = await Promise.all([
     staffFor(db),
     staffBlocksInWeek(db, monday, timeZone),
     withUnplaced ? unplacedWork(db, "staff") : Promise.resolve([]),
+    loadStaffHours(db),
   ]);
 
   const sequences = withUnplaced
@@ -367,7 +381,9 @@ async function loadStaffView(
       name: member.name,
       detail: member.employeeNumber,
       momentId: null,
-      hours: null,
+      // Personens egna tider eller företagets standard. Null när ingen av dem
+      // finns, och då ritas dagen vit som före fas 3.
+      hours: hoursForEmployee(hours, member.id),
     })),
     blocks: passes.map(toStaffBoardBlock),
     unplaced: unplaced.map(toBoardUnplaced),

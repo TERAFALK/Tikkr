@@ -11,6 +11,7 @@ import {
 import { formatCurrency } from "./money";
 import { describeAuditEvents } from "./audit-view";
 import { buildZip, type ZipEntry } from "./zip";
+import { dayName, formatMinuteOfDay } from "./weekly-hours";
 
 /**
  * REGISTERUTDRAG FÖR EN ANSTÄLLD (infört 2026-10-06).
@@ -66,7 +67,8 @@ export async function buildPersonExport(
 
   if (!employee) return null;
 
-  const [entries, breaks, absences, comp, passes, events] = await Promise.all([
+  const [entries, breaks, absences, comp, passes, staffDays, events] =
+    await Promise.all([
     db.timeEntry.findMany({
       where: { employeeId },
       orderBy: { clockInAt: "asc" },
@@ -100,6 +102,15 @@ export async function buildPersonExport(
       include: {
         order: { select: { orderNumber: true } },
         moment: { select: { name: true } },
+      },
+    }),
+    // Egna arbetstider i planeringen. Personens uppgifter av samma skäl som
+    // passen, och lika oberoende av om modulen är på.
+    db.staffDay.findMany({
+      where: { employeeId },
+      orderBy: { weekday: "asc" },
+      include: {
+        breaks: { orderBy: { startMinute: "asc" } },
       },
     }),
     db.auditEvent.findMany({
@@ -276,6 +287,30 @@ export async function buildPersonExport(
         duration: formatDuration(row.minutes),
         note: row.note ?? "",
         by: row.createdByEmail,
+      });
+    }
+  }
+
+  if (staffDays.length > 0) {
+    const sheet = workbook.addWorksheet("Arbetstider i planeringen");
+    sheet.columns = [
+      { header: "Dag", key: "day", width: 12 },
+      { header: "Från", key: "from", width: 10 },
+      { header: "Till", key: "to", width: 10 },
+      { header: "Raster", key: "breaks", width: 30 },
+    ];
+
+    for (const row of staffDays) {
+      sheet.addRow({
+        day: dayName(row.weekday),
+        from: formatMinuteOfDay(row.startMinute),
+        to: formatMinuteOfDay(row.endMinute),
+        breaks: row.breaks
+          .map(
+            (rest) =>
+              `${formatMinuteOfDay(rest.startMinute)}–${formatMinuteOfDay(rest.endMinute)}`
+          )
+          .join(", "),
       });
     }
   }

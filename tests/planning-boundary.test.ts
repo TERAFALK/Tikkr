@@ -44,6 +44,7 @@ const PLANNING_MODULES = [
   "planning-modes",
   "staff-planning",
   "plan-geometry",
+  "staff-hours",
 ];
 
 /** Lönemodulens. Speglar payroll-boundary.test.ts. */
@@ -283,6 +284,29 @@ describe("personalpassen är personuppgifter", () => {
 
     expect(source).toMatch(/db\.staffBlock\.findMany\(\{\s*where:\s*\{\s*employeeId\s*\}/);
     expect(source).toContain('addWorksheet("Planerade pass")');
+  });
+
+  it("anonymiseringen raderar personens egna arbetstider", () => {
+    // Att en namngiven person arbetar 07–12 säger något om hen. Företagets
+    // standard bär ingen person och står kvar.
+    expect(read("app/admin/(panel)/installningar/actions.ts")).toMatch(
+      /tx\.staffDay\.deleteMany\(\{\s*where:\s*\{\s*employeeId:\s*id\s*\}\s*\}\)/
+    );
+  });
+
+  it("registerutdraget lämnar ut personens egna arbetstider", () => {
+    const source = read("lib/person-export.ts");
+
+    expect(source).toMatch(/db\.staffDay\.findMany\(\{\s*where:\s*\{\s*employeeId\s*\}/);
+    expect(source).toContain('addWorksheet("Arbetstider i planeringen")');
+  });
+
+  it("personalens arbetstider läses aldrig ur löneunderlagets scheman", () => {
+    // Planeringens egna tabeller, av samma skäl som stationernas öppettider
+    // har sina. En kund kan ha planeringen utan löneunderlaget.
+    const source = read("lib/staff-hours.ts");
+
+    expect(source).not.toMatch(/\b(workSchedule|scheduleDay|scheduleBreak|absence)\b/);
   });
 
   it("registerutdraget frågar inte om modulen", () => {

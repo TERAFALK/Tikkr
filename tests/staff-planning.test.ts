@@ -11,6 +11,14 @@ import {
   staffingOf,
 } from "@/lib/staff-planning";
 import {
+  hoursForEmployee,
+  loadStaffHours,
+  removeOwnStaffHours,
+  saveOwnStaffHours,
+  saveStandardStaffHours,
+} from "@/lib/staff-hours";
+import { passWarnings } from "@/lib/staff-planning";
+import {
   deleteStation,
   moveBlock,
   placeBlock,
@@ -444,5 +452,112 @@ describe("raderna på tavlan", () => {
   it("är de aktiva anställda i bokstavsordning", async () => {
     const staff = await staffFor(db);
     expect(staff.map((member) => member.name)).toEqual(["Anna", "Bertil"]);
+  });
+});
+
+/* -------------------------------------------------------------------------- */
+/* Fas 3: personalens arbetstider                                              */
+/* -------------------------------------------------------------------------- */
+
+/** Mån–fre 07:00–16:00 med lunch 12:00–12:40. */
+const STANDARD = [1, 2, 3, 4, 5].map((weekday) => ({
+  weekday,
+  startMinute: 7 * 60,
+  endMinute: 16 * 60,
+  breaks: [{ startMinute: 12 * 60, endMinute: 12 * 60 + 40 }],
+}));
+
+describe("personalens arbetstider", () => {
+  it("egna tider går före standarden, och borttagna gäller standarden igen", async () => {
+    expect((await saveStandardStaffHours(db, companyId, STANDARD)).error).toBeUndefined();
+    expect(
+      (
+        await saveOwnStaffHours(db, companyId, anna, [
+          { weekday: 1, startMinute: 7 * 60, endMinute: 12 * 60, breaks: [] },
+        ])
+      ).error
+    ).toBeUndefined();
+
+    let set = await loadStaffHours(db);
+    expect(hoursForEmployee(set, anna)?.map((day) => day.weekday)).toEqual([1]);
+    expect(hoursForEmployee(set, bertil)?.length).toBe(5);
+
+    await removeOwnStaffHours(db, anna);
+    set = await loadStaffHours(db);
+    expect(hoursForEmployee(set, anna)?.length).toBe(5);
+  });
+
+  it("en ny standard skriver om den gamla och lämnar ingen dag kvar", async () => {
+    await saveStandardStaffHours(db, companyId, STANDARD);
+    await saveStandardStaffHours(db, companyId, STANDARD.slice(0, 2));
+
+    expect((await loadStaffHours(db)).standard.map((day) => day.weekday)).toEqual([1, 2]);
+  });
+
+  it("egna tider kräver minst en dag", async () => {
+    expect((await saveOwnStaffHours(db, companyId, anna, [])).error).toBe(
+      "Kryssa i minst en dag."
+    );
+  });
+
+  it("en person hos ett annat företag går inte att ge tider", async () => {
+    expect((await saveOwnStaffHours(db, companyId, theirEmployee, STANDARD)).error).toBe(
+      "Den anställda finns inte."
+    );
+    expect((await removeOwnStaffHours(db, theirEmployee)).error).toBe(
+      "Den anställda finns inte."
+    );
+  });
+
+  it("grannens standard syns inte", async () => {
+    await saveStandardStaffHours(forCompany(otherCompanyId), otherCompanyId, STANDARD);
+
+    expect((await loadStaffHours(db)).standard).toEqual([]);
+  });
+
+  it("ett pass kapas vid midnatt med personens raster inräknade", async () => {
+    // Måndag 21:00–24:00 med en rast 22:00–23:00 rymmer två timmars arbete.
+    // Utan tider hade det rymts tre.
+    await saveStandardStaffHours(db, companyId, [
+      {
+        weekday: 1,
+        startMinute: 7 * 60,
+        endMinute: 23 * 60,
+        breaks: [{ startMinute: 22 * 60, endMinute: 23 * 60 }],
+      },
+    ]);
+
+    const result = await pass({ startsAt: at(21), minutes: 240 });
+    expect(result.error).toBeUndefined();
+
+    const [placed] = await staffBlocksInWeek(db, MONDAY, SE);
+    expect(placed.minutes).toBe(120);
+  });
+
+  it("varnar för pass utanför arbetstid och för dubbelbokning", async () => {
+    await saveStandardStaffHours(db, companyId, STANDARD);
+
+    const early = await pass({ startsAt: at(6), minutes: 60 });
+    const first = await pass({ startsAt: at(9), minutes: 120 });
+    const second = await pass({ startsAt: at(10), minutes: 60, momentId: svetsning });
+
+    const week = await staffBlocksInWeek(db, MONDAY, SE);
+    const warnings = await passWarnings(db, week, SE);
+
+    expect(warnings[early.id!]).toEqual({ outsideHours: true, overlaps: false });
+    expect(warnings[first.id!]).toEqual({ outsideHours: false, overlaps: true });
+    expect(warnings[second.id!]).toEqual({ outsideHours: false, overlaps: true });
+  });
+
+  it("en bemanning krockar med personens pass på en annan station", async () => {
+    // Krockar räknas mot alla personens pass, inte bara de som skickas in.
+    const blockId = await stationBlock(at(8), 240);
+    const staffing = await pass({ plannedBlockId: blockId, startsAt: at(8), minutes: 120 });
+    await pass({ startsAt: at(9), minutes: 60, momentId: svetsning });
+
+    const passes = (await staffingOf(db, [blockId]))[blockId];
+    const warnings = await passWarnings(db, passes, SE);
+
+    expect(warnings[staffing.id!].overlaps).toBe(true);
   });
 });
