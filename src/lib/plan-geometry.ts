@@ -29,19 +29,13 @@
 export const DAY_BORDER = 2;
 
 /**
- * Bredden på en hopfälld helgdag. Rymmer "Lör" och datumet, och är ett tryck
- * stort nog att träffa med fingret.
- */
-export const COLLAPSED_DAY_WIDTH = 56;
-
-/**
  * Minsta skalan, i pixlar per minut. Under den rullar tavlan i sidled.
  *
  * LÅGT MED FLIT (ändrat 2026-10-17, var 0,25). Veckovyn är till för att se
- * hela veckan, och den som behöver läsa en timme byter till Dag. Med axeln
- * 06–18 och en utfälld helgdag behövde veckan 1 300 pixlar vid 0,25, och på en
- * vanlig skärm hamnade söndagen utanför kanten. Vid 0,12 ryms sju hela dagar
- * på drygt 900 pixlar; en telefon rullar fortfarande, och har dagvyn.
+ * hela veckan, och den som behöver läsa en timme byter till Dag. Sju dagar med
+ * axeln 06–18 behövde 1 400 pixlar vid 0,25, och på en vanlig skärm hamnade
+ * söndagen utanför kanten. Vid 0,12 ryms de på drygt 750 pixlar; en telefon
+ * rullar fortfarande, och har dagvyn.
  */
 export const WEEK_SCALE_FLOOR = 0.12;
 
@@ -57,8 +51,6 @@ export interface DayAxis {
 export interface DayPlan {
   /** Veckodagen, noll är måndag. */
   index: number;
-  /** En hopfälld dag har ingen tidslinje, bara sin rubrik. */
-  collapsed: boolean;
 }
 
 export interface DayColumn extends DayPlan {
@@ -69,36 +61,17 @@ export interface DayColumn extends DayPlan {
 }
 
 /**
- * Vilka dagar som ritas, och vilka som är hopfällda.
+ * Vilka dagar som ritas: hela veckan, eller den valda dagen i dagvyn.
  *
- * HELGEN ÄR ALLTID MED (ändrat 2026-10-17). Den doldes när ingen station gick
- * och inget låg där, och en vecka som pågick en lördag visade då varken dagen
- * eller vad klockan var. Nu står lördag och söndag som smala kolumner, och
- * blir breda när något planerats där, när en resurs har tider där eller när
- * det är den dagen.
- *
- * En vald dag ger bara den dagen: dagvyn.
+ * ALLA SJU, ALLTID SOM HELA DAGAR (ändrat 2026-10-17). Helgen doldes först
+ * när ingen station gick och inget låg där, och en vecka som pågick en lördag
+ * visade då varken dagen eller vad klockan var. Därefter stod en tom helgdag
+ * som en smal kolumn utan tidslinje, och den såg avkapad ut bredvid en hel dag.
+ * En dag är en dag, oavsett om något ligger där.
  */
-export function plannedDays(input: {
-  /** Per veckodag: någon resurs har tider den dagen. */
-  open: boolean[];
-  /** Per veckodag: något ligger planerat den dagen. */
-  used: boolean[];
-  /** Dagens veckodag, när veckan pågår. */
-  todayIndex: number | null;
-  /** Den valda dagen i dagvyn, annars null. */
-  focus: number | null;
-}): DayPlan[] {
-  if (input.focus !== null) return [{ index: input.focus, collapsed: false }];
-
-  return [0, 1, 2, 3, 4, 5, 6].map((index) => ({
-    index,
-    collapsed:
-      index >= 5 &&
-      !input.open[index] &&
-      !input.used[index] &&
-      input.todayIndex !== index,
-  }));
+export function plannedDays(focus: number | null): DayPlan[] {
+  if (focus !== null) return [{ index: focus }];
+  return [0, 1, 2, 3, 4, 5, 6].map((index) => ({ index }));
 }
 
 /** Minuterna dagens axel spänner över. */
@@ -109,9 +82,9 @@ export function axisMinutes(axis: DayAxis): number {
 /**
  * Skalan, i pixlar per minut, som fyller den bredd som finns.
  *
- * Hopfällda dagar och skiljelinjerna tar sin bredd först, och resten delas av
- * de öppna dagarna efter hur många minuter de spänner över. Under golvet blir
- * en timme smalare än ett ordernummer, och då rullar tavlan i sidled i stället.
+ * Skiljelinjerna tar sin bredd först, och resten delas av dagarna efter hur
+ * många minuter de spänner över. Under golvet blir en timme smalare än ett
+ * ordernummer, och då rullar tavlan i sidled i stället.
  */
 export function fitScale(input: {
   available: number;
@@ -119,16 +92,12 @@ export function fitScale(input: {
   axisOf: (index: number) => DayAxis;
   floor: number;
 }): number {
-  const collapsed = input.plans.filter((plan) => plan.collapsed).length;
+  const minutes = input.plans.reduce(
+    (total, plan) => total + axisMinutes(input.axisOf(plan.index)),
+    0
+  );
 
-  const minutes = input.plans
-    .filter((plan) => !plan.collapsed)
-    .reduce((total, plan) => total + axisMinutes(input.axisOf(plan.index)), 0);
-
-  const usable =
-    input.available -
-    input.plans.length * DAY_BORDER -
-    collapsed * COLLAPSED_DAY_WIDTH;
+  const usable = input.available - input.plans.length * DAY_BORDER;
 
   if (minutes === 0 || usable <= 0) return input.floor;
 
@@ -145,9 +114,9 @@ export function fitScale(input: {
  *
  * DET SOM BLIR ÖVER DELAS UT (ändrat 2026-10-17). Nedåt gav i stället upp
  * till en pixel för lite per dag, och raderna slutade före tavlans kant med en
- * vit strimma efter söndagen. Med `available` får de öppna dagarna en pixel
- * var, från måndag, tills bredden är fylld. Ryms veckan inte alls, under
- * golvet, finns ingenting över och ingenting delas ut.
+ * vit strimma efter söndagen. Med `available` får dagarna en pixel var, från
+ * måndag, tills bredden är fylld. Ryms veckan inte alls, under golvet, finns
+ * ingenting över och ingenting delas ut.
  */
 export function layoutDays(
   plans: DayPlan[],
@@ -156,9 +125,7 @@ export function layoutDays(
   available?: number
 ): DayColumn[] {
   const widths = plans.map((plan) =>
-    plan.collapsed
-      ? COLLAPSED_DAY_WIDTH
-      : Math.floor(axisMinutes(axisOf(plan.index)) * pxPerMinute)
+    Math.floor(axisMinutes(axisOf(plan.index)) * pxPerMinute)
   );
 
   const used =
@@ -166,18 +133,17 @@ export function layoutDays(
     plans.length * DAY_BORDER;
 
   let spare = available === undefined ? 0 : available - used;
-  const open = plans.filter((plan) => !plan.collapsed).length;
 
   // Bara avrundningens rester, aldrig mer än en pixel per dag. Något större
   // vore ett fel i skalan, och då ska det synas i stället för att smetas ut.
-  if (spare < 0 || spare > open) spare = 0;
+  if (spare < 0 || spare > plans.length) spare = 0;
 
   let x = 0;
 
   return plans.map((plan, index) => {
     let width = widths[index];
 
-    if (!plan.collapsed && spare > 0) {
+    if (spare > 0) {
       width += 1;
       spare -= 1;
     }
@@ -198,7 +164,7 @@ export function layoutWidth(columns: DayColumn[]): number {
 
 /**
  * Den dag och den minut ett x-läge träffar, räknat från tidslinjens
- * vänsterkant. Skiljelinjerna och hopfällda dagar träffar ingenting.
+ * vänsterkant. Skiljelinjerna träffar ingenting.
  *
  * Minuten är snäppt till `snap` och ligger alltid inom dagens axel: ett tryck
  * på dagens sista pixel är dagens sista kvart, inte nästa dags första.
@@ -211,7 +177,7 @@ export function dayAt(
   snap: number
 ): { index: number; minute: number } | null {
   const column = columns.find(
-    (item) => !item.collapsed && x >= item.left && x < item.left + item.width
+    (item) => x >= item.left && x < item.left + item.width
   );
 
   if (!column) return null;

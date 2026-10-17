@@ -1,6 +1,5 @@
 import { describe, it, expect } from "vitest";
 import {
-  COLLAPSED_DAY_WIDTH,
   DAY_BORDER,
   WEEK_SCALE_FLOOR,
   axisLabels,
@@ -25,45 +24,18 @@ import {
 
 const DAY: DayAxis = { startMinute: 6 * 60, endMinute: 18 * 60 };
 const axisOf = () => DAY;
-const WEEKDAYS = [0, 1, 2, 3, 4].map((index) => ({ index, collapsed: false }));
+const WEEKDAYS = [0, 1, 2, 3, 4].map((index) => ({ index }));
+const WEEK = [0, 1, 2, 3, 4, 5, 6].map((index) => ({ index }));
 
 describe("vilka dagar som ritas", () => {
-  const none = [false, false, false, false, false, false, false];
-
-  it("helgen är alltid med, hopfälld när den är tom", () => {
-    const plans = plannedDays({ open: none, used: none, todayIndex: null, focus: null });
-
-    expect(plans.map((plan) => plan.index)).toEqual([0, 1, 2, 3, 4, 5, 6]);
-    expect(plans.filter((plan) => plan.collapsed).map((plan) => plan.index)).toEqual([5, 6]);
-  });
-
-  it("en helgdag fälls ut när det är den dagen", () => {
-    // En vecka som pågår en lördag ska visa lördagen.
-    const plans = plannedDays({ open: none, used: none, todayIndex: 5, focus: null });
-    expect(plans[5].collapsed).toBe(false);
-    expect(plans[6].collapsed).toBe(true);
-  });
-
-  it("en helgdag fälls ut när något ligger där eller någon har tider", () => {
-    const used = [...none];
-    used[6] = true;
-    const open = [...none];
-    open[5] = true;
-
-    const plans = plannedDays({ open, used, todayIndex: null, focus: null });
-    expect(plans[5].collapsed).toBe(false);
-    expect(plans[6].collapsed).toBe(false);
-  });
-
-  it("en vardag fälls aldrig ihop", () => {
-    const plans = plannedDays({ open: none, used: none, todayIndex: null, focus: null });
-    expect(plans.slice(0, 5).every((plan) => !plan.collapsed)).toBe(true);
+  it("alla sju, som hela dagar", () => {
+    // En tom helgdag stod som en smal kolumn utan tidslinje, och såg avkapad
+    // ut bredvid en hel dag (ändrat 2026-10-17).
+    expect(plannedDays(null)).toEqual(WEEK);
   });
 
   it("dagvyn visar bara den valda dagen", () => {
-    expect(plannedDays({ open: none, used: none, todayIndex: 2, focus: 6 })).toEqual([
-      { index: 6, collapsed: false },
-    ]);
+    expect(plannedDays(6)).toEqual([{ index: 6 }]);
   });
 });
 
@@ -77,49 +49,35 @@ describe("var dagarna ligger", () => {
     expect(layoutWidth(columns)).toBe(5 * (DAY_BORDER + 360));
   });
 
-  it("en hopfälld dag har sin egen bredd", () => {
-    const columns = layoutDays(
-      [...WEEKDAYS, { index: 5, collapsed: true }],
-      axisOf,
-      0.5
-    );
-
-    expect(columns[5].width).toBe(COLLAPSED_DAY_WIDTH);
-  });
-
   it("bredderna är hela pixlar", () => {
     const columns = layoutDays(WEEKDAYS, axisOf, 0.333);
     expect(columns.every((column) => Number.isInteger(column.width))).toBe(true);
   });
 
-  it("skalan fyller bredden, skiljelinjer och hopfällda dagar inräknade", () => {
-    const plans = [...WEEKDAYS, { index: 5, collapsed: true }, { index: 6, collapsed: true }];
-    const available = 5 * 720 * 0.5 + 7 * DAY_BORDER + 2 * COLLAPSED_DAY_WIDTH;
+  it("skalan fyller bredden, skiljelinjerna inräknade", () => {
+    const available = 7 * 720 * 0.5 + 7 * DAY_BORDER;
 
-    const scale = fitScale({ available, plans, axisOf, floor: 0.1 });
+    const scale = fitScale({ available, plans: WEEK, axisOf, floor: 0.1 });
     expect(scale).toBeCloseTo(0.5);
-    expect(layoutWidth(layoutDays(plans, axisOf, scale))).toBeLessThanOrEqual(available);
+    expect(layoutWidth(layoutDays(WEEK, axisOf, scale, available))).toBe(available);
   });
 
   it("en hel vecka ryms på en vanlig skärm, utan rullning", () => {
-    // Felet 2026-10-17: med axeln 06–18 och lördagen utfälld blev veckan
-    // bredare än skärmen, golvet slog till, och söndagen hamnade utanför
-    // kanten. En tavla på 1100 pixlar, varav 160 är namnkolumnen.
+    // Felet 2026-10-17: med axeln 06–18 och helgen med blev veckan bredare
+    // än skärmen, golvet slog till, och söndagen hamnade utanför kanten. En
+    // tavla på 1100 pixlar, varav 160 är namnkolumnen.
     const available = 1100 - 160;
-    const allDays = [0, 1, 2, 3, 4, 5, 6].map((index) => ({ index, collapsed: false }));
 
-    const scale = fitScale({ available, plans: allDays, axisOf, floor: WEEK_SCALE_FLOOR });
-    expect(layoutWidth(layoutDays(allDays, axisOf, scale))).toBeLessThanOrEqual(available);
+    const scale = fitScale({ available, plans: WEEK, axisOf, floor: WEEK_SCALE_FLOOR });
+    expect(layoutWidth(layoutDays(WEEK, axisOf, scale, available))).toBe(available);
   });
 
   it("avrundningen gör aldrig veckan bredare än bredden", () => {
     // Varje dag avrundad uppåt gav upp till en pixel för mycket per dag, och
     // en rullningslist för fem pixlar.
-    const plans = [...WEEKDAYS, { index: 5, collapsed: true }, { index: 6, collapsed: true }];
-
     for (const available of [701, 913, 1037, 1281, 1499]) {
-      const scale = fitScale({ available, plans, axisOf, floor: 0.01 });
-      const width = layoutWidth(layoutDays(plans, axisOf, scale, available));
+      const scale = fitScale({ available, plans: WEEK, axisOf, floor: 0.01 });
+      const width = layoutWidth(layoutDays(WEEK, axisOf, scale, available));
 
       expect(width).toBeLessThanOrEqual(available);
     }
@@ -129,15 +87,13 @@ describe("var dagarna ligger", () => {
     // Nedåt avrundat blev det upp till en pixel över per dag, och raderna
     // slutade före tavlans kant med en vit strimma efter söndagen. Pixlarna
     // som blir över delas ut på dagarna, en var.
-    const plans = [...WEEKDAYS, { index: 5, collapsed: false }, { index: 6, collapsed: true }];
-
     for (const available of [701, 913, 1037, 1281, 1499]) {
-      const scale = fitScale({ available, plans, axisOf, floor: 0.01 });
-      const columns = layoutDays(plans, axisOf, scale, available);
+      const scale = fitScale({ available, plans: WEEK, axisOf, floor: 0.01 });
+      const columns = layoutDays(WEEK, axisOf, scale, available);
 
       expect(layoutWidth(columns)).toBe(available);
       // Ingen dag får mer än en pixel extra.
-      const widths = columns.filter((column) => !column.collapsed).map((column) => column.width);
+      const widths = columns.map((column) => column.width);
       expect(Math.max(...widths) - Math.min(...widths)).toBeLessThanOrEqual(1);
     }
   });
@@ -189,13 +145,11 @@ describe("vad ett tryck träffar", () => {
     expect(dayAt(columns, columns[1].left - 1, axisOf, scale, 15)).toBeNull();
   });
 
-  it("en hopfälld dag tar inte emot ett jobb", () => {
-    const withWeekend = layoutDays(
-      [...WEEKDAYS, { index: 5, collapsed: true }],
-      axisOf,
-      scale
-    );
-    expect(dayAt(withWeekend, withWeekend[5].left + 10, axisOf, scale, 15)).toBeNull();
+  it("söndagens sista pixel är söndag", () => {
+    const week = layoutDays(WEEK, axisOf, scale);
+    const last = week[6].left + week[6].width - 1;
+
+    expect(dayAt(week, last, axisOf, scale, 15)?.index).toBe(6);
   });
 });
 

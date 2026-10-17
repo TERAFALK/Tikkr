@@ -112,9 +112,9 @@ import {
  *
  * ── VECKA OCH DAG (ändrat 2026-10-17) ────────────────────────────────────
  *
- * Vecka lägger hela veckan i den bredd som finns, med helgen hopfälld när den
- * är tom. Dag lägger en dag i full bredd, och är vägen till läsbara timmar och
- * till en tavla som går att använda på en telefon. Den valda dagen står i
+ * Vecka lägger alla sju dagar i den bredd som finns. Dag lägger en dag i full
+ * bredd, och är vägen till läsbara timmar och till en tavla som går att
+ * använda på en telefon. Den valda dagen står i
  * adressfältet som `dag`, så att den överlever en omritning och ett bokmärke.
  * Dagen ersatte zoomknapparna, som förstorade hela veckan och lämnade resten
  * av den utanför kanten.
@@ -504,26 +504,12 @@ export default function PlanBoard({
   );
 
   /**
-   * Vilka dagar som ritas. Hela veckan, med helgen hopfälld när den är tom, eller
-   * bara den valda dagen. Se plannedDays i lib/plan-geometry.ts.
+   * Vilka dagar som ritas: alla sju, eller bara den valda dagen. Se
+   * plannedDays i lib/plan-geometry.ts.
    */
-  const plans = useMemo(() => {
-    const open = [0, 1, 2, 3, 4, 5, 6].map((index) =>
-      lanes.some((lane) => lane.hours?.some((day) => day.weekday === index + 1))
-    );
+  const plans = useMemo(() => plannedDays(focusIndex), [focusIndex]);
 
-    const used = [0, 1, 2, 3, 4, 5, 6].map((index) =>
-      blocks.some((block) => dayIndexOf(new Date(block.startsAt), days) === index)
-    );
-
-    return plannedDays({ open, used, todayIndex, focus: focusIndex });
-  }, [blocks, days, focusIndex, lanes, todayIndex]);
-
-  /** De dagar som har en tidslinje. */
-  const visibleDays = useMemo(
-    () => plans.filter((plan) => !plan.collapsed).map((plan) => plan.index),
-    [plans]
-  );
+  const visibleDays = useMemo(() => plans.map((plan) => plan.index), [plans]);
 
   /**
    * Tidsaxeln per dag.
@@ -639,7 +625,7 @@ export default function PlanBoard({
   const dayOffset = useCallback(
     (dayIndex: number) => {
       const column = columns.find(
-        (item) => item.index === dayIndex && !item.collapsed
+        (item) => item.index === dayIndex
       );
       return column ? STATION_COLUMN + column.left : null;
     },
@@ -1402,26 +1388,7 @@ export default function PlanBoard({
               {columns.map((column) => {
                 const isToday = column.index === todayIndex;
 
-                return column.collapsed ? (
-                  <button
-                    key={column.index}
-                    type="button"
-                    onClick={() => show(dayKeys[column.index])}
-                    style={{ width: column.width + DAY_BORDER }}
-                    className="shrink-0 border-l-2 border-neutral-200 py-2 text-center hover:bg-neutral-100"
-                  >
-                    <span
-                      className={`block text-[13px] font-medium ${
-                        isToday ? "text-tick-deep" : "text-neutral-900"
-                      }`}
-                    >
-                      {DAY_SHORT[column.index]}
-                    </span>
-                    <span className="block text-[11px] text-neutral-400">
-                      {dayLabel(days[column.index], timeZone)}
-                    </span>
-                  </button>
-                ) : (
+                return (
                   <div
                     key={column.index}
                     style={{ width: column.width + DAY_BORDER }}
@@ -1536,20 +1503,6 @@ export default function PlanBoard({
 
                     {columns.map((column) => {
                       const dayIndex = column.index;
-
-                      if (column.collapsed) {
-                        // En hopfälld helgdag. Ett tryck öppnar dagen, som
-                        // rubriken ovanför gör.
-                        return (
-                          <div
-                            key={dayIndex}
-                            aria-hidden="true"
-                            onClick={() => show(dayKeys[dayIndex])}
-                            style={{ width: column.width + DAY_BORDER }}
-                            className="shrink-0 cursor-pointer border-l-2 border-neutral-200 bg-neutral-100/70"
-                          />
-                        );
-                      }
 
                       return (
                       <DayCell

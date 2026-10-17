@@ -905,19 +905,20 @@ stripe_prices    — item, month_price_id, year_price_id, updated_by_email
    - **Axeln visar alltid minst 06–18** och en timme kring resursernas tider
      (`dayWindow`). Den slutade där stationen stängde, och då gick det inte att
      trycka in ett jobb 17:00, fast överbokning är tillåten.
-   - **Helgen är alltid med**, hopfälld när den är tom, och utfälld när något
-     ligger där, någon har tider där eller det är den dagen. En vecka som
-     pågick en lördag visade varken dagen eller linjen för nu.
+   - **Alla sju dagar visas, alltid som hela dagar.** Helgen doldes när den
+     var tom, och en vecka som pågick en lördag visade varken dagen eller
+     linjen för nu. En kort tid stod en tom helgdag som en smal kolumn utan
+     tidslinje, och den såg avkapad ut bredvid en hel dag.
    - **Vecka och Dag ersätter zoomknapparna.** Dag lägger en dag i full bredd
      och står i adressfältet som `dag`. Ett tryck på en dag i rubriken öppnar
      den, och pilarna går över veckans kant.
    - **Linjen för nu går på webbläsarens klocka**, och syns därför i båda
      vyerna och för personalen.
    - **Veckan ryms i skärmens bredd.** Golvet för skalan är lågt
-     (`WEEK_SCALE_FLOOR`, 0,12 pixlar per minut) och dagarnas bredder avrundas
-     nedåt. Med 0,25 behövde en vecka med axeln 06–18 och en utfälld lördag
-     1 300 pixlar, och söndagen hamnade utanför kanten. Den som behöver läsa
-     timmarna byter till Dag.
+     (`WEEK_SCALE_FLOOR`, 0,12 pixlar per minut), dagarnas bredder avrundas
+     nedåt och det som blir över delas ut en pixel per dag. Med 0,25 behövde
+     sju dagar med axeln 06–18 1 400 pixlar, och söndagen hamnade utanför
+     kanten. Den som behöver läsa timmarna byter till Dag.
 
    **ETT PERSONALPASS ÄR EN PERSONUPPGIFT**, till skillnad från en
    stationsruta: det säger var en namngiven person ska vara och när.
