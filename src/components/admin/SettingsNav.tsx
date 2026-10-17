@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import type { ModuleKey } from "@/lib/modules";
+import { WORK_HOURS_MODULES, type ModuleKey } from "@/lib/modules";
 import {
   IconBroom,
   IconBuilding,
@@ -46,6 +46,8 @@ interface SettingsPage {
   description: string;
   icon: React.ComponentType<React.SVGProps<SVGSVGElement>>;
   exact?: boolean;
+  /** Sidan visas bara med något av dessa tillval. Utelämnad betyder alltid. */
+  anyModule?: readonly ModuleKey[];
 }
 
 interface SettingsSection {
@@ -71,6 +73,15 @@ const sections: SettingsSection[] = [
         label: "Tid och automatik",
         description: "Tidszon och utstämpling",
         icon: IconClock,
+      },
+      {
+        // Arbetsytans och inte ett tillvals sedan 2026-10-17, men bara till
+        // nytta med löneunderlaget eller planeringen. Se work-hours.ts.
+        href: "/admin/installningar/arbetstider",
+        label: "Arbetstider",
+        description: "Schema och raster",
+        icon: IconTimeline,
+        anyModule: WORK_HOURS_MODULES,
       },
       {
         href: "/admin/installningar/prenumeration",
@@ -122,12 +133,6 @@ const sections: SettingsSection[] = [
         description: "Maskiner och öppettider",
         icon: IconStation,
       },
-      {
-        href: "/admin/installningar/personaltider",
-        label: "Personalens arbetstider",
-        description: "Standard och egna tider",
-        icon: IconPeople,
-      },
     ],
   },
   {
@@ -136,8 +141,8 @@ const sections: SettingsSection[] = [
     pages: [
       {
         href: "/admin/installningar/schema",
-        label: "Arbetstider",
-        description: "Schema och raster",
+        label: "Raster",
+        description: "Rasttyper på skärmen",
         icon: IconTimeline,
       },
       {
@@ -188,9 +193,15 @@ const sections: SettingsSection[] = [
 export default function SettingsNav({ modules }: { modules: ModuleKey[] }) {
   const pathname = usePathname();
 
-  const visible = sections.filter(
-    (section) => !section.module || modules.includes(section.module)
-  );
+  const visible = sections
+    .filter((section) => !section.module || modules.includes(section.module))
+    .map((section) => ({
+      ...section,
+      pages: section.pages.filter(
+        (page) =>
+          !page.anyModule || page.anyModule.some((key) => modules.includes(key))
+      ),
+    }));
 
   return (
     <nav className="mb-6 lg:mb-0 lg:w-56 lg:shrink-0">

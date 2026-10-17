@@ -5,6 +5,7 @@ import {
   type WeekdayHours,
 } from "./weekly-hours";
 import { addDaysInZone } from "./time-zone";
+import { loadWorkSchedules } from "./work-hours";
 
 /**
  * ARBETSTIDSSCHEMAT — PLANERAD TID.
@@ -122,55 +123,31 @@ export async function schedulesForEmployees(
   db: CompanyDb,
   employeeIds: string[]
 ): Promise<Map<string, Schedule | null>> {
-  const [employees, schedules] = await Promise.all([
-    db.employee.findMany({
-      where: { id: { in: employeeIds } },
-      select: { id: true, scheduleId: true, hourly: true },
-    }),
-    db.workSchedule.findMany({
-      select: {
-        id: true,
-        name: true,
-        isDefault: true,
-        days: {
-          select: {
-            weekday: true,
-            startMinute: true,
-            endMinute: true,
-            breaks: {
-              select: {
-                startMinute: true,
-                endMinute: true,
-                breakTypeId: true,
-              },
-            },
-          },
-        },
-      },
-    }),
-  ]);
-
-  const byId = new Map<string, Schedule>(
-    schedules.map((s) => [s.id, { id: s.id, name: s.name, days: s.days }])
+  // Tabellerna läses på ett ställe, i work-hours.ts, som planeringen också
+  // läser. Bara regeln om den timanställda är lönens egen.
+  const { schedules, defaultId, employees } = await loadWorkSchedules(
+    db,
+    employeeIds
   );
 
-  const fallback = schedules.find((s) => s.isDefault);
-  const fallbackSchedule = fallback ? byId.get(fallback.id) ?? null : null;
+  const fallbackSchedule = defaultId ? schedules.get(defaultId) ?? null : null;
 
   const result = new Map<string, Schedule | null>();
 
-  for (const employee of employees) {
+  for (const [id, employee] of employees) {
     // TIMANSTÄLLD MÄTS INTE MOT NÅGOT SCHEMA, inte ens företagets. Hen har
     // inte lovat några timmar, och föll förut tillbaka på standardschemat —
     // alltså 40 timmar planerat i veckan och ett flexsaldo som sjönk med
     // varje timme hen inte arbetat. Se Employee.hourly.
     if (employee.hourly) {
-      result.set(employee.id, null);
+      result.set(id, null);
       continue;
     }
 
-    const own = employee.scheduleId ? byId.get(employee.scheduleId) : undefined;
-    result.set(employee.id, own ?? fallbackSchedule);
+    const own = employee.scheduleId
+      ? schedules.get(employee.scheduleId)
+      : undefined;
+    result.set(id, own ?? fallbackSchedule);
   }
 
   return result;
@@ -196,168 +173,12 @@ export function daysInPeriod(
   return days;
 }
 
-/* --- Egna arbetstider per anställd ----------------------------------------
+/* --- Egna arbetstider och företagets schema ligger i work-hours.ts --------
  *
- * De flesta i en verkstad går på samma tider, och därför är företagets
- * standardschema det normala. Men alla gör det inte: en deltid, en som börjar
- * fem för att hinna hem, en lärling som går halva fredagen. Utan egna tider
- * mäts deras flex mot någon annans dag, och då visar saldot fel varje vecka.
- *
- * Personens tider lagras som ETT VANLIGT SCHEMA som bara hen är kopplad till.
- * Formen fanns redan i datamodellen (`Employee.scheduleId`), och beräkningen
- * behövde därför inte ändras alls: `schedulesForEmployees` tar personens eget
- * schema om det finns och standardschemat annars. */
+ * Arbetstiderna är ARBETSYTANS sedan 2026-10-17 och inte löneunderlagets:
+ * planeringen gråmarkerar och varnar efter samma tider som flexen mäts mot.
+ * Läsningen och skrivningen flyttade därför till en neutral fil, som båda
+ * tillvalen läser. Namnen exporteras om här, så att lönekoden läser sitt schema
+ * där den alltid gjort det. */
 
-/**
- * Namnet ett personligt schema får.
- *
- * Syns ingenstans i gränssnittet. Namn måste vara unika per företag, och två
- * anställda kan heta samma sak — därför id:t och inte namnet.
- */
-function personalScheduleName(employeeId: string): string {
-  return `employee:${employeeId}`;
-}
-
-/**
- * De egna tiderna för var och en i listan.
- *
- * Saknas personen i kartan går hen på företagets standard. En tom lista
- * förekommer inte: ett schema utan dagar raderas i stället för att sparas.
- */
-export async function ownScheduleDays(
-  db: CompanyDb,
-  employeeIds: string[]
-): Promise<Map<string, ScheduleDayInput[]>> {
-  const result = new Map<string, ScheduleDayInput[]>();
-  if (employeeIds.length === 0) return result;
-
-  const [employees, schedules] = await Promise.all([
-    db.employee.findMany({
-      where: { id: { in: employeeIds }, NOT: { scheduleId: null } },
-      select: { id: true, scheduleId: true },
-    }),
-    // Bara de personliga. Standardschemat hör till företaget, och skulle det
-    // dyka upp här såg det ut som att varje anställd har egna tider.
-    db.workSchedule.findMany({
-      where: { isDefault: false },
-      select: {
-        id: true,
-        days: {
-          orderBy: { weekday: "asc" },
-          select: {
-            weekday: true,
-            startMinute: true,
-            endMinute: true,
-            breaks: {
-              orderBy: { startMinute: "asc" },
-              select: { startMinute: true, endMinute: true },
-            },
-          },
-        },
-      },
-    }),
-  ]);
-
-  // Typargumenten skrivs ut. Utan dem tolkas paren i map() som en vanlig
-  // array och inte som tupler, och Map-konstruktorn vägrar ta emot dem.
-  const byId = new Map<string, ScheduleDayInput[]>(
-    schedules.map((schedule) => [schedule.id, schedule.days])
-  );
-
-  for (const employee of employees) {
-    const days = employee.scheduleId ? byId.get(employee.scheduleId) : undefined;
-    if (days) result.set(employee.id, days);
-  }
-
-  return result;
-}
-
-/**
- * Skriver en anställds egna tider.
- *
- * Tomma dagar betyder att personen ska gå på företagets standard igen, och då
- * raderas det personliga schemat. Raden ÄR tillståndet, samma princip som för
- * tillvalen: ett "eget schema utan dagar" vore ett andra sätt att uttrycka
- * standard, och två sätt hinner alltid börja säga olika saker.
- *
- * Företagets standardschema rörs aldrig härifrån. Skulle en anställd vara
- * kopplad till det lämnas kopplingen som den är.
- */
-export async function saveOwnScheduleDays(
-  db: CompanyDb,
-  companyId: string,
-  employeeId: string,
-  days: ScheduleDayInput[]
-): Promise<void> {
-  const employee = await db.employee.findFirst({
-    where: { id: employeeId },
-    select: { id: true, scheduleId: true },
-  });
-
-  // Hör personen till ett annat företag gav företagsfiltret ingen träff, och
-  // då ska ingenting skrivas.
-  if (!employee) return;
-
-  const own = employee.scheduleId
-    ? await db.workSchedule.findFirst({
-        where: { id: employee.scheduleId, isDefault: false },
-        select: { id: true },
-      })
-    : null;
-
-  if (days.length === 0) {
-    if (!own) return;
-
-    // Kopplingen nollställs av databasen när schemat försvinner
-    // (onDelete: SetNull), men vi gör det uttryckligen ändå: en kod som litar
-    // på en regel i schemat går sönder tyst den dag regeln ändras.
-    await db.employee.updateMany({
-      where: { id: employeeId },
-      data: { scheduleId: null },
-    });
-    await db.workSchedule.deleteMany({ where: { id: own.id, isDefault: false } });
-    return;
-  }
-
-  const scheduleId =
-    own?.id ??
-    (
-      await db.workSchedule.create({
-        data: {
-          companyId,
-          name: personalScheduleName(employeeId),
-          isDefault: false,
-        },
-      })
-    ).id;
-
-  // Dagarna skrivs om från grunden, av samma skäl som företagets schema gör
-  // det: en omskrivning kan inte lämna kvar en dag som tagits bort i rutan.
-  await db.scheduleDay.deleteMany({ where: { scheduleId } });
-
-  for (const day of days) {
-    await db.scheduleDay.create({
-      data: {
-        companyId,
-        scheduleId,
-        weekday: day.weekday,
-        startMinute: day.startMinute,
-        endMinute: day.endMinute,
-        breaks: {
-          create: day.breaks.map((rest) => ({
-            companyId,
-            startMinute: rest.startMinute,
-            endMinute: rest.endMinute,
-          })),
-        },
-      },
-    });
-  }
-
-  if (!own) {
-    await db.employee.updateMany({
-      where: { id: employeeId },
-      data: { scheduleId },
-    });
-  }
-}
+export { ownScheduleDays, saveOwnScheduleDays } from "./work-hours";

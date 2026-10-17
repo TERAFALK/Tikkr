@@ -1,7 +1,12 @@
 import { notFound } from "next/navigation";
 import type { AdminSession } from "./admin-session";
 import { unsafeGlobalPrisma } from "./db";
-import { MODULE_KEYS, isModuleKey, type ModuleKey } from "./modules";
+import {
+  MODULE_KEYS,
+  WORK_HOURS_MODULES,
+  isModuleKey,
+  type ModuleKey,
+} from "./modules";
 
 /**
  * VILKA TILLVAL ETT FÖRETAG HAR.
@@ -71,6 +76,21 @@ export async function requireModule(
   key: ModuleKey
 ): Promise<void> {
   if (await hasModule(session.companyId, key)) return;
+  notFound();
+}
+
+/**
+ * Om företaget har något tillval som använder arbetstiderna. Vilka det är
+ * står i WORK_HOURS_MODULES i modules.ts.
+ */
+export async function hasWorkHours(companyId: string): Promise<boolean> {
+  const modules = await enabledModules(companyId);
+  return WORK_HOURS_MODULES.some((key) => modules.includes(key));
+}
+
+/** Grinden för arbetstiderna. 404 utan något av tillvalen, som requireModule. */
+export async function requireWorkHours(session: AdminSession): Promise<void> {
+  if (await hasWorkHours(session.companyId)) return;
   notFound();
 }
 

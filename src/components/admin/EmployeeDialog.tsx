@@ -47,6 +47,7 @@ export default function EmployeeDialog({
   employee,
   scheduleDays,
   payroll = false,
+  workHours = payroll,
   atfForms,
 }: {
   trigger: string;
@@ -83,11 +84,17 @@ export default function EmployeeDialog({
   /**
    * true när företaget har löneunderlaget.
    *
-   * Styr BÅDA de lönerelaterade fälten i rutan: koden för flexsaldot och de
-   * egna arbetstiderna. Utan modulen finns ingetdera, och serveråtgärden
-   * frågar själv om modulen innan den skriver något av dem.
+   * Styr de lönerelaterade fälten i rutan: koden för flexsaldot, krysset
+   * Timanställd, startdatumet och arbetstidsformen. Utan modulen finns inget
+   * av dem, och serveråtgärden frågar själv om modulen innan den skriver.
    */
   payroll?: boolean;
+  /**
+   * true när företaget har ett tillval som använder arbetstiderna:
+   * löneunderlaget eller planeringen (ändrat 2026-10-17). Styr de egna
+   * arbetstiderna, som båda läser. Se work-hours.ts.
+   */
+  workHours?: boolean;
   /**
    * Arbetstidsformerna i företagets kollektivavtal för ATF. Utelämnad när
    * inget avtal är valt, och då visas inget val.
@@ -352,7 +359,7 @@ export default function EmployeeDialog({
               </div>
             )}
 
-            {payroll && !hourly && (
+            {workHours && !hourly && (
               <div className="border-t border-neutral-200 pt-4">
                 <label className="flex cursor-pointer items-start gap-2 text-[13px]">
                   <input

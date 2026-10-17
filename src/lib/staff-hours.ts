@@ -1,35 +1,36 @@
 import type { CompanyDb } from "./tenant";
 import { blockEnd, type StationHours } from "./plan-calendar";
-import { isoWeekdayIn, type WeekdayHours } from "./weekly-hours";
+import { isoWeekdayIn } from "./weekly-hours";
 import { startOfDayIn } from "./time-zone";
+import { loadWorkSchedules } from "./work-hours";
 
 /**
- * PERSONALENS ARBETSTIDER I PLANERINGEN (tillagt 2026-10-17, fas 3 av
+ * PERSONALENS TILLGÄNGLIGHET I PLANERINGEN (tillagt 2026-10-17, fas 3 av
  * issue #21).
  *
- * Enda vägen in till `staff_days` och `staff_breaks`. Två sorters rader:
+ * Vems tider som gäller, och om ett pass ligger utanför dem eller i ett annat.
+ * Tiderna själva är ARBETSYTANS, samma som löneunderlaget mäter flexen mot,
+ * och läses i work-hours.ts. Planeringen skriver aldrig några tider.
  *
- *   FÖRETAGETS STANDARD   utan anställd. Gäller alla som inte har egna.
- *   EGNA TIDER            med en anställd. Gäller i stället för standarden,
- *                         hela veckan.
+ * Två sorters tider:
  *
- * Saknas båda finns inga tider alls, och då gäller det som gällde före fas 3:
- * passet räknas i väggklockans minuter och dagen ritas vit. Det är skillnaden
- * mellan "inga tider" (`null`) och "inte den här dagen" (en vecka utan just
- * den veckodagen). Det första är okänt, det andra är ledigt.
+ *   FÖRETAGETS SCHEMA   under Inställningar, Arbetsytan, Arbetstider.
+ *   EGNA TIDER          under Anställda. Gäller i stället för schemat.
  *
- * ── PLANERINGENS EGNA, INTE LÖNEUNDERLAGETS ──────────────────────────────
+ * Saknas båda finns inga tider, och då räknas passet i väggklockans minuter
+ * och dagen ritas vit. Det är skillnaden mellan "inga tider" (`null`) och
+ * "inte den här dagen" (en vecka utan just den veckodagen). Det första är
+ * okänt, det andra är ledigt.
  *
- * Tiderna läses aldrig ur `work_schedules`, och frånvaro syns inte. Modulerna
- * säljs var för sig, och planeringen och löneunderlaget delar ingen kod.
- * Bevisas av tests/planning-boundary.test.ts. Formuläret de ändå delar bor i
- * weekly-hours.ts, som är neutral.
+ * EN TIMANSTÄLLD FÅR FÖRETAGETS TIDER HÄR (produktägarens val 2026-10-17).
+ * I löneunderlaget har hen inget schema alls, eftersom hen inte lovat några
+ * timmar och då inte ska mätas mot några. På tavlan behöver planeraren ändå
+ * se när verkstaden är öppen, och en helt vit dag vore att säga att hen kan
+ * planeras när som helst.
  *
- * ── EGNA TIDER ÄR EN PERSONUPPGIFT ───────────────────────────────────────
- *
- * Att en namngiven person arbetar 07–12 säger något om hen. Raderna med en
- * anställd raderas vid anonymisering och följer med i registerutdraget.
- * Företagets standard bär ingen person.
+ * Frånvaro syns inte. Den hör till löneunderlaget och är känslig, och
+ * planeringen delar ingen kod med det. Bevisas av
+ * tests/planning-boundary.test.ts.
  */
 
 /** Alla tider i arbetsytan, som tavlan och passen läser dem. */
@@ -38,54 +39,41 @@ export interface StaffHoursSet {
   own: Map<string, StationHours[]>;
 }
 
-export interface StaffHoursResult {
-  error?: string;
-}
-
-const DAY_SELECT = {
-  employeeId: true,
-  weekday: true,
-  startMinute: true,
-  endMinute: true,
-  breaks: {
-    orderBy: { startMinute: "asc" },
-    select: { startMinute: true, endMinute: true },
-  },
-} as const;
-
 /* -------------------------------------------------------------------------- */
 /* Läsning                                                                     */
 /* -------------------------------------------------------------------------- */
 
 /**
- * Arbetsytans tider. Hela tabellen på en gång: den har högst sju rader per
- * person som har egna tider, och tavlan behöver alla som syns.
+ * Arbetsytans tider för planeringen: företagets schema och de egna.
+ *
+ * Alla anställda på en gång, eftersom tavlan behöver alla som syns och
+ * schemana är få.
  */
 export async function loadStaffHours(db: CompanyDb): Promise<StaffHoursSet> {
-  const rows = await db.staffDay.findMany({
-    orderBy: { weekday: "asc" },
-    select: DAY_SELECT,
-  });
+  const { schedules, defaultId, employees } = await loadWorkSchedules(db);
 
-  const standard: StationHours[] = [];
+  const toHours = (scheduleId: string | null): StationHours[] =>
+    (scheduleId ? schedules.get(scheduleId)?.days ?? [] : []).map((day) => ({
+      weekday: day.weekday,
+      startMinute: day.startMinute,
+      endMinute: day.endMinute,
+      breaks: day.breaks.map(({ startMinute, endMinute }) => ({
+        startMinute,
+        endMinute,
+      })),
+    }));
+
   const own = new Map<string, StationHours[]>();
 
-  for (const row of rows) {
-    const day = {
-      weekday: row.weekday,
-      startMinute: row.startMinute,
-      endMinute: row.endMinute,
-      breaks: row.breaks,
-    };
-
-    if (row.employeeId === null) {
-      standard.push(day);
-    } else {
-      own.set(row.employeeId, [...(own.get(row.employeeId) ?? []), day]);
+  for (const [id, employee] of employees) {
+    // Ett eget schema är ett annat än företagets. Pekar någon på
+    // standardschemat är det ingen egen tid.
+    if (employee.scheduleId && employee.scheduleId !== defaultId) {
+      own.set(id, toHours(employee.scheduleId));
     }
   }
 
-  return { standard, own };
+  return { standard: toHours(defaultId), own };
 }
 
 /**
@@ -211,111 +199,4 @@ export function overlappingPasses(
   }
 
   return result;
-}
-
-/* -------------------------------------------------------------------------- */
-/* Skrivning                                                                   */
-/* -------------------------------------------------------------------------- */
-
-/**
- * Skriver om en uppsättning dagar från grunden: företagets standard eller en
- * anställds egna. En omskrivning kan inte lämna kvar en dag som tagits bort i
- * rutan, och den håller "en rad per veckodag" utan att databasen behöver kunna
- * det.
- */
-async function replaceDays(
-  db: CompanyDb,
-  companyId: string,
-  employeeId: string | null,
-  days: WeekdayHours[]
-): Promise<StaffHoursResult> {
-  const weekdays = days.map((day) => day.weekday);
-
-  if (new Set(weekdays).size !== weekdays.length) {
-    return { error: "En veckodag står två gånger." };
-  }
-
-  if (weekdays.some((weekday) => weekday < 1 || weekday > 7)) {
-    return { error: "Okänd veckodag." };
-  }
-
-  await db.$transaction(async (tx) => {
-    await tx.staffDay.deleteMany({ where: { employeeId } });
-
-    for (const day of days) {
-      await tx.staffDay.create({
-        data: {
-          companyId,
-          employeeId,
-          weekday: day.weekday,
-          startMinute: day.startMinute,
-          endMinute: day.endMinute,
-          breaks: {
-            create: day.breaks.map((rest) => ({
-              companyId,
-              startMinute: rest.startMinute,
-              endMinute: rest.endMinute,
-            })),
-          },
-        },
-      });
-    }
-  });
-
-  return {};
-}
-
-/**
- * Företagets standard. Noll dagar är tillåtet och betyder att ingen standard
- * finns: då gäller väggklockan för alla utan egna tider.
- */
-export async function saveStandardStaffHours(
-  db: CompanyDb,
-  companyId: string,
-  days: WeekdayHours[]
-): Promise<StaffHoursResult> {
-  return replaceDays(db, companyId, null, days);
-}
-
-/**
- * En anställds egna tider.
- *
- * PERSONEN SLÅS UPP GENOM FÖRETAGSKLIENTEN FÖRST. Id:t kommer från ett
- * formulär, och filtreringslagret stämplar företaget på raden men kan inte
- * veta vem den utpekade personen tillhör.
- *
- * Minst en dag: egna tider utan dagar finns inte. Den som vill att standarden
- * ska gälla tar bort de egna, se `removeOwnStaffHours`.
- */
-export async function saveOwnStaffHours(
-  db: CompanyDb,
-  companyId: string,
-  employeeId: string,
-  days: WeekdayHours[]
-): Promise<StaffHoursResult> {
-  const employee = await db.employee.findFirst({
-    where: { id: employeeId },
-    select: { id: true },
-  });
-
-  if (!employee) return { error: "Den anställda finns inte." };
-  if (days.length === 0) return { error: "Kryssa i minst en dag." };
-
-  return replaceDays(db, companyId, employee.id, days);
-}
-
-/** Tar bort en anställds egna tider. Företagets standard gäller igen. */
-export async function removeOwnStaffHours(
-  db: CompanyDb,
-  employeeId: string
-): Promise<StaffHoursResult> {
-  const employee = await db.employee.findFirst({
-    where: { id: employeeId },
-    select: { id: true },
-  });
-
-  if (!employee) return { error: "Den anställda finns inte." };
-
-  await db.staffDay.deleteMany({ where: { employeeId: employee.id } });
-  return {};
 }

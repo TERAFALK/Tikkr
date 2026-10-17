@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import bcrypt from "bcryptjs";
 import { assertWritable, requireAdmin } from "@/lib/admin-session";
-import { hasModule } from "@/lib/company-modules";
+import { hasModule, hasWorkHours } from "@/lib/company-modules";
 import { parseOre } from "@/lib/money";
 import { auditEmployeeChange, employeeBefore } from "@/lib/audit";
 import { readScheduleDays, saveOwnScheduleDays } from "@/lib/schedule";
@@ -209,9 +209,12 @@ async function saveSchedule(
   companyId: string,
   employeeId: string,
   formData: FormData,
-  payroll: boolean
+  payroll: boolean,
+  workHours: boolean
 ): Promise<string | null> {
-  if (!payroll) return null;
+  // De egna tiderna finns med löneunderlaget eller planeringen, se
+  // work-hours.ts. Timanställd är löneunderlagets kryss.
+  if (!workHours) return null;
 
   // EN TIMANSTÄLLD HAR INGET SCHEMA ALLS, inte ens ett eget. Fälten göms i
   // rutan när krysset sätts, men ett formulär kan skickas av annat än
@@ -294,6 +297,7 @@ export async function createEmployee(
   if (photo && "error" in photo) return { error: photo.error };
 
   const payroll = await hasModule(companyId, "PAYROLL");
+  const workHours = await hasWorkHours(companyId);
 
   const flexCode = await flexCodeFields(formData, payroll);
   if ("error" in flexCode) return { error: flexCode.error };
@@ -332,7 +336,8 @@ export async function createEmployee(
     companyId,
     created.id,
     formData,
-    payroll
+    payroll,
+    workHours
   );
   if (scheduleError) return { error: scheduleError };
 
@@ -366,6 +371,7 @@ export async function updateEmployee(
   const removePhoto = formData.get("removePhoto") === "on";
 
   const payroll = await hasModule(companyId, "PAYROLL");
+  const workHours = await hasWorkHours(companyId);
 
   const flexCode = await flexCodeFields(formData, payroll);
   if ("error" in flexCode) return { error: flexCode.error };
@@ -409,7 +415,14 @@ export async function updateEmployee(
     });
   }
 
-  const scheduleError = await saveSchedule(db, companyId, id, formData, payroll);
+  const scheduleError = await saveSchedule(
+    db,
+    companyId,
+    id,
+    formData,
+    payroll,
+    workHours
+  );
   if (scheduleError) return { error: scheduleError };
 
   revalidatePath(PATH);

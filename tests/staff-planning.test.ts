@@ -10,13 +10,8 @@ import {
   staffFor,
   staffingOf,
 } from "@/lib/staff-planning";
-import {
-  hoursForEmployee,
-  loadStaffHours,
-  removeOwnStaffHours,
-  saveOwnStaffHours,
-  saveStandardStaffHours,
-} from "@/lib/staff-hours";
+import { hoursForEmployee, loadStaffHours } from "@/lib/staff-hours";
+import { saveDefaultSchedule, saveOwnScheduleDays } from "@/lib/work-hours";
 import { passWarnings } from "@/lib/staff-planning";
 import {
   deleteStation,
@@ -468,49 +463,59 @@ const STANDARD = [1, 2, 3, 4, 5].map((weekday) => ({
 }));
 
 describe("personalens arbetstider", () => {
-  it("egna tider går före standarden, och borttagna gäller standarden igen", async () => {
-    expect((await saveStandardStaffHours(db, companyId, STANDARD)).error).toBeUndefined();
-    expect(
-      (
-        await saveOwnStaffHours(db, companyId, anna, [
-          { weekday: 1, startMinute: 7 * 60, endMinute: 12 * 60, breaks: [] },
-        ])
-      ).error
-    ).toBeUndefined();
+  // Arbetsytans tider, samma som löneunderlaget mäter flexen mot (beslutat
+  // 2026-10-17). Planeringen skriver dem aldrig, och testerna lägger in dem
+  // som sidan Arbetstider och rutan under Anställda gör.
+
+  it("egna tider går före företagets, och borttagna gäller företagets igen", async () => {
+    await saveDefaultSchedule(db, companyId, STANDARD);
+    await saveOwnScheduleDays(db, companyId, anna, [
+      { weekday: 1, startMinute: 7 * 60, endMinute: 12 * 60, breaks: [] },
+    ]);
 
     let set = await loadStaffHours(db);
     expect(hoursForEmployee(set, anna)?.map((day) => day.weekday)).toEqual([1]);
     expect(hoursForEmployee(set, bertil)?.length).toBe(5);
 
-    await removeOwnStaffHours(db, anna);
+    await saveOwnScheduleDays(db, companyId, anna, []);
     set = await loadStaffHours(db);
     expect(hoursForEmployee(set, anna)?.length).toBe(5);
   });
 
-  it("en ny standard skriver om den gamla och lämnar ingen dag kvar", async () => {
-    await saveStandardStaffHours(db, companyId, STANDARD);
-    await saveStandardStaffHours(db, companyId, STANDARD.slice(0, 2));
-
-    expect((await loadStaffHours(db)).standard.map((day) => day.weekday)).toEqual([1, 2]);
+  it("utan något schema finns inga tider", async () => {
+    expect(hoursForEmployee(await loadStaffHours(db), anna)).toBeNull();
   });
 
-  it("egna tider kräver minst en dag", async () => {
-    expect((await saveOwnStaffHours(db, companyId, anna, [])).error).toBe(
-      "Kryssa i minst en dag."
-    );
+  it("en timanställd får företagets tider", async () => {
+    // Produktägarens val 2026-10-17. I löneunderlaget har hen inget schema
+    // alls, men på tavlan ska det synas när verkstaden är öppen.
+    await saveDefaultSchedule(db, companyId, STANDARD);
+    await unsafeGlobalPrisma.employee.update({
+      where: { id: anna },
+      data: { hourly: true },
+    });
+
+    expect(hoursForEmployee(await loadStaffHours(db), anna)?.length).toBe(5);
+  });
+
+  it("schemats raster följer med", async () => {
+    await saveDefaultSchedule(db, companyId, STANDARD);
+
+    const [monday] = hoursForEmployee(await loadStaffHours(db), anna)!;
+    expect(monday.breaks).toEqual([
+      { startMinute: 12 * 60, endMinute: 12 * 60 + 40 },
+    ]);
   });
 
   it("en person hos ett annat företag går inte att ge tider", async () => {
-    expect((await saveOwnStaffHours(db, companyId, theirEmployee, STANDARD)).error).toBe(
-      "Den anställda finns inte."
-    );
-    expect((await removeOwnStaffHours(db, theirEmployee)).error).toBe(
-      "Den anställda finns inte."
-    );
+    await saveOwnScheduleDays(db, companyId, theirEmployee, STANDARD);
+
+    const theirs = await loadStaffHours(forCompany(otherCompanyId));
+    expect(theirs.own.size).toBe(0);
   });
 
-  it("grannens standard syns inte", async () => {
-    await saveStandardStaffHours(forCompany(otherCompanyId), otherCompanyId, STANDARD);
+  it("grannens schema syns inte", async () => {
+    await saveDefaultSchedule(forCompany(otherCompanyId), otherCompanyId, STANDARD);
 
     expect((await loadStaffHours(db)).standard).toEqual([]);
   });
@@ -518,7 +523,7 @@ describe("personalens arbetstider", () => {
   it("ett pass kapas vid midnatt med personens raster inräknade", async () => {
     // Måndag 21:00–24:00 med en rast 22:00–23:00 rymmer två timmars arbete.
     // Utan tider hade det rymts tre.
-    await saveStandardStaffHours(db, companyId, [
+    await saveDefaultSchedule(db, companyId, [
       {
         weekday: 1,
         startMinute: 7 * 60,
@@ -535,7 +540,7 @@ describe("personalens arbetstider", () => {
   });
 
   it("varnar för pass utanför arbetstid och för dubbelbokning", async () => {
-    await saveStandardStaffHours(db, companyId, STANDARD);
+    await saveDefaultSchedule(db, companyId, STANDARD);
 
     const early = await pass({ startsAt: at(6), minutes: 60 });
     const first = await pass({ startsAt: at(9), minutes: 120 });

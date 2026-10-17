@@ -246,10 +246,12 @@ support_visits — id, company_id, email, started_at, last_seen_at
 feedback_messages — id, company_id, author_user_id?, author_email, author_name?,
                  kind, area?, page?, body, done_at?, done_note?, done_by_email?
 
-  — löneunderlaget, se regel 7 —
+  — arbetstiderna, arbetsytans sedan 2026-10-17, se regel 8 —
 work_schedules   — id, company_id, name, is_default
 schedule_days    — id, company_id, schedule_id, weekday, start_minute, end_minute
 schedule_breaks  — id, company_id, schedule_day_id, start_minute, end_minute
+
+  — löneunderlaget, se regel 7 —
 break_types      — id, company_id, name, active, sort_order
 break_entries    — id, company_id, employee_id, break_type_id,
                    started_at, ended_at, source, needs_review
@@ -271,9 +273,6 @@ planned_blocks   — id, company_id, station_id, order_id, moment_id,
 staff_blocks     — id, company_id, employee_id, order_id, moment_id,
                    planned_block_id?, starts_at, minutes, note,
                    created_by_email
-staff_days       — id, company_id, employee_id? (tomt = företagets standard),
-                   weekday, start_minute, end_minute
-staff_breaks     — id, company_id, staff_day_id, start_minute, end_minute
 
   — tillvalen, se § 3.1 —
 company_modules  — id, company_id, module, source, stripe_item_id,
@@ -868,9 +867,32 @@ stripe_prices    — item, month_price_id, year_price_id, updated_by_email
    `tests/planning-modes.test.ts` fäller ett register och ett schema som
    glidit isär.
 
-   **Personalens arbetstider blir planeringens egna** och läses inte ur
-   löneunderlagets scheman, av samma skäl som stationernas öppettider har
-   egna tabeller. Den som har båda tillvalen skriver in dem två gånger.
+   **ARBETSTIDERNA ÄR ARBETSYTANS, INTE ETT TILLVALS** (beslutat 2026-10-17,
+   produktägarens val, ersätter "personalens arbetstider blir planeringens
+   egna" från 2026-10-14). Löneunderlaget mäter flexen mot dem och planeringen
+   gråmarkerar och varnar efter dem, och båda läser SAMMA tider. Planeringen
+   fick under en dag en egen uppsättning, och samma människors tider på två
+   ställen blev rörigt.
+
+   - **Företagets tider** står under Inställningar, Arbetsytan, **Arbetstider**,
+     och **egna tider** under Anställda, i personens ruta. Båda syns med
+     löneunderlaget eller planeringen, eller båda (`WORK_HOURS_MODULES` i
+     `modules.ts`, `requireWorkHours` i `company-modules.ts`). Rasttyperna för
+     stämplingsskärmen är löneunderlagets och står kvar där, under **Raster**.
+   - **En enda läsare**, `src/lib/work-hours.ts`, som är neutral som
+     `weekly-hours.ts`. `schedule.ts` och `staff-hours.ts` läser båda därifrån,
+     och `tests/planning-boundary.test.ts` fäller ett annat bibliotek som
+     läser tabellerna direkt. Gränsen mellan tillvalen står kvar: planeringen
+     importerar ingenting från löneunderlaget.
+   - **Bara regeln om den timanställda skiljer.** I löneunderlaget har hen
+     inget schema. I planeringen får hen företagets tider, så att tavlan visar
+     när verkstaden är öppen.
+   - **Frånvaro syns inte i planeringen.** Den är känslig och löneunderlagets.
+   - Tabellerna `staff_days` och `staff_breaks` från fas 3 togs bort i samma
+     PR, innan de nått `dev`: migrationen som skapade dem står kvar och nästa
+     tar bort dem, så att labbets historik stämmer.
+   - **Stationernas öppettider är kvar i egna tabeller.** En maskin är ingen
+     anställd.
 
    Byggs i faser: läget och vyerna (fas 1), personalpassen (fas 2),
    personalens arbetstider och tillgänglighet (fas 3) och passen mot
@@ -902,30 +924,22 @@ stripe_prices    — item, month_price_id, year_price_id, updated_by_email
      En operatör kör ibland två maskiner (regel 2). I Tjänst syns det på
      personalvyn, i Produktion i Bemanna, se arbetstiderna nedan.
 
-   **PERSONALENS ARBETSTIDER** (tillagt 2026-10-17, fas 3). Under
-   Inställningar, Personalens arbetstider, i `staff_days` och
-   `staff_breaks`. Enda vägen in är `src/lib/staff-hours.ts`.
+   **PERSONALENS TILLGÄNGLIGHET** (tillagt 2026-10-17, fas 3). Vems tider som
+   gäller och vad som ligger utanför dem räknas i `src/lib/staff-hours.ts`,
+   med tiderna ur `work-hours.ts`, se arbetstiderna ovan.
 
-   - **Företagets standard**, en rad per veckodag utan anställd, och **egna
-     tider** per anställd, som gäller i stället för standarden hela veckan.
-     Egna tider utan dagar finns inte: tas de bort gäller standarden igen.
-     Saknas båda finns inga tider, och då gäller väggklockan som före fas 3.
-     "Inga tider" och "ledig den dagen" är olika svar.
+   - **Egna tider går före företagets**, hela veckan. Saknas båda finns inga
+     tider, och då gäller väggklockan och dagen ritas vit. Tavlan säger då
+     "Personalen har inga arbetstider", med en länk till Arbetstider. "Inga
+     tider" och "ledig den dagen" är olika svar.
    - **Ett pass räknas i arbetsminuter**, som en stationsruta: personens
      raster hoppas över, och passet kapas vid midnatt med dem inräknade.
-   - **I Tjänst ritar tavlan personens tider**: stängd tid i grått, och gult
-     "över" när mer är planerat än dagen rymmer.
+   - **I Tjänst ritar tavlan personens tider**: stängd tid och raster i Lav
+     (`CLOSED_CLASS` i `PlanBoard`, samma som förklaringen), och gult "över"
+     när mer är planerat än dagen rymmer.
    - **I Produktion varnar Bemanna** för pass utanför arbetstid och för pass
      som ligger i ett annat av personens pass, även på en annan station
      (`passWarnings`). Varningar, aldrig hinder.
-   - **Egna tider sätts på inställningssidan och inte på tavlan**, eftersom
-     Produktion inte har någon personalvy att trycka på ett namn i.
-   - **Planeringens egna tider, inte löneunderlagets.** De läses aldrig ur
-     `work_schedules`, och frånvaro syns inte på tavlan.
-     `tests/planning-boundary.test.ts` fäller det.
-   - **Egna tider är personuppgifter.** Anonymiseringen raderar dem och
-     registerutdraget lämnar ut dem, även när planeringen är avstängd.
-     Företagets standard bär ingen person.
 
    **TIDSLINJEN** (ändrat 2026-10-17). Var dagarna ligger, vad ett tryck
    träffar och var klockslagen står räknas på ETT ställe,

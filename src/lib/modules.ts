@@ -97,6 +97,17 @@ export function isModuleKey(value: unknown): value is ModuleKey {
   return typeof value === "string" && Object.hasOwn(MODULES, value);
 }
 
+/**
+ * Tillvalen som använder ARBETSTIDERNA (beslutat 2026-10-17). Löneunderlaget
+ * mäter flexen mot dem och planeringen gråmarkerar och varnar efter dem, och
+ * båda läser samma tider, se work-hours.ts. Sidan Arbetstider och de egna
+ * tiderna under Anställda finns med vilket av dem som helst.
+ *
+ * Står här och inte i company-modules.ts, så att menyn i webbläsaren kan läsa
+ * samma lista som grinden på servern.
+ */
+export const WORK_HOURS_MODULES: readonly ModuleKey[] = ["PAYROLL", "PLANNING"];
+
 export function moduleName(key: ModuleKey): string {
   return MODULES[key].name;
 }
