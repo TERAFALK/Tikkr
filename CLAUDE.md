@@ -874,7 +874,7 @@ stripe_prices    — item, month_price_id, year_price_id, updated_by_email
 
    Byggs i faser: läget och vyerna (fas 1), personalpassen (fas 2),
    personalens arbetstider och tillgänglighet (fas 3) och passen mot
-   stämplingen (fas 4). Fas 1, 2 och 3 är gjorda.
+   stämplingen (fas 4). Alla fyra är gjorda.
 
    **PERSONALPASSEN** (tillagt 2026-10-14, fas 2). Ett pass är en anställd på
    en order och ett arbetsmoment, med start och längd, i `staff_blocks`. Enda
@@ -926,6 +926,24 @@ stripe_prices    — item, month_price_id, year_price_id, updated_by_email
    - **Egna tider är personuppgifter.** Anonymiseringen raderar dem och
      registerutdraget lämnar ut dem, även när planeringen är avstängd.
      Företagets standard bär ingen person.
+
+   **PLANERAT MOT STÄMPLAT PER PERSON** (tillagt 2026-10-17, fas 4).
+   `plan-live.ts` räknar utfallet för ett pass med `employeeId`: bara
+   personens egna stämplingar på passets order och moment, inom passet. Det är
+   exakt, till skillnad från en stationsruta, där tavlan inte vet vid vilken
+   maskin någon stod.
+
+   - **Passet** blir grönkantat när personen står instämplad, och visar
+     stämplat mot planerat, som stationsrutorna.
+   - **Raden för varje anställd** i Tjänst visar veckans "Planerat · Stämplat",
+     summan av passen och av det som stämplats inom dem (`laneTotals`).
+     Stämplat utanför ett pass räknas inte där; det syns i rapporterna.
+   - **Bemanna** visar det stämplade per bemannat pass.
+   - **En vecka som varit hämtar utfallet en gång**, utan pollning. Till
+     2026-10-17 visades utfallet bara för den pågående veckan, och planerat mot
+     stämplat gick inte att se i efterhand.
+   - Fortfarande råa minuter per jobb, aldrig `mainMinutes`. Vad personen
+     arbetat räknar tidrapporten, och planeringen delar ingen kod med den.
 
    **TIDSLINJEN** (ändrat 2026-10-17). Var dagarna ligger, vad ett tryck
    träffar och var klockslagen står räknas på ETT ställe,

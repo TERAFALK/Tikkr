@@ -40,6 +40,17 @@ import { blockEnd, type StationHours } from "./plan-calendar";
  * frågar om MASKINEN gick, inte om personen var på jobbet. Kör en operatör två
  * maskiner 08–12 ska båda rutorna visa fyra timmar — det är samma skillnad som
  * rapporterna och tidrapporten gör, se avgränsningen i CLAUDE.md.
+ *
+ * ── PERSONALENS PASS (fas 4, 2026-10-17) ─────────────────────────────────
+ *
+ * Ett pass har en person, och då är tillskrivningen EXAKT: bara personens egna
+ * stämplingar på passets order och moment räknas. Det är skillnaden mot en
+ * stationsruta, där tavlan inte kan veta vid vilken maskin någon stod. Samma
+ * funktion räknar båda, med `employeeId` på det som ska räknas per person.
+ *
+ * Fortfarande råa minuter per jobb, och fortfarande en indikation. Den som kör
+ * två jobb samtidigt får båda passen fyllda; vad hen arbetat räknar
+ * tidrapporten, och planeringen delar ingen kod med den.
  */
 
 /** En ruta som utfallet ska räknas för. */
@@ -49,8 +60,13 @@ export interface LiveBlock {
   momentId: string;
   startsAt: Date;
   minutes: number;
-  /** Stationens tider den dagen, för att veta var rutan slutar. */
+  /** Stationens eller personens tider den dagen, för att veta var den slutar. */
   hours: StationHours | null;
+  /**
+   * Personen ett pass gäller. Satt betyder att bara hens stämplingar räknas;
+   * utelämnat, som för en stationsruta, räknas allas.
+   */
+  employeeId?: string;
 }
 
 export interface BlockProgress {
@@ -94,9 +110,15 @@ export async function progressFor(
   const from = new Date(Math.min(...spans.map((span) => span.from)));
   const to = new Date(Math.max(...spans.map((span) => span.to)));
 
+  // Gäller alla rutorna personer räcker det att hämta deras stämplingar.
+  const people = blocks.every((block) => block.employeeId)
+    ? [...new Set(blocks.map((block) => block.employeeId as string))]
+    : null;
+
   const entries = await db.timeEntry.findMany({
     where: {
       kind: "ORDER",
+      ...(people ? { employeeId: { in: people } } : {}),
       orderId: { in: [...new Set(blocks.map((block) => block.orderId))] },
       momentId: { in: [...new Set(blocks.map((block) => block.momentId))] },
       clockInAt: { lt: to },
@@ -105,6 +127,7 @@ export async function progressFor(
       OR: [{ clockOutAt: null }, { clockOutAt: { gt: from } }],
     },
     select: {
+      employeeId: true,
       orderId: true,
       momentId: true,
       clockInAt: true,
@@ -123,6 +146,7 @@ export async function progressFor(
     for (const entry of entries) {
       if (entry.orderId !== block.orderId) continue;
       if (entry.momentId !== block.momentId) continue;
+      if (block.employeeId && entry.employeeId !== block.employeeId) continue;
 
       const entryFrom = entry.clockInAt.getTime();
       const entryTo = entry.clockOutAt?.getTime() ?? now.getTime();
@@ -152,4 +176,32 @@ export async function progressFor(
   }
 
   return result;
+}
+
+/**
+ * Veckans planerade och stämplade tid per rad, för personalvyn.
+ *
+ * Summan av passen och av det som stämplats INOM dem, så att två tal av samma
+ * sort jämförs: det som var tänkt och det som blev av det. Stämplat utanför
+ * ett pass räknas inte här; det syns i rapporterna.
+ *
+ * Ren räkning, utan databas. Tavlan räknar om den varje gång utfallet
+ * hämtats.
+ */
+export function laneTotals(
+  blocks: { id: string; laneId: string; minutes: number }[],
+  progress: Record<string, Pick<BlockProgress, "clockedMinutes">>
+): Map<string, { plannedMinutes: number; clockedMinutes: number }> {
+  const totals = new Map<string, { plannedMinutes: number; clockedMinutes: number }>();
+
+  for (const block of blocks) {
+    const total = totals.get(block.laneId) ?? { plannedMinutes: 0, clockedMinutes: 0 };
+
+    total.plannedMinutes += block.minutes;
+    total.clockedMinutes += progress[block.id]?.clockedMinutes ?? 0;
+
+    totals.set(block.laneId, total);
+  }
+
+  return totals;
 }

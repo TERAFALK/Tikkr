@@ -688,7 +688,7 @@ export const GUIDES = [
       "Vecka och Dag växlar mellan hela veckan och en dag i taget. Tryck på en dag i rubriken för att öppna den.",
       "Helgen är dold. Visa helg tar fram lördag och söndag, och en siffra på knappen visar hur mycket som är planerat där.",
       "Överbokning tillåts och markeras i gult.",
-      "En ruta som någon står instämplad på visas som pågående.",
+      "En ruta som någon står instämplad på visas som pågående. Under varje anställd står veckans planerade och stämplade tid.",
       "Planerad tid är en avsikt. Den faktureras aldrig och räknas inte som arbetad tid.",
     ],
     related: ["ordrar", "arbetsmoment"],

@@ -345,3 +345,57 @@ describe("företagsgränsen", () => {
     expect(result.size).toBe(0);
   });
 });
+
+describe("personalens pass räknas per person", () => {
+  // Ett pass har en person, och då är tillskrivningen exakt: bara personens
+  // egna stämplingar på passets order och moment räknas (fas 4, 2026-10-17).
+
+  it("räknar personens egna stämplingar", async () => {
+    await punch({ employeeId: anna, from: at(8), to: at(10) });
+
+    const result = await progressFor(db, [block({ employeeId: anna })], SE, at(17));
+    expect(result.get("block-1")?.clockedMinutes).toBe(120);
+  });
+
+  it("räknar inte någon annans stämpling på samma jobb", async () => {
+    // En stationsruta hade räknat Björns timmar. Annas pass gör det inte.
+    await punch({ employeeId: bjorn, from: at(8), to: at(10) });
+
+    const result = await progressFor(db, [block({ employeeId: anna })], SE, at(17));
+    expect(result.size).toBe(0);
+  });
+
+  it("är pågående bara när personen själv står instämplad", async () => {
+    await punch({ employeeId: bjorn, from: at(9), to: null });
+
+    const theirs = await progressFor(db, [block({ employeeId: anna })], SE, at(10));
+    expect(theirs.size).toBe(0);
+
+    await punch({ employeeId: anna, from: at(9, 30), to: null });
+
+    const own = await progressFor(db, [block({ employeeId: anna })], SE, at(10));
+    expect(own.get("block-1")).toMatchObject({
+      running: true,
+      people: ["Anna Andersson"],
+      clockedMinutes: 30,
+    });
+  });
+
+  it("två personer på samma jobb får var sitt utfall", async () => {
+    await punch({ employeeId: anna, from: at(8), to: at(9) });
+    await punch({ employeeId: bjorn, from: at(8), to: at(11) });
+
+    const result = await progressFor(
+      db,
+      [
+        block({ id: "anna-pass", employeeId: anna }),
+        block({ id: "bjorn-pass", employeeId: bjorn }),
+      ],
+      SE,
+      at(17)
+    );
+
+    expect(result.get("anna-pass")?.clockedMinutes).toBe(60);
+    expect(result.get("bjorn-pass")?.clockedMinutes).toBe(180);
+  });
+});
