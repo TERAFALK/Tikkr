@@ -61,17 +61,51 @@ export interface DayColumn extends DayPlan {
 }
 
 /**
- * Vilka dagar som ritas: hela veckan, eller den valda dagen i dagvyn.
+ * Vilka dagar som ritas: veckan, eller den valda dagen i dagvyn.
  *
- * ALLA SJU, ALLTID SOM HELA DAGAR (ändrat 2026-10-17). Helgen doldes först
- * när ingen station gick och inget låg där, och en vecka som pågick en lördag
- * visade då varken dagen eller vad klockan var. Därefter stod en tom helgdag
- * som en smal kolumn utan tidslinje, och den såg avkapad ut bredvid en hel dag.
- * En dag är en dag, oavsett om något ligger där.
+ * HELGEN ÄR DOLD SOM STANDARD och visas med en knapp (ändrat 2026-10-17,
+ * produktägarens val). Verkstäderna planerar måndag till fredag, och två
+ * dagar som nästan alltid står tomma tog en fjärdedel av veckans bredd.
+ *
+ * Visas den är varje dag en HEL dag, med sin tidslinje. En tom helgdag stod
+ * en kort tid som en smal kolumn utan tidslinje, och den såg avkapad ut
+ * bredvid en hel dag.
+ *
+ * Dagvyn visar den valda dagen även när helgen är dold. Den som öppnat en
+ * lördag har valt den.
  */
-export function plannedDays(focus: number | null): DayPlan[] {
+export function plannedDays(
+  focus: number | null,
+  showWeekend: boolean
+): DayPlan[] {
   if (focus !== null) return [{ index: focus }];
-  return [0, 1, 2, 3, 4, 5, 6].map((index) => ({ index }));
+
+  const days = showWeekend ? [0, 1, 2, 3, 4, 5, 6] : [0, 1, 2, 3, 4];
+  return days.map((index) => ({ index }));
+}
+
+/**
+ * Hur många dagar dagvyns pil flyttar, från veckodagen `from`.
+ *
+ * Är helgen dold hoppar pilen över den: fredag och framåt är måndag. Annars
+ * vore den dolda helgen två tryck man måste göra varje vecka för att komma
+ * förbi.
+ */
+export function stepDays(
+  from: number,
+  direction: -1 | 1,
+  showWeekend: boolean
+): number {
+  let offset = direction;
+
+  while (!showWeekend && isWeekend(from + offset)) offset += direction;
+
+  return offset;
+}
+
+/** Lördag eller söndag, för en veckodag som får ligga utanför veckan. */
+function isWeekend(index: number): boolean {
+  return ((index % 7) + 7) % 7 >= 5;
 }
 
 /** Minuterna dagens axel spänner över. */

@@ -69,7 +69,12 @@ export const dynamic = "force-dynamic";
 export default async function PlanningPage({
   searchParams,
 }: {
-  searchParams: Promise<{ v?: string; vy?: string; dag?: string }>;
+  searchParams: Promise<{
+    v?: string;
+    vy?: string;
+    dag?: string;
+    helg?: string;
+  }>;
 }) {
   const session = await requireAdmin();
   await requireModule(session, "PLANNING");
@@ -114,10 +119,15 @@ export default async function PlanningPage({
       : await loadStaffView(db, monday, timeZone, placesFromUnplaced);
 
   /** Adressen till tavlan, med vyn kvar. Förvald vy skrivs inte ut. */
+  // Helgen är dold som standard och visas med en knapp på tavlan. Valet står
+  // i adressfältet och följer med veckopilarna.
+  const showWeekend = params.helg === "visa";
+
   const href = (week: string | null, to: PlanningView = view) => {
     const query = new URLSearchParams();
     if (week) query.set("v", week);
     if (to !== views[0]) query.set("vy", PLANNING_VIEWS[to].slug);
+    if (showWeekend) query.set("helg", "visa");
 
     const text = query.toString();
     return text ? `/admin/planering?${text}` : "/admin/planering";
@@ -234,6 +244,7 @@ export default async function PlanningPage({
           isCurrentWeek={isCurrentWeek}
           today={toDateInput(new Date(), timeZone)}
           focusDay={focus ? toDateInput(focus, timeZone) : null}
+          showWeekend={showWeekend}
           readOnly={Boolean(session.support)}
         />
       )}

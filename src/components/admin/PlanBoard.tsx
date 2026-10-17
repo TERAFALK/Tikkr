@@ -36,6 +36,7 @@ import {
   layoutDays,
   layoutWidth,
   plannedDays,
+  stepDays,
   type DayAxis,
 } from "@/lib/plan-geometry";
 import {
@@ -296,6 +297,7 @@ export default function PlanBoard({
   isCurrentWeek,
   today,
   focusDay,
+  showWeekend,
   sequences,
   readOnly,
 }: {
@@ -325,6 +327,8 @@ export default function PlanBoard({
   today: string;
   /** Den valda dagen i dagvyn, "ÅÅÅÅ-MM-DD". Null betyder veckovyn. */
   focusDay: string | null;
+  /** Om lördag och söndag ritas. Dolda som standard, se plannedDays. */
+  showWeekend: boolean;
   /**
    * I vilken ordning varje orders moment ska göras, som moment-id per order.
    *
@@ -434,15 +438,33 @@ export default function PlanBoard({
     (direction: -1 | 1) => {
       if (focusIndex === null) return;
 
-      const target = focusIndex + direction;
+      // Över helgen när den är dold, se stepDays.
+      const offset = stepDays(focusIndex, direction, showWeekend);
+      const target = focusIndex + offset;
+
       show(
         target >= 0 && target < 7
           ? dayKeys[target]
-          : toDateParam(addDaysInZone(days[focusIndex], direction, timeZone), timeZone)
+          : toDateParam(addDaysInZone(days[focusIndex], offset, timeZone), timeZone)
       );
     },
-    [dayKeys, days, focusIndex, show, timeZone]
+    [dayKeys, days, focusIndex, show, showWeekend, timeZone]
   );
+
+  /**
+   * Visar eller döljer helgen. I adressfältet som `helg=visa`, som dagvyn, och
+   * inte i en kaka: valet följer med mellan veckor och dagar, och nästa gång
+   * tavlan öppnas är helgen dold igen. En kaka hade dessutom behövt stå i
+   * integritetspolicyns uppräkning.
+   */
+  const toggleWeekend = useCallback(() => {
+    const query = new URLSearchParams(searchParams.toString());
+
+    if (showWeekend) query.delete("helg");
+    else query.set("helg", "visa");
+
+    router.push(`${pathname}?${query.toString()}`);
+  }, [pathname, router, searchParams, showWeekend]);
 
   /* --- Utfallet ---------------------------------------------------------- */
 
@@ -507,7 +529,19 @@ export default function PlanBoard({
    * Vilka dagar som ritas: alla sju, eller bara den valda dagen. Se
    * plannedDays i lib/plan-geometry.ts.
    */
-  const plans = useMemo(() => plannedDays(focusIndex), [focusIndex]);
+  const plans = useMemo(
+    () => plannedDays(focusIndex, showWeekend),
+    [focusIndex, showWeekend]
+  );
+
+  /**
+   * Planerat på lördag och söndag. Står på knappen när helgen är dold, så att
+   * ett jobb på en lördag inte försvinner ur sikte bara för att knappen står
+   * på Dölj.
+   */
+  const weekendBlocks = blocks.filter(
+    (block) => (dayIndexOf(new Date(block.startsAt), days) ?? 0) >= 5
+  ).length;
 
   const visibleDays = useMemo(() => plans.map((plan) => plan.index), [plans]);
 
@@ -1320,6 +1354,25 @@ export default function PlanBoard({
                 ›
               </button>
             </div>
+          )}
+
+          {!isDay && (
+            <button
+              type="button"
+              onClick={toggleWeekend}
+              aria-pressed={showWeekend}
+              className="inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-[13px] font-medium text-neutral-600 hover:bg-neutral-100"
+            >
+              {showWeekend ? "Dölj helg" : "Visa helg"}
+              {!showWeekend && weekendBlocks > 0 && (
+                <span
+                  title={`${weekendBlocks} planerade i helgen`}
+                  className="rounded bg-amber-100 px-1.5 py-0.5 text-[11px] font-semibold tabular-nums text-amber-800"
+                >
+                  {weekendBlocks}
+                </span>
+              )}
+            </button>
           )}
 
           <div role="group" aria-label="Visa" className="flex gap-1">
