@@ -54,9 +54,10 @@ import PlanBoard, {
  * lib/planning-modes.ts. Vyn står i adressfältet som `vy`, så att veckopilarna
  * och ett bokmärke behåller den.
  *
- * Personalvyn har en rad per aktiv anställd. I läget Tjänst placeras passen
- * från Oplacerat; i läget Produktion är de bemanning, och läggs från
- * stationsrutans dialog med knappen Bemanna (fas 2, 2026-10-14).
+ * Personalvyn har en rad per aktiv anställd och finns bara i läget Tjänst,
+ * där passen placeras från Oplacerat. I läget Produktion är passen bemanning,
+ * och läggs från stationsrutans dialog med knappen Bemanna. Produktion hade en
+ * egen Personal-flik till 2026-10-17, se lib/planning-modes.ts.
  *
  * Sidan hämtar, mappar och lämnar över. Dragandet och det levande lagret bor i
  * PlanBoard, som är en klientkomponent: servern kan inte räkna om en rutas
@@ -104,7 +105,12 @@ export default async function PlanningPage({
   // Bara den visade vyns data hämtas.
   const board =
     view === "stations"
-      ? await loadStationView(db, monday, timeZone, views.includes("staff"))
+      ? await loadStationView(
+          db,
+          monday,
+          timeZone,
+          PLANNING_MODES[mode].staffsStations
+        )
       : await loadStaffView(db, monday, timeZone, placesFromUnplaced);
 
   /** Adressen till tavlan, med vyn kvar. Förvald vy skrivs inte ut. */

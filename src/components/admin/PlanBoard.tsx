@@ -2075,21 +2075,12 @@ function Legend({
         </>
       )}
 
-      {placing ? (
+      {placing && (
         <span className="ml-auto text-neutral-400">
           {armed
             ? `Tryck på ${target}, eller Esc för att avbryta`
             : `Tryck på ett jobb i Oplacerat, sedan på ${target}`}
         </span>
-      ) : (
-        kind === "staff" && (
-          // Personalen i en verkstad räknar inte av beräkningen, och har därför
-          // inget Oplacerat. Utan den här raden fanns ingen väg att se var
-          // ett pass läggs.
-          <span className="ml-auto text-neutral-400">
-            Pass läggs med Bemanna i en stationsruta
-          </span>
-        )
       )}
     </div>
   );

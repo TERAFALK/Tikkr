@@ -682,7 +682,7 @@ export const GUIDES = [
     notes: [
       "Under Inställningar, Planeringsläge, väljs Produktion eller Tjänst. Tjänst planerar personal, utan stationer.",
       "Produktion: öppna en ruta och tryck Bemanna för att planera en anställd på jobbet. Passet räknas inte mot beräknad tid.",
-      "Tjänst: under fliken Personal, tryck på ett jobb i Oplacerat och sedan på en anställd.",
+      "Tjänst: tryck på ett jobb i Oplacerat och sedan på en anställd.",
       "En anställd med två pass samtidigt markeras i gult.",
       "Vecka och Dag växlar mellan hela veckan och en dag i taget. Tryck på en dag i rubriken för att öppna den.",
       "Överbokning tillåts och markeras i gult.",

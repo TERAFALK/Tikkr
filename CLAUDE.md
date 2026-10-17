@@ -846,7 +846,7 @@ stripe_prices    — item, month_price_id, year_price_id, updated_by_email
 
    | Läge | Vyer på tavlan | Räknar av beräkningen |
    |---|---|---|
-   | Produktion (förval) | Stationer, Personal | stationernas rutor |
+   | Produktion (förval) | Stationer | stationernas rutor |
    | Tjänst | Personal | personalens pass |
 
    **Exakt EN resurs räknar av orderns beräknade tid.** Räknade både stationen
@@ -881,6 +881,11 @@ stripe_prices    — item, month_price_id, year_price_id, updated_by_email
 
    - **I Tjänst** placeras passen från Oplacerat, med samma två tryck som
      stationernas rutor, och räknar av orderns beräknade tid.
+   - **PRODUKTION HAR INGEN PERSONALFLIK** (ändrat 2026-10-17, produktägarens
+     beslut). Fliken visade bemanningen per person, men det gick inte att
+     planera något där, bara att se och flytta. Den togs bort, och tavlan i
+     Produktion är bara stationerna. Ett bokmärke till `?vy=personal` leder
+     till stationerna. Bemanningen finns kvar i stationsrutan, nedan.
    - **I Produktion** är passen bemanning. De läggs från stationsrutans dialog
      med knappen **Bemanna**, bär rutans id (`planned_block_id`), och start
      och längd föreslås ur rutan men går att ändra. De räknas inte mot
@@ -890,8 +895,9 @@ stripe_prices    — item, month_price_id, year_price_id, updated_by_email
    - **Tas stationsrutan bort ligger passet kvar** utan koppling
      (`onDelete: SetNull`). En persons planerade dag ska inte försvinna för att
      maskinplanen ändrades.
-   - **Två pass samtidigt för samma person varnas i gult**, avvisas inte. En
-     operatör kör ibland två maskiner (regel 2).
+   - **Två pass samtidigt för samma person varnas i gult** på personalvyn i
+     Tjänst, och avvisas inte. En operatör kör ibland två maskiner (regel 2).
+     I Produktion finns ingen personalvy, och dubbelbokningen syns inte.
    - Till fas 3 har en anställd inga arbetstider på tavlan: passet räknas i
      väggklockans minuter, utan raster, och kapas vid midnatt.
 
