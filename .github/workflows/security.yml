@@ -85,7 +85,7 @@ jobs:
       # --redact: ett fynd skrivs ut utan värdet. Loggen från en publik
       # körning är också publik.
       - name: Sök efter hemligheter
-        run: ./gitleaks git --redact --verbose --no-banner .
+        run: ./gitleaks git --config .gitleaks.toml --redact --verbose --no-banner .
 
   kodanalys:
     name: Kodanalys (semgrep)
