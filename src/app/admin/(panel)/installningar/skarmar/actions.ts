@@ -2,8 +2,8 @@
 
 import { revalidatePath } from "next/cache";
 import { assertWritable, requireAdmin } from "@/lib/admin-session";
-import { createKioskDevice, startPairing } from "@/lib/kiosk-auth";
-import { assertLicenseAvailable, LicenseError } from "@/lib/licenses";
+import { startPairing } from "@/lib/kiosk-auth";
+import { createLicensedDevice, LicenseError } from "@/lib/licenses";
 
 const PATH = "/admin/installningar/skarmar";
 
@@ -35,15 +35,19 @@ export async function addDevice(
   if (!name) return { error: "Ge skärmen ett namn." };
 
   // Kontrolleras här och inte bara i gränssnittet. En serveråtgärd är en
-  // publik ingång och måste skydda sig själv.
+  // publik ingång och måste skydda sig själv. Prövningen och skapandet sker
+  // under samma lås, så att två samtidiga tryck inte båda får den sista
+  // licensen, se createLicensedDevice.
+  let device: Awaited<ReturnType<typeof createLicensedDevice>>;
+
   try {
-    await assertLicenseAvailable(companyId);
+    device = await createLicensedDevice(companyId, name);
   } catch (error) {
     if (error instanceof LicenseError) return { error: error.message };
     throw error;
   }
 
-  const { device, pairing } = await createKioskDevice(companyId, name);
+  const pairing = await startPairing(device.id);
 
   revalidatePath(PATH);
 
