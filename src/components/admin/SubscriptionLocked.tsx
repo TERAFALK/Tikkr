@@ -18,6 +18,7 @@ export default function SubscriptionLocked({
   paymentsAvailable,
   yearlyAvailable,
   pricing,
+  canBuy,
 }: {
   state: AccessState;
   companyName: string;
@@ -25,6 +26,8 @@ export default function SubscriptionLocked({
   paymentsAvailable: boolean;
   yearlyAvailable: boolean;
   pricing: ScreenPricing;
+  /** Bara ägaren köper, se isOwner i admin-session.ts. */
+  canBuy: boolean;
 }) {
   return (
     <div className="mx-auto max-w-lg py-12">
@@ -48,7 +51,11 @@ export default function SubscriptionLocked({
         </div>
 
         <div className="mt-6 border-t border-neutral-200 pt-5">
-          {paymentsAvailable ? (
+          {!canBuy ? (
+            <p className="text-[13px] leading-relaxed text-neutral-600">
+              Prenumerationen aktiveras av arbetsytans ägare.
+            </p>
+          ) : paymentsAvailable ? (
             <form action={startCheckout} className="space-y-3">
               <label className="block">
                 <span className="mb-1 block text-[13px] font-medium text-neutral-700">

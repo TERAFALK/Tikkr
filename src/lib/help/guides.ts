@@ -738,7 +738,7 @@ export const GUIDES = [
       },
       {
         title: "Fyll i e-postadress och behörighet",
-        body: "Ägare kan dessutom hantera prenumerationen och andra administratörer.",
+        body: "Ägare kan dessutom hantera prenumerationen, anonymisera anställda och hantera andra administratörer.",
       },
       {
         title: "Tryck Skapa inbjudan",
@@ -770,6 +770,7 @@ export const GUIDES = [
       },
     ],
     notes: [
+      "Licenser, tillval och betalning ändras av en ägare.",
       "Kort, kvitton och uppsägning hanteras på betaltjänstens sida, som nås från samma sida.",
       "Stämplingsskärmarna slutar aldrig fungera vid utebliven betalning. Panelen låses efter tio dagar.",
       "Ingen bindningstid.",
@@ -793,7 +794,7 @@ export const GUIDES = [
       },
       {
         title: "Radera personuppgifter",
-        body: "Välj den anställde och skriv ANONYMISERA. Kan inte ångras.",
+        body: "Välj den anställde och skriv ANONYMISERA. Görs av en ägare. Kan inte ångras.",
       },
     ],
     notes: [

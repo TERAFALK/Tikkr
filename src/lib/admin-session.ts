@@ -285,6 +285,23 @@ async function touchVisit(visitId: string): Promise<void> {
   }
 }
 
+/**
+ * true för arbetsytans ägare.
+ *
+ * BARA ÄGAREN ÄNDRAR FAKTURAN OCH ANONYMISERAR (beslutat 2026-10-18,
+ * produktägarens val, säkerhetsgranskningen). Licenser, tillval, kassan och
+ * betalningsportalen ändrar vad kunden betalar, och anonymiseringen går inte
+ * att ångra. Tidigare krävde bara användarhanteringen en ägare, se
+ * admin-users.ts.
+ *
+ * Prövas i varje serveråtgärd det gäller, inte bara i gränssnittet, och
+ * bevisas av tests/owner-coverage.test.ts. Supportläget har rollen SUPPORT
+ * och räknas alltså aldrig som ägare.
+ */
+export function isOwner(session: AdminSession): boolean {
+  return session.role === "OWNER";
+}
+
 export async function requireAdmin(): Promise<AdminSession> {
   const admin = await currentAdmin();
 

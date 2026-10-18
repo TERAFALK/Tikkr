@@ -1,6 +1,6 @@
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
-import { READ_ONLY_COOKIE, requireAdmin } from "@/lib/admin-session";
+import { isOwner, READ_ONLY_COOKIE, requireAdmin } from "@/lib/admin-session";
 import { unsafeGlobalPrisma } from "@/lib/db";
 import { getOnboardingState } from "@/lib/onboarding";
 import { evaluateAccess } from "@/lib/subscription";
@@ -232,6 +232,7 @@ export default async function PanelLayout({
               paymentsAvailable={await paymentsAvailable()}
               yearlyAvailable={await yearlyAvailable()}
               pricing={await getScreenPricing()}
+              canBuy={isOwner(session)}
             />
           ) : (
             children

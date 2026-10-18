@@ -1,4 +1,4 @@
-import { requireAdmin } from "@/lib/admin-session";
+import { isOwner, requireAdmin } from "@/lib/admin-session";
 import { unsafeGlobalPrisma } from "@/lib/db";
 import { getBillingOverview } from "@/lib/billing";
 import { paymentsAvailable, yearlyAvailable } from "@/lib/stripe";
@@ -24,7 +24,10 @@ export default async function SubscriptionPage({
 }: {
   searchParams: Promise<{ klart?: string; skots?: string }>;
 }) {
-  const { companyId } = await requireAdmin();
+  const session = await requireAdmin();
+  const { companyId } = session;
+  // Licenser, tillval och betalning ändras bara av ägaren, se isOwner.
+  const owner = isOwner(session);
   const params = await searchParams;
 
   const company = await unsafeGlobalPrisma.company.findUnique({
@@ -204,6 +207,10 @@ export default async function SubscriptionPage({
               Prenumerationen sköts av Tikkr för det här företaget. Kontakta
               support@tikkr.se för att ändra antalet licenser eller tillvalen.
             </Alert>
+          ) : !owner ? (
+            <Alert tone="info">
+              Prenumerationen ändras av arbetsytans ägare.
+            </Alert>
           ) : overview.hasSubscription ? (
             <div className="space-y-6">
               <LicenseForm
@@ -297,7 +304,7 @@ export default async function SubscriptionPage({
               modules={overview.modules}
               hasSubscription={overview.hasSubscription}
               interval={overview.interval ?? "month"}
-              managed={overview.platformManaged}
+              managed={overview.platformManaged || !owner}
             />
           </div>
         </Card>
