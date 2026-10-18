@@ -11,12 +11,13 @@ declare module "next-auth" {
       companyName: string;
       role: string;
       /**
-       * När sessionen utfärdades, i sekunder.
+       * När personen loggade in, i sekunder. Ändras aldrig av en förnyelse.
        *
-       * Jämförs mot kontots passwordChangedAt, så att ett lösenordsbyte gör
-       * äldre sessioner ogiltiga. Se currentAdmin() i src/lib/admin-session.ts.
+       * Jämförs mot kontots passwordChangedAt och sessionsRevokedAt, och mot
+       * sessionens tak. Se auth-callbacks.ts och currentAdmin() i
+       * src/lib/admin-session.ts.
        */
-      issuedAt?: number;
+      authTime?: number;
       /**
        * Satt bara på den första sessionen efter en registrering, och bara så
        * länge appen inte är kopplad.
@@ -42,5 +43,7 @@ declare module "next-auth/jwt" {
     companyName?: string;
     role?: string;
     mfaDeferred?: boolean;
+    /** Inloggningstiden i sekunder. Sätts bara vid inloggningen. */
+    authTime?: number;
   }
 }

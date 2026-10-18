@@ -24,8 +24,8 @@ import { unsafeGlobalPrisma } from "@/lib/db";
 /** Vad den påhittade sessionen ska svara. Ändras per test. */
 let sessionUserId: string | null = null;
 
-/** När sessionen utfärdades, i sekunder. Som next-auth anger den. */
-let sessionIssuedAt: number | undefined;
+/** När personen loggade in, i sekunder. Se auth-callbacks.ts. */
+let sessionAuthTime: number | undefined;
 
 /**
  * Märket som den första sessionen efter en registrering bär.
@@ -41,7 +41,7 @@ vi.mock("@/lib/auth", () => ({
       ? {
           user: {
             id: sessionUserId,
-            issuedAt: sessionIssuedAt,
+            authTime: sessionAuthTime,
             mfaDeferred: sessionMfaDeferred,
           },
         }
@@ -116,12 +116,12 @@ beforeEach(async () => {
 
   ownerId = owner.id;
   sessionUserId = owner.id;
-  sessionIssuedAt = Math.floor(Date.now() / 1000);
+  sessionAuthTime = Math.floor(Date.now() / 1000);
 });
 
 afterEach(async () => {
   sessionUserId = null;
-  sessionIssuedAt = undefined;
+  sessionAuthTime = undefined;
   sessionMfaDeferred = false;
   // Städas på båda hållen. En kvarglömd supportcookie hade gjort nästa test
   // till ett supportbesök utan att testet nämnde något om det.
@@ -190,7 +190,7 @@ describe("lösenordsbyte ogiltigförklarar äldre sessioner", () => {
     // Situationen: någon annan har kommit åt kontot och är inloggad. Ägaren
     // byter lösenord. Då ska inkräktarens session sluta gälla, annars var
     // bytet meningslöst.
-    sessionIssuedAt = Math.floor(Date.now() / 1000) - 3600;
+    sessionAuthTime = Math.floor(Date.now() / 1000) - 3600;
 
     await unsafeGlobalPrisma.adminUser.update({
       where: { id: ownerId },
@@ -206,15 +206,37 @@ describe("lösenordsbyte ogiltigförklarar äldre sessioner", () => {
       data: { passwordChangedAt: new Date(Date.now() - 3600 * 1000) },
     });
 
-    sessionIssuedAt = Math.floor(Date.now() / 1000);
+    sessionAuthTime = Math.floor(Date.now() / 1000);
 
     expect(await currentAdmin()).not.toBeNull();
   });
 
   it("konto som aldrig bytt lösenord påverkas inte", async () => {
-    sessionIssuedAt = Math.floor(Date.now() / 1000) - 30 * 24 * 3600;
+    sessionAuthTime = Math.floor(Date.now() / 1000) - 6 * 24 * 3600;
 
     expect(await currentAdmin()).not.toBeNull();
+  });
+});
+
+/**
+ * TAKET RÄKNAS FRÅN INLOGGNINGEN (2026-10-18).
+ *
+ * Auth.js förlänger cookien vid varje förnyelse. Utan taket i currentAdmin()
+ * levde en session så länge någon använde den, även en stulen.
+ */
+describe("sessionen gäller sju dagar från inloggningen", () => {
+  it("en inloggning som är äldre än sju dagar nekas", async () => {
+    sessionAuthTime = Math.floor(Date.now() / 1000) - 7 * 24 * 3600 - 60;
+
+    expect(await currentAdmin()).toBeNull();
+  });
+
+  it("en session utan inloggningstid nekas", async () => {
+    // Sessioner från före ändringen bär bara `iat`, som Auth.js sätter om vid
+    // varje förnyelse. De får logga in en gång till.
+    sessionAuthTime = undefined;
+
+    expect(await currentAdmin()).toBeNull();
   });
 });
 
@@ -272,7 +294,7 @@ describe("tvåstegsinloggning är obligatorisk", () => {
 
 describe("utloggning på alla enheter", () => {
   it("session utfärdad före utloggningen nekas", async () => {
-    sessionIssuedAt = Math.floor(Date.now() / 1000) - 3600;
+    sessionAuthTime = Math.floor(Date.now() / 1000) - 3600;
 
     await unsafeGlobalPrisma.adminUser.update({
       where: { id: ownerId },
@@ -288,7 +310,7 @@ describe("utloggning på alla enheter", () => {
       data: { sessionsRevokedAt: new Date(Date.now() - 3600 * 1000) },
     });
 
-    sessionIssuedAt = Math.floor(Date.now() / 1000);
+    sessionAuthTime = Math.floor(Date.now() / 1000);
 
     expect(await currentAdmin()).not.toBeNull();
   });
