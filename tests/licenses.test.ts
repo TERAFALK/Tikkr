@@ -6,6 +6,7 @@ import {
   setLicenseCount,
   LicenseError,
   TRIAL_LICENSES,
+  createLicensedDevice,
 } from "@/lib/licenses";
 
 /**
@@ -63,6 +64,42 @@ describe("provperioden", () => {
     await expect(assertLicenseAvailable(companyId)).rejects.toThrow(
       LicenseError
     );
+  });
+});
+
+/**
+ * SAMTIDIGA TRYCK (2026-10-18).
+ *
+ * Prövningen och skapandet var två steg. Fem tryck i samma ögonblick läste
+ * alla "två lediga" och skapade fem skärmar på två licenser.
+ */
+describe("samtidiga tryck på Lägg till", () => {
+  it("ger aldrig fler skärmar än licenser", async () => {
+    const attempts = await Promise.allSettled(
+      Array.from({ length: 5 }, (_, index) =>
+        createLicensedDevice(companyId, `Samtidig ${index}`)
+      )
+    );
+
+    const created = attempts.filter((attempt) => attempt.status === "fulfilled");
+    const refused = attempts.filter(
+      (attempt) =>
+        attempt.status === "rejected" && attempt.reason instanceof LicenseError
+    );
+
+    expect(created).toHaveLength(TRIAL_LICENSES);
+    expect(refused).toHaveLength(5 - TRIAL_LICENSES);
+    expect((await getLicenseState(companyId)).used).toBe(TRIAL_LICENSES);
+  });
+
+  it("skapar ingen skärm när licenserna är slut", async () => {
+    await addDevice();
+    await addDevice();
+
+    await expect(createLicensedDevice(companyId, "En för mycket")).rejects.toThrow(
+      LicenseError
+    );
+    expect((await getLicenseState(companyId)).used).toBe(2);
   });
 });
 

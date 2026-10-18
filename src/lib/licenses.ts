@@ -53,6 +53,49 @@ export async function getLicenseState(companyId: string): Promise<LicenseState> 
 }
 
 /**
+ * LÄGGER UPP EN SKÄRM, BARA OM EN LICENS ÄR LEDIG, OCH ALDRIG TVÅ PÅ EN
+ * (tillagt 2026-10-18, säkerhetsgranskningen).
+ *
+ * Prövningen och skapandet var två steg utan något emellan, så två tryck på
+ * Lägg till i samma ögonblick läste båda "en licens ledig" och skapade varsin
+ * skärm. Nu sker båda i en transaktion som först tar ett lås per företag: den
+ * andra väntar tills den första sparat, och ser då dess skärm.
+ *
+ * Allt går genom transaktionens egen klient. Hade arbetet gått genom en annan
+ * anslutning medan låset hölls kunde samtidiga tryck ta slut på
+ * anslutningarna, och då väntar alla på varandra. Därför `companyId` utskrivet
+ * i frågan, som i kiosk-auth.ts. Låset är rå SQL men utan kunddata, som i
+ * clock.ts. Kopplingskoden tas fram efteråt, utanför låset, se startPairing.
+ */
+export async function createLicensedDevice(companyId: string, name: string) {
+  return unsafeGlobalPrisma.$transaction(async (tx) => {
+    const lockKey = `licenses:${companyId}`;
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${lockKey}))`;
+
+    const [company, used] = await Promise.all([
+      tx.company.findUnique({
+        where: { id: companyId },
+        select: { screenLicenses: true },
+      }),
+      tx.kioskDevice.count({ where: { companyId } }),
+    ]);
+
+    const total = company?.screenLicenses ?? TRIAL_LICENSES;
+    if (used >= total) throw new LicenseError(fullMessage(total));
+
+    return tx.kioskDevice.create({ data: { companyId, name } });
+  });
+}
+
+function fullMessage(total: number): string {
+  return (
+    `Samtliga ${total} licenser används. Utöka antalet under ` +
+    `Inställningar → Prenumeration, eller radera en skärm ni inte ` +
+    `längre använder.`
+  );
+}
+
+/**
  * Vägrar om det inte finns en ledig licens.
  *
  * Meddelandet säger vad som behöver göras, inte bara att det inte gick. Ett
@@ -63,11 +106,7 @@ export async function assertLicenseAvailable(companyId: string): Promise<void> {
 
   if (state.available > 0) return;
 
-  throw new LicenseError(
-    `Samtliga ${state.total} licenser används. Utöka antalet under ` +
-      `Inställningar → Prenumeration, eller radera en skärm ni inte ` +
-      `längre använder.`
-  );
+  throw new LicenseError(fullMessage(state.total));
 }
 
 /**
