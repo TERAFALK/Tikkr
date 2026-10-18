@@ -1343,7 +1343,17 @@ ligger i `src/lib/feedback.ts`, och `tests/feedback.test.ts` fäller den.
 
    **Sessionen gäller sju dagar** (ändrat 2026-10-06, var trettio dagar). Ett
    lösenordsbyte eller "Logga ut på alla enheter" under Ditt konto gör äldre
-   sessioner ogiltiga. **E-postadressen bekräftas** med en länk vid
+   sessioner ogiltiga.
+
+   **De sju dagarna räknas från INLOGGNINGEN, och återkallelsen prövas mot
+   samma tid** (ändrat 2026-10-18, säkerhetsgranskningen). Prövningen låg mot
+   `iat`, som Auth.js sätter om varje gång `/api/auth/session` signerar om
+   sessionen. Den som hade en stulen cookie behövde därför bara göra ett anrop
+   efter utloggningen för att vara inne igen, och en session som användes
+   minst en gång i veckan gick aldrig ut. Nu bär token `authTime`, som sätts
+   bara vid inloggningen, och `currentAdmin()` nekar en session utan den. Se
+   `auth-callbacks.ts`. Konsekvensen är att alla loggar in en gång till efter
+   versionen, och därefter var sjunde dag oavsett hur ofta panelen används. **E-postadressen bekräftas** med en länk vid
    registreringen; det spärrar ingenting, men panelen visar en remsa tills
    det är gjort, och en obekräftad adress går att rätta själv. Registreringen
    tar högst fem nya arbetsytor per kvart och IP-adress. Se `account.ts` och
