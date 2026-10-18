@@ -1,0 +1,148 @@
+# Säkerhetskontrollerna (infört 2026-10-18, säkerhetsgranskningen).
+#
+# Körs på varje pull request, varje push till dev och prod och en gång i
+# veckan, eftersom en ny sårbarhet i ett beroende dyker upp utan att någon
+# ändrat koden. Fyra jobb, som körs samtidigt:
+#
+#   beroenden  npm audit mot lockfilen
+#   hemligheter  gitleaks över hela historiken, eftersom repot är publikt
+#   kodanalys  semgrep med regler för TypeScript, Node och OWASP
+#   image      trivy mot Docker-imagen
+#
+# Verktygen hämtas i en låst version, och gitleaks med kontrollsumma. Versioner
+# väljs minst två veckor efter att de släppts, så att en kapad release hinner
+# upptäckas av någon annan först. Dependabot föreslår uppdateringar av resten,
+# se .github/dependabot.yml.
+#
+# Den här filen driftsätter ingenting och har bara läsrätt.
+
+name: Säkerhet
+
+on:
+  pull_request:
+  push:
+    branches: [dev, prod]
+  schedule:
+    # Måndagar 05:17 UTC. Ett udda klockslag, så att körningen inte hamnar i
+    # GitHubs kö på heltimmen.
+    - cron: "17 5 * * 1"
+  workflow_dispatch:
+
+concurrency:
+  group: security-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  beroenden:
+    name: Beroenden (npm audit)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+
+      # Det som följer med till produktionen fäller vid HÖG. Utvecklingsverktygen
+      # fäller först vid KRITISK: de körs bara här och på laptopen, men en
+      # kritisk sårbarhet i testverktyget är ändå en väg in i CI.
+      - name: Beroenden i produktionen, hög och kritisk
+        run: npm audit --omit=dev --audit-level=high
+
+      - name: Alla beroenden, kritisk
+        run: npm audit --audit-level=critical
+
+  hemligheter:
+    name: Hemligheter (gitleaks)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    env:
+      GITLEAKS_VERSION: 8.30.1
+      GITLEAKS_SHA256: 551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb
+
+    steps:
+      # Hela historiken. En nyckel som tagits bort i en senare commit finns
+      # kvar i den gamla, och repot är publikt.
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      # Binären och inte gitleaks-action, som kräver en licens för konton som
+      # tillhör en organisation.
+      - name: Hämta gitleaks
+        run: |
+          curl -sSfL -o gitleaks.tar.gz \
+            "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
+          echo "${GITLEAKS_SHA256}  gitleaks.tar.gz" | sha256sum --check
+          tar -xzf gitleaks.tar.gz gitleaks
+
+      # --redact: ett fynd skrivs ut utan värdet. Loggen från en publik
+      # körning är också publik.
+      - name: Sök efter hemligheter
+        run: ./gitleaks git --redact --verbose --no-banner .
+
+  kodanalys:
+    name: Kodanalys (semgrep)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    container:
+      image: semgrep/semgrep:1.178.0
+
+    steps:
+      - uses: actions/checkout@v5
+
+      # BLOCKERAR BARA VID ERROR. Reglerna för TypeScript och OWASP säger mycket
+      # som är varningar eller information, och en kontroll som alltid är röd
+      # slutar någon titta på. Varningarna står i loggen.
+      #
+      # Ett fynd som är fel avfärdas med en kommentar på raden:
+      #   // nosemgrep: <regel-id> — skälet
+      - name: Semgrep
+        run: >-
+          semgrep scan
+          --config p/typescript
+          --config p/nodejsscan
+          --config p/owasp-top-ten
+          --config p/secrets
+          --exclude tests
+          --exclude prisma/migrations
+          --metrics off
+          --severity ERROR
+          --error
+
+  image:
+    name: Docker-imagen (trivy)
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    env:
+      TRIVY_IMAGE: aquasec/trivy:0.75.0
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Bygg Docker-imagen
+        run: >-
+          docker build --target runner --tag tikkr-app:skanning
+          --build-arg TIKKR_VERSION=skanning-${{ github.sha }} .
+
+      # Fäller vid KRITISK som har en rättelse. HÖG skrivs ut men fäller inte:
+      # basimagen node:22-alpine får nya fynd mellan våra byggen, och en sådan
+      # ska åtgärdas genom att bygga om, inte stoppa varje PR under tiden.
+      - name: Hög och kritisk, rapport
+        run: >-
+          docker run --rm -v /var/run/docker.sock:/var/run/docker.sock
+          "$TRIVY_IMAGE" image --quiet --ignore-unfixed
+          --severity HIGH,CRITICAL --exit-code 0 tikkr-app:skanning
+
+      - name: Kritisk med rättelse, fäller
+        run: >-
+          docker run --rm -v /var/run/docker.sock:/var/run/docker.sock
+          "$TRIVY_IMAGE" image --quiet --ignore-unfixed
+          --severity CRITICAL --exit-code 1 tikkr-app:skanning
