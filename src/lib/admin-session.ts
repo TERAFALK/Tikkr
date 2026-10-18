@@ -4,6 +4,7 @@ import { auth } from "./auth";
 import { unsafeGlobalPrisma } from "./db";
 import { forCompany, type CompanyDb } from "./tenant";
 import { readSupportSession } from "./support-session";
+import { SESSION_MAX_AGE_SECONDS } from "./session-lifetime";
 
 /**
  * Grinden till adminpanelen.
@@ -199,16 +200,27 @@ export async function currentAdmin(): Promise<AdminSession | null> {
   // byta lösenord när man misstänker att någon annan är inne — den andras
   // inloggning skulle fortsätta fungera.
   //
-  // Utfärdandetiden räknas i hela sekunder. En marginal på en sekund gör att
-  // den som byter sitt eget lösenord och loggas in på nytt i samma ögonblick
-  // inte råkar kastas ut av sin egen ändring.
-  if (session.user.issuedAt) {
-    const issued = session.user.issuedAt * 1000;
-    const cutoffs = [account.passwordChangedAt, account.sessionsRevokedAt];
+  // Prövas mot INLOGGNINGSTIDEN, aldrig mot `iat` (ändrat 2026-10-18). Auth.js
+  // sätter om `iat` vid varje förnyelse, så en stulen cookie klarade annars
+  // prövningen efter ett enda anrop till /api/auth/session. Se
+  // auth-callbacks.ts. Saknas tiden är sessionen från före ändringen, och den
+  // nekas: hellre en inloggning till än en cookie som går att förnya förbi
+  // regeln.
+  //
+  // Tiden räknas i hela sekunder. En marginal på en sekund gör att den som
+  // byter sitt eget lösenord och loggas in på nytt i samma ögonblick inte
+  // råkar kastas ut av sin egen ändring.
+  const authTime = session.user.authTime;
+  if (typeof authTime !== "number") return null;
 
-    for (const cutoff of cutoffs) {
-      if (cutoff && issued < cutoff.getTime() - 1000) return null;
-    }
+  const authenticated = authTime * 1000;
+
+  // Taket gäller från inloggningen. Cookien förlängs av Auth.js vid varje
+  // förnyelse, och utan taket levde en session så länge någon använde den.
+  if (Date.now() - authenticated > SESSION_MAX_AGE_SECONDS * 1000) return null;
+
+  for (const cutoff of [account.passwordChangedAt, account.sessionsRevokedAt]) {
+    if (cutoff && authenticated < cutoff.getTime() - 1000) return null;
   }
 
   // Allt kommer från databasen, inget från token. Ett företagsnamn som ändrats
