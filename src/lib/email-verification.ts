@@ -202,15 +202,15 @@ export async function changeUnverifiedEmail(params: {
     );
   }
 
-  if (isLockedOut("admin", user.email)) {
+  if (await isLockedOut("admin", user.email)) {
     throw new EmailVerificationError(LOCKED_OUT_MESSAGE);
   }
 
   if (!(await bcrypt.compare(params.password, user.passwordHash))) {
-    noteFailedLogin("admin", user.email);
+    await noteFailedLogin("admin", user.email);
     throw new EmailVerificationError("Lösenordet stämmer inte.");
   }
-  clearFailedLogins("admin", user.email);
+  await clearFailedLogins("admin", user.email);
 
   if (email === user.email) return;
 

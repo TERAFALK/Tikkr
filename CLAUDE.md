@@ -303,6 +303,7 @@ company_prices   — id, company_id, item, monthly_ore, updated_by_email
 
   — plattformens egna tabeller, aldrig kundens —
 stripe_prices    — item, month_price_id, year_price_id, updated_by_email
+login_throttles  — scope, key_hash, count, until
 ```
 
 ### Beslutade regler för stämpling (bestämt 2026-08-10)
@@ -1334,6 +1335,20 @@ ligger i `src/lib/feedback.ts`, och `tests/feedback.test.ts` fäller den.
 2. **Kiosk-token, inte PIN** — varje fysisk skärm får en lång, slumpad,
    återkallningsbar, company-scopad token vid uppsättning. Utan giltig token
    accepteras ingen stämpling.
+
+   **Kopplingskoden bromsas bara per IP-adress** (beslutat 2026-10-18,
+   produktägarens val, säkerhetsgranskningen). Fem fel per adress och kvart.
+   En gemensam spärr på hundra fel för hela installationen togs bort, eftersom
+   vem som helst kunde stänga skärmkopplingen för alla kunder med ett skript
+   mot `/kiosk`. Koden är kvar på sex siffror och gäller i fem minuter, och
+   priset är uttryckligt: den som gissar från många adresser får fem försök
+   per adress.
+
+   **Bromsarna ligger i databasen** (ändrat 2026-10-18), i `login_throttles`,
+   och inte i minnet. En räknare i minnet nollades vid varje driftsättning.
+   Nyckeln, alltså e-postadressen eller IP-adressen, sparas som SHA-256, och
+   rader som löpt ut raderas löpande. Koden i steg två räknas nu också per IP,
+   både i adminpanelen och i plattformspanelen. Se `login-throttle.ts`.
 3. **Fullständig audit-logg** — varje stämpling sparar tidsstämpel, kiosk-ID och
    IP, så admin i efterhand kan se och manuellt korrigera en felaktig stämpling.
 

@@ -70,7 +70,7 @@ function lastCode(): string {
 }
 
 beforeEach(async () => {
-  __resetThrottle();
+  await __resetThrottle();
   sent.length = 0;
   process.env.AUTH_SECRET = "testhemlighet-for-alternativ";
   await createUser({});

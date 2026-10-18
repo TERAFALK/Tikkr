@@ -4,6 +4,7 @@ import { unsafeGlobalPrisma } from "./db";
 import { verifyAdminCode, verifyEmailLoginCode } from "./admin-mfa";
 import { decodeTicket } from "./login-ticket";
 import { isTrustedDevice } from "./trusted-device";
+import { clientIpFrom } from "./client-ip";
 import { jwtCallback, sessionCallback } from "./auth-callbacks";
 import { SESSION_MAX_AGE_SECONDS } from "./session-lifetime";
 
@@ -75,12 +76,17 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         device: { type: "text" },
       },
 
-      async authorize(credentials) {
+      async authorize(credentials, request) {
         const ticket = decodeTicket("admin", String(credentials?.ticket ?? ""));
         if (!ticket) return null;
 
         const code = String(credentials?.code ?? "");
         const method = String(credentials?.method ?? "app");
+
+        // Adressen för spärren per IP på koden, se admin-mfa.ts. Auth.js
+        // bygger anropet ur det inkommande, även när signIn() kallas från en
+        // serveråtgärd, så det är vår egen proxys X-Forwarded-For som läses.
+        const ip = clientIpFrom(request.headers);
 
         // FÖRSTA SESSIONEN EFTER EN REGISTRERING (2026-10-11).
         //
@@ -104,9 +110,11 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
               ? await verifyEmailLoginCode(
                   ticket.sub,
                   code,
-                  ticket.afterReset === true
+                  ticket.afterReset === true,
+                  new Date(),
+                  ip
                 )
-              : await verifyAdminCode(ticket.sub, code));
+              : await verifyAdminCode(ticket.sub, code, new Date(), ip));
 
         if (!passed) return null;
 

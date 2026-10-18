@@ -104,7 +104,7 @@ describe("plattformens inloggning kräver koden", () => {
   const originalSecret = process.env.AUTH_SECRET;
 
   beforeEach(async () => {
-    __resetThrottle();
+    await __resetThrottle();
     process.env.PLATFORM_ADMIN_EMAILS = email;
     process.env.AUTH_SECRET = authSecret;
 

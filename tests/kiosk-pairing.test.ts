@@ -62,7 +62,7 @@ let companyId: string;
 
 beforeEach(async () => {
   jar.clear();
-  __resetThrottle();
+  await __resetThrottle();
   callerIp = `198.51.100.${Math.ceil(Math.random() * 250)}`;
 
   const company = await unsafeGlobalPrisma.company.create({
@@ -350,6 +350,30 @@ describe("tak på antalet gissningar", () => {
     form.set("code", pairing.code);
 
     expect((await pairDevice({}, form)).pairedAs).toBe("Svetsen");
+  });
+
+  /**
+   * INGEN GEMENSAM SPÄRR (2026-10-18, produktägarens beslut).
+   *
+   * Hundra fel totalt låste tidigare kopplingen för alla kunder i en kvart,
+   * och vem som helst kunde utlösa det med ett skript mot /kiosk.
+   */
+  it("många felgissningar från andra adresser stänger inte kopplingen för någon annan", async () => {
+    const { pairing } = await createKioskDevice(companyId, "Lackeringen");
+
+    for (let attempt = 0; attempt < 120; attempt += 1) {
+      callerIp = `192.0.2.${attempt % 250}`;
+      const guess = new FormData();
+      guess.set("code", String(400000 + attempt));
+      await pairDevice({}, guess);
+    }
+
+    callerIp = "203.0.113.9";
+
+    const form = new FormData();
+    form.set("code", pairing.code);
+
+    expect((await pairDevice({}, form)).pairedAs).toBe("Lackeringen");
   });
 
   it("en lyckad koppling nollställer räknaren", async () => {

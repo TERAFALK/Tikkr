@@ -1,3 +1,6 @@
+import { createHash } from "node:crypto";
+import { unsafeGlobalPrisma } from "./db";
+
 /**
  * BROMSNING AV LÖSENORDSGISSNINGAR.
  *
@@ -9,16 +12,18 @@
  * gissning meningslös, tillräckligt milt för att den som skrivit fel tre gånger
  * inte ska behöva höra av sig.
  *
- * RÄKNAS I MINNET, inte i databasen. Det räcker så länge appen kör som en
- * process, vilket den gör i dagens uppsättning. Körs den någon gång i flera
- * processer eller på flera servrar nollas räknaren per process, och skyddet
- * försvagas i motsvarande grad — då ska räkningen flyttas till databasen.
- * Noterat här så att det inte glöms bort.
+ * RÄKNAS I DATABASEN (ändrat 2026-10-18, säkerhetsgranskningen). Räknaren låg
+ * i minnet, och nollades därmed vid varje omstart, alltså vid varje
+ * driftsättning: den som gissade på en tvåstegskod fick fem nya försök varje
+ * gång en version släpptes. Minnet hade dessutom ett tak, och den som fyllde
+ * det med nya nycklar kunde tränga ut en låsning som redan gällde. Tabellen
+ * har inget tak, och raderna städas när de löpt ut.
  *
  * Låsningen är per e-postadress, inte per IP. Skälet: den som gissar lösenord
  * mot ETT konto byter lätt IP, medan en verkstad ofta delar en enda utgående
  * adress. En IP-baserad spärr hade alltså stängt ute hela kunden när en person
- * skrev fel.
+ * skrev fel. Där en IP-räknare ändå finns ligger den bredvid, med ett högre
+ * tak.
  */
 
 const MAX_ATTEMPTS = 5;
@@ -28,84 +33,91 @@ const LOCKOUT_MS = 15 * 60 * 1000;
 export const LOCKED_OUT_MESSAGE =
   "För många misslyckade försök. Försök igen om femton minuter.";
 
-/**
- * Högsta antalet nycklar räknaren håller.
- *
- * Nycklarna kommer utifrån — en e-postadress, en IP — och den som skickar en
- * ny för varje anrop fyller annars minnet tills processen dör. Vid taket rensas
- * först det som löpt ut, sedan de äldsta. Att glömma en gammal räkning ger en
- * gissare ett par försök till; att krascha ger alla kunder ett avbrott.
- */
-const MAX_KEYS = 10_000;
-
-const attempts = new Map<string, { count: number; until: number }>();
-
-function key(scope: string, email: string): string {
-  return `${scope}:${email}`;
+/** Nyckeln som den lagras: e-postadresser och IP-adresser sparas inte i klartext. */
+function hashKey(key: string): string {
+  return createHash("sha256").update(key).digest("hex");
 }
 
 /**
- * true när adressen är låst just nu.
+ * true när nyckeln är låst just nu.
  *
  * `scope` skiljer kundinloggningen från plattformsinloggningen, så att
  * misslyckade försök på den ena aldrig låser den andra. Samma person kan ha
  * konto på båda hållen.
  *
- * `maxAttempts` behövs för räknare som gäller fler än en person, som det
- * gemensamma taket för kopplingskoder. Fem är rätt för ett konto men inte för
- * en hel installation.
+ * `maxAttempts` behövs för räknare som gäller fler än en person, som taket per
+ * IP-adress. Fem är rätt för ett konto men inte för en hel verkstad.
  */
-export function isLockedOut(
+export async function isLockedOut(
   scope: string,
-  email: string,
-  maxAttempts: number = MAX_ATTEMPTS
-): boolean {
-  const record = attempts.get(key(scope, email));
-  if (!record) return false;
+  key: string,
+  maxAttempts: number = MAX_ATTEMPTS,
+  now: Date = new Date()
+): Promise<boolean> {
+  const record = await unsafeGlobalPrisma.loginThrottle.findUnique({
+    where: { scope_keyHash: { scope, keyHash: hashKey(key) } },
+    select: { count: true, until: true },
+  });
 
-  if (record.until < Date.now()) {
-    attempts.delete(key(scope, email));
-    return false;
-  }
+  if (!record || record.until < now) return false;
 
   return record.count >= maxAttempts;
 }
 
-/** Räknar upp ett misslyckat försök och förlänger låsningen. */
-export function noteFailedLogin(scope: string, email: string): void {
-  const id = key(scope, email);
-  const record = attempts.get(id) ?? { count: 0, until: 0 };
+/**
+ * Räknar upp ett misslyckat försök och förlänger låsningen.
+ *
+ * Svarar med räkningen EFTER det här försöket, som den blev i samma fråga.
+ * Den som behöver pröva ett tak mot samtidiga anrop ska pröva det talet och
+ * inte läsa om räkningen efteråt: då har andra anrop hunnit räkna upp den, och
+ * fler än nödvändigt avvisas. Se registreringen.
+ */
+export async function noteFailedLogin(
+  scope: string,
+  key: string,
+  now: Date = new Date()
+): Promise<number> {
+  const until = new Date(now.getTime() + LOCKOUT_MS);
 
-  record.count += 1;
-  record.until = Date.now() + LOCKOUT_MS;
+  // Det som löpt ut tas bort först, både för den här nyckeln och för alla
+  // andra. En räkning som gått ut ska börja om från ett, inte fortsätta där
+  // den slutade, och tabellen ska inte växa med varje gissning som gjorts.
+  await unsafeGlobalPrisma.loginThrottle.deleteMany({
+    where: { until: { lt: now } },
+  });
 
-  // Tas bort och läggs in igen, så att kartans ordning blir "senast rörd sist"
-  // och rensningen nedan tar de äldsta först.
-  attempts.delete(id);
-  attempts.set(id, record);
+  const where = { scope_keyHash: { scope, keyHash: hashKey(key) } };
 
-  if (attempts.size > MAX_KEYS) prune();
-}
+  try {
+    const row = await unsafeGlobalPrisma.loginThrottle.upsert({
+      where,
+      create: { scope, keyHash: hashKey(key), count: 1, until },
+      update: { count: { increment: 1 }, until },
+      select: { count: true },
+    });
+    return row.count;
+  } catch (error) {
+    // Två misslyckanden i samma ögonblick kan båda försöka skapa raden. Den
+    // som förlorar räknar upp den som vann, så att inget försök går förlorat.
+    if ((error as { code?: string } | null)?.code !== "P2002") throw error;
 
-function prune(): void {
-  const now = Date.now();
-
-  for (const [id, record] of attempts) {
-    if (record.until < now) attempts.delete(id);
-  }
-
-  for (const id of attempts.keys()) {
-    if (attempts.size <= MAX_KEYS) break;
-    attempts.delete(id);
+    const row = await unsafeGlobalPrisma.loginThrottle.update({
+      where,
+      data: { count: { increment: 1 }, until },
+      select: { count: true },
+    });
+    return row.count;
   }
 }
 
 /** Nollställer efter en lyckad inloggning. */
-export function clearFailedLogins(scope: string, email: string): void {
-  attempts.delete(key(scope, email));
+export async function clearFailedLogins(scope: string, key: string): Promise<void> {
+  await unsafeGlobalPrisma.loginThrottle.deleteMany({
+    where: { scope, keyHash: hashKey(key) },
+  });
 }
 
 /** Nollställer allt. Används av testerna. */
-export function __resetThrottle(): void {
-  attempts.clear();
+export async function __resetThrottle(): Promise<void> {
+  await unsafeGlobalPrisma.loginThrottle.deleteMany({});
 }

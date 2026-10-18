@@ -1,4 +1,5 @@
-import { describe, it, expect, beforeEach, vi, afterEach } from "vitest";
+import { describe, it, expect, beforeEach, afterAll } from "vitest";
+import { unsafeGlobalPrisma } from "@/lib/db";
 import {
   clearFailedLogins,
   isLockedOut,
@@ -13,111 +14,146 @@ import {
  * hålla på i timmar. Det är den här spärren som gör det. Reglerna som skyddas
  * här: femte försöket låser, låsningen släpper av sig själv, en lyckad
  * inloggning nollställer, och de två panelerna räknas var för sig.
+ *
+ * Räkningen ligger i databasen sedan 2026-10-18, så att en omstart inte nollar
+ * den. Tiden styrs med `now` i stället för låtsade timers, som inte rör
+ * databasens klocka.
  */
 
-beforeEach(() => {
-  __resetThrottle();
+beforeEach(async () => {
+  await __resetThrottle();
 });
 
-afterEach(() => {
-  vi.useRealTimers();
+afterAll(async () => {
+  await __resetThrottle();
+  await unsafeGlobalPrisma.$disconnect();
 });
 
-function failTimes(scope: string, email: string, times: number) {
+async function failTimes(scope: string, key: string, times: number, now?: Date) {
   for (let i = 0; i < times; i += 1) {
-    noteFailedLogin(scope, email);
+    await noteFailedLogin(scope, key, now);
   }
 }
 
+const minutes = (count: number) => count * 60 * 1000;
+
 describe("låsning efter upprepade försök", () => {
-  it("fyra försök låser inte", () => {
-    failTimes("admin", "chef@mekaniska.se", 4);
-    expect(isLockedOut("admin", "chef@mekaniska.se")).toBe(false);
+  it("fyra försök låser inte", async () => {
+    await failTimes("admin", "chef@mekaniska.se", 4);
+    expect(await isLockedOut("admin", "chef@mekaniska.se")).toBe(false);
   });
 
-  it("femte försöket låser", () => {
-    failTimes("admin", "chef@mekaniska.se", 5);
-    expect(isLockedOut("admin", "chef@mekaniska.se")).toBe(true);
+  it("femte försöket låser", async () => {
+    await failTimes("admin", "chef@mekaniska.se", 5);
+    expect(await isLockedOut("admin", "chef@mekaniska.se")).toBe(true);
   });
 
-  it("okänd adress är aldrig låst", () => {
-    failTimes("admin", "chef@mekaniska.se", 5);
-    expect(isLockedOut("admin", "nagon.annan@mekaniska.se")).toBe(false);
+  it("okänd adress är aldrig låst", async () => {
+    await failTimes("admin", "chef@mekaniska.se", 5);
+    expect(await isLockedOut("admin", "nagon.annan@mekaniska.se")).toBe(false);
   });
 });
 
 describe("låsningen släpper", () => {
-  it("efter femton minuter", () => {
-    vi.useFakeTimers();
-
-    failTimes("admin", "chef@mekaniska.se", 5);
-    expect(isLockedOut("admin", "chef@mekaniska.se")).toBe(true);
+  it("efter femton minuter", async () => {
+    const start = new Date();
+    await failTimes("admin", "chef@mekaniska.se", 5, start);
 
     // Fjorton minuter räcker inte.
-    vi.advanceTimersByTime(14 * 60 * 1000);
-    expect(isLockedOut("admin", "chef@mekaniska.se")).toBe(true);
+    const fourteen = new Date(start.getTime() + minutes(14));
+    expect(await isLockedOut("admin", "chef@mekaniska.se", 5, fourteen)).toBe(true);
 
-    vi.advanceTimersByTime(2 * 60 * 1000);
-    expect(isLockedOut("admin", "chef@mekaniska.se")).toBe(false);
+    const sixteen = new Date(start.getTime() + minutes(16));
+    expect(await isLockedOut("admin", "chef@mekaniska.se", 5, sixteen)).toBe(false);
   });
 
-  it("varje nytt försök förlänger låsningen", () => {
-    vi.useFakeTimers();
+  it("en räkning som löpt ut börjar om från ett", async () => {
+    // Annars hade ett enda fel efter en låsning som gått ut låst igen direkt.
+    const start = new Date();
+    await failTimes("admin", "chef@mekaniska.se", 5, start);
 
-    failTimes("admin", "chef@mekaniska.se", 5);
+    const later = new Date(start.getTime() + minutes(16));
+    await noteFailedLogin("admin", "chef@mekaniska.se", later);
 
-    vi.advanceTimersByTime(14 * 60 * 1000);
-    noteFailedLogin("admin", "chef@mekaniska.se");
-
-    // Utan förlängningen hade låsningen släppt en minut senare, och den som
-    // fortsätter gissa hade fått en ny omgång var femtonde minut i evighet.
-    vi.advanceTimersByTime(2 * 60 * 1000);
-    expect(isLockedOut("admin", "chef@mekaniska.se")).toBe(true);
-  });
-
-  it("efter en lyckad inloggning", () => {
-    failTimes("admin", "chef@mekaniska.se", 5);
-    clearFailedLogins("admin", "chef@mekaniska.se");
-
-    expect(isLockedOut("admin", "chef@mekaniska.se")).toBe(false);
+    expect(await isLockedOut("admin", "chef@mekaniska.se", 5, later)).toBe(false);
+    expect(await isLockedOut("admin", "chef@mekaniska.se", 1, later)).toBe(true);
   });
 });
 
-describe("gemensamma räknare", () => {
-  it("ett eget tak gäller i stället för fem", () => {
-    // Taket för kopplingskoder gäller hela installationen. Fem fel i hela
-    // landet får inte låsa alla kunders skärmkopplingar.
-    failTimes("kiosk-pairing-global", "*", 99);
-    expect(isLockedOut("kiosk-pairing-global", "*", 100)).toBe(false);
+describe("lyckad inloggning", () => {
+  it("nollställer räkningen", async () => {
+    await failTimes("admin", "chef@mekaniska.se", 4);
+    await clearFailedLogins("admin", "chef@mekaniska.se");
+    await noteFailedLogin("admin", "chef@mekaniska.se");
 
-    noteFailedLogin("kiosk-pairing-global", "*");
-    expect(isLockedOut("kiosk-pairing-global", "*", 100)).toBe(true);
+    expect(await isLockedOut("admin", "chef@mekaniska.se")).toBe(false);
   });
 });
 
-describe("minnet har ett tak", () => {
-  it("en ny nyckel per anrop fyller inte minnet, och den senaste räknas", () => {
-    // Nycklarna kommer utifrån. Utan tak kunde den som skickade en ny adress
-    // vid varje anrop fylla minnet tills processen dog.
-    for (let i = 0; i < 10_050; i += 1) {
-      noteFailedLogin("admin", `gissning-${i}@example.com`);
-    }
+describe("egna tak", () => {
+  it("ett eget tak gäller i stället för fem", async () => {
+    // Taket per IP-adress är högre än per konto: en verkstad delar ofta en
+    // adress, och tre personer som skriver fel ska inte stänga ute de andra.
+    await failTimes("admin-ip", "198.51.100.7", 29);
+    expect(await isLockedOut("admin-ip", "198.51.100.7", 30)).toBe(false);
 
-    failTimes("admin", "chef@mekaniska.se", 5);
-    expect(isLockedOut("admin", "chef@mekaniska.se")).toBe(true);
+    await noteFailedLogin("admin-ip", "198.51.100.7");
+    expect(await isLockedOut("admin-ip", "198.51.100.7", 30)).toBe(true);
+  });
+});
 
-    // Den äldsta har fått ge plats.
-    expect(isLockedOut("admin", "gissning-0@example.com", 1)).toBe(false);
+describe("räkningen ligger i databasen", () => {
+  it("adressen sparas inte i klartext", async () => {
+    await noteFailedLogin("admin", "chef@mekaniska.se");
+
+    const rows = await unsafeGlobalPrisma.loginThrottle.findMany();
+    expect(rows).toHaveLength(1);
+    expect(rows[0].keyHash).not.toContain("mekaniska");
+    expect(rows[0].keyHash).toMatch(/^[0-9a-f]{64}$/);
+  });
+
+  it("rader som löpt ut städas bort", async () => {
+    const start = new Date();
+    await failTimes("admin", "gammal@example.com", 3, start);
+
+    await noteFailedLogin(
+      "admin",
+      "ny@example.com",
+      new Date(start.getTime() + minutes(16))
+    );
+
+    const rows = await unsafeGlobalPrisma.loginThrottle.findMany();
+    expect(rows).toHaveLength(1);
+  });
+
+  it("varje samtidigt fel får sin egen plats i räkningen", async () => {
+    // Registreringen prövar taket mot det talet. Läste den om räkningen i
+    // stället hade samtidiga anrop sett varandras och fler än nödvändigt
+    // avvisats.
+    const counts = await Promise.all(
+      Array.from({ length: 6 }, () => noteFailedLogin("signup-ip", "198.51.100.42"))
+    );
+
+    expect([...counts].sort((a, b) => a - b)).toEqual([1, 2, 3, 4, 5, 6]);
+  });
+
+  it("två fel i samma ögonblick räknas båda", async () => {
+    await Promise.all([
+      noteFailedLogin("admin", "samtidig@example.com"),
+      noteFailedLogin("admin", "samtidig@example.com"),
+    ]);
+
+    expect(await isLockedOut("admin", "samtidig@example.com", 2)).toBe(true);
   });
 });
 
 describe("panelerna räknas var för sig", () => {
-  it("en låst kundinloggning låser inte plattformspanelen", () => {
+  it("en låst kundinloggning låser inte plattformspanelen", async () => {
     // Samma person kan ha konto på båda hållen. Att någon gissar på det ena
     // får inte stänga ute den rätta personen från det andra.
-    failTimes("admin", "adi@terafalk.com", 5);
+    await failTimes("admin", "adi@terafalk.com", 5);
 
-    expect(isLockedOut("admin", "adi@terafalk.com")).toBe(true);
-    expect(isLockedOut("platform", "adi@terafalk.com")).toBe(false);
+    expect(await isLockedOut("admin", "adi@terafalk.com")).toBe(true);
+    expect(await isLockedOut("platform", "adi@terafalk.com")).toBe(false);
   });
 });

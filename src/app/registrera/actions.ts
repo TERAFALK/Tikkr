@@ -6,6 +6,7 @@ import { signIn, SIGNUP_METHOD } from "@/lib/auth";
 import {
   createCompanyWithOwner,
   SignupError,
+  validateSignup,
   type SignupStep,
 } from "@/lib/signup";
 import { sendEmailVerification } from "@/lib/email-verification";
@@ -57,6 +58,13 @@ export interface SignupState {
  *
  * Räknas med samma broms som inloggningen, fast varje registrering räknas och
  * inte bara de misslyckade.
+ *
+ * FÖRSÖKET RÄKNAS INNAN ARBETSYTAN SKAPAS (ändrat 2026-10-18,
+ * säkerhetsgranskningen). Räkningen skedde efteråt, och tio anrop i samma
+ * ögonblick hann alla förbi prövningen medan den första hashade sitt lösenord.
+ * Nu räknas försöket upp först och prövas sedan, så att det sjätte samtidiga
+ * avvisas. Fel i fälten räknas inte, eftersom de prövas innan; en adress som
+ * redan finns räknas, vilket också bromsar den som letar efter adresser.
  */
 const SIGNUP_SCOPE = "signup-ip";
 const SIGNUP_MAX_PER_WINDOW = 5;
@@ -81,7 +89,7 @@ export async function register(
     companyName: String(formData.get("companyName") ?? ""),
   };
 
-  if (ip && isLockedOut(SIGNUP_SCOPE, ip, SIGNUP_MAX_PER_WINDOW)) {
+  if (ip && await isLockedOut(SIGNUP_SCOPE, ip, SIGNUP_MAX_PER_WINDOW)) {
     return {
       error:
         "För många nya arbetsytor från den här adressen. Försök igen om en kvart.",
@@ -97,6 +105,20 @@ export async function register(
     return { error: "Lösenorden är inte lika.", step: 2, values };
   }
 
+  const problem = validateSignup({ ...values, password });
+  if (problem) return { error: problem.message, step: problem.step, values };
+
+  // Talet är det här försökets plats i ordningen, räknat i samma fråga som
+  // räknade upp det. Att läsa om räkningen efteråt hade avvisat fler än
+  // nödvändigt, eftersom samtidiga anrop då hunnit räkna upp den.
+  if (ip && (await noteFailedLogin(SIGNUP_SCOPE, ip)) > SIGNUP_MAX_PER_WINDOW) {
+    return {
+      error:
+        "För många nya arbetsytor från den här adressen. Försök igen om en kvart.",
+      values,
+    };
+  }
+
   let ownerId: string;
 
   try {
@@ -110,8 +132,6 @@ export async function register(
     }
     throw error;
   }
-
-  if (ip) noteFailedLogin(SIGNUP_SCOPE, ip);
 
   // Bekräftelsen SPÄRRAR NU PANELEN för den nya ägaren, tills länken använts.
   // Går mejlet inte iväg finns en knapp för att försöka igen på spärrsidan.

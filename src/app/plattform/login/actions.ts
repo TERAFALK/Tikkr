@@ -7,6 +7,7 @@ import {
   startPlatformSession,
 } from "@/lib/platform-session";
 import { clearTicket, issueTicket, readTicket } from "@/lib/login-ticket";
+import { requestIp } from "@/lib/client-ip";
 import type { TwoStepState } from "@/components/ui/TwoStepForm";
 
 export interface PlatformLoginState {
@@ -20,7 +21,8 @@ export async function platformLogin(
 ): Promise<PlatformLoginState> {
   const outcome = await checkPlatformPassword(
     String(formData.get("email") ?? ""),
-    String(formData.get("password") ?? "")
+    String(formData.get("password") ?? ""),
+    await requestIp()
   );
 
   if (!outcome.ok || !outcome.email) {
@@ -43,7 +45,9 @@ export async function platformConfirmCode(
 
   const outcome = await verifyPlatformCode(
     ticket.sub,
-    String(formData.get("code") ?? "")
+    String(formData.get("code") ?? ""),
+    new Date(),
+    await requestIp()
   );
 
   if (!outcome.ok || !outcome.email) {
