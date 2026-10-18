@@ -4,6 +4,7 @@ import { auth } from "./auth";
 import { unsafeGlobalPrisma } from "./db";
 import { forCompany, type CompanyDb } from "./tenant";
 import { readSupportSession } from "./support-session";
+import { isPlatformAdmin } from "./platform-access";
 import { SESSION_MAX_AGE_SECONDS } from "./session-lifetime";
 
 /**
@@ -150,7 +151,13 @@ export async function currentAdmin(): Promise<AdminSession | null> {
   // Att låta kundsessionen vinna hade dessutom gett skrivrätt i ett läge som
   // ser ut som läsläge, vilket är det värsta av de två utfallen.
   const support = await readSupportSession();
-  if (support) return supportAdmin(support);
+
+  // Behörigheten prövas vid varje anrop, inte bara när besöket startades
+  // (tillagt 2026-10-18). En adress som tagits bort ur PLATFORM_ADMIN_EMAILS
+  // var annars kvar i kundens panel tills cookien gick ut, upp till en
+  // halvtimme. Cookien räknas då som ogiltig, och kundens egen session, om
+  // en sådan finns, prövas som vanligt nedan.
+  if (support && isPlatformAdmin(support.email)) return supportAdmin(support);
 
   const session = await auth();
   if (!session?.user?.id) return null;

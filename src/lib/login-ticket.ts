@@ -75,9 +75,17 @@ function sign(scope: TicketScope, data: string): string {
   return createHmac("sha256", signingKey(scope)).update(data).digest("base64url");
 }
 
-/** Bara en sökväg i samma app. En fullständig adress vore en öppen omdirigering. */
-function safeNext(next: string | undefined): string | undefined {
-  return next && next.startsWith("/") && !next.startsWith("//") ? next : undefined;
+/**
+ * Bara en sökväg i samma app. En fullständig adress vore en öppen omdirigering.
+ *
+ * Bakåtsnedstreck och styrtecken vägras också (ändrat 2026-10-18): webbläsare
+ * läser `/\evil.se` som `//evil.se`, alltså en annan sajt, och en tabb eller
+ * radbrytning i adressen tas bort innan den tolkas.
+ */
+export function safeNext(next: string | undefined): string | undefined {
+  if (!next || !next.startsWith("/") || next.startsWith("//")) return undefined;
+  if (/[\\\u0000-\u001f\u007f]/.test(next)) return undefined;
+  return next;
 }
 
 export function encodeTicket(

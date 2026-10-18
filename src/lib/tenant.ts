@@ -1,3 +1,4 @@
+import { Prisma } from "@prisma/client";
 import { unsafeGlobalPrisma } from "./db";
 
 /**
@@ -141,6 +142,115 @@ function stampCompanyOnData(data: unknown, companyId: string): unknown {
   return data;
 }
 
+/**
+ * Relationsfälten per modell, ur Prismas egen beskrivning av schemat, med
+ * modellen varje fält pekar på.
+ *
+ * Behövs för att känna igen en NÄSTLAD skrivning: `employee: { connect: { id
+ * } }` eller `breaks: { create: [...] }`. Lagret stämplar bara den yttersta
+ * raden, så en nästlad skrivning kunde annars koppla en rad till ett annat
+ * företags anställd, eller skapa rader som aldrig prövats.
+ */
+const RELATION_FIELDS: ReadonlyMap<string, ReadonlyMap<string, string>> = new Map(
+  Prisma.dmmf.datamodel.models.map((model) => [
+    model.name,
+    new Map(
+      model.fields
+        .filter((field) => field.kind === "object")
+        .map((field) => [field.name, field.type])
+    ),
+  ])
+);
+
+/** Det enda som får stå i en nästlad skrivning: nya rader. */
+const NESTED_CREATE_KEYS = new Set(["create", "createMany"]);
+
+function rowsOf(value: unknown): Record<string, unknown>[] {
+  return (Array.isArray(value) ? value : [value]).filter(
+    (row): row is Record<string, unknown> => Boolean(row) && typeof row === "object"
+  );
+}
+
+function nestedError(model: string, key: string, why: string): TenantIsolationError {
+  return new TenantIsolationError(
+    `Nästlad skrivning via "${model}.${key}" genom en klient låst till ett ` +
+      `företag: ${why}`
+  );
+}
+
+/**
+ * PRÖVAR NÄSTLADE SKRIVNINGAR PÅ KUNDDATA (tillagt 2026-10-18,
+ * säkerhetsgranskningen).
+ *
+ * Vid `create` får en relation bara bära NYA rader, och varje sådan rad ska
+ * uttryckligen ha samma `companyId`, eftersom lagret inte stämplar nästlade
+ * rader själv. Det är så stationernas och schemats raster skapas. Kopplingar
+ * till befintliga rader (`connect`, `connectOrCreate`) och nästlade
+ * ändringar vägras: varje koppling sätts som ett id-fält, efter att raden
+ * slagits upp genom den här klienten.
+ *
+ * Vid en ändring (`update`) vägras varje nästlad skrivning. Ingen kod behöver
+ * dem, och en ny ska prövas här först.
+ */
+function checkNestedWrites(
+  model: string,
+  data: unknown,
+  companyId: string,
+  allowCreate: boolean
+) {
+  const relations = RELATION_FIELDS.get(model);
+  if (!relations || relations.size === 0) return;
+
+  for (const row of rowsOf(data)) {
+    for (const [key, target] of relations) {
+      const value = row[key];
+      if (value === undefined) continue;
+
+      if (!allowCreate) throw nestedError(model, key, "inte tillåtet vid en ändring.");
+
+      if (!value || typeof value !== "object" || Array.isArray(value)) {
+        throw nestedError(model, key, "okänd form.");
+      }
+
+      for (const [operation, payload] of Object.entries(value)) {
+        if (!NESTED_CREATE_KEYS.has(operation)) {
+          throw nestedError(
+            model,
+            key,
+            `"${operation}" är inte tillåtet. Sätt id-fältet i stället, efter att ` +
+              "raden slagits upp genom forCompany()."
+          );
+        }
+
+        const children =
+          operation === "createMany"
+            ? rowsOf((payload as { data?: unknown } | null)?.data)
+            : rowsOf(payload);
+
+        for (const child of children) {
+          if (TENANT_MODEL_SET.has(target) && child.companyId !== companyId) {
+            throw nestedError(model, key, "varje ny rad ska bära samma companyId.");
+          }
+          checkNestedWrites(target, child, companyId, true);
+        }
+      }
+    }
+  }
+}
+
+/**
+ * Prövar det som skrivs vid en ändring: företaget får inte bytas, och inga
+ * nästlade skrivningar. Utan prövningen kunde `update({ data: { companyId } })`
+ * flytta en rad till ett annat företag, fast frågan bara hittade egna rader.
+ */
+function checkUpdateData(model: string, data: unknown, companyId: string) {
+  checkNestedWrites(model, data, companyId, false);
+
+  for (const row of rowsOf(data)) {
+    rejectForeignCompanyId(row.companyId, companyId, "flytta en rad");
+  }
+}
+
 /** Kastas när något försöker skriva genom en klient som bara får läsa. */
 export class ReadOnlyError extends Error {
   constructor(message: string) {
@@ -276,18 +386,24 @@ export function forCompany(companyId: string, options: CompanyDbOptions = {}) {
             case "count":
             case "aggregate":
             case "groupBy":
-            case "updateMany":
             case "deleteMany":
-            case "update":
             case "delete":
+              return run(mergeWhere(a, companyId));
+
+            case "updateMany":
+            case "update":
+              checkUpdateData(model, a.data, companyId);
               return run(mergeWhere(a, companyId));
 
             case "create":
             case "createMany":
             case "createManyAndReturn":
+              checkNestedWrites(model, a.data, companyId, true);
               return run({ ...a, data: stampCompanyOnData(a.data, companyId) });
 
             case "upsert":
+              checkNestedWrites(model, a.create, companyId, true);
+              checkUpdateData(model, a.update, companyId);
               return run({
                 ...mergeWhere(a, companyId),
                 create: stampCompanyOnData(a.create, companyId),
