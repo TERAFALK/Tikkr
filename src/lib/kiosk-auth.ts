@@ -261,6 +261,8 @@ export async function unpairDevice(deviceId: string): Promise<void> {
  * därmed en licens från och med att den skapas — vilket är rimligt, eftersom
  * det är kunden som bestämt att den ska finnas.
  */
+// Panelen går INTE hit utan via createLicensedDevice i licenses.ts, som prövar
+// licensen under ett lås. Den här lägger upp en skärm utan att fråga.
 export async function createKioskDevice(companyId: string, name: string) {
   const device = await unsafeGlobalPrisma.kioskDevice.create({
     data: { companyId, name },

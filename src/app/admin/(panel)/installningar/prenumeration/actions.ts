@@ -2,7 +2,7 @@
 
 import { redirect } from "next/navigation";
 import { appUrl } from "@/lib/app-url";
-import { assertWritable, requireAdmin } from "@/lib/admin-session";
+import { assertWritable, isOwner, requireAdmin } from "@/lib/admin-session";
 import { revalidatePath } from "next/cache";
 import {
   applyLicenseChange,
@@ -36,6 +36,11 @@ async function baseUrl(): Promise<string> {
  * Samma text på båda ställena den behövs, så att svaret inte beror på vilken
  * knapp som trycktes.
  */
+/** Se isOwner i admin-session.ts. */
+const OWNER_ONLY = "Endast ägare kan ändra prenumerationen.";
+
+const PAGE = "/admin/installningar/prenumeration";
+
 const MANAGED_NOTICE =
   "Prenumerationen sköts av Tikkr för det här företaget. Kontakta " +
   "support@tikkr.se för att ändra licenser eller tillval.";
@@ -43,6 +48,7 @@ const MANAGED_NOTICE =
 export async function startCheckout(formData: FormData) {
   const session = await requireAdmin();
   await assertWritable(session);
+  if (!isOwner(session)) redirect(PAGE);
 
   // SKÖTS FÖRETAGET AV OSS FINNS INGET ATT KÖPA HÄR. En kortprenumeration
   // ovanpå en faktura vi redan skickar betyder att kunden betalar två gånger,
@@ -96,6 +102,7 @@ export async function changeLicenses(
 ): Promise<LicenseFormState> {
   const session = await requireAdmin();
   await assertWritable(session);
+  if (!isOwner(session)) return { error: OWNER_ONLY };
 
   const screens = Number(formData.get("screens"));
   const step = String(formData.get("step") ?? "");
@@ -157,6 +164,7 @@ export async function changeLicenses(
 export async function openBillingPortal() {
   const session = await requireAdmin();
   await assertWritable(session);
+  if (!isOwner(session)) redirect(PAGE);
 
   const url = await createPortalSession({
     companyId: session.companyId,
@@ -206,6 +214,7 @@ export async function changeModule(
 ): Promise<ModuleFormState> {
   const session = await requireAdmin();
   await assertWritable(session);
+  if (!isOwner(session)) return { error: OWNER_ONLY };
 
   const key = String(formData.get("module") ?? "");
   const on = String(formData.get("on") ?? "") === "1";

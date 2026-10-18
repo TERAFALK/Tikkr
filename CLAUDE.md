@@ -172,6 +172,17 @@ skickas vidare i `next.config.ts`, så att bokmärken fortsätter fungera.
 Frågan för en ny sida är alltså hur ofta den öppnas: varje dag eller vecka
 hör den till menyn, en gång och sedan sällan hör den till Inställningar.
 
+**Bara ägaren ändrar fakturan och anonymiserar** (beslutat 2026-10-18,
+produktägarens val, säkerhetsgranskningen). Ägaren bjuder in, tar bort och
+nollställer administratörer som förut, och nu också licenser, tillval,
+kassan, betalningsportalen och GDPR-anonymiseringen. Allt annat gör en
+administratör. Skälet är att de två första ändrar vad kunden betalar, och
+den sista går inte att ångra. En administratör ser prenumerationssidan men
+inga knappar, och den låsta panelen säger att ägaren aktiverar
+prenumerationen. Prövningen ligger i varje serveråtgärd (`isOwner` i
+`admin-session.ts`) och bevisas av `tests/owner-coverage.test.ts`, som
+härleder prenumerationens åtgärder ur filen.
+
 **Stämplingar och Rapporter visar 50 rader i taget** (beslutat 2026-10-17,
 issue #24), med Föregående och Nästa. Båda ritade varje rad i urvalet, och en
 rapport utan datum var då varje stämpling arbetsytan gjort: sidan blev
@@ -1351,7 +1362,17 @@ ligger i `src/lib/feedback.ts`, och `tests/feedback.test.ts` fäller den.
 
    **Sessionen gäller sju dagar** (ändrat 2026-10-06, var trettio dagar). Ett
    lösenordsbyte eller "Logga ut på alla enheter" under Ditt konto gör äldre
-   sessioner ogiltiga. **E-postadressen bekräftas** med en länk vid
+   sessioner ogiltiga.
+
+   **De sju dagarna räknas från INLOGGNINGEN, och återkallelsen prövas mot
+   samma tid** (ändrat 2026-10-18, säkerhetsgranskningen). Prövningen låg mot
+   `iat`, som Auth.js sätter om varje gång `/api/auth/session` signerar om
+   sessionen. Den som hade en stulen cookie behövde därför bara göra ett anrop
+   efter utloggningen för att vara inne igen, och en session som användes
+   minst en gång i veckan gick aldrig ut. Nu bär token `authTime`, som sätts
+   bara vid inloggningen, och `currentAdmin()` nekar en session utan den. Se
+   `auth-callbacks.ts`. Konsekvensen är att alla loggar in en gång till efter
+   versionen, och därefter var sjunde dag oavsett hur ofta panelen används. **E-postadressen bekräftas** med en länk vid
    registreringen; det spärrar ingenting, men panelen visar en remsa tills
    det är gjort, och en obekräftad adress går att rätta själv. Registreringen
    tar högst fem nya arbetsytor per kvart och IP-adress. Se `account.ts` och
@@ -1521,6 +1542,16 @@ ligger i `src/lib/feedback.ts`, och `tests/feedback.test.ts` fäller den.
    om detta mot kunden.
 7. **HTTPS + kort request-timeout** — stämpling ska kännas omedelbar men gå
    krypterat.
+
+   **Content-Security-Policy på grundnivå** (beslutat 2026-10-18,
+   produktägarens val, säkerhetsgranskningen), i `next.config.ts`. Allt från
+   egen adress, inga plugins, `base-uri` och `frame-ancestors` låsta, och
+   formulär bara hit och till Stripes kassa och kundportal. Inline-skript
+   tillåts, eftersom en nonce kräver att varje sida renderas vid varje anrop,
+   även säljsidan. Policyn sätts inte på `/api`, där ett PDF-svar annars kan
+   sluta visas i webbläsarens egen PDF-visare. Bevisas av
+   `tests/security-headers.test.ts`. Versionen i `/api/health` står kvar, se
+   § 5.
 8. **GDPR** — adminpanelen ska stödja export och radering av en anställds data
    (rätt att bli glömd). PUB-avtal hanteras utanför koden, men bygg
    funktionaliteten.
