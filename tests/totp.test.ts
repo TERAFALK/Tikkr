@@ -94,6 +94,15 @@ describe("nyckeln lagras krypterad", () => {
     const sealed = sealSecret(RFC_SECRET, "hemlig-nyckel");
     expect(openSecret(sealed, "en-annan-nyckel")).toBeNull();
   });
+
+  it("en avkortad äkthetstagg avvisas", () => {
+    // AES-GCM godtar annars en tagg på fyra byte, och en kortare tagg är
+    // lättare att förfalska (2026-10-18, semgrep gcm-no-tag-length).
+    const [version, iv, tag, body] = sealSecret(RFC_SECRET, "hemlig-nyckel").split(".");
+    const short = Buffer.from(tag, "base64url").subarray(0, 4).toString("base64url");
+
+    expect(openSecret([version, iv, short, body].join("."), "hemlig-nyckel")).toBeNull();
+  });
 });
 
 describe("plattformens inloggning kräver koden", () => {

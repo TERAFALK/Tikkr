@@ -1603,6 +1603,16 @@ en ny omgång i labbet.
 - **CI** (`.github/workflows/ci.yml`) kör typkontroll, alla tester mot en egen
   Postgres, ett bygge av Docker-imagen och en kontroll av compose-filerna på
   varje PR och push till `dev` och `prod`. Den driftsätter ingenting.
+- **Säkerhetskontrollerna** (`.github/workflows/security.yml`, infört
+  2026-10-18) körs på samma händelser och dessutom varje måndag:
+  `npm audit` (produktionens beroenden fäller vid hög, alla vid kritisk),
+  gitleaks över hela historiken (repot är publikt), semgrep (fäller vid
+  ERROR) och trivy mot imagen (fäller vid kritisk med rättelse). Verktygen
+  är låsta på versioner som är minst två veckor gamla. Dependabot föreslår
+  uppdateringar som PR:er mot `dev` (`.github/dependabot.yml`). Inget slås
+  ihop av sig självt.
+- **ZAP mot labbet** (`zap-baseline.yml`) startas bara för hand, efter en
+  driftsättning i labbet, och vägrar en annan adress än `test.tikkr.se`.
 - **Labbet är staging.** Ingen tredje miljö, se § 9.
 - **Produktionen kör bara taggar**, och taggen sätts på `prod` när labbet kört
   samma innehåll på `dev`. Driftsättningen är ett kommando som användaren själv kör på
