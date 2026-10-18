@@ -31,6 +31,13 @@
     "prisma": "^6.5.0",
     "tailwindcss": "^4.1.0",
     "typescript": "^5.8.0",
-    "vitest": "^3.1.0"
+    "vitest": "^4.1.12"
+  },
+  "overrides": {
+    "next": {
+      "postcss": "^8.5.31"
+    },
+    "deepmerge-ts": "^8.0.0",
+    "uuid": "^11.1.1"
   }
 }
