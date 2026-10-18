@@ -52,6 +52,24 @@ const IP_SCOPE = "admin-ip";
 const IP_MAX_FAILURES = 30;
 
 /**
+ * Spärren per IP-adress för KODEN i steg två (tillagt 2026-10-18).
+ *
+ * Steg två räknades bara per konto. Den som hade ett lösenord kunde gissa fem
+ * koder per kvart på varje konto hen kommit åt, från samma adress. Taket är
+ * högre än per konto av samma skäl som spärren för lösenordet ovan.
+ */
+const CODE_IP_SCOPE = "admin-code-ip";
+const CODE_IP_MAX_FAILURES = 20;
+
+async function codeIpLocked(ip: string | undefined): Promise<boolean> {
+  return ip ? isLockedOut(CODE_IP_SCOPE, ip, CODE_IP_MAX_FAILURES) : false;
+}
+
+async function noteCodeIpFailure(ip: string | undefined): Promise<void> {
+  if (ip) await noteFailedLogin(CODE_IP_SCOPE, ip);
+}
+
+/**
  * En riktig hash av ett lösenord ingen har. Jämförelsen tar då lika lång tid
  * oavsett om kontot finns, och svarstiden avslöjar inte vilka adresser som
  * är kunder.
@@ -76,8 +94,8 @@ export async function checkAdminPassword(params: {
   // Kontrolleras före uppslaget. Är adressen låst ska ingen tid läggas på att
   // jämföra lösenord — det är hela poängen med spärren.
   if (
-    isLockedOut(THROTTLE_SCOPE, email) ||
-    (params.ip && isLockedOut(IP_SCOPE, params.ip, IP_MAX_FAILURES))
+    await isLockedOut(THROTTLE_SCOPE, email) ||
+    (params.ip && await isLockedOut(IP_SCOPE, params.ip, IP_MAX_FAILURES))
   ) {
     return { ok: false, error: LOCKED_OUT_MESSAGE };
   }
@@ -93,8 +111,8 @@ export async function checkAdminPassword(params: {
   );
 
   if (!user || !correct) {
-    noteFailedLogin(THROTTLE_SCOPE, email);
-    if (params.ip) noteFailedLogin(IP_SCOPE, params.ip);
+    await noteFailedLogin(THROTTLE_SCOPE, email);
+    if (params.ip) await noteFailedLogin(IP_SCOPE, params.ip);
     return wrong;
   }
 
@@ -159,7 +177,8 @@ export async function adminTwoStep(userId: string): Promise<TwoStep | null> {
 export async function verifyAdminCode(
   userId: string,
   code: string,
-  now: Date = new Date()
+  now: Date = new Date(),
+  ip?: string
 ): Promise<boolean> {
   const user = await unsafeGlobalPrisma.adminUser.findUnique({
     where: { id: userId },
@@ -173,13 +192,19 @@ export async function verifyAdminCode(
 
   if (!user?.totpSecret) return false;
 
-  if (isLockedOut(THROTTLE_SCOPE, user.email)) return false;
+  if (
+    (await isLockedOut(THROTTLE_SCOPE, user.email)) ||
+    (await codeIpLocked(ip))
+  ) {
+    return false;
+  }
 
   const secret = openSecret(user.totpSecret, process.env.AUTH_SECRET ?? "");
   const step = secret ? verifyTotp(secret, code, now, user.totpLastStep) : null;
 
   if (step === null) {
-    noteFailedLogin(THROTTLE_SCOPE, user.email);
+    await noteFailedLogin(THROTTLE_SCOPE, user.email);
+    await noteCodeIpFailure(ip);
     return false;
   }
 
@@ -197,11 +222,11 @@ export async function verifyAdminCode(
   });
 
   if (claimed.count === 0) {
-    noteFailedLogin(THROTTLE_SCOPE, user.email);
+    await noteFailedLogin(THROTTLE_SCOPE, user.email);
     return false;
   }
 
-  clearFailedLogins(THROTTLE_SCOPE, user.email);
+  await clearFailedLogins(THROTTLE_SCOPE, user.email);
   return true;
 }
 
@@ -347,7 +372,8 @@ export async function verifyEmailLoginCode(
   userId: string,
   code: string,
   afterReset: boolean,
-  now: Date = new Date()
+  now: Date = new Date(),
+  ip?: string
 ): Promise<boolean> {
   if (afterReset) return false;
 
@@ -364,7 +390,12 @@ export async function verifyEmailLoginCode(
 
   if (!user?.loginCodeHash || !user.loginCodeExpiresAt) return false;
   if (!user.emailVerifiedAt || !user.totpEnabledAt) return false;
-  if (isLockedOut(THROTTLE_SCOPE, user.email)) return false;
+  if (
+    (await isLockedOut(THROTTLE_SCOPE, user.email)) ||
+    (await codeIpLocked(ip))
+  ) {
+    return false;
+  }
 
   const given = code.replace(/\s/g, "");
   const expected = Buffer.from(user.loginCodeHash);
@@ -377,7 +408,8 @@ export async function verifyEmailLoginCode(
     timingSafeEqual(expected, actual);
 
   if (!correct) {
-    noteFailedLogin(THROTTLE_SCOPE, user.email);
+    await noteFailedLogin(THROTTLE_SCOPE, user.email);
+    await noteCodeIpFailure(ip);
     return false;
   }
 
@@ -390,6 +422,6 @@ export async function verifyEmailLoginCode(
 
   if (claimed.count === 0) return false;
 
-  clearFailedLogins(THROTTLE_SCOPE, user.email);
+  await clearFailedLogins(THROTTLE_SCOPE, user.email);
   return true;
 }

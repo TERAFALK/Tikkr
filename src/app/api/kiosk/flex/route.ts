@@ -70,7 +70,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Ange din kod." }, { status: 400 });
   }
 
-  if (isLockedOut(THROTTLE_SCOPE, employeeId)) {
+  if (await isLockedOut(THROTTLE_SCOPE, employeeId)) {
     return NextResponse.json(
       { error: "För många försök. Vänta en kvart och försök igen." },
       { status: 429 }
@@ -88,11 +88,11 @@ export async function POST(request: NextRequest) {
   // angav fel kod. Skärmen ska inte gå att använda för att ta reda på vilka
   // som har en kod satt.
   if (!employee?.flexCodeHash || !(await bcrypt.compare(code, employee.flexCodeHash))) {
-    noteFailedLogin(THROTTLE_SCOPE, employeeId);
+    await noteFailedLogin(THROTTLE_SCOPE, employeeId);
     return NextResponse.json({ error: "Fel kod." }, { status: 401 });
   }
 
-  clearFailedLogins(THROTTLE_SCOPE, employeeId);
+  await clearFailedLogins(THROTTLE_SCOPE, employeeId);
 
   const minutes = await currentFlexMinutes(
     db,

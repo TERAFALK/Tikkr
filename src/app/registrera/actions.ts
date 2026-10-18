@@ -81,7 +81,7 @@ export async function register(
     companyName: String(formData.get("companyName") ?? ""),
   };
 
-  if (ip && isLockedOut(SIGNUP_SCOPE, ip, SIGNUP_MAX_PER_WINDOW)) {
+  if (ip && await isLockedOut(SIGNUP_SCOPE, ip, SIGNUP_MAX_PER_WINDOW)) {
     return {
       error:
         "För många nya arbetsytor från den här adressen. Försök igen om en kvart.",
@@ -111,7 +111,7 @@ export async function register(
     throw error;
   }
 
-  if (ip) noteFailedLogin(SIGNUP_SCOPE, ip);
+  if (ip) await noteFailedLogin(SIGNUP_SCOPE, ip);
 
   // Bekräftelsen SPÄRRAR NU PANELEN för den nya ägaren, tills länken använts.
   // Går mejlet inte iväg finns en knapp för att försöka igen på spärrsidan.

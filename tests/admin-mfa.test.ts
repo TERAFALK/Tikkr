@@ -26,7 +26,7 @@ let userId: string;
 let email: string;
 
 beforeEach(async () => {
-  __resetThrottle();
+  await __resetThrottle();
   process.env.AUTH_SECRET = "testhemlighet-for-tvasteg";
 
   const unique = Math.random().toString(36).slice(2, 10);

@@ -862,6 +862,26 @@ model PasswordReset {
   @@map("password_resets")
 }
 
+/// Misslyckade försök att logga in, gissa en kod eller registrera sig.
+///
+/// I databasen och inte i minnet (ändrat 2026-10-18), så att en omstart eller
+/// en driftsättning inte nollar räkningen. Se src/lib/login-throttle.ts.
+///
+/// Ingen kunddata och ingen companyId: raden gäller en adress eller en IP, inte
+/// ett företag. Nyckeln lagras som SHA-256, så att tabellen inte blir en lista
+/// över e-postadresser och IP-adresser. Rader som löpt ut raderas löpande.
+model LoginThrottle {
+  id      String   @id @default(cuid())
+  scope   String
+  keyHash String   @map("key_hash")
+  count   Int
+  until   DateTime
+
+  @@unique([scope, keyHash])
+  @@index([until])
+  @@map("login_throttles")
+}
+
 /// En länk som bekräftar en administratörs e-postadress.
 ///
 /// Byggd som PasswordReset: bara fingeravtrycket sparas, den har en utgångstid

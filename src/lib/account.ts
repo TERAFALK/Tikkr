@@ -60,17 +60,17 @@ export async function changeOwnPassword(params: {
 
   if (!user) throw new AccountError("Kontot finns inte.");
 
-  if (isLockedOut(THROTTLE_SCOPE, user.email)) {
+  if (await isLockedOut(THROTTLE_SCOPE, user.email)) {
     throw new AccountError(LOCKED_OUT_MESSAGE);
   }
 
   const correct = await bcrypt.compare(params.current, user.passwordHash);
   if (!correct) {
-    noteFailedLogin(THROTTLE_SCOPE, user.email);
+    await noteFailedLogin(THROTTLE_SCOPE, user.email);
     throw new AccountError("Det nuvarande lösenordet stämmer inte.");
   }
 
-  clearFailedLogins(THROTTLE_SCOPE, user.email);
+  await clearFailedLogins(THROTTLE_SCOPE, user.email);
 
   if (params.next.length < MIN_PASSWORD_LENGTH) {
     throw new AccountError(
