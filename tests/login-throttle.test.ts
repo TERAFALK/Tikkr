@@ -126,6 +126,17 @@ describe("räkningen ligger i databasen", () => {
     expect(rows).toHaveLength(1);
   });
 
+  it("varje samtidigt fel får sin egen plats i räkningen", async () => {
+    // Registreringen prövar taket mot det talet. Läste den om räkningen i
+    // stället hade samtidiga anrop sett varandras och fler än nödvändigt
+    // avvisats.
+    const counts = await Promise.all(
+      Array.from({ length: 6 }, () => noteFailedLogin("signup-ip", "198.51.100.42"))
+    );
+
+    expect([...counts].sort((a, b) => a - b)).toEqual([1, 2, 3, 4, 5, 6]);
+  });
+
   it("två fel i samma ögonblick räknas båda", async () => {
     await Promise.all([
       noteFailedLogin("admin", "samtidig@example.com"),

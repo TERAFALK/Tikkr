@@ -108,17 +108,15 @@ export async function register(
   const problem = validateSignup({ ...values, password });
   if (problem) return { error: problem.message, step: problem.step, values };
 
-  if (ip) {
-    await noteFailedLogin(SIGNUP_SCOPE, ip);
-
-    // Räkningen inkluderar nu det här försöket, därav ett mer än taket.
-    if (await isLockedOut(SIGNUP_SCOPE, ip, SIGNUP_MAX_PER_WINDOW + 1)) {
-      return {
-        error:
-          "För många nya arbetsytor från den här adressen. Försök igen om en kvart.",
-        values,
-      };
-    }
+  // Talet är det här försökets plats i ordningen, räknat i samma fråga som
+  // räknade upp det. Att läsa om räkningen efteråt hade avvisat fler än
+  // nödvändigt, eftersom samtidiga anrop då hunnit räkna upp den.
+  if (ip && (await noteFailedLogin(SIGNUP_SCOPE, ip)) > SIGNUP_MAX_PER_WINDOW) {
+    return {
+      error:
+        "För många nya arbetsytor från den här adressen. Försök igen om en kvart.",
+      values,
+    };
   }
 
   let ownerId: string;

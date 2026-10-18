@@ -64,12 +64,19 @@ export async function isLockedOut(
   return record.count >= maxAttempts;
 }
 
-/** Räknar upp ett misslyckat försök och förlänger låsningen. */
+/**
+ * Räknar upp ett misslyckat försök och förlänger låsningen.
+ *
+ * Svarar med räkningen EFTER det här försöket, som den blev i samma fråga.
+ * Den som behöver pröva ett tak mot samtidiga anrop ska pröva det talet och
+ * inte läsa om räkningen efteråt: då har andra anrop hunnit räkna upp den, och
+ * fler än nödvändigt avvisas. Se registreringen.
+ */
 export async function noteFailedLogin(
   scope: string,
   key: string,
   now: Date = new Date()
-): Promise<void> {
+): Promise<number> {
   const until = new Date(now.getTime() + LOCKOUT_MS);
 
   // Det som löpt ut tas bort först, både för den här nyckeln och för alla
@@ -82,20 +89,24 @@ export async function noteFailedLogin(
   const where = { scope_keyHash: { scope, keyHash: hashKey(key) } };
 
   try {
-    await unsafeGlobalPrisma.loginThrottle.upsert({
+    const row = await unsafeGlobalPrisma.loginThrottle.upsert({
       where,
       create: { scope, keyHash: hashKey(key), count: 1, until },
       update: { count: { increment: 1 }, until },
+      select: { count: true },
     });
+    return row.count;
   } catch (error) {
     // Två misslyckanden i samma ögonblick kan båda försöka skapa raden. Den
     // som förlorar räknar upp den som vann, så att inget försök går förlorat.
     if ((error as { code?: string } | null)?.code !== "P2002") throw error;
 
-    await unsafeGlobalPrisma.loginThrottle.update({
+    const row = await unsafeGlobalPrisma.loginThrottle.update({
       where,
       data: { count: { increment: 1 }, until },
+      select: { count: true },
     });
+    return row.count;
   }
 }
 
