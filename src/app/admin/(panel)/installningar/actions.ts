@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { assertWritable, requireAdmin } from "@/lib/admin-session";
+import { assertWritable, isOwner, requireAdmin } from "@/lib/admin-session";
 import { unsafeGlobalPrisma } from "@/lib/db";
 import { recordAudit } from "@/lib/audit";
 import { parseMarkupPercent } from "@/lib/money";
@@ -272,6 +272,10 @@ export async function anonymizeEmployee(
 ): Promise<SaveState> {
   const session = await requireAdmin();
   await assertWritable(session);
+  // Går inte att ångra, och bara ägaren gör det. Se isOwner.
+  if (!isOwner(session)) {
+    return { error: "Endast ägare kan anonymisera en anställd." };
+  }
   const { db } = session;
 
   const id = String(formData.get("employeeId") ?? "");

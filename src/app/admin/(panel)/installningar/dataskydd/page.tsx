@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { requireAdmin } from "@/lib/admin-session";
+import { isOwner, requireAdmin } from "@/lib/admin-session";
 import { hasModule } from "@/lib/company-modules";
 import SaveForm from "@/components/admin/SaveForm";
 import {
@@ -16,7 +16,11 @@ import { anonymizeEmployee } from "../actions";
 export const dynamic = "force-dynamic";
 
 export default async function DataProtectionPage() {
-  const { db, companyId } = await requireAdmin();
+  const session = await requireAdmin();
+  const { db, companyId } = session;
+  // Anonymiseringen gör bara ägaren, se isOwner. Övriga ser varningen men
+  // inte formuläret.
+  const owner = isOwner(session);
 
   // VAD SOM SPARAS BEROR PÅ TILLVALET, och texten nedan måste säga rätt sak.
   // Med löneunderlaget registreras frånvaro med orsak, vilket kan vara en
@@ -81,6 +85,7 @@ export default async function DataProtectionPage() {
             <span className="mt-1.5 block">Detta går inte att ångra.</span>
           </Alert>
 
+          {owner ? (
           <SaveForm
             action={anonymizeEmployee}
             submitLabel="Anonymisera personen"
@@ -109,6 +114,11 @@ export default async function DataProtectionPage() {
               <Input name="confirm" placeholder="ANONYMISERA" required />
             </Field>
           </SaveForm>
+          ) : (
+            <p className="text-[13px] text-neutral-600">
+              Anonymiseringen görs av arbetsytans ägare.
+            </p>
+          )}
         </div>
       </Card>
 

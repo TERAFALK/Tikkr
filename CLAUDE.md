@@ -172,6 +172,17 @@ skickas vidare i `next.config.ts`, så att bokmärken fortsätter fungera.
 Frågan för en ny sida är alltså hur ofta den öppnas: varje dag eller vecka
 hör den till menyn, en gång och sedan sällan hör den till Inställningar.
 
+**Bara ägaren ändrar fakturan och anonymiserar** (beslutat 2026-10-18,
+produktägarens val, säkerhetsgranskningen). Ägaren bjuder in, tar bort och
+nollställer administratörer som förut, och nu också licenser, tillval,
+kassan, betalningsportalen och GDPR-anonymiseringen. Allt annat gör en
+administratör. Skälet är att de två första ändrar vad kunden betalar, och
+den sista går inte att ångra. En administratör ser prenumerationssidan men
+inga knappar, och den låsta panelen säger att ägaren aktiverar
+prenumerationen. Prövningen ligger i varje serveråtgärd (`isOwner` i
+`admin-session.ts`) och bevisas av `tests/owner-coverage.test.ts`, som
+härleder prenumerationens åtgärder ur filen.
+
 **Stämplingar och Rapporter visar 50 rader i taget** (beslutat 2026-10-17,
 issue #24), med Föregående och Nästa. Båda ritade varje rad i urvalet, och en
 rapport utan datum var då varje stämpling arbetsytan gjort: sidan blev
