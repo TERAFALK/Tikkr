@@ -14,6 +14,12 @@ export default defineConfig({
     fileParallelism: false,
     testTimeout: 20000,
   },
+  // JSX översätts av testerna själva. tsconfig säger "preserve", eftersom
+  // Next vill ha JSX orörd, och vitest 4 följer den inställningen. Ett test som
+  // importerar en komponent, som employees.test.ts, föll då på JSX-syntaxen.
+  oxc: {
+    jsx: { runtime: "automatic" },
+  },
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
