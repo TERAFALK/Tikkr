@@ -1510,6 +1510,16 @@ ligger i `src/lib/feedback.ts`, och `tests/feedback.test.ts` fäller den.
    om detta mot kunden.
 7. **HTTPS + kort request-timeout** — stämpling ska kännas omedelbar men gå
    krypterat.
+
+   **Content-Security-Policy på grundnivå** (beslutat 2026-10-18,
+   produktägarens val, säkerhetsgranskningen), i `next.config.ts`. Allt från
+   egen adress, inga plugins, `base-uri` och `frame-ancestors` låsta, och
+   formulär bara hit och till Stripes kassa och kundportal. Inline-skript
+   tillåts, eftersom en nonce kräver att varje sida renderas vid varje anrop,
+   även säljsidan. Policyn sätts inte på `/api`, där ett PDF-svar annars kan
+   sluta visas i webbläsarens egen PDF-visare. Bevisas av
+   `tests/security-headers.test.ts`. Versionen i `/api/health` står kvar, se
+   § 5.
 8. **GDPR** — adminpanelen ska stödja export och radering av en anställds data
    (rätt att bli glömd). PUB-avtal hanteras utanför koden, men bygg
    funktionaliteten.
