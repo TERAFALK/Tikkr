@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import path from "node:path";
-import { encodeTicket, decodeTicket } from "@/lib/login-ticket";
+import { encodeTicket, decodeTicket, safeNext } from "@/lib/login-ticket";
 
 /**
  * LAPPEN MELLAN STEG ETT OCH STEG TVÅ I INLOGGNINGEN.
@@ -45,6 +45,18 @@ describe("lappen bär sitt innehåll fram och tillbaka", () => {
     );
 
     expect(ticket?.next).toBeUndefined();
+  });
+
+  it("vägar som webbläsaren läser som en annan sajt kastas", () => {
+    // `/\evil.example` blir `//evil.example` i webbläsaren, och en tabb eller
+    // radbrytning tas bort innan adressen tolkas (2026-10-18).
+    for (const next of ["//evil.example", "/\\evil.example", "/\t/evil.example", "/\n/evil.example"]) {
+      expect(safeNext(next)).toBeUndefined();
+    }
+  });
+
+  it("en vanlig väg i appen står kvar", () => {
+    expect(safeNext("/admin/konto?ruta=tvasteg")).toBe("/admin/konto?ruta=tvasteg");
   });
 });
 

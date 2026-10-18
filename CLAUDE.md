@@ -1008,6 +1008,14 @@ Multi-tenant-isolering byggs i appens kod: **varje databasfråga går via ett
 gemensamt lager** i Prisma som alltid filtrerar på inloggad användares
 `company_id`. Ett enda ställe i koden, inte utspritt — och testat automatiskt.
 
+**Lagret prövar också det som skrivs** (tillagt 2026-10-18,
+säkerhetsgranskningen). En ändring får inte sätta ett annat `companyId`, och
+nästlade skrivningar på kunddata är begränsade till nya rader som själva bär
+rätt `companyId`, som schemats och stationernas raster. Kopplingar
+(`connect`) och nästlade ändringar vägras: en koppling sätts som ett id-fält,
+efter att raden slagits upp genom `forCompany()`. Bevisas av
+`tests/tenant-writes.test.ts`.
+
 ### 3.1 Tillval — moduler kunden betalar extra för (beslutat 2026-09-27)
 
 **Basen är stämpling mot order**: kioskskärmen, rapporterna och
@@ -1428,6 +1436,9 @@ ligger i `src/lib/feedback.ts`, och `tests/feedback.test.ts` fäller den.
      `tests/support-coverage.test.ts`.
    - **Varje besök skrivs ner** i `support_visits` innan cookien sätts, och
      visas på kundens sida i plattformspanelen.
+   - **Behörigheten prövas vid varje anrop** (tillagt 2026-10-18). En adress
+     som tagits bort ur `PLATFORM_ADMIN_EMAILS` förlorar supportläget direkt,
+     inte när cookien går ut.
 
    Supportläget släpps igenom prenumerationslåset — en obetald faktura är
    oftast precis varför kunden ringer.

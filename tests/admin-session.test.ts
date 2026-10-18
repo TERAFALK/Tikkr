@@ -89,6 +89,8 @@ beforeEach(async () => {
   unique = Math.random().toString(36).slice(2, 10);
   supportCookie = null;
   process.env.AUTH_SECRET ??= "testhemlighet-for-sessionstestet";
+  // Supportbesöken prövas mot listan vid varje anrop, se currentAdmin.
+  process.env.PLATFORM_ADMIN_EMAILS = "adi@terafalk.se";
 
   const [company, other] = await Promise.all([
     unsafeGlobalPrisma.company.create({
@@ -345,6 +347,20 @@ describe("supportläge", () => {
     expect(session?.email).toBe("adi@terafalk.se");
     expect(session?.role).toBe("SUPPORT");
     expect(session?.support).toBeTruthy();
+  });
+
+  it("en adress som tagits bort ur listan får inget supportläge", async () => {
+    // Cookien är giltig i en halvtimme. Den som tagits bort ur
+    // PLATFORM_ADMIN_EMAILS ska inte vara kvar i kundens panel under tiden
+    // (2026-10-18).
+    await enterSupport();
+    process.env.PLATFORM_ADMIN_EMAILS = "nagon.annan@terafalk.se";
+
+    const session = await currentAdmin();
+
+    expect(session?.support).toBeUndefined();
+    // Kundens egen session står kvar, och den är kundens egen inloggning.
+    expect(session?.email).toBe(`agare-${unique}@example.com`);
   });
 
   it("databasklienten kan läsa men inte skriva", async () => {
