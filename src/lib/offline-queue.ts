@@ -13,12 +13,44 @@
  * startas om. Varje tryck bär ett eget id, så att ett omskickat tryck känns
  * igen av servern och inte blir en dubblett — alltså ingen dubbelfakturerad tid.
  *
+ * SKÄRMENS BILD AV VEM SOM ÄR INSTÄMPLAD fanns förut bara i minnet. Efter en
+ * omstart utan nät startade skärmen på sidans sparade kopia, från senast sidan
+ * laddades. Provat 2026-10-19: två instämplade, wifi av, sladden ur — trycken
+ * låg kvar i kön men skärmen visade båda som utstämplade. Samma sak i det
+ * vanligare fallet: folk stämplar in med nät, strömmen går och tar routern
+ * med sig, och skärmen startar före routern. Den som ser sig själv
+ * utstämplad trycker igen, och väljer hen ett annat jobb står två öppna
+ * samtidigt och faktureras för samma tid.
+ *
+ * Bilden sparas därför också, se `saveView`, i en egen databas så att köns
+ * aldrig behöver röras. Vilken bild som gäller när skärmen startar avgör
+ * `shouldRestoreAtStart`. Samma regel om disken gäller kön och bilden, och den
+ * står på ETT ställe: `tx`.
+ *
  * Körs bara i webbläsaren.
  */
 
-const DB_NAME = "tikkr";
-const DB_VERSION = 1;
-const STORE = "punch-queue";
+interface StoreSpec {
+  db: string;
+  version: number;
+  store: string;
+  /** Saknas den ges nyckeln vid varje skrivning. */
+  keyPath?: string;
+}
+
+/** Kön. Namn och version är oförändrade sedan första skärmen; rör dem inte. */
+const QUEUE: StoreSpec = {
+  db: "tikkr",
+  version: 1,
+  store: "punch-queue",
+  keyPath: "clientPunchId",
+};
+
+/** Bilden av vem som är instämplad, medan kön inte är tom. */
+const VIEW: StoreSpec = { db: "tikkr-view", version: 1, store: "view" };
+
+/** Den enda posten i VIEW. Det finns bara en bild åt gången. */
+const VIEW_KEY = "current";
 
 export interface QueuedPunch {
   /** Skärmens eget id för trycket. Nyckeln som hindrar dubbletter. */
@@ -46,14 +78,17 @@ export interface QueuedPunch {
   label: string;
 }
 
-function openDb(): Promise<IDBDatabase> {
+function openDb(spec: StoreSpec): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
-    const request = indexedDB.open(DB_NAME, DB_VERSION);
+    const request = indexedDB.open(spec.db, spec.version);
 
     request.onupgradeneeded = () => {
       const db = request.result;
-      if (!db.objectStoreNames.contains(STORE)) {
-        db.createObjectStore(STORE, { keyPath: "clientPunchId" });
+      if (!db.objectStoreNames.contains(spec.store)) {
+        db.createObjectStore(
+          spec.store,
+          spec.keyPath ? { keyPath: spec.keyPath } : undefined
+        );
       }
     };
 
@@ -84,20 +119,23 @@ function openDb(): Promise<IDBDatabase> {
  * finns inget att rädda. Men det krymper från sekunder till det ögonblicket.
  *
  * Läsningar behöver inget av det, och får vara snabba.
+ *
+ * Gäller kön och bilden lika, och står därför bara här.
  */
 function tx<T>(
+  spec: StoreSpec,
   mode: IDBTransactionMode,
   run: (store: IDBObjectStore) => IDBRequest<T>
 ): Promise<T> {
-  return openDb().then(
+  return openDb(spec).then(
     (db) =>
       new Promise<T>((resolve, reject) => {
         const transaction = db.transaction(
-          STORE,
+          spec.store,
           mode,
           mode === "readwrite" ? { durability: "strict" } : undefined
         );
-        const request = run(transaction.objectStore(STORE));
+        const request = run(transaction.objectStore(spec.store));
 
         transaction.oncomplete = () => resolve(request.result);
         // Ett fel i anropet avbryter transaktionen, och då kommer båda. Det
@@ -111,12 +149,12 @@ function tx<T>(
 
 /** Lägger ett tryck i kön. Anropas innan något skickas. */
 export async function enqueue(punch: QueuedPunch): Promise<void> {
-  await tx("readwrite", (store) => store.put(punch));
+  await tx(QUEUE, "readwrite", (store) => store.put(punch));
 }
 
 /** Alla tryck som väntar, i den ordning de gjordes. */
 export async function pending(): Promise<QueuedPunch[]> {
-  const all = await tx<QueuedPunch[]>("readonly", (store) =>
+  const all = await tx<QueuedPunch[]>(QUEUE, "readonly", (store) =>
     store.getAll() as IDBRequest<QueuedPunch[]>
   );
   // Ordningen spelar roll: servern vägrar en instämpling som ligger före ett
@@ -125,7 +163,7 @@ export async function pending(): Promise<QueuedPunch[]> {
 }
 
 async function remove(clientPunchId: string): Promise<void> {
-  await tx("readwrite", (store) => store.delete(clientPunchId));
+  await tx(QUEUE, "readwrite", (store) => store.delete(clientPunchId));
 }
 
 export interface FlushResult {
@@ -257,4 +295,101 @@ export function flush(): Promise<FlushResult> {
   });
 
   return flushing;
+}
+
+/* -------------------------------------------------------------------------- */
+/* Bilden som hör till kön                                                     */
+/* -------------------------------------------------------------------------- */
+
+/** Det som sparas: skärmens bild, och när den togs. */
+export interface SavedView<T> {
+  view: T;
+  /** Skärmens klocka, samma som trycken i kön. Se `shouldRestoreView`. */
+  savedAt: string;
+}
+
+/**
+ * Sparar skärmens bild av vem som är instämplad.
+ *
+ * Anroparen sparar varje gång bilden ÄNDRAS, och bara då. Serverns bild kommer
+ * var femte sekund och är oftast densamma, och en skrivning till disken varje
+ * gång hade slitit på skärmens minne för ingenting. Bilden ändras när någon
+ * stämplar, på den här skärmen eller en annan.
+ *
+ * Fönstret mellan trycket och bilden är några millisekunder. Går strömmen
+ * precis där ligger trycket i kön men inte i bilden, och skärmen visar läget
+ * före det. Det rättar sig när nätet kommer tillbaka och kön tömts.
+ *
+ * Bilden är nycklad på de anställdas id:n och bär inga namn. Kopplas skärmen
+ * till ett annat företag matchar den ingen, och visar ingen som instämplad.
+ */
+export async function saveView<T>(view: T): Promise<void> {
+  const saved: SavedView<T> = { view, savedAt: new Date().toISOString() };
+  await tx(VIEW, "readwrite", (store) => store.put(saved, VIEW_KEY));
+}
+
+/** Den sparade bilden, eller null om ingen finns. */
+export async function loadView<T>(): Promise<SavedView<T> | null> {
+  const saved = await tx<SavedView<T> | undefined>(VIEW, "readonly", (store) =>
+    store.get(VIEW_KEY)
+  );
+  return saved ?? null;
+}
+
+/** Tar bort bilden. Anropas när kön är tom och serverns bild gäller igen. */
+export async function clearView(): Promise<void> {
+  await tx(VIEW, "readwrite", (store) => store.delete(VIEW_KEY));
+}
+
+/**
+ * Om en sparad bild hör till trycken som väntar.
+ *
+ * Bilden ska vara tagen EFTER det äldsta trycket i kön. En äldre bild hör till
+ * ett tidigare avbrott — sparad när kön senast var full, och aldrig borttagen
+ * för att strömmen gick i samma stund som kön tömdes. Den hade visat ett läge
+ * som inte längre gäller, och då är serverns sparade sida en bättre gissning.
+ *
+ * Båda tiderna kommer från skärmens egen klocka, så en klocka som går fel
+ * spelar ingen roll här: den går lika fel på båda.
+ */
+export function shouldRestoreView(
+  saved: Pick<SavedView<unknown>, "savedAt"> | null,
+  queue: Pick<QueuedPunch, "at">[]
+): boolean {
+  if (!saved || queue.length === 0) return false;
+
+  const savedAt = Date.parse(saved.savedAt);
+  const oldest = Math.min(...queue.map((punch) => Date.parse(punch.at)));
+
+  return Number.isFinite(savedAt) && Number.isFinite(oldest) && savedAt >= oldest;
+}
+
+/**
+ * Om skärmen ska lägga tillbaka sin sparade bild när den startar.
+ *
+ * Två fall, och de skiljer sig i vem som vet bäst:
+ *
+ * VÄNTAR TRYCK vet skärmen bäst, eftersom servern ännu inte fått dem. Bilden
+ * läggs tillbaka om den hör till de tryck som väntar, se `shouldRestoreView`.
+ * Servern frågas inte: dess bild är äldre än trycken oavsett vad den svarar.
+ *
+ * ÄR KÖN TOM vet servern bäst, om den svarar. Svarar den gäller dess bild, som
+ * förut. Svarar den inte är den sparade bilden det senaste skärmen visste, och
+ * bättre än sidans sparade kopia, som kan vara från i natt. Frågan ställs bara
+ * då, och den som ställer den bestämmer hur länge den väntar.
+ */
+export async function shouldRestoreAtStart(
+  saved: Pick<SavedView<unknown>, "savedAt"> | null,
+  queue: Pick<QueuedPunch, "at">[],
+  serverAnswers: () => Promise<boolean>
+): Promise<boolean> {
+  if (!saved) return false;
+  if (queue.length > 0) return shouldRestoreView(saved, queue);
+
+  try {
+    return !(await serverAnswers());
+  } catch {
+    // En fråga som kastar är en server som inte svarade.
+    return true;
+  }
 }

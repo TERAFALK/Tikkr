@@ -3,7 +3,17 @@
 import "fake-indexeddb/auto";
 
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { enqueue, flush, pending, type QueuedPunch } from "@/lib/offline-queue";
+import {
+  clearView,
+  enqueue,
+  flush,
+  loadView,
+  pending,
+  saveView,
+  shouldRestoreAtStart,
+  shouldRestoreView,
+  type QueuedPunch,
+} from "@/lib/offline-queue";
 
 /**
  * OFFLINE-KÖN.
@@ -67,12 +77,42 @@ async function clearQueue(): Promise<void> {
 
 beforeEach(async () => {
   await clearQueue();
+  await clearView();
   vi.restoreAllMocks();
 });
 
 afterEach(() => {
   vi.restoreAllMocks();
 });
+
+/** Fångar varje transaktion kön och bilden öppnar, med det den bad om. */
+function watchTransactions() {
+  const opened: {
+    mode: IDBTransactionMode | undefined;
+    options: IDBTransactionOptions | undefined;
+    committed: () => boolean;
+  }[] = [];
+
+  const original = IDBDatabase.prototype.transaction;
+
+  vi.spyOn(IDBDatabase.prototype, "transaction").mockImplementation(
+    function (this: IDBDatabase, ...args: Parameters<IDBDatabase["transaction"]>) {
+      const transaction = original.apply(this, args);
+      let done = false;
+      transaction.addEventListener("complete", () => {
+        done = true;
+      });
+      opened.push({
+        mode: args[1],
+        options: args[2],
+        committed: () => done,
+      });
+      return transaction;
+    }
+  );
+
+  return opened;
+}
 
 describe("kön sparar innan den skickar", () => {
   it("ett tryck ligger i kön direkt", async () => {
@@ -99,35 +139,6 @@ describe("kön sparar innan den skickar", () => {
  *     anropet i den godkänts
  */
 describe("ett tryck som sagts vara sparat överlever ett strömavbrott", () => {
-  /** Fångar varje transaktion kön öppnar, med det den bad om. */
-  function watchTransactions() {
-    const opened: {
-      mode: IDBTransactionMode | undefined;
-      options: IDBTransactionOptions | undefined;
-      committed: () => boolean;
-    }[] = [];
-
-    const original = IDBDatabase.prototype.transaction;
-
-    vi.spyOn(IDBDatabase.prototype, "transaction").mockImplementation(
-      function (this: IDBDatabase, ...args: Parameters<IDBDatabase["transaction"]>) {
-        const transaction = original.apply(this, args);
-        let done = false;
-        transaction.addEventListener("complete", () => {
-          done = true;
-        });
-        opened.push({
-          mode: args[1],
-          options: args[2],
-          committed: () => done,
-        });
-        return transaction;
-      }
-    );
-
-    return opened;
-  }
-
   it("skrivningen ber om att datan ska nå disken", async () => {
     const opened = watchTransactions();
 
@@ -363,5 +374,161 @@ describe("inga dubbletter", () => {
     await enqueue(punch({ clientPunchId: "samma" }));
 
     expect(await pending()).toHaveLength(1);
+  });
+});
+
+/**
+ * BILDEN SOM HÖR TILL KÖN.
+ *
+ * Provat 2026-10-19: två instämplade, wifi av, sladden ur. Trycken låg kvar i
+ * kön, men skärmen visade båda som utstämplade, eftersom den startade på sidans
+ * sparade kopia från före trycken. Den som ser sig själv utstämplad trycker
+ * igen — och väljer hen ett annat jobb faktureras samma tid två gånger.
+ */
+describe("bilden av vem som är instämplad", () => {
+  const view = {
+    active: { anna: [{ since: "2026-10-19T07:00:00.000Z", label: "2601" }] },
+    breaks: {},
+  };
+
+  it("sparas och går att läsa tillbaka", async () => {
+    await saveView(view);
+
+    const saved = await loadView<typeof view>();
+    expect(saved?.view).toEqual(view);
+    expect(Number.isFinite(Date.parse(saved!.savedAt))).toBe(true);
+  });
+
+  it("finns inte när ingen sparats", async () => {
+    expect(await loadView()).toBeNull();
+  });
+
+  it("tas bort", async () => {
+    await saveView(view);
+    await clearView();
+
+    expect(await loadView()).toBeNull();
+  });
+
+  it("ersätter den förra, så att det bara finns en bild", async () => {
+    await saveView({ active: {}, breaks: {} });
+    await saveView(view);
+
+    expect((await loadView<typeof view>())?.view).toEqual(view);
+  });
+
+  it("sparas på disken, som kön", async () => {
+    const opened = watchTransactions();
+
+    await saveView(view);
+
+    const writes = opened.filter((t) => t.mode === "readwrite");
+    expect(writes.length).toBeGreaterThan(0);
+    for (const write of writes) {
+      expect(write.options?.durability).toBe("strict");
+      expect(write.committed()).toBe(true);
+    }
+  });
+
+  it("blandas aldrig ihop med kön", async () => {
+    await saveView(view);
+    expect(await pending()).toEqual([]);
+
+    await enqueue(punch({ clientPunchId: "abc" }));
+    await clearView();
+    expect((await pending()).map((p) => p.clientPunchId)).toEqual(["abc"]);
+  });
+});
+
+describe("shouldRestoreView", () => {
+  const at = (iso: string) => ({ at: iso });
+
+  it("lägger tillbaka en bild tagen efter det äldsta trycket", () => {
+    expect(
+      shouldRestoreView({ savedAt: "2026-10-19T07:05:00.000Z" }, [
+        at("2026-10-19T07:01:00.000Z"),
+        at("2026-10-19T07:04:00.000Z"),
+      ])
+    ).toBe(true);
+  });
+
+  it("lägger tillbaka en bild tagen i samma ögonblick som trycket", () => {
+    const t = "2026-10-19T07:01:00.000Z";
+    expect(shouldRestoreView({ savedAt: t }, [at(t)])).toBe(true);
+  });
+
+  it("lägger inte tillbaka en bild från ett tidigare avbrott", () => {
+    // Bilden låg kvar sedan förra gången kön var full. Den hör inte till de
+    // tryck som väntar nu, och hade visat ett läge som inte längre gäller.
+    expect(
+      shouldRestoreView({ savedAt: "2026-10-18T15:00:00.000Z" }, [
+        at("2026-10-19T07:01:00.000Z"),
+      ])
+    ).toBe(false);
+  });
+
+  it("lägger inte tillbaka något när kön är tom", () => {
+    expect(
+      shouldRestoreView({ savedAt: "2026-10-19T07:05:00.000Z" }, [])
+    ).toBe(false);
+  });
+
+  it("lägger inte tillbaka något utan sparad bild", () => {
+    expect(shouldRestoreView(null, [at("2026-10-19T07:01:00.000Z")])).toBe(
+      false
+    );
+  });
+
+  it("lägger inte tillbaka en bild med en tid som inte går att läsa", () => {
+    expect(
+      shouldRestoreView({ savedAt: "trasig" }, [at("2026-10-19T07:01:00.000Z")])
+    ).toBe(false);
+  });
+});
+
+describe("shouldRestoreAtStart", () => {
+  const saved = { savedAt: "2026-10-19T09:58:00.000Z" };
+
+  /** En server som svarar som angivet, och räknar hur ofta den frågats. */
+  function server(answers: boolean) {
+    const ask = vi.fn(async () => answers);
+    return ask;
+  }
+
+  it("lägger inte tillbaka något utan sparad bild, och frågar inte servern", async () => {
+    const ask = server(false);
+    expect(await shouldRestoreAtStart(null, [], ask)).toBe(false);
+    expect(ask).not.toHaveBeenCalled();
+  });
+
+  it("med väntande tryck avgör de, och servern frågas inte", async () => {
+    // Serverns bild är äldre än trycken oavsett vad den svarar.
+    const ask = server(true);
+    const queue = [{ at: "2026-10-19T09:55:00.000Z" }];
+
+    expect(await shouldRestoreAtStart(saved, queue, ask)).toBe(true);
+    expect(ask).not.toHaveBeenCalled();
+  });
+
+  it("med väntande tryck läggs en bild från ett tidigare avbrott inte tillbaka", async () => {
+    const queue = [{ at: "2026-10-19T10:05:00.000Z" }];
+    expect(await shouldRestoreAtStart(saved, queue, server(false))).toBe(false);
+  });
+
+  it("med tom kö och en server som svarar gäller serverns bild", async () => {
+    expect(await shouldRestoreAtStart(saved, [], server(true))).toBe(false);
+  });
+
+  it("med tom kö och en server som inte svarar läggs bilden tillbaka", async () => {
+    // Strömmen gick och tog routern med sig. Skärmen startade först, och sidans
+    // sparade kopia är från senast sidan laddades.
+    expect(await shouldRestoreAtStart(saved, [], server(false))).toBe(true);
+  });
+
+  it("en fråga som kastar räknas som en server som inte svarade", async () => {
+    const ask = vi.fn(async () => {
+      throw new TypeError("Failed to fetch");
+    });
+    expect(await shouldRestoreAtStart(saved, [], ask)).toBe(true);
   });
 });
