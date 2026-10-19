@@ -352,6 +352,13 @@ const SYNC_MS = 5_000;
  */
 const LIST_REFRESH_MS = 60_000;
 
+/**
+ * Hur ofta en skärm vi sålt rapporterar sitt nät till adminpanelen. Tätt nog
+ * att uppgiften stämmer när supporten tittar, glest nog att aldrig märkas. En
+ * kunds egen dator rapporterar aldrig.
+ */
+const DEVICE_REPORT_MS = 5 * 60_000;
+
 export default function KioskScreen({
   companyName,
   deviceName,
@@ -713,19 +720,35 @@ export default function KioskScreen({
    * Bara skärmar som kör i kioskappen har något att säga. En kunds egen dator
    * hör aldrig av sig, och syns därför i adminpanelen utan fjärrkontroller —
    * vilket är hela skillnaden mellan de två sorternas skärm.
+   *
+   * Om och om igen, och inte bara vid laddning: nätet ändras, och en uppgift om
+   * wifisignalen som lästes av för en timme sedan säger ingenting om nu. Direkt
+   * när nätet kommer tillbaka också, eftersom det är just då frågan ställs.
    */
   useEffect(() => {
-    const info = readDeviceInfo();
-    if (!info) return;
+    const report = () => {
+      const info = readDeviceInfo();
+      if (!info) return;
 
-    void fetch("/api/kiosk/device", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify(info),
-    }).catch(() => {
-      // Nätet är nere. Rapporten är inte värd en omsändning — nästa laddning
-      // gör om den, och ingen arbetstid hänger på den.
-    });
+      void fetch("/api/kiosk/device", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(info),
+      }).catch(() => {
+        // Nätet är nere. Rapporten är inte värd en omsändning — nästa gör om
+        // den, och ingen arbetstid hänger på den.
+      });
+    };
+
+    report();
+
+    const timer = setInterval(report, DEVICE_REPORT_MS);
+    window.addEventListener("online", report);
+
+    return () => {
+      clearInterval(timer);
+      window.removeEventListener("online", report);
+    };
   }, []);
 
   /**

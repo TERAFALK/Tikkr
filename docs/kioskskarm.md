@@ -275,7 +275,11 @@ Adminpanelen listar företagets skärmar med namn och senaste kontakt
 väntande tryck i kön och när den senast nådde servern. Det täcker det vanliga
 supportsamtalet utan någon extra tjänst.
 
-### Resten via JavaScript-bryggan — byggt
+### Resten via JavaScript-bryggan — byggt, och provat på hårdvara
+
+Provat 2026-10-19 på en ProDVX APPC-24X med Fully Kiosk Browser 1.61.4 och
+WebView 142.0.7444.48. Skärmen rapporterade in sig och fick knappen
+Fjärrstyrning i panelen.
 
 `src/lib/fully.ts` är den enda filen som vet att Fully finns. Saknas objektet
 svarar den null på allt, och stämpling, offline-kö och device-token fungerar
@@ -283,13 +287,18 @@ precis som på en kunds egen dator. Bevisas av `tests/fully.test.ts`.
 
 Så här hänger det ihop:
 
-1. Skärmen rapporterar app- och WebView-version till `POST /api/kiosk/device`
-   vid laddning. Bara skärmar med appen hör av sig.
+1. Skärmen rapporterar app- och WebView-version, nät och serienummer till
+   `POST /api/kiosk/device` vid laddning, var femte minut och när nätet kommer
+   tillbaka. Bara skärmar med appen hör av sig. Vad av anropet som får skrivas
+   avgör `src/lib/kiosk-report.ts`.
 2. `kiosk_devices.fully_version` är därmed ifylld på en Tikkr-skärm och null på
    en vanlig dator. **Det är så de skiljs åt** — en förmåga skärmen intygar,
    inte en bock någon kryssat i och glömt.
-3. Adminpanelen visar ljusstyrka och **Starta om** bara för skärmar med
-   `fully_version` satt. Övriga får en tom cell, ingen gråad knapp.
+3. Adminpanelen visar knappen **Fjärrstyrning** bara för skärmar med
+   `fully_version` satt. Övriga får ingen knapp alls, inte en gråad. Rutan
+   visar enhetens uppgifter, ljusstyrka i procent och **Starta om**, som
+   frågar först. Kontrollerna låg tidigare direkt på raden, och raden blev så
+   bred att talet klipptes: 100 visades som 10.
 4. `GET /api/kiosk/state` bär tillbaka ljusstyrkan och omstartsönskemålet.
    Rutten pollas ändå var femte sekund, så en ändring i panelen syns på väggen
    nästan direkt.
@@ -303,6 +312,14 @@ Ljusstyrkan lagras 0–100 och räknas om till appens skala i `fully.ts`.
 ⟨verifiera⟩ att skalan är 0–255 och att `WRITE_SETTINGS` beviljas av device
 owner. Blir det fel är det en rad som ändras.
 
+**Serienumret syns först när Fully är device owner.** Modern Android ger inte
+en vanlig app tillgång till det, vilket Fully skriver själva. Platshållare som
+`unknown` visas aldrig som ett nummer.
+
+**Wifisignalen visas som appen lämnar den.** Fully dokumenterar den som en
+sträng utan skala. ⟨verifiera⟩ vad den betyder på första skärmen, och tolka den
+först då.
+
 Funktionerna som används, med namnen ur Fullys egen dokumentation av
 JavaScript-gränssnittet:
 
@@ -310,6 +327,12 @@ JavaScript-gränssnittet:
 |---|---|
 | `fully.getFullyVersion()` | appens version — det som gör skärmen till en Tikkr-skärm i panelen |
 | `fully.getWebviewVersion()` | webbmotorns version |
+| `fully.getSerialNumberDeviceOwner()` | serienumret, när Fully är device owner |
+| `fully.getSerialNumber()` | serienumret annars, om Android lämnar ut det |
+| `fully.isWifiConnected()` | om wifi är anslutet |
+| `fully.isNetworkConnected()` | om något nät alls är anslutet. Anslutet utan wifi är kabel |
+| `fully.getWifiSsid()` | wifinätets namn, inom citattecken |
+| `fully.getWifiSignalLevel()` | signalen, som sträng |
 | `fully.setScreenBrightness(int)` | ljusstyrka, `-1` för enhetens standard |
 | `fully.restartApp()` | starta om appen |
 

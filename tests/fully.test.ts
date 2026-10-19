@@ -86,7 +86,7 @@ describe("med kioskappen", () => {
       getWebviewVersion: () => "124.0.6367.82",
     });
 
-    expect(readDeviceInfo()).toEqual({
+    expect(readDeviceInfo()).toMatchObject({
       fullyVersion: "1.61.4",
       webviewVersion: "124.0.6367.82",
     });
@@ -105,6 +105,116 @@ describe("med kioskappen", () => {
     expect(readDeviceInfo()).toEqual({
       fullyVersion: "1.61.4",
       webviewVersion: null,
+      serialNumber: null,
+      network: null,
+    });
+  });
+
+  it("läser wifinätet utan Androids citattecken", () => {
+    javaBridge({
+      getFullyVersion: () => "1.61.4",
+      isWifiConnected: () => true,
+      isNetworkConnected: () => true,
+      getWifiSsid: () => '"Verkstaden"',
+      getWifiSignalLevel: () => "3",
+    });
+
+    expect(readDeviceInfo()?.network).toEqual({
+      type: "WIFI",
+      ssid: "Verkstaden",
+      signal: "3",
+    });
+  });
+
+  it("lämnar inget nätverksnamn när Android döljer det", () => {
+    javaBridge({
+      getFullyVersion: () => "1.61.4",
+      isWifiConnected: () => true,
+      getWifiSsid: () => "<unknown ssid>",
+    });
+
+    expect(readDeviceInfo()?.network).toEqual({
+      type: "WIFI",
+      ssid: null,
+      signal: null,
+    });
+  });
+
+  it("anslutet nät som inte är wifi är kabel", () => {
+    javaBridge({
+      getFullyVersion: () => "1.61.4",
+      isWifiConnected: () => false,
+      isNetworkConnected: () => true,
+      getWifiSsid: () => '"Förra nätet"',
+    });
+
+    expect(readDeviceInfo()?.network).toEqual({
+      type: "WIRED",
+      ssid: null,
+      signal: null,
+    });
+  });
+
+  it("rapporterar inget nät när enheten säger att inget är anslutet", () => {
+    javaBridge({
+      getFullyVersion: () => "1.61.4",
+      isWifiConnected: () => false,
+      isNetworkConnected: () => false,
+    });
+
+    expect(readDeviceInfo()?.network).toBeNull();
+  });
+
+  it("tar serienumret som device owner i första hand", () => {
+    javaBridge({
+      getFullyVersion: () => "1.61.4",
+      getSerialNumberDeviceOwner: () => "PDX24X0042",
+      getSerialNumber: () => "unknown",
+    });
+
+    expect(readDeviceInfo()?.serialNumber).toBe("PDX24X0042");
+  });
+
+  it("faller tillbaka på det vanliga serienumret", () => {
+    javaBridge({
+      getFullyVersion: () => "1.61.4",
+      getSerialNumberDeviceOwner: () => "",
+      getSerialNumber: () => "PDX24X0042",
+    });
+
+    expect(readDeviceInfo()?.serialNumber).toBe("PDX24X0042");
+  });
+
+  it("visar inte Androids platshållare som ett serienummer", () => {
+    // Utan device owner svarar modern Android med en platshållare.
+    for (const placeholder of ["unknown", "UNKNOWN", "<unknown>", "0", "000"]) {
+      javaBridge({
+        getFullyVersion: () => "1.61.4",
+        getSerialNumberDeviceOwner: () => placeholder,
+        getSerialNumber: () => placeholder,
+      });
+
+      expect(readDeviceInfo()?.serialNumber).toBeNull();
+    }
+  });
+
+  it("ett nätanrop som kastar kostar inte resten av rapporten", () => {
+    javaBridge({
+      getFullyVersion: () => "1.61.4",
+      getWebviewVersion: () => "142.0",
+      isWifiConnected: () => {
+        throw new Error("nej");
+      },
+      isNetworkConnected: () => {
+        throw new Error("nej");
+      },
+    });
+
+    expect(readDeviceInfo()).toEqual({
+      fullyVersion: "1.61.4",
+      webviewVersion: "142.0",
+      serialNumber: null,
+      network: null,
     });
   });
 

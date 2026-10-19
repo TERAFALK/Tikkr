@@ -49,6 +49,14 @@
 interface FullyBridge {
   getFullyVersion?: () => string;
   getWebviewVersion?: () => string;
+  /** Kräver att Fully är device owner. Se readSerialNumber. */
+  getSerialNumberDeviceOwner?: () => string;
+  getSerialNumber?: () => string;
+  isNetworkConnected?: () => boolean;
+  isWifiConnected?: () => boolean;
+  getWifiSsid?: () => string;
+  /** En sträng, utan dokumenterad skala. */
+  getWifiSignalLevel?: () => string;
   /** `-1` betyder enhetens standard. */
   setScreenBrightness?: (level: number) => void;
   restartApp?: () => void;
@@ -75,14 +83,94 @@ export function hasFully(): boolean {
   return bridge() !== null;
 }
 
+export interface FullyNetwork {
+  type: "WIFI" | "WIRED";
+  ssid: string | null;
+  signal: string | null;
+}
+
 export interface FullyDeviceInfo {
   fullyVersion: string;
   webviewVersion: string | null;
+  serialNumber: string | null;
+  network: FullyNetwork | null;
 }
 
 /** Ett ifyllt strängvärde, eller null för allt annat. */
 function text(value: unknown): string | null {
   return typeof value === "string" && value.trim() !== "" ? value.trim() : null;
+}
+
+/**
+ * Kör ett anrop till appen och ger null om det kastar.
+ *
+ * Funktionen som skickas in ska anropa som metod, `() => api.getX?.()`, aldrig
+ * en loss-plockad funktion. Se rubriken överst i filen.
+ *
+ * Varje uppgift läses för sig: en webbmotor som inte svarar ska inte kosta
+ * appens version, och en ny appversion ska aldrig kunna fälla
+ * stämplingsskärmen.
+ */
+function safely<T>(read: () => T): T | null {
+  try {
+    return read() ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Det Android lämnar i stället för ett serienummer när appen inte får se det.
+ * Ett sådant värde är inget nummer och ska inte stå i panelen som ett.
+ */
+const NOT_A_SERIAL = /^(unknown|<unknown>|null|0+)$/i;
+
+/**
+ * Serienumret.
+ *
+ * Modern Android ger inte en vanlig app tillgång till det, vilket Fully skriver
+ * i sin dokumentation. Som device owner får appen det, och då svarar
+ * `getSerialNumberDeviceOwner`. Annars prövas den vanliga, som på äldre
+ * Android kan svara.
+ */
+function readSerialNumber(api: FullyBridge): string | null {
+  for (const value of [
+    safely(() => api.getSerialNumberDeviceOwner?.()),
+    safely(() => api.getSerialNumber?.()),
+  ]) {
+    const serial = text(value);
+    if (serial && !NOT_A_SERIAL.test(serial)) return serial;
+  }
+  return null;
+}
+
+/**
+ * Nätet enheten sitter på.
+ *
+ * Wifi om wifi är anslutet, annars kabel om något nät alls är det. ProDVX-
+ * skärmarna har ingen SIM-plats, så "anslutet men inte wifi" är i praktiken
+ * nätverkskabel.
+ */
+function readNetwork(api: FullyBridge): FullyNetwork | null {
+  if (safely(() => api.isWifiConnected?.()) === true) {
+    // Android lämnar namnet inom citattecken, och ett namn den inte får visa
+    // som "<unknown ssid>".
+    const raw = text(safely(() => api.getWifiSsid?.()));
+    const ssid =
+      raw && raw !== "<unknown ssid>" ? raw.replace(/^"(.*)"$/, "$1") : null;
+
+    return {
+      type: "WIFI",
+      ssid,
+      signal: text(safely(() => api.getWifiSignalLevel?.())),
+    };
+  }
+
+  if (safely(() => api.isNetworkConnected?.()) === true) {
+    return { type: "WIRED", ssid: null, signal: null };
+  }
+
+  return null;
 }
 
 /**
@@ -95,27 +183,15 @@ export function readDeviceInfo(): FullyDeviceInfo | null {
   const api = bridge();
   if (!api) return null;
 
-  let fullyVersion: string | null = null;
-  let webviewVersion: string | null = null;
+  const fullyVersion = text(safely(() => api.getFullyVersion?.()));
+  if (!fullyVersion) return null;
 
-  // Var för sig: en webbmotor som inte svarar ska inte kosta appens version.
-  try {
-    if (typeof api.getFullyVersion === "function") {
-      fullyVersion = text(api.getFullyVersion());
-    }
-  } catch {
-    // En ny appversion ska inte kunna fälla stämplingsskärmen.
-  }
-
-  try {
-    if (typeof api.getWebviewVersion === "function") {
-      webviewVersion = text(api.getWebviewVersion());
-    }
-  } catch {
-    // Se ovan.
-  }
-
-  return fullyVersion ? { fullyVersion, webviewVersion } : null;
+  return {
+    fullyVersion,
+    webviewVersion: text(safely(() => api.getWebviewVersion?.())),
+    serialNumber: readSerialNumber(api),
+    network: readNetwork(api),
+  };
 }
 
 /** Ställer ljusstyrkan. `percent` är 0–100. Gör ingenting utan appen. */

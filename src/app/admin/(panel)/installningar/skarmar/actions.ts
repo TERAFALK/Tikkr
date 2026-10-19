@@ -115,35 +115,50 @@ export async function deleteDevice(formData: FormData) {
   revalidatePath(PATH);
 }
 
+/** Svaret från fjärrstyrningens två åtgärder, för rutans kvittens. */
+export interface RemoteControlState {
+  ok?: string;
+  error?: string;
+}
+
+/** Svaret när en skärm inte går att fjärrstyra, eller inte finns. */
+const NOT_REMOTE = "Skärmen går inte att fjärrstyra.";
+
 /**
  * Ställer ljusstyrkan på en skärm.
  *
- * Bara meningsfullt på skärmar som kör i kioskappen — panelen visar därför
- * fältet bara för dem. Kontrolleras ändå här: en serveråtgärd är en publik
+ * Bara meningsfullt på skärmar som kör i kioskappen, och panelen visar därför
+ * rutan bara för dem. Kontrolleras ändå här: en serveråtgärd är en publik
  * ingång och får inte lita på att gränssnittet höll emot.
  *
  * Skärmen plockar upp värdet vid nästa pollning, alltså inom några sekunder.
  */
-export async function setBrightness(formData: FormData) {
+export async function setBrightness(
+  _previous: RemoteControlState,
+  formData: FormData
+): Promise<RemoteControlState> {
   const session = await requireAdmin();
   await assertWritable(session);
   const { db } = session;
 
   const id = String(formData.get("id") ?? "");
-  if (!id) return;
+  if (!id) return { error: NOT_REMOTE };
 
-  const raw = Number(formData.get("brightness"));
-  if (!Number.isFinite(raw)) return;
+  const raw = Number(String(formData.get("brightness") ?? "").replace(",", "."));
+  if (!Number.isFinite(raw)) return { error: "Skriv ett tal mellan 0 och 100." };
 
   const brightness = Math.min(100, Math.max(0, Math.round(raw)));
 
   // Går genom företagsfiltret, och träffar inget om skärmen saknar appen.
-  await db.kioskDevice.updateMany({
+  const { count } = await db.kioskDevice.updateMany({
     where: { id, fullyVersion: { not: null } },
     data: { brightness },
   });
 
+  if (count === 0) return { error: NOT_REMOTE };
+
   revalidatePath(PATH);
+  return { ok: "Ljusstyrkan är sparad." };
 }
 
 /**
@@ -155,20 +170,27 @@ export async function setBrightness(formData: FormData) {
  * varje omstart lett till nästa.
  *
  * Är skärmen nere händer ingenting förrän den kommer tillbaka, och då är
- * omstarten överflödig. Det är rätt beteende: den har just startat.
+ * omstarten överflödig. Det är rätt beteende: den har just startat. Ligger
+ * det tryck i skärmens kö väntar omstarten tills de skickats.
  */
-export async function requestRestart(formData: FormData) {
+export async function requestRestart(
+  _previous: RemoteControlState,
+  formData: FormData
+): Promise<RemoteControlState> {
   const session = await requireAdmin();
   await assertWritable(session);
   const { db } = session;
 
   const id = String(formData.get("id") ?? "");
-  if (!id) return;
+  if (!id) return { error: NOT_REMOTE };
 
-  await db.kioskDevice.updateMany({
+  const { count } = await db.kioskDevice.updateMany({
     where: { id, fullyVersion: { not: null } },
     data: { restartRequestedAt: new Date() },
   });
 
+  if (count === 0) return { error: NOT_REMOTE };
+
   revalidatePath(PATH);
+  return { ok: "Omstarten är skickad." };
 }

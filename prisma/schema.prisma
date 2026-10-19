@@ -59,6 +59,15 @@ enum PlanningMode {
   SERVICE
 }
 
+/// Hur en stämplingsskärm är ansluten, som den själv rapporterar det. Se
+/// KioskDevice.networkType.
+enum KioskNetworkType {
+  WIFI
+  /// Allt anslutet nät som inte är wifi. ProDVX-skärmarna har ingen SIM-plats,
+  /// så i praktiken nätverkskabel.
+  WIRED
+}
+
 /// Vad en stämpling avser. Se TimeEntry.kind.
 enum TimeEntryKind {
   /// Tid som ska faktureras en kundorder.
@@ -1319,6 +1328,27 @@ model KioskDevice {
   /// satt när sidan laddades verkställs aldrig — annars hade varje omstart
   /// lett till nästa, i all oändlighet.
   restartRequestedAt DateTime? @map("restart_requested_at")
+
+  /// Enhetens serienummer, för garanti och för ProDVX-licensen som är
+  /// kopplad till det. Går bara att läsa när Fully är device owner — modern
+  /// Android ger inte en vanlig app tillgång till det — så det är null tills
+  /// skärmen låsts.
+  serialNumber String? @map("serial_number")
+
+  /// NÄTET SOM SKÄRMEN SENAST RAPPORTERADE. Offline-kön finns för att
+  /// verkstadswifi hackar, och när tryck hamnar i kön är det här första frågan
+  /// supporten ställer. Uppgifterna är en ögonblicksbild från `reportedAt`;
+  /// en skärm som tappat nätet kan inte rapportera att den gjort det.
+  networkType KioskNetworkType? @map("network_type")
+  wifiSsid    String?           @map("wifi_ssid")
+  /// Som appen lämnar den. Fully dokumenterar den som en sträng utan skala,
+  /// så den lagras som den kommer och tolkas inte förrän den lästs av på en
+  /// fysisk skärm.
+  wifiSignal  String?           @map("wifi_signal")
+
+  /// När skärmen senast rapporterade uppgifterna ovan. Sätts av servern,
+  /// aldrig ur anropet.
+  reportedAt DateTime? @map("reported_at")
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
