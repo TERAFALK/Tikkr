@@ -62,6 +62,29 @@ function openDb(): Promise<IDBDatabase> {
   });
 }
 
+/**
+ * Kör ett anrop mot kön och svarar när det LIGGER PÅ DISKEN.
+ *
+ * Provat 2026-10-19 på en ProDVX-skärm: wifi av, två tryck, rutan visade att
+ * de väntade, och när sladden drogs ur var de borta. Två saker låg bakom, och
+ * båda måste vara rätt för att "sparat" ska betyda något:
+ *
+ * 1. SVARET KOMMER NÄR TRANSAKTIONEN ÄR KLAR, inte när anropet i den godkänts.
+ *    `request.onsuccess` betyder bara att skrivningen accepterats; först
+ *    `oncomplete` betyder att den är genomförd. Kön svarade förut på det
+ *    första, och skärmen gick vidare som om trycket var säkrat.
+ *
+ * 2. SKRIVNINGEN BER OM DISKEN, `durability: "strict"`. Chromium räknar
+ *    annars en transaktion som klar innan datan nått disken, för att det går
+ *    fortare — ett strömavbrott strax efter tar då med sig trycket. En skrivning
+ *    per tryck är ingenting att spara in på, och strömavbrottet i en verkstad
+ *    är precis när kön ska hålla.
+ *
+ * Fönstret blir aldrig noll: drar någon ur sladden samma hundradel trycket görs
+ * finns inget att rädda. Men det krymper från sekunder till det ögonblicket.
+ *
+ * Läsningar behöver inget av det, och får vara snabba.
+ */
 function tx<T>(
   mode: IDBTransactionMode,
   run: (store: IDBObjectStore) => IDBRequest<T>
@@ -69,9 +92,19 @@ function tx<T>(
   return openDb().then(
     (db) =>
       new Promise<T>((resolve, reject) => {
-        const request = run(db.transaction(STORE, mode).objectStore(STORE));
-        request.onsuccess = () => resolve(request.result);
-        request.onerror = () => reject(request.error);
+        const transaction = db.transaction(
+          STORE,
+          mode,
+          mode === "readwrite" ? { durability: "strict" } : undefined
+        );
+        const request = run(transaction.objectStore(STORE));
+
+        transaction.oncomplete = () => resolve(request.result);
+        // Ett fel i anropet avbryter transaktionen, och då kommer båda. Det
+        // andra svaret gör ingenting: ett löfte avgörs bara en gång.
+        transaction.onerror = () => reject(transaction.error ?? request.error);
+        transaction.onabort = () =>
+          reject(transaction.error ?? new Error("Kön kunde inte sparas."));
       })
   );
 }

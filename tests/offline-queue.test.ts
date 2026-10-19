@@ -84,6 +84,74 @@ describe("kön sparar innan den skickar", () => {
   });
 });
 
+/**
+ * ETT STRÖMAVBROTT EFTER ETT TRYCK.
+ *
+ * Provat 2026-10-19 på en ProDVX-skärm: wifi av, två tryck, rutan visade att
+ * de väntade — och efter att sladden dragits ur var de borta. Kön hade svarat
+ * "sparat" när skrivningen godkänts, inte när den låg på disken, och nyare
+ * Chromium väntar inte på disken utan att man ber om det.
+ *
+ * Två villkor måste hålla för att "sparat" ska betyda något:
+ *   - skrivningen begär `durability: "strict"`, alltså att datan når disken
+ *     innan transaktionen räknas som klar
+ *   - `enqueue` svarar först när transaktionen är klar, inte när själva
+ *     anropet i den godkänts
+ */
+describe("ett tryck som sagts vara sparat överlever ett strömavbrott", () => {
+  /** Fångar varje transaktion kön öppnar, med det den bad om. */
+  function watchTransactions() {
+    const opened: {
+      mode: IDBTransactionMode | undefined;
+      options: IDBTransactionOptions | undefined;
+      committed: () => boolean;
+    }[] = [];
+
+    const original = IDBDatabase.prototype.transaction;
+
+    vi.spyOn(IDBDatabase.prototype, "transaction").mockImplementation(
+      function (this: IDBDatabase, ...args: Parameters<IDBDatabase["transaction"]>) {
+        const transaction = original.apply(this, args);
+        let done = false;
+        transaction.addEventListener("complete", () => {
+          done = true;
+        });
+        opened.push({
+          mode: args[1],
+          options: args[2],
+          committed: () => done,
+        });
+        return transaction;
+      }
+    );
+
+    return opened;
+  }
+
+  it("skrivningen ber om att datan ska nå disken", async () => {
+    const opened = watchTransactions();
+
+    await enqueue(punch());
+
+    const writes = opened.filter((t) => t.mode === "readwrite");
+    expect(writes.length).toBeGreaterThan(0);
+    for (const write of writes) {
+      expect(write.options?.durability).toBe("strict");
+    }
+  });
+
+  it("enqueue svarar först när transaktionen är klar", async () => {
+    const opened = watchTransactions();
+
+    await enqueue(punch());
+
+    // Direkt efter svaret, utan att vänta en tick till. Svarade kön när
+    // anropet godkänts var transaktionen inte klar än här.
+    const write = opened.find((t) => t.mode === "readwrite");
+    expect(write?.committed()).toBe(true);
+  });
+});
+
 describe("när servern svarar", () => {
   it("trycket skickas och tas bort ur kön", async () => {
     const fetchMock = vi
