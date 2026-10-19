@@ -210,8 +210,8 @@ vid uppstart.
 
 ## 7. Inställningar som måste vara AV
 
-Fem inställningar i Fully raderar var och en något som Tikkr förlitar sig på. Det
-är den enskilt viktigaste tabellen i det här dokumentet.
+Åtta inställningar i Fully stoppar eller raderar var och en något som Tikkr
+förlitar sig på. Det är den enskilt viktigaste tabellen i det här dokumentet.
 
 | Inställning | Vad som går sönder |
 |---|---|
@@ -220,6 +220,13 @@ Fem inställningar i Fully raderar var och en något som Tikkr förlitar sig på
 | **Delete Cache on Auto Reload** | Tömmer service worker-cachen. Skärmen är död vid wifi-glapp |
 | **Clear Cache After Each Page** | Samma, vid varje sidladdning |
 | **Pause Webview while in Background** | Kan stoppa synkförsök när skärmen går i vila |
+| **Wait for Network Connection** | Fully laddar ingen sida alls utan nät, och visar "Waiting for network". Tikkr får aldrig starta från skärmens egen kopia |
+| **Auto Reload on Network Reconnect** | Laddar om sidan när nätet kommer tillbaka. Tikkr skickar kön själv och behöver ingen omladdning |
+| **Auto Reload on Internet Reconnect** | Samma |
+
+De tre sista hittades 2026-10-19 på den första ProDVX-skärmen: utan nät startade
+den aldrig om. Samma prov visade att kön tappade väntande tryck när sladden
+drogs ur, vilket var ett fel i `offline-queue.ts` och inte i Fully.
 
 Två fjärrkommandon får aldrig tryckas på en skärm med osynkad kö: **Clear Cache**
 och **Clear Web Cookies**. Det senare återkallar i praktiken skärmens koppling.
