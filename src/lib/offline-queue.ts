@@ -13,17 +13,19 @@
  * startas om. Varje tryck bär ett eget id, så att ett omskickat tryck känns
  * igen av servern och inte blir en dubblett — alltså ingen dubbelfakturerad tid.
  *
- * BILDEN SOM HÖR TILL KÖN. Medan tryck väntar är skärmens egen bild av vem som
- * är instämplad nyare än serverns, och skärmen tar inte emot serverns. Den
- * bilden fanns förut bara i minnet. Provat 2026-10-19: två instämplade, wifi
- * av, sladden ur — trycken låg kvar i kön men skärmen visade båda som
- * utstämplade, eftersom den startade på sidans sparade kopia från före
- * trycken. Den som ser sig själv utstämplad trycker igen, och väljer hen ett
- * annat jobb står två öppna samtidigt och faktureras för samma tid.
+ * SKÄRMENS BILD AV VEM SOM ÄR INSTÄMPLAD fanns förut bara i minnet. Efter en
+ * omstart utan nät startade skärmen på sidans sparade kopia, från senast sidan
+ * laddades. Provat 2026-10-19: två instämplade, wifi av, sladden ur — trycken
+ * låg kvar i kön men skärmen visade båda som utstämplade. Samma sak i det
+ * vanligare fallet: folk stämplar in med nät, strömmen går och tar routern
+ * med sig, och skärmen startar före routern. Den som ser sig själv
+ * utstämplad trycker igen, och väljer hen ett annat jobb står två öppna
+ * samtidigt och faktureras för samma tid.
  *
  * Bilden sparas därför också, se `saveView`, i en egen databas så att köns
- * aldrig behöver röras. Samma regel om disken gäller båda, och den står på
- * ETT ställe: `tx`.
+ * aldrig behöver röras. Vilken bild som gäller när skärmen startar avgör
+ * `shouldRestoreAtStart`. Samma regel om disken gäller kön och bilden, och den
+ * står på ETT ställe: `tx`.
  *
  * Körs bara i webbläsaren.
  */
@@ -309,13 +311,17 @@ export interface SavedView<T> {
 /**
  * Sparar skärmens bild av vem som är instämplad.
  *
- * Bara medan kön inte är tom: det är bara då bilden behövs, och en skrivning
- * till disken var femte sekund, när serverns bild kommer in, sliter på
- * skärmens minne för ingenting.
+ * Anroparen sparar varje gång bilden ÄNDRAS, och bara då. Serverns bild kommer
+ * var femte sekund och är oftast densamma, och en skrivning till disken varje
+ * gång hade slitit på skärmens minne för ingenting. Bilden ändras när någon
+ * stämplar, på den här skärmen eller en annan.
  *
  * Fönstret mellan trycket och bilden är några millisekunder. Går strömmen
  * precis där ligger trycket i kön men inte i bilden, och skärmen visar läget
  * före det. Det rättar sig när nätet kommer tillbaka och kön tömts.
+ *
+ * Bilden är nycklad på de anställdas id:n och bär inga namn. Kopplas skärmen
+ * till ett annat företag matchar den ingen, och visar ingen som instämplad.
  */
 export async function saveView<T>(view: T): Promise<void> {
   const saved: SavedView<T> = { view, savedAt: new Date().toISOString() };
@@ -356,4 +362,34 @@ export function shouldRestoreView(
   const oldest = Math.min(...queue.map((punch) => Date.parse(punch.at)));
 
   return Number.isFinite(savedAt) && Number.isFinite(oldest) && savedAt >= oldest;
+}
+
+/**
+ * Om skärmen ska lägga tillbaka sin sparade bild när den startar.
+ *
+ * Två fall, och de skiljer sig i vem som vet bäst:
+ *
+ * VÄNTAR TRYCK vet skärmen bäst, eftersom servern ännu inte fått dem. Bilden
+ * läggs tillbaka om den hör till de tryck som väntar, se `shouldRestoreView`.
+ * Servern frågas inte: dess bild är äldre än trycken oavsett vad den svarar.
+ *
+ * ÄR KÖN TOM vet servern bäst, om den svarar. Svarar den gäller dess bild, som
+ * förut. Svarar den inte är den sparade bilden det senaste skärmen visste, och
+ * bättre än sidans sparade kopia, som kan vara från i natt. Frågan ställs bara
+ * då, och den som ställer den bestämmer hur länge den väntar.
+ */
+export async function shouldRestoreAtStart(
+  saved: Pick<SavedView<unknown>, "savedAt"> | null,
+  queue: Pick<QueuedPunch, "at">[],
+  serverAnswers: () => Promise<boolean>
+): Promise<boolean> {
+  if (!saved) return false;
+  if (queue.length > 0) return shouldRestoreView(saved, queue);
+
+  try {
+    return !(await serverAnswers());
+  } catch {
+    // En fråga som kastar är en server som inte svarade.
+    return true;
+  }
 }

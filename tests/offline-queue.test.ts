@@ -10,6 +10,7 @@ import {
   loadView,
   pending,
   saveView,
+  shouldRestoreAtStart,
   shouldRestoreView,
   type QueuedPunch,
 } from "@/lib/offline-queue";
@@ -482,5 +483,52 @@ describe("shouldRestoreView", () => {
     expect(
       shouldRestoreView({ savedAt: "trasig" }, [at("2026-10-19T07:01:00.000Z")])
     ).toBe(false);
+  });
+});
+
+describe("shouldRestoreAtStart", () => {
+  const saved = { savedAt: "2026-10-19T09:58:00.000Z" };
+
+  /** En server som svarar som angivet, och räknar hur ofta den frågats. */
+  function server(answers: boolean) {
+    const ask = vi.fn(async () => answers);
+    return ask;
+  }
+
+  it("lägger inte tillbaka något utan sparad bild, och frågar inte servern", async () => {
+    const ask = server(false);
+    expect(await shouldRestoreAtStart(null, [], ask)).toBe(false);
+    expect(ask).not.toHaveBeenCalled();
+  });
+
+  it("med väntande tryck avgör de, och servern frågas inte", async () => {
+    // Serverns bild är äldre än trycken oavsett vad den svarar.
+    const ask = server(true);
+    const queue = [{ at: "2026-10-19T09:55:00.000Z" }];
+
+    expect(await shouldRestoreAtStart(saved, queue, ask)).toBe(true);
+    expect(ask).not.toHaveBeenCalled();
+  });
+
+  it("med väntande tryck läggs en bild från ett tidigare avbrott inte tillbaka", async () => {
+    const queue = [{ at: "2026-10-19T10:05:00.000Z" }];
+    expect(await shouldRestoreAtStart(saved, queue, server(false))).toBe(false);
+  });
+
+  it("med tom kö och en server som svarar gäller serverns bild", async () => {
+    expect(await shouldRestoreAtStart(saved, [], server(true))).toBe(false);
+  });
+
+  it("med tom kö och en server som inte svarar läggs bilden tillbaka", async () => {
+    // Strömmen gick och tog routern med sig. Skärmen startade först, och sidans
+    // sparade kopia är från senast sidan laddades.
+    expect(await shouldRestoreAtStart(saved, [], server(false))).toBe(true);
+  });
+
+  it("en fråga som kastar räknas som en server som inte svarade", async () => {
+    const ask = vi.fn(async () => {
+      throw new TypeError("Failed to fetch");
+    });
+    expect(await shouldRestoreAtStart(saved, [], ask)).toBe(true);
   });
 });

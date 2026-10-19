@@ -3,13 +3,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
-  clearView,
   enqueue,
   flush,
   loadView,
   pending,
   saveView,
-  shouldRestoreView,
+  shouldRestoreAtStart,
   type QueuedPunch,
 } from "@/lib/offline-queue";
 import {
@@ -382,6 +381,13 @@ const LIST_REFRESH_MS = 60_000;
  */
 const DEVICE_REPORT_MS = 5 * 60_000;
 
+/**
+ * Hur länge skärmen väntar på servern när den startar, innan den lägger
+ * tillbaka sin sparade bild. Utan nät svarar frågan direkt med ett fel; tiden
+ * gäller bara ett nät som finns men inte når fram.
+ */
+const START_PROBE_MS = 4_000;
+
 export default function KioskScreen({
   companyName,
   deviceName,
@@ -564,41 +570,37 @@ export default function KioskScreen({
   /**
    * true när skärmen prövat att lägga tillbaka sin sparade bild.
    *
-   * Förrän dess får bilden varken sparas eller tas bort. Skärmen startar med
-   * en tom kö i minnet, och utan spärren hade effekten nedan tagit bort den
-   * sparade bilden innan den hunnit läsas.
+   * Förrän dess sparas ingenting. Skärmen startar på sidans sparade kopia,
+   * och utan spärren hade effekten nedan skrivit den över den sparade bilden
+   * innan den hunnit läsas — och därmed raderat just det den är till för.
    */
   const [viewReady, setViewReady] = useState(false);
 
-  /**
-   * Om en bild ligger sparad. Börjar som true: en bild kan ligga kvar från ett
-   * tidigare avbrott, om strömmen gick i samma stund som kön tömdes, och den
-   * tas då bort en gång när skärmen startat med tom kö.
-   */
-  const viewSaved = useRef(true);
+  /** Den bild som senast sparades, som text. Se effekten nedan. */
+  const lastSavedView = useRef<string | null>(null);
 
   /**
-   * Sparar bilden medan tryck väntar, och tar bort den när kön är tom.
+   * Sparar bilden varje gång den ändras, och bara då.
    *
-   * Borttagningen sker bara när läget skiftar. Serverns bild kommer var femte
-   * sekund, och en skrivning till disken varje gång hade slitit på skärmens
-   * minne för ingenting.
+   * Serverns bild kommer var femte sekund och är nästan alltid densamma som
+   * förra gången. En skrivning till disken varje gång hade slitit på skärmens
+   * minne för ingenting, så bilden jämförs först. Den ändras när någon stämplar,
+   * här eller på en annan skärm.
    */
   useEffect(() => {
     if (!viewReady) return;
 
-    if (waiting > 0) {
-      viewSaved.current = true;
-      void saveView<KioskView>({ active, breaks, autoClosed, recent }).catch(
-        () => {
-          // Bilden är en hjälp, inte ett åtagande. Trycket ligger i kön.
-        }
-      );
-    } else if (viewSaved.current) {
-      viewSaved.current = false;
-      void clearView().catch(() => {});
-    }
-  }, [viewReady, waiting, active, breaks, autoClosed, recent]);
+    const view: KioskView = { active, breaks, autoClosed, recent };
+    const text = JSON.stringify(view);
+    if (text === lastSavedView.current) return;
+
+    lastSavedView.current = text;
+    void saveView(view).catch(() => {
+      // Bilden är en hjälp, inte ett åtagande; trycken ligger i kön. Nästa
+      // ändring försöker igen.
+      lastSavedView.current = null;
+    });
+  }, [viewReady, active, breaks, autoClosed, recent]);
 
   // Tidpunkten då servern senast svarade. Visas i kugghjulet — en skärm som
   // tappat nätet ser annars likadan ut som en som fungerar.
@@ -726,16 +728,22 @@ export default function KioskScreen({
     void pending()
       .then(async (queue) => {
         setQueueLength(queue.length);
-        if (queue.length === 0) return;
 
-        // Väntar tryck har skärmen startat om under ett avbrott. Bilden den
-        // har nu är sidans sparade kopia, från före trycken: lägg tillbaka
-        // den som gällde när strömmen gick. Se offline-queue.ts.
+        // Bilden skärmen har nu är sidans sparade kopia, från senast sidan
+        // laddades — kanske i natt. Efter ett avbrott är den sparade bilden
+        // ofta bättre. Vilken som gäller avgör shouldRestoreAtStart.
         const saved = await loadView<KioskView>();
+        const restore = await shouldRestoreAtStart(saved, queue, () =>
+          fetch("/api/kiosk/state", {
+            cache: "no-store",
+            signal: AbortSignal.timeout(START_PROBE_MS),
+          }).then((response) => response.ok)
+        );
+        if (!restore || !saved) return;
 
-        // Kön kan ha tömts medan bilden lästes. Då gäller serverns bild.
-        if (!saved || !shouldRestoreView(saved, queue)) return;
-        if (waitingRef.current === 0) return;
+        // Tömdes kön medan bilden lästes gäller serverns bild. Kom nätet
+        // tillbaka under frågan rättar nästa hämtning bilden inom fem sekunder.
+        if (queue.length > 0 && waitingRef.current === 0) return;
 
         setActive(saved.view.active);
         setBreaks(saved.view.breaks);
