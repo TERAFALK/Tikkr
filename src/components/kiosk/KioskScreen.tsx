@@ -2,7 +2,16 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { enqueue, flush, pending, type QueuedPunch } from "@/lib/offline-queue";
+import {
+  clearView,
+  enqueue,
+  flush,
+  loadView,
+  pending,
+  saveView,
+  shouldRestoreView,
+  type QueuedPunch,
+} from "@/lib/offline-queue";
 import {
   applyBrightness,
   hasFully,
@@ -216,6 +225,20 @@ function jobLabel(choice: KioskJobChoice): string {
  * src/app/kiosk/page.tsx.
  */
 type RecentJob = KioskRecentJob;
+
+/**
+ * Skärmens bild av läget, så som den sparas medan tryck väntar i kön.
+ *
+ * Exakt de fyra som följer regeln om kön nedan: medan tryck väntar är den
+ * lokala bilden nyare än serverns. Sparades bara en del visade skärmen efter
+ * ett avbrott en blandning av två tidpunkter. Se `saveView` i offline-queue.ts.
+ */
+interface KioskView {
+  active: Record<string, ActiveJob[]>;
+  breaks: Record<string, KioskBreak>;
+  autoClosed: Record<string, KioskAutoClosedJob[]>;
+  recent: Record<string, RecentJob>;
+}
 
 /** Driftmeddelande från plattformen. Kortad form — bannern behöver inte datum. */
 export interface KioskNotice {
@@ -538,6 +561,45 @@ export default function KioskScreen({
 
   const [waiting, setWaiting] = useState(0);
 
+  /**
+   * true när skärmen prövat att lägga tillbaka sin sparade bild.
+   *
+   * Förrän dess får bilden varken sparas eller tas bort. Skärmen startar med
+   * en tom kö i minnet, och utan spärren hade effekten nedan tagit bort den
+   * sparade bilden innan den hunnit läsas.
+   */
+  const [viewReady, setViewReady] = useState(false);
+
+  /**
+   * Om en bild ligger sparad. Börjar som true: en bild kan ligga kvar från ett
+   * tidigare avbrott, om strömmen gick i samma stund som kön tömdes, och den
+   * tas då bort en gång när skärmen startat med tom kö.
+   */
+  const viewSaved = useRef(true);
+
+  /**
+   * Sparar bilden medan tryck väntar, och tar bort den när kön är tom.
+   *
+   * Borttagningen sker bara när läget skiftar. Serverns bild kommer var femte
+   * sekund, och en skrivning till disken varje gång hade slitit på skärmens
+   * minne för ingenting.
+   */
+  useEffect(() => {
+    if (!viewReady) return;
+
+    if (waiting > 0) {
+      viewSaved.current = true;
+      void saveView<KioskView>({ active, breaks, autoClosed, recent }).catch(
+        () => {
+          // Bilden är en hjälp, inte ett åtagande. Trycket ligger i kön.
+        }
+      );
+    } else if (viewSaved.current) {
+      viewSaved.current = false;
+      void clearView().catch(() => {});
+    }
+  }, [viewReady, waiting, active, breaks, autoClosed, recent]);
+
   // Tidpunkten då servern senast svarade. Visas i kugghjulet — en skärm som
   // tappat nätet ser annars likadan ut som en som fungerar.
   const [lastSyncedAt, setLastSyncedAt] = useState<Date | null>(null);
@@ -661,7 +723,32 @@ export default function KioskScreen({
 
   // Töm kön när nätet kommer tillbaka, och regelbundet som skyddsnät.
   useEffect(() => {
-    void pending().then((queue) => setQueueLength(queue.length));
+    void pending()
+      .then(async (queue) => {
+        setQueueLength(queue.length);
+        if (queue.length === 0) return;
+
+        // Väntar tryck har skärmen startat om under ett avbrott. Bilden den
+        // har nu är sidans sparade kopia, från före trycken: lägg tillbaka
+        // den som gällde när strömmen gick. Se offline-queue.ts.
+        const saved = await loadView<KioskView>();
+
+        // Kön kan ha tömts medan bilden lästes. Då gäller serverns bild.
+        if (!saved || !shouldRestoreView(saved, queue)) return;
+        if (waitingRef.current === 0) return;
+
+        setActive(saved.view.active);
+        setBreaks(saved.view.breaks);
+        setAutoClosed(saved.view.autoClosed);
+        setRecent(saved.view.recent);
+      })
+      .catch(() => {
+        // En bild som inte går att läsa är ingen anledning att stoppa
+        // skärmen. Trycken ligger kvar i kön, och servern rättar bilden när
+        // nätet kommer tillbaka.
+      })
+      .finally(() => setViewReady(true));
+
     void drain();
 
     const onOnline = () => void drain();
