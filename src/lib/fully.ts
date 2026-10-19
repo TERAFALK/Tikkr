@@ -20,6 +20,19 @@
  * släcka stämpelklockan, och då går arbetstid förlorad. Se CLAUDE.md § 7.1:
  * gränssnitt som inte behöver finnas ska inte finnas.
  *
+ * FUNKTIONSNAMNEN är de i Fullys egen dokumentation av JavaScript-gränssnittet
+ * (fully-kiosk.com, avsnittet JavaScript Interface). Första versionen av filen
+ * byggde på `getDeviceInfo()`, som bara finns i Fullys fjärr-API och inte för
+ * webbsidan, och på den första fysiska skärmen rapporterade den därför
+ * ingenting. Ett nytt namn här kontrolleras mot dokumentationen, inte mot en
+ * sammanfattning av den.
+ *
+ * FUNKTIONERNA ANROPAS SOM METODER PÅ OBJEKTET, alltid `api.restartApp()` och
+ * aldrig en loss-plockad `restart()`. Androids WebView avvisar ett anrop där
+ * `this` inte är det inlagda objektet, och felet syns inte — det fångas av
+ * `try` nedan och skärmen gör tyst ingenting. `tests/fully.test.ts` har en
+ * brygga som kastar på samma sätt.
+ *
  * SÄKERHET. Appen lägger `fully` hos den sida som är laddad, vilken den än
  * är. Inställningen får därför bara vara påslagen i kombination med en låst
  * startadress. Det är en uppsättningsregel och står i docs/kioskskarm.md —
@@ -34,21 +47,19 @@
  * för ett fel mitt i en stämpling.
  */
 interface FullyBridge {
-  getDeviceInfo?: () => string;
-  /** Två stavningar finns i omlopp mellan versioner. Se applyBrightness. */
-  setBrightness?: (value: number) => void;
-  setScreenBrightness?: (value: number) => void;
+  getFullyVersion?: () => string;
+  getWebviewVersion?: () => string;
+  /** `-1` betyder enhetens standard. */
+  setScreenBrightness?: (level: number) => void;
   restartApp?: () => void;
-  restart?: () => void;
 }
 
 /**
  * Appens skala för ljusstyrka.
  *
- * ⟨verifiera⟩ på första fysiska enheten. Android räknar själv 0–255, och
- * appen speglar normalt det — men intervallet är inte dokumenterat på ett
- * sätt jag kunnat belägga. Blir det fel är det den här raden som ändras, och
- * ingenting annat.
+ * ⟨verifiera⟩ på första fysiska enheten. Dokumentationen säger bara att
+ * `setScreenBrightness` tar ett heltal, och Android räknar själv 0–255. Blir
+ * det fel är det den här raden som ändras, och ingenting annat.
  */
 const BRIGHTNESS_MAX = 255;
 
@@ -65,53 +76,57 @@ export function hasFully(): boolean {
 }
 
 export interface FullyDeviceInfo {
-  fullyVersion: string | null;
+  fullyVersion: string;
   webviewVersion: string | null;
+}
+
+/** Ett ifyllt strängvärde, eller null för allt annat. */
+function text(value: unknown): string | null {
+  return typeof value === "string" && value.trim() !== "" ? value.trim() : null;
 }
 
 /**
  * Läser av enheten.
  *
- * `getDeviceInfo` svarar med JSON som text, och fältnamnen skiljer sig mellan
- * versioner. Därför plockas bara det vi behöver, och allt annat ignoreras —
- * en ny appversion ska inte kunna fälla stämplingsskärmen.
+ * Null när appens version inte går att läsa. Det är versionen som gör skärmen
+ * till en Tikkr-skärm i adminpanelen, så utan den finns inget att rapportera.
  */
 export function readDeviceInfo(): FullyDeviceInfo | null {
   const api = bridge();
-  if (!api?.getDeviceInfo) return null;
+  if (!api) return null;
+
+  let fullyVersion: string | null = null;
+  let webviewVersion: string | null = null;
+
+  // Var för sig: en webbmotor som inte svarar ska inte kosta appens version.
+  try {
+    if (typeof api.getFullyVersion === "function") {
+      fullyVersion = text(api.getFullyVersion());
+    }
+  } catch {
+    // En ny appversion ska inte kunna fälla stämplingsskärmen.
+  }
 
   try {
-    const raw = api.getDeviceInfo();
-    const info = JSON.parse(raw) as Record<string, unknown>;
-
-    const text = (value: unknown): string | null =>
-      typeof value === "string" && value.trim() !== "" ? value.trim() : null;
-
-    return {
-      fullyVersion: text(info.appVersionName) ?? text(info.appVersionCode),
-      webviewVersion: text(info.webviewVersion) ?? text(info.webviewUA),
-    };
+    if (typeof api.getWebviewVersion === "function") {
+      webviewVersion = text(api.getWebviewVersion());
+    }
   } catch {
-    // Trasig JSON eller en funktion som betett sig oväntat. Skärmen ska
-    // stämpla vidare — enhetsuppgifter är trevliga att ha, inte nödvändiga.
-    return null;
+    // Se ovan.
   }
+
+  return fullyVersion ? { fullyVersion, webviewVersion } : null;
 }
 
 /** Ställer ljusstyrkan. `percent` är 0–100. Gör ingenting utan appen. */
 export function applyBrightness(percent: number): void {
   const api = bridge();
-  if (!api) return;
-
-  // Två stavningar har funnits i appens gränssnitt. Att ta den som finns är
-  // billigare än att låsa sig vid en och tyst sluta fungera vid en uppdatering.
-  const set = api.setBrightness ?? api.setScreenBrightness;
-  if (typeof set !== "function") return;
+  if (typeof api?.setScreenBrightness !== "function") return;
 
   const clamped = Math.min(100, Math.max(0, Math.round(percent)));
 
   try {
-    set(Math.round((clamped / 100) * BRIGHTNESS_MAX));
+    api.setScreenBrightness(Math.round((clamped / 100) * BRIGHTNESS_MAX));
   } catch {
     // Saknad behörighet, troligen WRITE_SETTINGS. Inget att göra åt härifrån,
     // och absolut inget att fälla skärmen för.
@@ -121,13 +136,10 @@ export function applyBrightness(percent: number): void {
 /** Startar om kioskappen. Gör ingenting utan appen. */
 export function restartApp(): void {
   const api = bridge();
-  if (!api) return;
-
-  const restart = api.restartApp ?? api.restart;
-  if (typeof restart !== "function") return;
+  if (typeof api?.restartApp !== "function") return;
 
   try {
-    restart();
+    api.restartApp();
   } catch {
     // Se applyBrightness.
   }

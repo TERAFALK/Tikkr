@@ -303,17 +303,24 @@ Ljusstyrkan lagras 0–100 och räknas om till appens skala i `fully.ts`.
 ⟨verifiera⟩ att skalan är 0–255 och att `WRITE_SETTINGS` beviljas av device
 owner. Blir det fel är det en rad som ändras.
 
-Funktionerna som används:
+Funktionerna som används, med namnen ur Fullys egen dokumentation av
+JavaScript-gränssnittet:
 
 | Funktion | Vad |
 |---|---|
-| `fully.getDeviceInfo()` | enhetsuppgifter, app- och WebView-version |
-| `fully.restart()` | starta om appen |
-| `fully.screenOn()` / `fully.screenOff()` | tända och släcka |
-| `fully.setBrightness(v)` | ljusstyrka |
-| `fully.bringToForeground()` | ta fram kiosken |
-| `fully.getScreenshot()` | skärmbild vid support |
-| `fully.exit()` | stänga appen |
+| `fully.getFullyVersion()` | appens version — det som gör skärmen till en Tikkr-skärm i panelen |
+| `fully.getWebviewVersion()` | webbmotorns version |
+| `fully.setScreenBrightness(int)` | ljusstyrka, `-1` för enhetens standard |
+| `fully.restartApp()` | starta om appen |
+
+Första versionen byggde på `fully.getDeviceInfo()`. Den finns bara i Fullys
+fjärr-API, inte för webbsidan, och den första fysiska skärmen rapporterade
+därför ingenting. Den anropade dessutom funktionerna loss-plockade från
+objektet, vilket Androids WebView avvisar utan att det syns. Kontrollera ett
+nytt namn mot dokumentationen, och anropa alltid som metod: `fully.restartApp()`.
+
+Fler finns, t.ex. `turnScreenOff()`, `reboot()` och `getSerialNumber()`. Använd
+dem bara när det finns ett skäl.
 
 Det löser problemet de andra vägarna har: **ingen inkommande anslutning behövs.**
 Skärmen ringer ut till Tikkr som den redan gör. Ingen NAT-hålning, ingen broker,

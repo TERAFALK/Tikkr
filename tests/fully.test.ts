@@ -1,4 +1,4 @@
-import { describe, it, expect, afterEach, vi } from "vitest";
+import { describe, it, expect, afterEach } from "vitest";
 import {
   applyBrightness,
   hasFully,
@@ -14,12 +14,40 @@ import {
  * `fully`-objekt. Går något sönder utan appen har vi två produkter att
  * underhålla, och den billigare går sönder först.
  *
+ * Funktionsnamnen kommer ur Fullys egen dokumentation av JavaScript-
+ * gränssnittet. Första versionen av bryggan byggde på `getDeviceInfo()`, som
+ * bara finns i Fullys fjärr-API och inte för webbsidan, och på den första
+ * fysiska skärmen rapporterade den därför ingenting.
+ *
  * Behöver ingen databas.
  */
 
-/** Sätter upp ett låtsas-`fully` på window, som appen skulle ha gjort. */
-function withBridge(bridge: Record<string, unknown>) {
+/**
+ * Ett `fully`-objekt som beter sig som Androids brygga.
+ *
+ * WebView vägrar ett anrop där funktionen lyfts loss från objektet: den måste
+ * anropas som en metod på det. Ett vanligt testobjekt bryr sig inte om det, och
+ * första versionen av bryggan gick därför igenom testerna men tyst sönder på
+ * riktig hårdvara. Här kastar varje funktion om `this` inte är objektet.
+ */
+function javaBridge(methods: Record<string, (...args: never[]) => unknown>) {
+  const calls: { name: string; args: unknown[] }[] = [];
+  const bridge: Record<string, unknown> = {};
+
+  for (const [name, impl] of Object.entries(methods)) {
+    bridge[name] = function (this: unknown, ...args: never[]) {
+      if (this !== bridge) {
+        throw new Error(
+          "Java bridge method can't be invoked on a non-injected object"
+        );
+      }
+      calls.push({ name, args });
+      return impl(...args);
+    };
+  }
+
   (globalThis as { window?: unknown }).window = { fully: bridge };
+  return calls;
 }
 
 afterEach(() => {
@@ -48,86 +76,78 @@ describe("utan kioskappen", () => {
 
 describe("med kioskappen", () => {
   it("känner igen skärmen", () => {
-    withBridge({});
+    javaBridge({});
     expect(hasFully()).toBe(true);
   });
 
-  it("läser av app- och webbmotorversion", () => {
-    withBridge({
-      getDeviceInfo: () =>
-        JSON.stringify({ appVersionName: "1.57.1", webviewVersion: "124.0" }),
+  it("läser app- och webbmotorversion med Fullys dokumenterade funktioner", () => {
+    javaBridge({
+      getFullyVersion: () => "1.61.4",
+      getWebviewVersion: () => "124.0.6367.82",
     });
 
     expect(readDeviceInfo()).toEqual({
-      fullyVersion: "1.57.1",
-      webviewVersion: "124.0",
+      fullyVersion: "1.61.4",
+      webviewVersion: "124.0.6367.82",
     });
   });
 
-  it("tål att fält saknas", () => {
-    withBridge({ getDeviceInfo: () => JSON.stringify({ annat: "värde" }) });
+  it("rapporterar ingenting utan appens version", () => {
+    // Det är versionen som gör skärmen till en Tikkr-skärm i panelen. Utan den
+    // finns inget att visa, och inget att skicka.
+    javaBridge({ getWebviewVersion: () => "124.0" });
+    expect(readDeviceInfo()).toBeNull();
+  });
+
+  it("klarar sig utan webbmotorns version", () => {
+    javaBridge({ getFullyVersion: () => "1.61.4" });
 
     expect(readDeviceInfo()).toEqual({
-      fullyVersion: null,
+      fullyVersion: "1.61.4",
       webviewVersion: null,
     });
   });
 
-  it("tål trasig JSON utan att kasta", () => {
-    withBridge({ getDeviceInfo: () => "{inte json" });
+  it("behandlar en tom sträng som saknad", () => {
+    javaBridge({ getFullyVersion: () => "  ", getWebviewVersion: () => "" });
     expect(readDeviceInfo()).toBeNull();
   });
 
   it("räknar om procent till appens skala", () => {
-    const set = vi.fn();
-    withBridge({ setBrightness: set });
+    const calls = javaBridge({ setScreenBrightness: () => undefined });
 
     applyBrightness(100);
-    expect(set).toHaveBeenLastCalledWith(255);
-
     applyBrightness(0);
-    expect(set).toHaveBeenLastCalledWith(0);
-
     applyBrightness(50);
-    expect(set).toHaveBeenLastCalledWith(128);
+
+    expect(calls.map((c) => c.args[0])).toEqual([255, 0, 128]);
   });
 
   it("håller sig innanför 0 och 100 även vid orimliga värden", () => {
-    const set = vi.fn();
-    withBridge({ setBrightness: set });
+    const calls = javaBridge({ setScreenBrightness: () => undefined });
 
     applyBrightness(999);
-    expect(set).toHaveBeenLastCalledWith(255);
-
     applyBrightness(-40);
-    expect(set).toHaveBeenLastCalledWith(0);
-  });
 
-  it("godtar den andra stavningen av ljusstyrkefunktionen", () => {
-    const set = vi.fn();
-    withBridge({ setScreenBrightness: set });
-
-    applyBrightness(100);
-    expect(set).toHaveBeenCalledWith(255);
+    expect(calls.map((c) => c.args[0])).toEqual([255, 0]);
   });
 
   it("startar om", () => {
-    const restart = vi.fn();
-    withBridge({ restartApp: restart });
+    const calls = javaBridge({ restartApp: () => undefined });
 
     restartApp();
-    expect(restart).toHaveBeenCalledOnce();
+    expect(calls.map((c) => c.name)).toEqual(["restartApp"]);
   });
 
   it("en funktion som kastar fäller inte skärmen", () => {
-    withBridge({
-      setBrightness: () => {
+    javaBridge({
+      setScreenBrightness: () => {
         throw new Error("WRITE_SETTINGS saknas");
       },
       restartApp: () => {
         throw new Error("nej");
       },
-      getDeviceInfo: () => {
+      getFullyVersion: () => {
         throw new Error("nej");
       },
     });
@@ -138,7 +158,7 @@ describe("med kioskappen", () => {
   });
 
   it("en app utan funktionerna gör tyst ingenting", () => {
-    withBridge({});
+    javaBridge({});
 
     expect(() => applyBrightness(50)).not.toThrow();
     expect(() => restartApp()).not.toThrow();
