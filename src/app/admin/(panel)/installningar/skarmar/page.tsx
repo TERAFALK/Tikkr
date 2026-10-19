@@ -2,10 +2,10 @@ import Link from "next/link";
 import { requireAdmin } from "@/lib/admin-session";
 import PairingCodeDialog from "@/components/admin/PairingCodeDialog";
 import ConfirmButton from "@/components/admin/ConfirmButton";
+import RemoteControlDialog from "@/components/admin/RemoteControlDialog";
 import {
   Alert,
   Badge,
-  Button,
   Card,
   CardHeader,
   EmptyState,
@@ -45,6 +45,11 @@ export default async function DevicesPage() {
       fullyVersion: true,
       webviewVersion: true,
       brightness: true,
+      serialNumber: true,
+      networkType: true,
+      wifiSsid: true,
+      wifiSignal: true,
+      reportedAt: true,
       _count: { select: { timeEntries: true } },
     },
   });
@@ -127,7 +132,6 @@ export default async function DevicesPage() {
                 <Th>Status</Th>
                 <Th>Senast aktiv</Th>
                 <Th numeric>Stämplingar</Th>
-                <Th>Ljusstyrka</Th>
                 <Th>
                   <span className="sr-only">Åtgärder</span>
                 </Th>
@@ -144,14 +148,6 @@ export default async function DevicesPage() {
                       <span className="mt-0.5 block text-xs text-neutral-400">
                         Upplagd {formatDateTime(device.createdAt)}
                       </span>
-                      {/* Webbmotorns version. Offline-kön står på service
-                          worker och IndexedDB, och när något krånglar är det
-                          första man vill veta utan att åka dit. */}
-                      {device.webviewVersion && (
-                        <span className="mt-0.5 block text-xs text-neutral-400">
-                          WebView {device.webviewVersion}
-                        </span>
-                      )}
                     </Td>
 
                     <Td>
@@ -174,42 +170,32 @@ export default async function DevicesPage() {
                       {device._count.timeEntries}
                     </Td>
 
-                    {/* Bara skärmar vi sålt går att styra. En kunds egen dator
-                        får en tom cell, inte en gråad knapp med en förklaring
-                        — se CLAUDE.md § 7.1 punkt 1. */}
                     <Td>
-                      {device.fullyVersion && (
-                        <form
-                          action={setBrightness}
-                          className="flex items-center gap-1.5"
-                        >
-                          <input type="hidden" name="id" value={device.id} />
-                          <Input
-                            name="brightness"
-                            type="number"
-                            min={0}
-                            max={100}
-                            step={5}
-                            defaultValue={device.brightness ?? 100}
-                            aria-label={`Ljusstyrka för ${device.name}`}
-                            className="w-20"
-                          />
-                          <Button type="submit" tone="secondary">
-                            Spara
-                          </Button>
-                        </form>
-                      )}
-                    </Td>
-
-                    <Td>
-                      <div className="flex justify-end gap-2">
+                      {/* Knapparna bryts inte. Raden blev för smal när den bar
+                          ljusstyrkan, och "Koppla om" stod på två rader. */}
+                      <div className="flex justify-end gap-2 whitespace-nowrap">
+                        {/* Bara skärmar vi sålt går att styra. En kunds egen
+                            dator får ingen knapp alls, inte en gråad med en
+                            förklaring: § 7.1 punkt 1. */}
                         {device.fullyVersion && (
-                          <form action={requestRestart}>
-                            <input type="hidden" name="id" value={device.id} />
-                            <Button type="submit" tone="secondary">
-                              Starta om
-                            </Button>
-                          </form>
+                          <RemoteControlDialog
+                            device={{
+                              id: device.id,
+                              name: device.name,
+                              fullyVersion: device.fullyVersion,
+                              webviewVersion: device.webviewVersion,
+                              serialNumber: device.serialNumber,
+                              networkType: device.networkType,
+                              wifiSsid: device.wifiSsid,
+                              wifiSignal: device.wifiSignal,
+                              reportedAt: device.reportedAt
+                                ? formatDateTime(device.reportedAt)
+                                : null,
+                              brightness: device.brightness,
+                            }}
+                            setBrightness={setBrightness}
+                            requestRestart={requestRestart}
+                          />
                         )}
 
                         <PairingCodeDialog

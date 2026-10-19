@@ -193,6 +193,16 @@ och en grupp som delas mellan två sidor behåller sin egen summa
 hela urvalet, eftersom summorna behöver det. Pågående stämplingar står
 överst på första sidan. Sidnumret följer inte med när perioden byts.
 
+**Stämplingsskärmar vi säljer fjärrstyrs från panelen, aldrig från skärmen**
+(beslutat 2026-10-19). En skärm som kör i Fully Kiosk rapporterar sin
+version, sitt nät och sitt serienummer, och får då knappen Fjärrstyrning
+under Stämplingsskärmar: ljusstyrka och omstart. En kunds egen dator eller
+surfplatta rapporterar ingenting och får ingen knapp. Det är en förmåga
+skärmen intygar och inte en bock, så den kan inte vara fel. Ingenting av det
+syns på stämplingsskärmen, som saknar inloggning: ett reglage där hade låtit
+vem som helst släcka stämpelklockan. `src/lib/fully.ts` är enda filen som
+känner appen, och hårdvaran står i `docs/kioskskarm.md`.
+
 ### Multi-tenant
 
 Flera kundföretag delar samma app-instans, men deras data är **helt isolerad**
@@ -262,7 +272,11 @@ admin_users    — id, company_id, email, first_name?, last_name?, phone?,
 email_verifications — id, user_id, token_hash, email, expires_at, used_at
 audit_events   — id, company_id, actor_email, entity, entity_id, action,
                  before, after, subject_employee_id
-kiosk_devices  — id, company_id, name, device_token, active, last_seen_at
+kiosk_devices  — id, company_id, name, token_hash?, pairing_code_hash?,
+                 pairing_expires_at?, last_seen_at?,
+                 fully_version?, webview_version?, brightness?,
+                 restart_requested_at?, serial_number?, network_type?,
+                 wifi_ssid?, wifi_signal?, reported_at?
 support_visits — id, company_id, email, started_at, last_seen_at
 feedback_messages — id, company_id, author_user_id?, author_email, author_name?,
                  kind, area?, page?, body, done_at?, done_note?, done_by_email?
