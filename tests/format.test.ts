@@ -143,6 +143,36 @@ describe("ingen yta visar tim:min", () => {
   });
 
   /**
+   * NYCKELTALEN I SÄLJSIDANS BILDER, OCH DERAS ENHET (tillagt 2026-10-20).
+   *
+   * Testet ovan läser bildernas datafält. Talen i korten skrivs i stället
+   * som `value="…"` direkt i koden, och "Fakturerbar tid 84:30" i hjälten
+   * och "Total tid 84,5 tim:min" i rapportbilden gick därför igenom. Ett
+   * nyckeltal är aldrig ett klockslag, så inget `value` får ha kolon.
+   */
+  it("säljsidans nyckeltal har varken kolon eller enheten tim:min", () => {
+    const found = ["components/marketing/Mockups.tsx", "components/marketing/Sections.tsx"]
+      .flatMap((name) => {
+        const text = readFileSync(path.join(SRC, name), "utf8");
+
+        return [
+          ...[...text.matchAll(/\bvalue="(\d+:\d{2})"/g)].map(
+            ([match]) => `${name}: ${match}`
+          ),
+          ...[...text.matchAll(/\bhint="tim:min"/g)].map(
+            ([match]) => `${name}: ${match}`
+          ),
+        ];
+      });
+
+    expect(
+      found,
+      "Nyckeltalen i säljsidans bilder ska stå som decimaltimmar, med " +
+        "enheten timmar."
+    ).toEqual([]);
+  });
+
+  /**
    * ENHETEN I KOLUMNRUBRIKEN SÄGER TIMMAR.
    *
    * Rubriken "Tid (tim:min)" stod på nitton ställen innan formatet byttes, och

@@ -950,7 +950,7 @@ export function ReportMockup({ className = "" }: { className?: string }) {
           </div>
 
           <div className="mb-2.5 grid grid-cols-2 gap-2 sm:grid-cols-4">
-            <Stat label="Total tid" value="84,5" hint="tim:min" />
+            <Stat label="Total tid" value="84,5" hint="timmar" />
             <Stat label="Stämplingar" value="37" />
             <Stat label="Pågår just nu" value="4" tone="emerald" />
             <Stat label="Ogranskade" value="1" tone="amber" />
