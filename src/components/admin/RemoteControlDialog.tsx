@@ -131,7 +131,7 @@ function Body({
           <Row label="WebView">{device.webviewVersion}</Row>
         )}
         {device.networkType && (
-          <Row label="Nät">
+          <Row label="Anslutning">
             {device.networkType === "WIRED"
               ? "Kabel"
               : device.wifiSsid
