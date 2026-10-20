@@ -193,6 +193,30 @@ och en grupp som delas mellan två sidor behåller sin egen summa
 hela urvalet, eftersom summorna behöver det. Pågående stämplingar står
 överst på första sidan. Sidnumret följer inte med när perioden byts.
 
+Stämplingar har EN Ändra-ruta för hela listan (ändrat 2026-10-20). Varje rad
+hade en egen, och varje ruta bar hela orderregistret, så sidan växte med rader
+gånger ordrar. Rapporten hämtar raderna med sina nycklar och namnen en gång
+per anställd, order och moment.
+
+**Översikten svarar på vad som händer nu och vad som väntar** (beslutat
+2026-10-20, produktägarens godkända förslag). Den samlar det man annars
+öppnar fem sidor för, och har inga diagram för diagrammens skull:
+
+- **Nyckeltalen.** "Registrerat idag" och veckans tid räknas av `buildWeek`,
+  samma räkning som Veckovy.
+- **Pågående arbete.**
+- **Att göra:** granskning, ordrar från stämplingsskärmar att komplettera,
+  automatisk utstämpling som inte körs, och stämplingsskärmar som inte hört
+  av sig på ett dygn, samma gräns som plattformens lista.
+- **Ordrar i arbete:** de senaste sju dagarna, tid mot beräknad tid, räknat
+  av `orderRows` som orderlistan.
+- **Planerat idag**, bara med Planering, räknat i `plan-today.ts` med
+  tavlans egna delar.
+
+Sidan hämtas om varje minut medan fliken syns. Frånvarande idag valdes bort:
+frånvaro är känslig och hör till löneunderlaget (§ 4 punkt 9). Säljsidans
+bild av översikten (`AdminMockup`) ändras i samma PR som översikten.
+
 **Stämplingsskärmar vi säljer fjärrstyrs från panelen, aldrig från skärmen**
 (beslutat 2026-10-19). En skärm som kör i Fully Kiosk rapporterar sin
 version, sitt nät och sitt serienummer, och får då knappen Fjärrstyrning
@@ -677,6 +701,15 @@ login_throttles  — scope, key_hash, count, until
    framräknade på det ingående saldot. Nuvärdet räknas fram på servern och
    skickas aldrig in från rutan — ett tal webbläsaren räknat på hinner bli
    gammalt medan rutan står öppen.
+
+   **Saldot idag och en periods flex räknas utan tidrapporten runt omkring**
+   (ändrat 2026-10-20). `currentFlexMinutes` byggde en hel tidrapport från
+   startdatumet till idag, och ATF-underlaget en för förra månaden, för att få
+   fram ett tal var. Tidrapport blev långsammare för varje vecka personen
+   arbetat. Nu räknar `flexBetween` i `payroll.ts` dem, samma väg som det
+   ingående saldot: samma formel dag för dag, men bara med tiderna och
+   frånvaron. `tests/flex-time.test.ts` fäller en räkning som börjar säga
+   något annat än tidrapporten.
 
    **Saldot räknas från STARTDATUMET (`balance_opening_date`), och är det tomt
    från personens FÖRSTA STÄMPLING** (tillagt 2026-10-01). Dagen avgörs på ett ställe,
@@ -1853,6 +1886,27 @@ skalorna används på drygt niohundra ställen, och nya värden rebrandar allt p
 en gång utan niohundra ändringar som inte går att bygga på den här maskinen.
 Ny kod använder hellre `text-fjord`, `bg-tick-deep` och de andra
 varumärkesnamnen.
+
+**RÖRELSE OCH LADDNING** (beslutat 2026-10-20, produktägarens godkännande).
+Gäller adminpanelen och plattformspanelen. Kort, liten och bara när något
+kommer in, aldrig medan man arbetar i en vy:
+
+- **Sidbyte:** nytt innehåll tonas in fyra pixlar (`.panel-content > *`).
+  Menyn står still, och den klickade punkten markeras direkt med en prick
+  medan sidan hämtas (`NavFeedback.tsx`).
+- **Skelett** i sidans egen form (`Skeleton.tsx`, `loading.tsx`), först
+  efter 150 ms, så att en snabb sida inte blinkar förbi ett. När samma sida
+  hämtas om står det gamla kvar tills det nya kommit.
+- **Staplar växer fram** när de ritas, med `scale` så att ingenting runt
+  dem flyttar sig (`.animate-grow-*`). Produktägarens önskan.
+- **Ett tal som ändras medan sidan står öppen lyser upp** (`LiveValue`).
+- **Ingen rörlig bakgrund i panelerna.** Säljsidans ljus passar inloggningen
+  men konkurrerar med siffrorna i en arbetsyta.
+- **`prefers-reduced-motion` stänger av allt**, och skelettet står då stilla.
+
+Stämplingsskärmen behåller sitt korta vybyte och sin tryckkvittens, på samma
+tidsvariabel (`--motion-fast`). Den får inga skelett: ett tryck ska kännas
+omedelbart, och den laddar ingenting som motiverar ett.
 
 **Typsnittet är Geist**, och ingenting annat. Laddas av `next/font` i
 `src/app/layout.tsx`, som packar filerna med bygget — en kioskskärm utan nät
