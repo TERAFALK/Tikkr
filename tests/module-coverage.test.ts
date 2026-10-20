@@ -157,6 +157,7 @@ const MODULE_SURFACES: Record<string, ModuleSurface> = {
       "staff-planning",
       "plan-geometry",
       "staff-hours",
+      "plan-today",
     ],
     models: [
       "station",
@@ -178,9 +179,13 @@ const MODULE_SURFACES: Record<string, ModuleSurface> = {
     // den beräknade tiden är basen. Bara leveransdatumet hör till planeringen,
     // och bara det ligger bakom `hasModule`. Samma avvägning som anstallda/*
     // gör för löneunderlaget.
+    //
+    // (oversikt)/page.tsx: översikten är basen. Bara kortet Planerat idag hör
+    // till planeringen, och det hämtas och ritas bara när `hasModule` säger ja.
     partial: [
       "app/admin/(panel)/ordrar/page.tsx",
       "app/admin/(panel)/ordrar/actions.ts",
+      "app/admin/(panel)/(oversikt)/page.tsx",
     ],
 
     // PlanBoard.tsx: ren presentation. Tavlan renderas bara av sidan, som har

@@ -64,12 +64,22 @@ export interface OrderRow {
  */
 export async function orderRows(
   db: CompanyDb,
-  options: { customerId?: string; onlyQuickJobs?: boolean } = {}
+  options: {
+    customerId?: string;
+    onlyQuickJobs?: boolean;
+    /**
+     * Bara de här ordrarna. Översikten visar en handfull ordrar i arbete, och
+     * ska räkna deras tid exakt som orderlistan gör — men inte hämta varje
+     * stämpling på varje order för att visa åtta av dem.
+     */
+    ids?: string[];
+  } = {}
 ): Promise<OrderRow[]> {
   const orders = await db.order.findMany({
     where: {
       ...(options.customerId ? { customerId: options.customerId } : {}),
       ...(options.onlyQuickJobs ? { isQuickJob: true } : {}),
+      ...(options.ids ? { id: { in: options.ids } } : {}),
     },
     orderBy: [{ status: "asc" }, { orderNumber: "asc" }],
     select: {

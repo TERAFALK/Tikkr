@@ -43,16 +43,27 @@ export default function NewEntryDialog({
   orders,
   moments,
   indirectMoments,
+  openOnMount = false,
 }: {
   employees: Option[];
   orders: Option[];
   moments: Option[];
   /** De aktiva improduktiva momenten. */
   indirectMoments: Option[];
+  /**
+   * Öppnar rutan direkt, för genvägen på översikten (`?ny=1`). Utan den
+   * landade man på sidan och fick leta rätt på samma knapp en gång till.
+   */
+  openOnMount?: boolean;
 }) {
   const [state, action] = useActionState<EntryFormState, FormData>(addEntry, {});
   const [kind, setKind] = useState<"ORDER" | "INDIRECT">("ORDER");
   const dialog = useRef<HTMLDialogElement>(null);
+
+  // En gång, vid uppkopplingen. Stängs rutan ska den stanna stängd.
+  useEffect(() => {
+    if (openOnMount) dialog.current?.showModal();
+  }, [openOnMount]);
 
   // Stängs först när posten faktiskt skapats.
   useEffect(() => {

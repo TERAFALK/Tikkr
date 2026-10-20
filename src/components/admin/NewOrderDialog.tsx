@@ -30,6 +30,7 @@ export default function NewOrderDialog({
   action,
   trigger = "Ny order",
   planning = false,
+  openOnMount = false,
 }: {
   customers: SearchSelectOption[];
   moments: BudgetMomentOption[];
@@ -40,10 +41,20 @@ export default function NewOrderDialog({
   trigger?: string;
   /** Visar leveransdatumet. Sätts när tillvalet Planering är på. */
   planning?: boolean;
+  /**
+   * Öppnar rutan direkt, för genvägen på översikten (`?ny=1`). Utan den
+   * landade man på sidan och fick leta rätt på samma knapp en gång till.
+   */
+  openOnMount?: boolean;
 }) {
   const dialog = useRef<HTMLDialogElement>(null);
 
   const [state, submit] = useActionState<OrderFormState, FormData>(action, {});
+
+  // En gång, vid uppkopplingen. Stängs rutan ska den stanna stängd.
+  useEffect(() => {
+    if (openOnMount) dialog.current?.showModal();
+  }, [openOnMount]);
 
   // Stängs bara när sparandet gick igenom. Ett avvisat påslag ska stå kvar med
   // sitt felmeddelande, inte försvinna och lämna kvar det man skrivit.

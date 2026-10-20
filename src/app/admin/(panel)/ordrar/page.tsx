@@ -9,8 +9,14 @@ import { closeOrders, createOrder, toggleOrder, updateOrder } from "./actions";
 
 export const dynamic = "force-dynamic";
 
-export default async function OrdersPage() {
+export default async function OrdersPage({
+  searchParams,
+}: {
+  /** `ny=1` öppnar Ny order direkt. Genvägen på översikten. */
+  searchParams: Promise<{ ny?: string }>;
+}) {
   const { db, companyId } = await requireAdmin();
+  const { ny } = await searchParams;
 
   // Leveransdatumet i orderrutan hör till tillvalet Planering. Att det döljs
   // här är kosmetik — serveråtgärden frågar om modulen själv, se actions.ts.
@@ -28,12 +34,15 @@ export default async function OrdersPage() {
     orderRows(db),
   ]);
 
-  const newOrder = (
+  // Två ställen, men bara rubrikens öppnas av genvägen. Öppnades båda
+  // skulle två rutor ligga ovanpå varandra på en tom sida.
+  const newOrder = (openOnMount: boolean) => (
     <NewOrderDialog
       customers={customerList}
       moments={moments}
       action={createOrder}
       planning={planning}
+      openOnMount={openOnMount}
     />
   );
 
@@ -44,7 +53,7 @@ export default async function OrdersPage() {
       <PageHeader
         title="Ordrar"
         help="ordrar"
-        action={newOrder}
+        action={newOrder(ny === "1")}
       />
 
       {/* Ordrar som verkstaden lagt upp själv. De har ofta ett avskrivet
@@ -65,7 +74,7 @@ export default async function OrdersPage() {
       {rows.length === 0 ? (
         <EmptyState
           title="Inga ordrar upplagda"
-          action={newOrder}
+          action={newOrder(false)}
         />
       ) : (
         <OrdersTable

@@ -643,6 +643,10 @@ function Sidebar({ active }: { active: string }) {
  * Anna står på två rader. En operatör som kör två maskiner har två öppna
  * stämplingar, och båda ordrarna ska betala sin — därför är nyckeltalet fyra
  * personer och fem jobb.
+ *
+ * ATT GÖRA OCH ORDRAR I ARBETE (2026-10-20). Översikten fick två kort till,
+ * och bilden följde med samma dag. Planerat idag står inte med: det hör till
+ * ett tillval, och bilden visar basen.
  */
 const ROWS = [
   {
@@ -682,6 +686,21 @@ const ROWS = [
   },
 ];
 
+const TODO = [
+  { title: "1 stämpling att granska", detail: null },
+  { title: "Svetsen", detail: "Ingen kontakt sedan 2026-10-19 15:42." },
+];
+
+/**
+ * Registrerat och beräknat, i timmar. Andelen ger stapelns längd; 2603 har
+ * dragit över och står i gult, som i produkten.
+ */
+const IN_PROGRESS = [
+  { order: "2601", customer: "Volvo Lastvagnar", hours: "42,25", share: 75 },
+  { order: "2603", customer: "Atlas Copco", hours: "28", share: 117 },
+  { order: "2604", customer: "Sandvik Coromant", hours: "14,25", share: 36 },
+];
+
 export function AdminMockup({ className = "" }: { className?: string }) {
   return (
     <Frame label="Adminpanelen" meta="översikt" className={className}>
@@ -696,12 +715,13 @@ export function AdminMockup({ className = "" }: { className?: string }) {
               hint="5 pågående jobb"
               tone="emerald"
             />
-            <Stat label="Registrerat idag" value="18,5" />
+            <Stat label="Registrerat idag" value="18,5" hint="Vecka 43: 96,25" />
             <Stat label="Att granska" value="1" tone="amber" />
             <Stat label="Öppna ordrar" value="4" />
           </div>
 
-          <div className="overflow-hidden rounded-lg border border-neutral-200 bg-white">
+          <div className="grid gap-2 sm:grid-cols-3">
+          <div className="overflow-hidden rounded-lg border border-neutral-200 bg-white sm:col-span-2">
             <div className="border-b border-neutral-200 px-3 py-1.5">
               <span className="text-[10px] font-semibold text-neutral-900">
                 Pågående arbete
@@ -749,6 +769,78 @@ export function AdminMockup({ className = "" }: { className?: string }) {
                 </span>
               </div>
             ))}
+          </div>
+
+          {/* Att göra, med samma sorts rader som produkten skriver. */}
+          <div className="overflow-hidden rounded-lg border border-neutral-200 bg-white">
+            <div className="border-b border-neutral-200 px-3 py-1.5">
+              <span className="text-[10px] font-semibold text-neutral-900">
+                Att göra
+              </span>
+            </div>
+            {TODO.map((item) => (
+              <div
+                key={item.title}
+                className="flex items-start gap-2 border-b border-neutral-100 px-3 py-1.5 last:border-0"
+              >
+                <span className="mt-1 size-1 shrink-0 rounded-full bg-amber-500" />
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-[10px] font-medium text-neutral-900">
+                    {item.title}
+                  </span>
+                  {item.detail && (
+                    <span className="block truncate text-[8px] text-neutral-500">
+                      {item.detail}
+                    </span>
+                  )}
+                </span>
+              </div>
+            ))}
+          </div>
+          </div>
+
+          {/* Ordrar i arbete. Staplarna växer fram som i panelen. */}
+          <div className="mt-2 overflow-hidden rounded-lg border border-neutral-200 bg-white">
+            <div className="border-b border-neutral-200 px-3 py-1.5">
+              <span className="text-[10px] font-semibold text-neutral-900">
+                Ordrar i arbete
+              </span>
+            </div>
+            {IN_PROGRESS.map((order, index) => {
+              const over = order.share > 100;
+
+              return (
+                <div
+                  key={order.order}
+                  className="flex items-center gap-3 border-b border-neutral-100 px-3 py-1.5 last:border-0"
+                >
+                  <span className="min-w-0 flex-1 truncate text-[10px]">
+                    <span className="font-medium text-tick-deep">
+                      {order.order}
+                    </span>
+                    <span className="ml-1.5 text-neutral-500">
+                      {order.customer}
+                    </span>
+                  </span>
+                  <span className="hidden w-24 shrink-0 sm:block">
+                    <span className="block h-1 overflow-hidden rounded-full bg-neutral-100">
+                      <span
+                        className={`animate-grow-x block h-full rounded-full ${
+                          over ? "bg-amber-500" : "bg-emerald-500"
+                        }`}
+                        style={{
+                          width: `${Math.min(100, order.share)}%`,
+                          ["--i" as string]: index + 6,
+                        }}
+                      />
+                    </span>
+                  </span>
+                  <span className="w-10 shrink-0 text-right text-[10px] font-medium tabular-nums text-neutral-900">
+                    {order.hours}
+                  </span>
+                </div>
+              );
+            })}
           </div>
         </div>
       </div>
