@@ -1,5 +1,7 @@
 "use client";
 
+import Form from "next/form";
+import { usePathname } from "next/navigation";
 import { useEffect, useRef, type ReactNode } from "react";
 
 /**
@@ -22,6 +24,12 @@ import { useEffect, useRef, type ReactNode } from "react";
  * Knappen "Visa" finns kvar. Den behövs inte längre, men är vad formuläret
  * faller tillbaka på om JavaScript inte kört — och då ska filtren fortfarande
  * gå att använda.
+ *
+ * `next/form` och inte `<form>` (ändrat 2026-10-20). Ett vanligt GET-formulär
+ * laddar om hela dokumentet: menyn ritades om, sidan blinkade vitt och
+ * rullningen hoppade till toppen vid varje ändrat filter. Den här byter bara
+ * innehållet, som en länk i menyn, och står kvar där man var. Utan JavaScript
+ * är den ett vanligt formulär igen.
  */
 export default function FilterForm({
   className,
@@ -31,6 +39,7 @@ export default function FilterForm({
   children: ReactNode;
 }) {
   const form = useRef<HTMLFormElement>(null);
+  const pathname = usePathname();
 
   useEffect(() => {
     const element = form.current;
@@ -43,8 +52,8 @@ export default function FilterForm({
   }, []);
 
   return (
-    <form ref={form} className={className}>
+    <Form ref={form} action={pathname} scroll={false} className={className}>
       {children}
-    </form>
+    </Form>
   );
 }

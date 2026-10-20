@@ -143,6 +143,34 @@ describe("summering utan filter", () => {
     expect(perMoment["Montering"]).toBe(11 * 60); // 1 + 10
   });
 
+  // Namnen slås upp för sig sedan 2026-10-20, se buildReport. En rad som
+  // tappade sin order, sin kund eller sitt namn på vägen vore en rad på ett
+  // fakturaunderlag som ingen kan härleda.
+  it("varje rad bär sina namn, och kunden kommer med via ordern", async () => {
+    const report = await buildReport(forCompany(companyId));
+
+    const bosseOnA = report.rows.find(
+      (row) => row.employeeName === "Bosse" && row.orderNumber === "9001"
+    );
+    expect(bosseOnA).toMatchObject({
+      label: "9001 · Svetsning",
+      customerName: "Kund A",
+      momentName: "Svetsning",
+      billable: true,
+    });
+
+    // Order 9002 har ingen kund.
+    expect(
+      report.rows
+        .filter((row) => row.orderNumber === "9002")
+        .every((row) => row.customerName === null)
+    ).toBe(true);
+
+    expect(
+      report.byCustomer.map((group) => [group.label, group.minutes])
+    ).toEqual([["Kund A", 6 * 60]]);
+  });
+
   it("räknar poster som behöver granskas", async () => {
     const report = await buildReport(forCompany(companyId));
     expect(report.needsReviewCount).toBe(1);

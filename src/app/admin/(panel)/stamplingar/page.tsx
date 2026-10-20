@@ -1,9 +1,8 @@
 import Link from "next/link";
-import SearchSelect from "@/components/admin/SearchSelect";
 import { requireAdmin } from "@/lib/admin-session";
 import { companyTimeZone } from "@/lib/company";
 import NewEntryDialog from "@/components/admin/NewEntryDialog";
-import ActionDialog from "@/components/ui/ActionDialog";
+import { EditEntryButton, EntryEditor } from "@/components/admin/EntryEditor";
 import FilterForm from "@/components/admin/FilterForm";
 import {
   Badge,
@@ -35,7 +34,7 @@ import WeekStepper from "@/components/admin/WeekStepper";
 import ConfirmButton from "@/components/admin/ConfirmButton";
 import Pager from "@/components/platform/Pager";
 import { paging } from "@/lib/paging";
-import { deleteEntry, editEntry, type EditEntryState } from "./actions";
+import { deleteEntry } from "./actions";
 
 export const dynamic = "force-dynamic";
 
@@ -235,25 +234,8 @@ export default async function EntriesPage({
     .filter((moment) => moment.active)
     .map((moment) => ({ id: moment.id, label: moment.name }));
 
-  // En BEFINTLIG post behåller däremot sitt eget moment i listan, avaktiverat
-  // eller inte. Föll det bort skulle rutan visa ett annat moment som valt, och
-  // ett sparat formulär flytta tiden dit — tyst, på ett underlag som kanske
-  // redan fakturerats.
-  const momentOptionsFor = (currentId: string | null) =>
-    moments
-      .filter((moment) => moment.active || moment.id === currentId)
-      .map((moment) => ({
-        id: moment.id,
-        label: moment.active ? moment.name : `${moment.name} (avaktiverat)`,
-      }));
-
-  const indirectOptionsFor = (currentId: string | null) =>
-    indirectMoments
-      .filter((moment) => moment.active || moment.id === currentId)
-      .map((moment) => ({
-        id: moment.id,
-        label: moment.active ? moment.name : `${moment.name} (avaktiverat)`,
-      }));
+  // En BEFINTLIG post behåller däremot sitt eget moment i listan, även
+  // avaktiverat. Det avgörs i rutan, se moment-options.ts.
 
   return (
     <>
@@ -343,6 +325,11 @@ export default async function EntriesPage({
           title="Inga stämplingar"
         />
       ) : (
+        <EntryEditor
+          orders={orderOptions}
+          moments={moments}
+          indirectMoments={indirectMoments}
+        >
         <Card>
           <CardHeader
             title={`${total.toLocaleString("sv-SE")} ${total === 1 ? "post" : "poster"}`}
@@ -426,109 +413,29 @@ export default async function EntriesPage({
                               Historik
                             </Link>
                           )}
-                          {/* ActionDialog och inte FormDialog: den här rutan
-                              KAN avvisas. En sluttid före starttiden, en
-                              överlappande post eller en stängd order ska
-                              synas inuti rutan i stället för att stänga den
-                              som om allt gått bra. */}
-                          <ActionDialog<EditEntryState>
-                            trigger="Ändra"
-                            triggerTone="ghost"
-                            title={`Ändra stämpling: ${entry.employee.name}`}
-                            action={editEntry}
-                            initial={{}}
-                            submitLabel="Spara"
-                          >
-                            <input type="hidden" name="id" value={entry.id} />
-                            <input
-                              type="hidden"
-                              name="employeeId"
-                              value={entry.employeeId}
-                            />
-
-                            {/* Posten behåller sin sort. En improduktiv
-                                stämpling har varken order eller arbetsmoment,
-                                och visades den i orderformuläret skulle ett
-                                sparat formulär göra en städtimme till
-                                fakturerbar ordertid — tyst. */}
-                            <input
-                              type="hidden"
-                              name="kind"
-                              value={entry.kind}
-                            />
-
-                            {entry.kind === "INDIRECT" ? (
-                              <Field label="Improduktivt moment">
-                                <Select
-                                  name="indirectMomentId"
-                                  defaultValue={entry.indirectMomentId ?? ""}
-                                >
-                                  {indirectOptionsFor(
-                                    entry.indirectMomentId
-                                  ).map((option) => (
-                                    <option key={option.id} value={option.id}>
-                                      {option.label}
-                                    </option>
-                                  ))}
-                                </Select>
-                              </Field>
-                            ) : (
-                              <>
-                                <Field label="Order">
-                                  <SearchSelect
-                                    name="orderId"
-                                    inDialog
-                                    options={orderOptions}
-                                    defaultValue={entry.orderId}
-                                    placeholder="Sök order…"
-                                    emptyLabel="Välj order…"
-                                    required
-                                  />
-                                </Field>
-
-                                <Field label="Arbetsmoment">
-                                  <Select
-                                    name="momentId"
-                                    defaultValue={entry.momentId ?? ""}
-                                  >
-                                    {momentOptionsFor(entry.momentId).map(
-                                      (option) => (
-                                        <option
-                                          key={option.id}
-                                          value={option.id}
-                                        >
-                                          {option.label}
-                                        </option>
-                                      )
-                                    )}
-                                  </Select>
-                                </Field>
-                              </>
-                            )}
-
-                            <div className="grid gap-4 sm:grid-cols-2">
-                              <Field label="Instämplad">
-                                <Input
-                                  type="datetime-local"
-                                  name="clockInAt"
-                                  defaultValue={toLocalDateTimeInput(
-                                    entry.clockInAt,
-                                    timeZone
-                                  )}
-                                />
-                              </Field>
-                              <Field label="Utstämplad">
-                                <Input
-                                  type="datetime-local"
-                                  name="clockOutAt"
-                                  defaultValue={toLocalDateTimeInput(
-                                    entry.clockOutAt!,
-                                    timeZone
-                                  )}
-                                />
-                              </Field>
-                            </div>
-                          </ActionDialog>
+                          {/* En gemensam ruta för hela listan, se
+                              EntryEditor. Den KAN avvisas: en sluttid före
+                              starttiden, en överlappande post eller en
+                              stängd order syns inuti rutan. */}
+                          <EditEntryButton
+                            entry={{
+                              id: entry.id,
+                              employeeId: entry.employeeId,
+                              employeeName: entry.employee.name,
+                              kind: entry.kind,
+                              orderId: entry.orderId,
+                              momentId: entry.momentId,
+                              indirectMomentId: entry.indirectMomentId,
+                              clockInAt: toLocalDateTimeInput(
+                                entry.clockInAt,
+                                timeZone
+                              ),
+                              clockOutAt: toLocalDateTimeInput(
+                                entry.clockOutAt!,
+                                timeZone
+                              ),
+                            }}
+                          />
 
                           <form action={deleteEntry}>
                             <input type="hidden" name="id" value={entry.id} />
@@ -559,6 +466,7 @@ export default async function EntriesPage({
             hrefFor={pageHref}
           />
         </Card>
+        </EntryEditor>
       )}
     </>
   );

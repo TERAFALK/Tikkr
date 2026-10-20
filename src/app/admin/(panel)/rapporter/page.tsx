@@ -68,23 +68,6 @@ export default async function ReportsPage({
   const { presets } = datePresets(timeZone);
   const week = weekStep("/admin/rapporter", params, timeZone);
 
-  const [employees, orders, moments, customers] = await Promise.all([
-    db.employee.findMany({ orderBy: { name: "asc" }, select: { id: true, name: true } }),
-    db.order.findMany({
-      orderBy: { orderNumber: "asc" },
-      select: {
-        id: true,
-        orderNumber: true,
-        customer: { select: { name: true } },
-      },
-    }),
-    db.workMoment.findMany({
-      orderBy: { name: "asc" },
-      select: { id: true, name: true },
-    }),
-    customerOptions(db),
-  ]);
-
   // Datumfälten ger ett datum utan klockslag, och tolkas i FÖRETAGETS tidszon.
   // "Till och med" sträcker sig till dygnets sista millisekund — annars faller
   // hela den dagens poster bort, vilket ser ut som att ingen arbetat då.
@@ -105,15 +88,33 @@ export default async function ReportsPage({
       ? params.kind
       : "ALL";
 
-  const report = await buildReport(db, {
-    from: fromDate ? startOfDayIn(fromDate, timeZone) : undefined,
-    to: toDate ? endOfDayIn(toDate, timeZone) : undefined,
-    employeeId: params.employeeId,
-    orderId: params.orderId,
-    customerId: params.customerId,
-    momentId: params.momentId,
-    kind,
-  });
+  // Rapporten hämtas samtidigt med filtrens listor. Den väntade förut på
+  // dem, fast den inte behöver något ur dem.
+  const [employees, orders, moments, customers, report] = await Promise.all([
+    db.employee.findMany({ orderBy: { name: "asc" }, select: { id: true, name: true } }),
+    db.order.findMany({
+      orderBy: { orderNumber: "asc" },
+      select: {
+        id: true,
+        orderNumber: true,
+        customer: { select: { name: true } },
+      },
+    }),
+    db.workMoment.findMany({
+      orderBy: { name: "asc" },
+      select: { id: true, name: true },
+    }),
+    customerOptions(db),
+    buildReport(db, {
+      from: fromDate ? startOfDayIn(fromDate, timeZone) : undefined,
+      to: toDate ? endOfDayIn(toDate, timeZone) : undefined,
+      employeeId: params.employeeId,
+      orderId: params.orderId,
+      customerId: params.customerId,
+      momentId: params.momentId,
+      kind,
+    }),
+  ]);
 
   // "detalj" är standard: den som öppnar en rapport vill oftast se raderna.
   const view: ReportView =
