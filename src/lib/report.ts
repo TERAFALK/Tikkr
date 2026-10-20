@@ -106,7 +106,15 @@ export async function buildReport(
   db: CompanyDb,
   filters: ReportFilters = {}
 ): Promise<ReportResult> {
-  const entries = await db.timeEntry.findMany({
+  // NAMNEN HÄMTAS FÖR SIG, EN GÅNG PER NAMN (ändrat 2026-10-20).
+  //
+  // Frågan valde förut anställd, order, kund och moment som relationer. Prisma
+  // löser det med en fråga per relation och varje rads id i en IN-lista — för
+  // en rapport utan datum tusentals id:n, och kunden ett led längre bort.
+  // Nu hämtas raderna med sina nycklar, och sedan varje anställd, order och
+  // moment de pekar på EN gång, alla samtidigt. Raderna och summorna är exakt
+  // desamma; bara vägen till dem är kortare.
+  const rawEntries = await db.timeEntry.findMany({
     where: {
       employeeId: filters.employeeId || undefined,
       orderId: filters.orderId || undefined,
@@ -130,19 +138,65 @@ export async function buildReport(
       needsReview: true,
       source: true,
       kind: true,
-      employee: { select: { id: true, name: true, employeeNumber: true } },
-      order: {
-        select: {
-          id: true,
-          orderNumber: true,
-          customerId: true,
-          customer: { select: { name: true } },
-        },
-      },
-      moment: { select: { id: true, name: true } },
-      indirectMoment: { select: { id: true, name: true } },
+      employeeId: true,
+      orderId: true,
+      momentId: true,
+      indirectMomentId: true,
     },
   });
+
+  const idsOf = (pick: (entry: (typeof rawEntries)[number]) => string | null) => [
+    ...new Set(rawEntries.map(pick).filter((id): id is string => id !== null)),
+  ];
+
+  const [employees, orders, moments, indirectMoments] = await Promise.all([
+    db.employee.findMany({
+      where: { id: { in: idsOf((entry) => entry.employeeId) } },
+      select: { id: true, name: true, employeeNumber: true },
+    }),
+    db.order.findMany({
+      where: { id: { in: idsOf((entry) => entry.orderId) } },
+      select: {
+        id: true,
+        orderNumber: true,
+        customerId: true,
+        customer: { select: { name: true } },
+      },
+    }),
+    db.workMoment.findMany({
+      where: { id: { in: idsOf((entry) => entry.momentId) } },
+      select: { id: true, name: true },
+    }),
+    db.indirectMoment.findMany({
+      where: { id: { in: idsOf((entry) => entry.indirectMomentId) } },
+      select: { id: true, name: true },
+    }),
+  ]);
+
+  const byId = <T extends { id: string }>(list: T[]) =>
+    new Map(list.map((item) => [item.id, item]));
+  const employeeById = byId(employees);
+  const orderById = byId(orders);
+  const momentById = byId(moments);
+  const indirectById = byId(indirectMoments);
+
+  // Samma form som relationerna gav, så att allt nedanför är orört. En
+  // anställd kan inte saknas (stämplingen pekar dit med en främmande nyckel),
+  // men skulle den göra det blir raden namnlös i stället för att försvinna
+  // ur en summa.
+  const entries = rawEntries.map((entry) => ({
+    ...entry,
+    employee: employeeById.get(entry.employeeId) ?? {
+      id: entry.employeeId,
+      name: "",
+      employeeNumber: null,
+    },
+    order: entry.orderId ? (orderById.get(entry.orderId) ?? null) : null,
+    moment: entry.momentId ? (momentById.get(entry.momentId) ?? null) : null,
+    indirectMoment: entry.indirectMomentId
+      ? (indirectById.get(entry.indirectMomentId) ?? null)
+      : null,
+  }));
 
   const rows: ReportRow[] = entries.map((entry) => {
     const label = describeEntry(entry);
