@@ -2409,20 +2409,24 @@ function OrderNumberPad({
        mer än en surfplattas höjd. Nu delar knappsatsen och knapparna på den
        plats som blir över, i stället för att var och en kräva sitt mått.
 
-       På en bred skärm står vägarna vidare i en kolumn till höger, från
-       displayen ner till bekräftelseknappen. Under knappsatsen fick de bara
-       den höjd som blev över och var de minsta tryckytorna på skärmen, fast
-       Improduktiv tid trycks varje dag. Knappsatsen behåller sin bredd.
+       På en bred skärm står knappsatsen i mitten och vägarna vidare i en
+       kolumn på var sida, från displayen ner till bekräftelseknappen: det som
+       gäller ordrar till vänster, improduktiv tid till höger. Under
+       knappsatsen fick de bara den höjd som blev över och var de minsta
+       tryckytorna på skärmen, fast Improduktiv tid trycks varje dag.
 
-       VARJE del har en uttrycklig plats i rutnätet. Fick bara kolumnen till
-       höger en, lade webbläsaren resten i första lediga ruta: displayen
-       hamnade i högerkolumnen och bekräftelseknappen på raden som tar all
-       höjd som blir över. */
-    <div className="mx-auto flex min-h-0 w-full max-w-xl flex-1 flex-col lg:grid lg:max-w-none lg:grid-cols-[minmax(0,36rem)_16rem] lg:grid-rows-[auto_auto_auto_minmax(0,1fr)_auto] lg:justify-center lg:gap-x-6">
+       VARJE del har en uttrycklig plats i rutnätet. Utan den lägger
+       webbläsaren delarna i första lediga ruta, och displayen hamnade en
+       gång i en sidokolumn.
+
+       Sidokolumnerna krymper före knappsatsen: på 1024 px ryms inte tre
+       kolumner i full bredd. Högerkolumnen står kvar tom utan improduktiva
+       moment, så att knappsatsen fortfarande står i mitten. */
+    <div className="mx-auto flex min-h-0 w-full max-w-xl flex-1 flex-col lg:grid lg:max-w-none lg:grid-cols-[minmax(0,14rem)_minmax(0,36rem)_minmax(0,14rem)] lg:grid-rows-[auto_auto_auto_minmax(0,1fr)_auto] lg:justify-center lg:gap-x-6">
       {/* Vid byte står det man lämnar i rubriken. Knappsatsen ser likadan ut
           i båda fallen, och den som tryckt fel ska se det innan numret är
           inslaget. */}
-      <h2 className="kiosk-frame-title mb-2 shrink-0 lg:col-start-1 lg:row-start-1 text-xl font-semibold text-neutral-900 sm:mb-4 sm:text-2xl">
+      <h2 className="kiosk-frame-title mb-2 shrink-0 lg:col-start-2 lg:row-start-1 text-xl font-semibold text-neutral-900 sm:mb-4 sm:text-2xl">
         {switchingFrom
           ? `${employee.name}: byter från ${switchingFrom}`
           : `${employee.name}: slå in ordernummer`}
@@ -2430,7 +2434,7 @@ function OrderNumberPad({
 
       {/* Fast höjd på både ruta och besked. Utan den hoppar knappsatsen nedåt
           i samma stund som första siffran trycks in. */}
-      <div className="kiosk-frame-display flex h-16 lg:col-start-1 lg:row-start-2 shrink-0 items-center justify-center rounded-xl border-2 border-neutral-200 bg-white sm:h-24">
+      <div className="kiosk-frame-display flex h-16 lg:col-start-2 lg:row-start-2 shrink-0 items-center justify-center rounded-xl border-2 border-neutral-200 bg-white sm:h-24">
         <span className="text-4xl font-semibold tabular-nums tracking-[0.2em] text-neutral-900">
           {typed || <span className="text-neutral-300">—</span>}
         </span>
@@ -2439,7 +2443,7 @@ function OrderNumberPad({
       {/* Tom när inget slagits in, men raden står kvar och behåller sin höjd.
           Utan den hoppar knappsatsen uppåt i samma stund som första siffran
           trycks in och beskedet dyker upp. */}
-      <div className="kiosk-frame-hint flex h-9 lg:col-start-1 lg:row-start-3 shrink-0 items-center justify-center sm:h-12">
+      <div className="kiosk-frame-hint flex h-9 lg:col-start-2 lg:row-start-3 shrink-0 items-center justify-center sm:h-12">
         {match ? (
           <span className="text-lg font-semibold text-emerald-700">
             {match.customerName ?? "Kund saknas på ordern"}
@@ -2451,7 +2455,7 @@ function OrderNumberPad({
         ) : null}
       </div>
 
-      <div className="grid min-h-0 flex-1 auto-rows-fr grid-cols-3 lg:col-start-1 lg:row-start-4 gap-2 sm:gap-3">
+      <div className="grid min-h-0 flex-1 auto-rows-fr grid-cols-3 lg:col-start-2 lg:row-start-4 gap-2 sm:gap-3">
         {["1", "2", "3", "4", "5", "6", "7", "8", "9"].map((digit) => (
           <button
             key={digit}
@@ -2515,11 +2519,15 @@ function OrderNumberPad({
           Färgen byter till amber i det läget. Att välja en befintlig order och
           att lägga upp en ny är olika saker, och skillnaden ska synas innan
           man trycker — en order som skapas av misstag blir en rad kontoret
-          får rätta. */}
+          får rätta.
+
+          Höjden är fast och rymmer två rader. Tom har knappen en rad och med
+          ett nummer två, och utan fast höjd hoppade knappsatsen ovanför den
+          vid första siffran. */}
       <button
         onClick={() => (match ? onPick(match) : typed && onCreate(typed))}
         disabled={!match && !typed}
-        className={`kiosk-frame-cta kiosk-press mt-2 lg:col-start-1 lg:row-start-5 min-h-14 w-full shrink-0 rounded-xl px-4 py-3.5 text-2xl font-semibold disabled:bg-neutral-200 disabled:text-neutral-400 ${
+        className={`kiosk-frame-cta kiosk-press mt-2 lg:col-start-2 lg:row-start-5 h-[5.5rem] w-full shrink-0 rounded-xl px-4 py-3.5 text-2xl font-semibold disabled:bg-neutral-200 disabled:text-neutral-400 ${
           match
             ? "bg-blue-600 text-white active:bg-blue-700"
             : "bg-amber-500 text-white active:bg-amber-600"
@@ -2556,40 +2564,48 @@ function OrderNumberPad({
           Knappsatsen är första vyn sedan 2026-10-01, och allt som tidigare
           låg i rutnätet med öppna ordrar måste därför gå att nå härifrån.
           Improduktiv tid är det som annars hamnat längst bort, och den
-          registreras varje dag. */}
-      <div className="mt-2 flex shrink-0 flex-wrap gap-2 lg:col-start-2 lg:row-start-2 lg:row-end-6 lg:mt-0 lg:flex-col lg:flex-nowrap lg:gap-3">
-        <button
-          onClick={onBrowse}
-          className="kiosk-press min-h-11 flex-1 rounded-xl border border-neutral-200 bg-white px-4 py-2.5 text-lg font-semibold text-neutral-900 active:bg-neutral-50 lg:text-2xl"
-        >
-          Visa öppna ordrar
-        </button>
+          registreras varje dag.
 
-        {/* SNABBJOBB, också härifrån.
-            
-            Vägen fanns: slår man in ett nummer som inte finns blir den stora
-            knappen "Skapa order NNN". Men den som INTE har ett nummer — en
-            akut reparation som kontoret får lägga upp efteråt — såg ingen väg
-            alls, och knappsatsen är numera första vyn även vid jobbyte.
-            
-            Samma amber som i ordervyn. Att lägga upp en ny order är något
-            annat än att välja en befintlig, och skillnaden ska synas innan
-            man trycker. */}
-        <button
-          onClick={onQuickJob}
-          className="kiosk-press min-h-11 rounded-xl border border-amber-300 bg-amber-50 px-5 py-2.5 text-lg font-semibold text-amber-900 active:bg-amber-100 lg:flex-1 lg:text-2xl"
-        >
-          Snabbjobb
-        </button>
-
-        {hasIndirect && (
+          Under lg är de en rad under knappsatsen, och grupperna nedan finns
+          inte (`contents`). Från lg är raden borta och grupperna är var sin
+          sidokolumn. */}
+      <div className="mt-2 flex shrink-0 flex-wrap gap-2 lg:contents">
+        <div className="contents lg:col-start-1 lg:row-start-2 lg:row-end-6 lg:flex lg:flex-col lg:gap-3">
           <button
-            onClick={onIndirect}
-            className="kiosk-press min-h-11 rounded-xl border border-neutral-200 bg-white px-5 py-2.5 text-lg font-semibold text-neutral-600 active:bg-neutral-50 lg:flex-1 lg:text-2xl"
+            onClick={onBrowse}
+            className="kiosk-press min-h-11 flex-1 rounded-xl border border-neutral-200 bg-white px-4 py-2.5 text-lg font-semibold text-neutral-900 active:bg-neutral-50 lg:text-2xl"
           >
-            Improduktiv tid
+            Visa öppna ordrar
           </button>
-        )}
+
+          {/* SNABBJOBB, också härifrån.
+            
+              Vägen fanns: slår man in ett nummer som inte finns blir den stora
+              knappen "Skapa order NNN". Men den som INTE har ett nummer — en
+              akut reparation som kontoret får lägga upp efteråt — såg ingen väg
+              alls, och knappsatsen är numera första vyn även vid jobbyte.
+            
+              Samma amber som i ordervyn. Att lägga upp en ny order är något
+              annat än att välja en befintlig, och skillnaden ska synas innan
+              man trycker. */}
+          <button
+            onClick={onQuickJob}
+            className="kiosk-press min-h-11 rounded-xl border border-amber-300 bg-amber-50 px-5 py-2.5 text-lg font-semibold text-amber-900 active:bg-amber-100 lg:flex-1 lg:text-2xl"
+          >
+            Snabbjobb
+          </button>
+        </div>
+
+        <div className="contents lg:col-start-3 lg:row-start-2 lg:row-end-6 lg:flex lg:flex-col">
+          {hasIndirect && (
+            <button
+              onClick={onIndirect}
+              className="kiosk-press min-h-11 rounded-xl border border-neutral-200 bg-white px-5 py-2.5 text-lg font-semibold text-neutral-600 active:bg-neutral-50 lg:flex-1 lg:text-2xl"
+            >
+              Improduktiv tid
+            </button>
+          )}
+        </div>
       </div>
     </div>
   );
