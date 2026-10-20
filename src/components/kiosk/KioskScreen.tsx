@@ -2407,8 +2407,13 @@ function OrderNumberPad({
     /* Den högsta vyn i kiosken, och den som gjorde att skärmen måste skrollas:
        displayen, tolv siffertangenter och tre knappar under dem summerade till
        mer än en surfplattas höjd. Nu delar knappsatsen och knapparna på den
-       plats som blir över, i stället för att var och en kräva sitt mått. */
-    <div className="mx-auto flex min-h-0 w-full max-w-xl flex-1 flex-col">
+       plats som blir över, i stället för att var och en kräva sitt mått.
+
+       På en bred skärm står vägarna vidare i en kolumn till höger, från
+       displayen ner till bekräftelseknappen. Under knappsatsen fick de bara
+       den höjd som blev över och var de minsta tryckytorna på skärmen, fast
+       Improduktiv tid trycks varje dag. Knappsatsen behåller sin bredd. */
+    <div className="mx-auto flex min-h-0 w-full max-w-xl flex-1 flex-col lg:grid lg:max-w-none lg:grid-cols-[minmax(0,36rem)_16rem] lg:grid-rows-[auto_auto_auto_minmax(0,1fr)_auto] lg:justify-center lg:gap-x-6">
       {/* Vid byte står det man lämnar i rubriken. Knappsatsen ser likadan ut
           i båda fallen, och den som tryckt fel ska se det innan numret är
           inslaget. */}
@@ -2547,10 +2552,10 @@ function OrderNumberPad({
           låg i rutnätet med öppna ordrar måste därför gå att nå härifrån.
           Improduktiv tid är det som annars hamnat längst bort, och den
           registreras varje dag. */}
-      <div className="mt-2 flex shrink-0 flex-wrap gap-2">
+      <div className="mt-2 flex shrink-0 flex-wrap gap-2 lg:col-start-2 lg:row-start-2 lg:row-end-6 lg:mt-0 lg:flex-col lg:flex-nowrap lg:gap-3">
         <button
           onClick={onBrowse}
-          className="kiosk-press min-h-11 flex-1 rounded-xl border border-neutral-200 bg-white px-4 py-2.5 text-lg font-semibold text-neutral-900 active:bg-neutral-50"
+          className="kiosk-press min-h-11 flex-1 rounded-xl border border-neutral-200 bg-white px-4 py-2.5 text-lg font-semibold text-neutral-900 active:bg-neutral-50 lg:text-2xl"
         >
           Visa öppna ordrar
         </button>
@@ -2567,7 +2572,7 @@ function OrderNumberPad({
             man trycker. */}
         <button
           onClick={onQuickJob}
-          className="kiosk-press min-h-11 rounded-xl border border-amber-300 bg-amber-50 px-5 py-2.5 text-lg font-semibold text-amber-900 active:bg-amber-100"
+          className="kiosk-press min-h-11 rounded-xl border border-amber-300 bg-amber-50 px-5 py-2.5 text-lg font-semibold text-amber-900 active:bg-amber-100 lg:flex-1 lg:text-2xl"
         >
           Snabbjobb
         </button>
@@ -2575,7 +2580,7 @@ function OrderNumberPad({
         {hasIndirect && (
           <button
             onClick={onIndirect}
-            className="kiosk-press min-h-11 rounded-xl border border-neutral-200 bg-white px-5 py-2.5 text-lg font-semibold text-neutral-600 active:bg-neutral-50"
+            className="kiosk-press min-h-11 rounded-xl border border-neutral-200 bg-white px-5 py-2.5 text-lg font-semibold text-neutral-600 active:bg-neutral-50 lg:flex-1 lg:text-2xl"
           >
             Improduktiv tid
           </button>
