@@ -478,9 +478,14 @@ async function OrdersInProgress({ db }: { db: CompanyDb }) {
           {orders.map((order) => (
             <li
               key={order.id}
-              className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-6 gap-y-1 border-b border-neutral-100 px-5 py-3 last:border-0 sm:grid-cols-[minmax(0,1fr)_12rem_4rem]"
+              // En flexrad och inte ett rutnät (ändrat 2026-10-20). Rutnätet
+              // flyttade timmarna till första kolumnen på bred skärm, eftersom
+              // en ruta med fast rad placeras före de andra. Här står allt i
+              // den ordning det skrivs: order, stapel, timmar. På en telefon
+              // går stapeln ned på en egen rad under (`order-last`).
+              className="flex flex-wrap items-center gap-x-6 gap-y-1.5 border-b border-neutral-100 px-5 py-3 last:border-0"
             >
-              <span className="min-w-0 truncate text-[13px]">
+              <span className="min-w-0 flex-1 truncate text-[13px]">
                 {/* Ordernumret leder till rapporten för ordern: den som ser
                     att en order dragit över vill veta vad tiden gick till. */}
                 <Link
@@ -496,7 +501,7 @@ async function OrdersInProgress({ db }: { db: CompanyDb }) {
                 )}
               </span>
 
-              <span className="col-span-2 row-start-2 sm:col-span-1 sm:row-start-auto">
+              <div className="order-last w-full sm:order-none sm:w-48 sm:shrink-0">
                 {order.budgetMinutes ? (
                   <BudgetBar
                     budgetMinutes={order.budgetMinutes}
@@ -507,9 +512,9 @@ async function OrdersInProgress({ db }: { db: CompanyDb }) {
                     Ingen beräknad tid
                   </span>
                 )}
-              </span>
+              </div>
 
-              <span className="col-start-2 row-start-1 text-right text-[13px] font-medium tabular-nums text-neutral-900 sm:col-start-auto">
+              <span className="w-14 shrink-0 text-right text-[13px] font-medium tabular-nums text-neutral-900">
                 {formatDuration(order.minutes)}
               </span>
             </li>
