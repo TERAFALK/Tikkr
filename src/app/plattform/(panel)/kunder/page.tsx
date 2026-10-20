@@ -13,7 +13,6 @@ import {
   Tr,
 } from "@/components/ui";
 import { formatDate, formatDateTime } from "@/lib/format";
-import PlatformShell from "@/components/platform/PlatformShell";
 import Pager from "@/components/platform/Pager";
 import { SubscriptionBadge } from "@/components/platform/Pieces";
 
@@ -40,7 +39,7 @@ export default async function CompaniesPage({
 }: {
   searchParams: Promise<{ q?: string; sida?: string }>;
 }) {
-  const { email } = await requirePlatformAdmin();
+  await requirePlatformAdmin();
 
   const search = await searchParams;
   const query = (search.q ?? "").trim();
@@ -68,7 +67,7 @@ export default async function CompaniesPage({
   const kr = (value: number) => `${value.toLocaleString("sv-SE")} kr`;
 
   return (
-    <PlatformShell email={email}>
+    <>
       <PageHeader title="Kunder" />
 
       {companies.length === 0 ? (
@@ -181,6 +180,6 @@ export default async function CompaniesPage({
           />
         </Card>
       )}
-    </PlatformShell>
+    </>
   );
 }

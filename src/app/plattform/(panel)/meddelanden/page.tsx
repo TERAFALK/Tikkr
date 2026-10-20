@@ -1,7 +1,6 @@
 import Link from "next/link";
 import { requirePlatformAdmin } from "@/lib/platform-admin";
 import { archivedNoticeCount, listNotices, noticeState } from "@/lib/notices";
-import PlatformShell from "@/components/platform/PlatformShell";
 import NoticeForm from "@/components/platform/NoticeForm";
 import ConfirmButton from "@/components/admin/ConfirmButton";
 import { Badge, Card, CardHeader, EmptyState, PageHeader } from "@/components/ui";
@@ -36,7 +35,7 @@ export default async function NoticesPage({
 }: {
   searchParams: Promise<{ arkiv?: string }>;
 }) {
-  const { email } = await requirePlatformAdmin();
+  await requirePlatformAdmin();
   const showArchive = (await searchParams).arkiv === "1";
 
   const [notices, archivedCount] = await Promise.all([
@@ -46,7 +45,7 @@ export default async function NoticesPage({
 
   if (showArchive) {
     return (
-      <PlatformShell email={email}>
+      <>
         <Link
           href="/plattform/meddelanden"
           className="text-[13px] font-medium text-tick-deep hover:underline"
@@ -74,7 +73,7 @@ export default async function NoticesPage({
             </Card>
           )}
         </div>
-      </PlatformShell>
+      </>
     );
   }
 
@@ -83,7 +82,7 @@ export default async function NoticesPage({
   const finished = notices.filter((n) => noticeState(n) === "avslutat");
 
   return (
-    <PlatformShell email={email}>
+    <>
       <PageHeader
         title="Driftmeddelanden"
         description="Banner hos samtliga företag."
@@ -148,7 +147,7 @@ export default async function NoticesPage({
           />
         </div>
       )}
-    </PlatformShell>
+    </>
   );
 }
 

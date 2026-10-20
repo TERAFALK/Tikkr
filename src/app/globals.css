@@ -288,7 +288,8 @@ dialog {
 }
 
 .animate-view {
-  animation: view-in 0.14s ease-out both;
+  /* Samma tid som panelernas snabba rörelser, se --motion-fast nedan. */
+  animation: view-in var(--motion-fast) ease-out both;
 }
 
 /*

@@ -3,7 +3,7 @@
 import {
   removeCompany,
   type DeleteCompanyState,
-} from "@/app/plattform/kunder/[companyId]/actions";
+} from "@/app/plattform/(panel)/kunder/[companyId]/actions";
 import ActionDialog from "@/components/ui/ActionDialog";
 import { Alert, Field, Input } from "@/components/ui";
 

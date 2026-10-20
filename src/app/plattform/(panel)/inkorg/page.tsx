@@ -9,7 +9,6 @@ import {
   areaLabel,
   listInbox,
 } from "@/lib/feedback";
-import PlatformShell from "@/components/platform/PlatformShell";
 import Pager from "@/components/platform/Pager";
 import ActionDialog from "@/components/ui/ActionDialog";
 import { Card, EmptyState, Field, PageHeader, Textarea } from "@/components/ui";
@@ -42,7 +41,7 @@ export default async function InboxPage({
 }: {
   searchParams: Promise<{ vy?: string; typ?: string; kund?: string; sida?: string }>;
 }) {
-  const { email } = await requirePlatformAdmin();
+  await requirePlatformAdmin();
   const params = await searchParams;
 
   const view: View = params.vy === "arkiv" ? "arkiv" : "inkorg";
@@ -82,7 +81,7 @@ export default async function InboxPage({
   };
 
   return (
-    <PlatformShell email={email}>
+    <>
       <PageHeader title="Inkorg" />
 
       <div className="mb-4 flex flex-wrap items-center gap-x-6 gap-y-3">
@@ -204,7 +203,7 @@ export default async function InboxPage({
           )}
         </div>
       )}
-    </PlatformShell>
+    </>
   );
 }
 

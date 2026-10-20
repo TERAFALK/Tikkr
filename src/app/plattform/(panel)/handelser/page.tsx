@@ -3,7 +3,6 @@ import {
   companyNameById,
   requirePlatformAdmin,
 } from "@/lib/platform-admin";
-import PlatformShell from "@/components/platform/PlatformShell";
 import ActivityTable from "@/components/platform/ActivityTable";
 import Pager from "@/components/platform/Pager";
 import { Card, CardHeader, EmptyState, PageHeader } from "@/components/ui";
@@ -26,7 +25,7 @@ export default async function ActivityPage({
 }: {
   searchParams: Promise<{ sida?: string }>;
 }) {
-  const { email } = await requirePlatformAdmin();
+  await requirePlatformAdmin();
   const page = Number((await searchParams).sida) || 1;
 
   const [log, names] = await Promise.all([
@@ -35,7 +34,7 @@ export default async function ActivityPage({
   ]);
 
   return (
-    <PlatformShell email={email}>
+    <>
       <PageHeader
         title="Händelser"
         description="Utförda från plattformspanelen."
@@ -61,6 +60,6 @@ export default async function ActivityPage({
           />
         </Card>
       )}
-    </PlatformShell>
+    </>
   );
 }

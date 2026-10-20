@@ -3,7 +3,7 @@
 import {
   changeModule,
   type ModuleFormState,
-} from "@/app/plattform/kunder/[companyId]/actions";
+} from "@/app/plattform/(panel)/kunder/[companyId]/actions";
 import ActionDialog from "@/components/ui/ActionDialog";
 import { MODULES, type ModuleKey } from "@/lib/modules";
 import { Badge, Field, Input } from "@/components/ui";

@@ -1,4 +1,4 @@
-import { endSupport } from "@/app/plattform/kunder/[companyId]/actions";
+import { endSupport } from "@/app/plattform/(panel)/kunder/[companyId]/actions";
 
 /**
  * BANNERN SOM SÄGER ATT DU INTE ÄR KUNDEN.
