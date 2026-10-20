@@ -2,7 +2,11 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { unsafeGlobalPrisma } from "@/lib/db";
 import { forCompany } from "@/lib/tenant";
 import { createDefaultAbsenceReasons, markAbsence } from "@/lib/absence";
-import { buildPayrollPeriod, currentFlexMinutes } from "@/lib/payroll";
+import {
+  buildPayrollPeriod,
+  currentFlexMinutes,
+  periodFlexMinutes,
+} from "@/lib/payroll";
 import { parseMinuteOfDay } from "@/lib/schedule";
 
 /**
@@ -425,6 +429,106 @@ describe("en annan kunds orsak", () => {
 
     expect(
       await unsafeGlobalPrisma.absence.count({ where: { employeeId: anna } })
+    ).toBe(0);
+  });
+});
+
+/**
+ * DEN SMALA RÄKNINGEN GER SAMMA TAL SOM TIDRAPPORTEN (2026-10-20).
+ *
+ * Saldot idag och förra månadens flex till ATF-underlaget räknades förut
+ * genom att bygga en hel tidrapport — för saldot från startdatumet till idag,
+ * med varje stämpling, rast och frånvaro. Det gjorde Tidrapport långsammare
+ * för varje vecka personen arbetat. Nu räknas de med samma smala väg som det
+ * ingående saldot, och talen ska vara exakt desamma som den fulla rapportens.
+ *
+ * Veckan har allt som räknas olika: en stämpling före startdatumet, ett
+ * sidojobb, en halv flexledig dag, en röd dag med arbete, en sjukdag och en
+ * dag utan någonting.
+ */
+describe("den smala räkningen", () => {
+  const THURSDAY = 24;
+  const PREVIOUS_FRIDAY = 18;
+
+  async function busyWeek(): Promise<string> {
+    const anna = await employee({
+      name: "Anna",
+      balanceOpeningDate: day(MONDAY),
+      flexOpeningMinutes: 90,
+    });
+
+    // Före startdatumet: syns men räknas inte.
+    await stamp(anna, PREVIOUS_FRIDAY, "07:00", "17:00");
+
+    // Måndag: nio timmar, med ett sidojobb som inte ska räknas två gånger.
+    await stamp(anna, MONDAY, "07:00", "16:00");
+    await stamp(anna, MONDAY, "08:00", "10:00");
+
+    // Tisdag: fyra timmars arbete och fyra timmar flexledigt.
+    await stamp(anna, TUESDAY, "07:00", "11:00");
+    await markAbsence(forCompany(companyId), companyId, {
+      employeeId: anna,
+      date: day(TUESDAY),
+      reasonId: flexledig,
+      minutes: 240,
+      byEmail: "chef@flextest.se",
+    });
+
+    // Onsdag: röd dag, och två timmars arbete ändå.
+    await unsafeGlobalPrisma.holiday.create({
+      data: {
+        companyId,
+        date: day(WEDNESDAY),
+        name: "Testdagen",
+        createdByEmail: "chef@flextest.se",
+      },
+    });
+    await stamp(anna, WEDNESDAY, "07:00", "09:00");
+
+    // Torsdag sjuk, fredag ingenting alls.
+    await markAbsence(forCompany(companyId), companyId, {
+      employeeId: anna,
+      date: day(THURSDAY),
+      reasonId: sjuk,
+      byEmail: "chef@flextest.se",
+    });
+
+    return anna;
+  }
+
+  it("saldot idag är tidrapportens utgående saldo", async () => {
+    const anna = await busyWeek();
+    const week = await period(anna, MONDAY, FRIDAY);
+
+    // 90 ingående, +60 måndag, −240 tisdag, +120 onsdag, 0 torsdag, −480
+    // fredag.
+    expect(week.flex.closing).toBe(90 + 60 - 240 + 120 + 0 - 480);
+
+    expect(
+      await currentFlexMinutes(forCompany(companyId), TZ, anna, at(FRIDAY, "23:00"))
+    ).toBe(week.flex.closing);
+  });
+
+  it("en periods flex är tidrapportens, även när perioden börjar före startdatumet", async () => {
+    const anna = await busyWeek();
+
+    for (const [from, to] of [
+      [TUESDAY, THURSDAY],
+      [PREVIOUS_FRIDAY, FRIDAY],
+      [PREVIOUS_FRIDAY, PREVIOUS_FRIDAY],
+    ]) {
+      expect(
+        await periodFlexMinutes(forCompany(companyId), TZ, anna, day(from), day(to))
+      ).toBe((await period(anna, from, to)).totals.flex);
+    }
+  });
+
+  it("en timanställd har ingen flex på den smala vägen heller", async () => {
+    const tim = await employee({ name: "Tim", hourly: true });
+    await stamp(tim, MONDAY, "07:00", "17:00");
+
+    expect(
+      await periodFlexMinutes(forCompany(companyId), TZ, tim, day(MONDAY), day(FRIDAY))
     ).toBe(0);
   });
 });

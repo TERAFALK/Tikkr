@@ -1,5 +1,5 @@
 import type { CompanyDb } from "./tenant";
-import { buildPayrollPeriod, type PayrollPeriod } from "./payroll";
+import { periodFlexMinutes, type PayrollPeriod } from "./payroll";
 import { atfEarnedMinutes, findAgreement, workFormFor } from "./collective-agreements";
 import { addDaysInZone, wallTimeIn } from "./time-zone";
 
@@ -127,15 +127,15 @@ export async function buildAtf(
     timeZone
   );
 
-  const previous = await buildPayrollPeriod(
+  // Bara månadens flex behövs, inte en hel tidrapport för månaden. Samma tal,
+  // se periodFlexMinutes och tests/flex-time.test.ts.
+  const previousMonthFlexMinutes = await periodFlexMinutes(
     db,
     timeZone,
     period.employee.id,
     previousStart,
     previousEnd
   );
-
-  const previousMonthFlexMinutes = previous?.totals.flex ?? 0;
   const invalidAbsenceMinutes = atfAbsence((absence) => !absence.givesAtf);
 
   const holidayMinutes = period.days
