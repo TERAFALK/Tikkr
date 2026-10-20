@@ -3,7 +3,7 @@
 import {
   changeLicenseCount,
   type LicenseFormState,
-} from "@/app/plattform/kunder/[companyId]/actions";
+} from "@/app/plattform/(panel)/kunder/[companyId]/actions";
 import ActionDialog from "@/components/ui/ActionDialog";
 import { Field, Input } from "@/components/ui";
 

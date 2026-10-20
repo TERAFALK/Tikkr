@@ -9,7 +9,6 @@ import { emailIsConfigured } from "@/lib/email";
 import { paymentsAvailable } from "@/lib/stripe";
 import { ButtonLink, Card, CardHeader, PageHeader, Stat } from "@/components/ui";
 import { formatDateTime } from "@/lib/format";
-import PlatformShell from "@/components/platform/PlatformShell";
 import RevenueChart from "@/components/platform/RevenueChart";
 import ActivityTable from "@/components/platform/ActivityTable";
 import { Fact, Facts, Section } from "@/components/platform/Pieces";
@@ -47,7 +46,7 @@ export const metadata = { title: "Översikt · Tikkr" };
  * går, och om maskineriet mår bra.
  */
 export default async function PlatformPage() {
-  const { email } = await requirePlatformAdmin();
+  await requirePlatformAdmin();
 
   const [companies, activity, names, devices, trials, quiet, history, health] =
     await Promise.all([
@@ -72,7 +71,7 @@ export default async function PlatformPage() {
   const kr = (value: number) => `${value.toLocaleString("sv-SE")} kr`;
 
   return (
-    <PlatformShell email={email}>
+    <>
       <PageHeader
         title="Översikt"
         description={`${companies.length} företag på installationen, varav ${usedLast30} har registrerat tid senaste 30 dagarna.`}
@@ -187,6 +186,6 @@ export default async function PlatformPage() {
           </Card>
         </div>
       </Section>
-    </PlatformShell>
+    </>
   );
 }

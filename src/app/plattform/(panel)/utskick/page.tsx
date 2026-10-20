@@ -1,7 +1,6 @@
 import { requirePlatformAdmin } from "@/lib/platform-admin";
 import { broadcastRecipients } from "@/lib/platform-broadcast";
 import { emailIsConfigured } from "@/lib/email";
-import PlatformShell from "@/components/platform/PlatformShell";
 import BroadcastForm from "@/components/platform/BroadcastForm";
 import { Alert, Card, CardHeader, PageHeader } from "@/components/ui";
 
@@ -17,7 +16,7 @@ export const metadata = { title: "Utskick · Tikkr" };
  * andra, och ett utskick är inget man vill råka hamna i.
  */
 export default async function BroadcastPage() {
-  const { email } = await requirePlatformAdmin();
+  await requirePlatformAdmin();
 
   const [all, paying, trialing] = await Promise.all([
     broadcastRecipients("all"),
@@ -26,7 +25,7 @@ export default async function BroadcastPage() {
   ]);
 
   return (
-    <PlatformShell email={email}>
+    <>
       <PageHeader
         title="Utskick"
         description="Mejl till kundernas administratörer."
@@ -57,6 +56,6 @@ export default async function BroadcastPage() {
         Marknadsföring kräver annan rättslig grund och omfattas inte av
         funktionen.
       </p>
-    </PlatformShell>
+    </>
   );
 }

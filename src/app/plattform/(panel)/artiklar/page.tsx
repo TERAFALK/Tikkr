@@ -9,7 +9,6 @@ import {
 } from "@/lib/price-book";
 import { MODULES, MODULE_KEYS, isModuleKey } from "@/lib/modules";
 import { hasStripeKey } from "@/lib/stripe";
-import PlatformShell from "@/components/platform/PlatformShell";
 import PriceForm from "@/components/platform/PriceForm";
 import { Alert, Card, CardHeader, PageHeader } from "@/components/ui";
 
@@ -28,7 +27,7 @@ export const metadata = { title: "Artiklar · Tikkr" };
  * kommer, annars ser det ut som att sidan ljuger.
  */
 export default async function PricesPage() {
-  const { email } = await requirePlatformAdmin();
+  await requirePlatformAdmin();
 
   const stored = new Map((await storedPrices()).map((row) => [row.item, row]));
   const keyPresent = hasStripeKey();
@@ -65,7 +64,7 @@ export default async function PricesPage() {
   });
 
   return (
-    <PlatformShell email={email}>
+    <>
       <PageHeader title="Artiklar" />
 
       {!keyPresent && (
@@ -121,7 +120,7 @@ export default async function PricesPage() {
           </div>
         </Card>
       </div>
-    </PlatformShell>
+    </>
   );
 }
 

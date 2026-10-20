@@ -1,6 +1,6 @@
 "use client";
 
-import Link, { useLinkStatus } from "next/link";
+import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { logout } from "@/app/admin/actions";
@@ -23,6 +23,7 @@ import type { ModuleKey } from "@/lib/modules";
 import CompanyBadge from "@/components/ui/CompanyBadge";
 import FeedbackButton from "@/components/admin/FeedbackButton";
 import { LogoMark, WordmarkOnly } from "@/components/ui/Logo";
+import { PendingDot, useClickedLink } from "@/components/ui/NavFeedback";
 
 /**
  * Vänsternavigeringen.
@@ -127,22 +128,9 @@ export default function AdminSidebar({
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
 
-  // DEN KLICKADE PUNKTEN MARKERAS DIREKT (2026-10-20). Markeringen följde
-  // adressen, och adressen byts först när servern svarat. Under tiden stod
-  // den gamla punkten markerad, och ett klick såg ut att inte ha tagit.
-  // Nollställs när adressen väl bytts, så att den aldrig kan fastna.
-  const [clicked, setClicked] = useState<string | null>(null);
-  useEffect(() => setClicked(null), [pathname]);
-
-  const follow = (href: string) => (event: React.MouseEvent) => {
-    setOpen(false);
-
-    // Ctrl- och Cmd-klick öppnar en ny flik. Den här fliken står kvar där
-    // den var, och markeringen ska göra det också.
-    const newTab =
-      event.metaKey || event.ctrlKey || event.shiftKey || event.button !== 0;
-    if (!newTab) setClicked(href);
-  };
+  // DEN KLICKADE PUNKTEN MARKERAS DIREKT (2026-10-20). Se NavFeedback.
+  const { clicked, follow: followLink } = useClickedLink(pathname);
+  const follow = (href: string) => followLink(href, () => setOpen(false));
 
   const isActive = (href: string, exact = false) =>
     clicked
@@ -396,24 +384,6 @@ export default function AdminSidebar({
         {nav}
       </aside>
     </>
-  );
-}
-
-/**
- * Pricken som säger att sidan hämtas.
- *
- * Syns först efter en stund (`skeleton-delay`), så att en sida som svarar
- * direkt inte blinkar förbi en prick. Grön, eftersom grönt är "pågår just nu".
- */
-function PendingDot() {
-  const { pending } = useLinkStatus();
-  if (!pending) return null;
-
-  return (
-    <span
-      aria-hidden
-      className="skeleton-delay size-1.5 shrink-0 rounded-full bg-tick-deep"
-    />
   );
 }
 

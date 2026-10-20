@@ -2,7 +2,6 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { auditLog, requirePlatformAdmin } from "@/lib/platform-admin";
 import { unsafeGlobalPrisma } from "@/lib/db";
-import PlatformShell from "@/components/platform/PlatformShell";
 import ActivityTable from "@/components/platform/ActivityTable";
 import Pager from "@/components/platform/Pager";
 import { Card, CardHeader, EmptyState, PageHeader } from "@/components/ui";
@@ -22,7 +21,7 @@ export default async function CompanyHistoryPage({
   params: Promise<{ companyId: string }>;
   searchParams: Promise<{ sida?: string }>;
 }) {
-  const { email } = await requirePlatformAdmin();
+  await requirePlatformAdmin();
   const { companyId } = await params;
   const page = Number((await searchParams).sida) || 1;
 
@@ -36,7 +35,7 @@ export default async function CompanyHistoryPage({
   const log = await auditLog({ companyId, page });
 
   return (
-    <PlatformShell email={email}>
+    <>
       <Link
         href={`/plattform/kunder/${companyId}`}
         className="text-[13px] font-medium text-tick-deep hover:underline"
@@ -72,6 +71,6 @@ export default async function CompanyHistoryPage({
           </Card>
         )}
       </div>
-    </PlatformShell>
+    </>
   );
 }

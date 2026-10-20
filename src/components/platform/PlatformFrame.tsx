@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { useState, type ReactNode } from "react";
 import { LogoMark, WordmarkOnly } from "@/components/ui/Logo";
 import ReloadOnDeploy from "@/components/ui/ReloadOnDeploy";
+import { PendingDot, useClickedLink } from "@/components/ui/NavFeedback";
 import {
   IconBuilding,
   IconHistory,
@@ -150,7 +151,9 @@ export default function PlatformFrame({
 
       <div className="min-w-0 flex-1">
         <main className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
-          {children}
+          {/* Ramen som sidbytet tonas in i, som i kundpanelen. Se
+              `.panel-content` i globals.css. */}
+          <div className="panel-content">{children}</div>
         </main>
       </div>
     </div>
@@ -167,6 +170,9 @@ function Nav({
   onNavigate: () => void;
 }) {
   const pathname = usePathname();
+
+  // Den klickade punkten markeras direkt. Se NavFeedback.
+  const { clicked, follow } = useClickedLink(pathname);
 
   return (
     <nav className="flex h-full flex-col gap-6 p-3">
@@ -192,16 +198,18 @@ function Nav({
             </p>
             <ul className="space-y-0.5">
               {section.links.map((link) => {
-                const active = link.exact
-                  ? pathname === link.href
-                  : pathname.startsWith(link.href);
+                const active = clicked
+                  ? clicked === link.href
+                  : link.exact
+                    ? pathname === link.href
+                    : pathname.startsWith(link.href);
                 const Icon = link.icon;
 
                 return (
                   <li key={link.href}>
                     <Link
                       href={link.href}
-                      onClick={onNavigate}
+                      onClick={follow(link.href, onNavigate)}
                       className={`flex items-center gap-2.5 rounded-md px-2 py-1.5 text-[13px] font-medium transition-colors ${
                         active
                           ? "bg-neutral-100 text-neutral-900"
@@ -212,6 +220,7 @@ function Nav({
                         className={active ? "text-tick-deep" : "text-neutral-400"}
                       />
                       <span className="flex-1 truncate">{link.label}</span>
+                      <PendingDot />
 
                       {/* Gult, som Granskning i kundens panel: något väntar
                           på att någon tar hand om det. */}
@@ -247,3 +256,4 @@ function Nav({
     </nav>
   );
 }
+

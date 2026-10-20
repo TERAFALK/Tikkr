@@ -3,7 +3,7 @@
 import {
   changeSubscription,
   type SubscriptionFormState,
-} from "@/app/plattform/kunder/[companyId]/actions";
+} from "@/app/plattform/(panel)/kunder/[companyId]/actions";
 import ActionDialog from "@/components/ui/ActionDialog";
 import { Field, Input, Select } from "@/components/ui";
 

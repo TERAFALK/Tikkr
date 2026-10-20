@@ -28,7 +28,6 @@ import {
   minutesBetween,
 } from "@/lib/format";
 import SubscriptionOverrideForm from "@/components/platform/SubscriptionOverrideForm";
-import PlatformShell from "@/components/platform/PlatformShell";
 import ManualLicenseForm from "@/components/platform/ManualLicenseForm";
 import ModuleForm from "@/components/platform/ModuleForm";
 import AgreedPriceForm, {
@@ -79,7 +78,7 @@ export default async function CompanyPage({
 }: {
   params: Promise<{ companyId: string }>;
 }) {
-  const { email } = await requirePlatformAdmin();
+  await requirePlatformAdmin();
   const { companyId } = await params;
 
   const detail = await getCompanyDetail(companyId);
@@ -173,7 +172,7 @@ export default async function CompanyPage({
     : null;
 
   return (
-    <PlatformShell email={email}>
+    <>
       <Link
         href="/plattform/kunder"
         className="text-[13px] font-medium text-tick-deep hover:underline"
@@ -622,6 +621,6 @@ export default async function CompanyPage({
           </Section>
         </div>
       </div>
-    </PlatformShell>
+    </>
   );
 }
