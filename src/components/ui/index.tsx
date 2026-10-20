@@ -221,7 +221,8 @@ export function Stat({
   icon,
 }: {
   label: string;
-  value: string | number;
+  /** Ett tal, eller `LiveValue` runt talet där det uppdateras medan man tittar. */
+  value: ReactNode;
   hint?: string;
   tone?: "neutral" | "active" | "warning";
   icon?: ReactNode;

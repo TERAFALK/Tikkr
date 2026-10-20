@@ -54,6 +54,8 @@ interface SearchParams {
   from?: string;
   to?: string;
   sida?: string;
+  /** Öppnar Ny stämpling direkt. Genvägen på översikten. */
+  ny?: string;
 }
 
 export default async function EntriesPage({
@@ -250,6 +252,7 @@ export default async function EntriesPage({
             indirectMoments={indirectMoments
               .filter((moment) => moment.active)
               .map((moment) => ({ id: moment.id, label: moment.name }))}
+            openOnMount={params.ny === "1"}
           />
         }
       />
