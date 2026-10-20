@@ -410,7 +410,7 @@ export function Hero() {
           >
             <SatelliteCard
               label="Fakturerbar tid"
-              value="84:30"
+              value="84,5"
               foot="Vecka 16, samtliga ordrar"
               tone="tick"
             />
