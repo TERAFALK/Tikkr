@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import Link, { useLinkStatus } from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { logout } from "@/app/admin/actions";
@@ -127,6 +127,30 @@ export default function AdminSidebar({
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
 
+  // DEN KLICKADE PUNKTEN MARKERAS DIREKT (2026-10-20). Markeringen följde
+  // adressen, och adressen byts först när servern svarat. Under tiden stod
+  // den gamla punkten markerad, och ett klick såg ut att inte ha tagit.
+  // Nollställs när adressen väl bytts, så att den aldrig kan fastna.
+  const [clicked, setClicked] = useState<string | null>(null);
+  useEffect(() => setClicked(null), [pathname]);
+
+  const follow = (href: string) => (event: React.MouseEvent) => {
+    setOpen(false);
+
+    // Ctrl- och Cmd-klick öppnar en ny flik. Den här fliken står kvar där
+    // den var, och markeringen ska göra det också.
+    const newTab =
+      event.metaKey || event.ctrlKey || event.shiftKey || event.button !== 0;
+    if (!newTab) setClicked(href);
+  };
+
+  const isActive = (href: string, exact = false) =>
+    clicked
+      ? clicked === href
+      : exact
+        ? pathname === href
+        : pathname.startsWith(href);
+
   // PRICKEN SLÄCKS NÄR SIDAN ÖPPNAS, även här. Layouten renderas inte om när
   // man går mellan sidorna i panelen, så värdet den skickade står kvar tills
   // nästa omladdning. Utan det här tändes pricken igen så fort man lämnade
@@ -197,16 +221,14 @@ export default function AdminSidebar({
             </p>
             <ul className="space-y-0.5">
               {section.links.map((link) => {
-                const active = link.exact
-                  ? pathname === link.href
-                  : pathname.startsWith(link.href);
+                const active = isActive(link.href, link.exact);
                 const Icon = link.icon;
 
                 return (
                   <li key={link.href}>
                     <Link
                       href={link.href}
-                      onClick={() => setOpen(false)}
+                      onClick={follow(link.href)}
                       className={`flex items-center gap-2.5 rounded-md px-2 py-1.5 text-[13px] font-medium transition-colors ${
                         active
                           ? "bg-neutral-100 text-neutral-900"
@@ -217,6 +239,7 @@ export default function AdminSidebar({
                         className={active ? "text-tick-deep" : "text-neutral-400"}
                       />
                       <span className="flex-1 truncate">{link.label}</span>
+                      <PendingDot />
 
                       {link.badge && reviewCount > 0 && (
                         <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[11px] font-semibold tabular-nums text-amber-700">
@@ -241,16 +264,16 @@ export default function AdminSidebar({
         {showAccount && (
           <Link
             href="/admin/konto"
-            onClick={() => setOpen(false)}
+            onClick={follow("/admin/konto")}
             className={`flex items-center gap-2.5 rounded-md px-2 py-1.5 transition-colors ${
-              pathname.startsWith("/admin/konto")
+              isActive("/admin/konto")
                 ? "bg-neutral-100 text-neutral-900"
                 : "text-neutral-600 hover:bg-neutral-50 hover:text-neutral-900"
             }`}
           >
             <IconUser
               className={
-                pathname.startsWith("/admin/konto")
+                isActive("/admin/konto")
                   ? "shrink-0 text-tick-deep"
                   : "shrink-0 text-neutral-400"
               }
@@ -268,16 +291,16 @@ export default function AdminSidebar({
 
         <Link
           href="/admin/installningar"
-          onClick={() => setOpen(false)}
+          onClick={follow("/admin/installningar")}
           className={`flex items-center gap-2.5 rounded-md px-2 py-1.5 text-[13px] font-medium transition-colors ${
-            pathname.startsWith("/admin/installningar")
+            isActive("/admin/installningar")
               ? "bg-neutral-100 text-neutral-900"
               : "text-neutral-600 hover:bg-neutral-50 hover:text-neutral-900"
           }`}
         >
           <IconSettings
             className={
-              pathname.startsWith("/admin/installningar")
+              isActive("/admin/installningar")
                 ? "text-tick-deep"
                 : "text-neutral-400"
             }
@@ -373,6 +396,24 @@ export default function AdminSidebar({
         {nav}
       </aside>
     </>
+  );
+}
+
+/**
+ * Pricken som säger att sidan hämtas.
+ *
+ * Syns först efter en stund (`skeleton-delay`), så att en sida som svarar
+ * direkt inte blinkar förbi en prick. Grön, eftersom grönt är "pågår just nu".
+ */
+function PendingDot() {
+  const { pending } = useLinkStatus();
+  if (!pending) return null;
+
+  return (
+    <span
+      aria-hidden
+      className="skeleton-delay size-1.5 shrink-0 rounded-full bg-tick-deep"
+    />
   );
 }
 

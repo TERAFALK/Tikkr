@@ -43,7 +43,7 @@ export default function BudgetBar({
     <div className="min-w-28">
       <div className="h-1.5 overflow-hidden rounded-full bg-neutral-100">
         <div
-          className={`h-full rounded-full ${tone.bar}`}
+          className={`animate-grow-x h-full rounded-full ${tone.bar}`}
           // Stapeln stannar vid full bredd. Överskridandet står i siffror
           // bredvid — en stapel som växer utanför sin ruta säger inte hur
           // mycket, bara att det hänt.
