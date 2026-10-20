@@ -1,4 +1,6 @@
+import type { ShopOrderStatus } from "@prisma/client";
 import type { EmailMessage } from "./email";
+import { formatCurrency } from "./money";
 
 /**
  * MEJLEN SYSTEMET SKICKAR.
@@ -104,6 +106,11 @@ interface Layout {
    * escape() där stycket sätts ihop.
    */
   paragraphs: string[];
+  /**
+   * En tabell med två spalter efter styckena, för belopp. Texten escapas
+   * här, till skillnad från styckena, eftersom den alltid är data.
+   */
+  rows?: { label: string; value: string; strong?: boolean }[];
   button?: { label: string; href: string };
   /** Stycken efter knappen, i mindre och ljusare text. */
   afterword?: string[];
@@ -139,6 +146,27 @@ function render(layout: Layout): string {
         <p style="margin:0 0 18px;padding:10px 12px;background-color:${COLORS.linkBox};border:1px solid ${COLORS.border};border-radius:6px;font-family:${FONT};font-size:12px;line-height:1.5;color:${COLORS.body};word-break:break-all;">
           ${escape(layout.button.href)}
         </p>`
+    : "";
+
+  // Beloppen står i en tabell och inte i en flexrad, av samma skäl som
+  // knappen: Outlook känner bara tabeller. Beloppen högerställs så att
+  // kronorna står under varandra.
+  const rows = layout.rows?.length
+    ? `
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:4px 0 18px;border-top:1px solid ${COLORS.border};">
+${layout.rows
+  .map(
+    (row) => `          <tr>
+            <td style="padding:8px 12px 8px 0;border-bottom:1px solid ${COLORS.border};font-family:${FONT};font-size:14px;line-height:1.4;color:${
+              row.strong ? COLORS.heading : COLORS.body
+            };${row.strong ? "font-weight:600;" : ""}">${escape(row.label)}</td>
+            <td align="right" style="padding:8px 0;border-bottom:1px solid ${COLORS.border};font-family:${FONT};font-size:14px;line-height:1.4;white-space:nowrap;color:${
+              row.strong ? COLORS.heading : COLORS.body
+            };${row.strong ? "font-weight:600;" : ""}">${escape(row.value)}</td>
+          </tr>`
+  )
+  .join("\n")}
+        </table>`
     : "";
 
   return `<!doctype html>
@@ -179,6 +207,7 @@ function render(layout: Layout): string {
                 ${escape(layout.heading)}
               </h1>
 ${layout.paragraphs.map((text) => paragraph(text)).join("")}
+${rows}
 ${button}
 ${(layout.afterword ?? []).map((text) => paragraph(text, true)).join("")}
             </td>
@@ -459,6 +488,196 @@ export function passwordChangedEmail(params: { to: string }): EmailMessage {
         "Lösenordet till ditt Tikkr-konto har just ändrats. Alla enheter som var inloggade har loggats ut.",
       ],
       afterword: [warning],
+    },
+  });
+}
+
+/* -------------------------------------------------------------------------- */
+/* Beställningar av tillbehör                                                  */
+/* -------------------------------------------------------------------------- */
+
+/** Det mejlet behöver veta om en beställning. Ögonblicksbilden, aldrig mer. */
+export interface ShopEmailOrder {
+  number: number;
+  companyName: string;
+  contactName: string;
+  addressLine: string;
+  postalCode: string;
+  city: string;
+  reference: string | null;
+  lines: { name: string; quantity: number; subtotalOre: number }[];
+  goodsOre: number;
+  shippingOre: number | null;
+  vatOre: number;
+  totalOre: number;
+  carrier: string | null;
+  trackingUrl: string | null;
+}
+
+/** Ämne, rubrik och första stycket per läge. Läget avgör, inte anroparen. */
+const SHOP_COPY: Partial<
+  Record<ShopOrderStatus, { subject: (n: number) => string; heading: string; intro: (n: number) => string }>
+> = {
+  RECEIVED: {
+    subject: (n) => `Beställning ${n} är mottagen`,
+    heading: "Tack för beställningen",
+    intro: (n) =>
+      `Vi har tagit emot beställning ${n}. Vi går igenom den och hör av oss när den är bekräftad.`,
+  },
+  CONFIRMED: {
+    subject: (n) => `Beställning ${n} är bekräftad`,
+    heading: "Beställningen är bekräftad",
+    intro: (n) => `Vi har bekräftat beställning ${n} och börjar förbereda den.`,
+  },
+  IN_PRODUCTION: {
+    subject: (n) => `Beställning ${n} tillverkas`,
+    heading: "Tillverkningen har börjat",
+    intro: (n) => `Beställning ${n} tillverkas och förbereds nu.`,
+  },
+  SHIPPED: {
+    subject: (n) => `Beställning ${n} är skickad`,
+    heading: "Beställningen är skickad",
+    intro: (n) => `Beställning ${n} har lämnat oss.`,
+  },
+  CANCELED: {
+    subject: (n) => `Beställning ${n} är avbruten`,
+    heading: "Beställningen är avbruten",
+    intro: (n) => `Beställning ${n} är avbruten och kommer inte att levereras.`,
+  },
+  PROBLEM: {
+    subject: (n) => `Om beställning ${n}`,
+    heading: "Vi behöver stämma av beställningen",
+    intro: (n) => `Det gäller beställning ${n}.`,
+  },
+};
+
+/** Lägena som har ett mejl. Samma urval som notifiesCustomer i status.ts. */
+export function hasShopEmail(status: ShopOrderStatus): boolean {
+  return Boolean(SHOP_COPY[status]);
+}
+
+/**
+ * Ett besked om en beställning.
+ *
+ * Bär alltid sammanställningen med moms, så att varje mejl om beställningen
+ * går att läsa för sig. Interna anteckningar finns inte i det här anropet,
+ * och kan därför inte hamna i ett mejl.
+ *
+ * Frakten står som "Tillkommer" tills vi satt den. Totalen heter då
+ * "Summa, exkl. frakt", eftersom den inte är vad fakturan kommer att landa på.
+ */
+export function shopOrderEmail(params: {
+  to: string;
+  status: ShopOrderStatus;
+  order: ShopEmailOrder;
+  message: string | null;
+  /** Beräknad leveranstid, ur katalogen. Står i de tidiga beskeden. */
+  delivery: string | null;
+  link: string;
+}): EmailMessage {
+  const { order, status } = params;
+  const copy = SHOP_COPY[status];
+
+  if (!copy) {
+    throw new Error(`Inget mejl för läget ${status}.`);
+  }
+
+  const n = order.number;
+  const shippingKnown = order.shippingOre !== null;
+
+  const rows = [
+    ...order.lines.map((line) => ({
+      label: `${line.quantity} × ${line.name}`,
+      value: formatCurrency(line.subtotalOre),
+    })),
+    { label: "Summa varor, exkl. moms", value: formatCurrency(order.goodsOre) },
+    {
+      label: shippingKnown ? "Frakt, exkl. moms" : "Frakt",
+      value: shippingKnown ? formatCurrency(order.shippingOre!) : "Tillkommer",
+    },
+    { label: "Moms 25 %", value: formatCurrency(order.vatOre) },
+    {
+      label: shippingKnown ? "Totalt inkl. moms" : "Summa inkl. moms, exkl. frakt",
+      value: formatCurrency(order.totalOre),
+      strong: true,
+    },
+  ];
+
+  const early = status === "RECEIVED" || status === "CONFIRMED" || status === "IN_PRODUCTION";
+  const deliveryLine = early && params.delivery ? params.delivery : null;
+
+  const carrierLine =
+    status === "SHIPPED" && order.carrier ? `Transportör: ${order.carrier}.` : null;
+
+  const address = [
+    order.contactName,
+    order.addressLine,
+    `${order.postalCode} ${order.city}`,
+    order.reference ? `Märkning: ${order.reference}` : null,
+  ].filter((part): part is string => Boolean(part));
+
+  const addressLine = `Levereras till ${order.companyName}, ${address.join(", ")}.`;
+
+  const invoiceLine =
+    status === "RECEIVED"
+      ? "Frakten tillkommer. Beställningen faktureras vid leverans."
+      : status === "SHIPPED"
+        ? "Fakturan kommer separat."
+        : null;
+
+  const reply = "Svara på det här mejlet om något inte stämmer.";
+
+  const tracking =
+    status === "SHIPPED" && order.trackingUrl
+      ? { label: "Följ leveransen", href: order.trackingUrl }
+      : null;
+
+  const paragraphs = [
+    escape(copy.intro(n)),
+    ...(params.message
+      ? params.message
+          .split(/\n{2,}/)
+          .map((block) => block.trim())
+          .filter(Boolean)
+          .map((block) => escape(block).replace(/\n/g, "<br>"))
+      : []),
+    ...(deliveryLine ? [escape(deliveryLine)] : []),
+    ...(carrierLine ? [escape(carrierLine)] : []),
+  ];
+
+  const lines = [
+    copy.intro(n),
+    ...(params.message ? ["", params.message] : []),
+    ...(deliveryLine ? ["", deliveryLine] : []),
+    ...(carrierLine ? ["", carrierLine] : []),
+    ...(tracking ? ["", `Följ leveransen: ${tracking.href}`] : []),
+    "",
+    ...rows.map((row) => `${row.label}: ${row.value}`),
+    "",
+    addressLine,
+    ...(invoiceLine ? ["", invoiceLine] : []),
+    "",
+    `Beställningen i Tikkr: ${params.link}`,
+    "",
+    reply,
+  ];
+
+  return compose({
+    to: params.to,
+    subject: copy.subject(n),
+    lines,
+    layout: {
+      preheader: copy.intro(n),
+      heading: copy.heading,
+      paragraphs,
+      rows,
+      button: tracking ?? { label: "Visa beställningen", href: params.link },
+      afterword: [
+        escape(addressLine),
+        ...(invoiceLine ? [escape(invoiceLine)] : []),
+        ...(tracking ? [`Beställningen i Tikkr: ${escape(params.link)}`] : []),
+        reply,
+      ],
     },
   });
 }

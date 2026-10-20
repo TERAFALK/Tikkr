@@ -11,6 +11,7 @@ import {
   IconDevice,
   IconHistory,
   IconMoment,
+  IconPackage,
   IconPeople,
   IconReport,
   IconShield,
@@ -88,6 +89,14 @@ const sections: SettingsSection[] = [
         label: "Prenumeration",
         description: "Betalning och skärmar",
         icon: IconTag,
+      },
+      {
+        // Här och inte i vänstermenyn: man beställer en skärm sällan, se
+        // CLAUDE.md § 1, Adminflöde.
+        href: "/admin/installningar/tillbehor",
+        label: "Tillbehör",
+        description: "Stämplingsskärmar och beställningar",
+        icon: IconPackage,
       },
     ],
   },

@@ -88,6 +88,25 @@ export function safeNext(next: string | undefined): string | undefined {
   return next;
 }
 
+/**
+ * En returadress INOM ADMINPANELEN, eller undefined.
+ *
+ * Säljsidans Beställ-knapp skickar den som inte är inloggad till
+ * inloggningen med `?till=/admin/...`, och personen ska landa där efter
+ * tvåsteget. Adressen kommer utifrån, så den prövas som safeNext och måste
+ * dessutom ligga under /admin: en inloggning ska inte kunna skicka vidare
+ * till plattformspanelen eller tillbaka till inloggningen.
+ */
+export function safeAdminNext(next: string | undefined | null): string | undefined {
+  const safe = safeNext(next ?? undefined);
+  if (!safe) return undefined;
+  if (safe !== "/admin" && !safe.startsWith("/admin/") && !safe.startsWith("/admin?")) {
+    return undefined;
+  }
+  if (safe.startsWith("/admin/login")) return undefined;
+  return safe;
+}
+
 export function encodeTicket(
   scope: TicketScope,
   sub: string,

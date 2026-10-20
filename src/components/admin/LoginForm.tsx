@@ -5,11 +5,16 @@ import { useFormStatus } from "react-dom";
 import { login, type LoginState } from "@/app/admin/login/actions";
 import { Alert, Button, Field, Input } from "@/components/ui";
 
-export default function LoginForm() {
+/**
+ * `next` är sidan personen var på väg till. Den skickas med och prövas på
+ * servern, se safeAdminNext.
+ */
+export default function LoginForm({ next }: { next?: string }) {
   const [state, action] = useActionState<LoginState, FormData>(login, {});
 
   return (
     <form action={action} className="space-y-4">
+      {next && <input type="hidden" name="next" value={next} />}
       {state.error && <Alert>{state.error}</Alert>}
 
       <Field label="E-postadress">

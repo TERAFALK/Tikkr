@@ -6,6 +6,7 @@ import { unsafeGlobalPrisma } from "@/lib/db";
 import { recordAudit } from "@/lib/audit";
 import { parseMarkupPercent } from "@/lib/money";
 import { saved, type SaveState } from "@/lib/save-state";
+import { readProfileForm, validateProfile } from "@/lib/shop/profile";
 import { normalizeTimeOfDay } from "@/lib/time-input";
 import { parseTimeOfDay } from "@/lib/time-zone";
 
@@ -33,6 +34,42 @@ export async function saveCompany(
 
   revalidatePath("/admin/installningar");
   revalidatePath("/admin");
+
+  return saved();
+}
+
+/**
+ * Sparar företagets leverans- och fakturauppgifter.
+ *
+ * Inget fält krävs här: uppgifterna förifyller beställningsformuläret, och
+ * det är beställningen som kräver dem. Det som står prövas ändå, så att ett
+ * felskrivet postnummer upptäcks här och inte i formuläret om ett halvår.
+ *
+ * Varje administratör får ändra dem. Att beställa är ägarens, se
+ * placeAccessoryOrder.
+ */
+export async function saveCompanyProfile(
+  _previous: SaveState,
+  formData: FormData
+): Promise<SaveState> {
+  const session = await requireAdmin();
+  await assertWritable(session);
+  const { companyId, db } = session;
+
+  const { errors, clean } = validateProfile(readProfileForm(formData), {
+    requireForOrder: false,
+  });
+
+  if (!clean) return { error: Object.values(errors)[0] };
+
+  await db.companyProfile.upsert({
+    where: { companyId },
+    create: { companyId, ...clean },
+    update: { ...clean },
+  });
+
+  revalidatePath("/admin/installningar");
+  revalidatePath("/admin/installningar/tillbehor");
 
   return saved();
 }
