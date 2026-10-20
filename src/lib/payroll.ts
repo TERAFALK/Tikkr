@@ -230,7 +230,19 @@ export async function buildPayrollPeriod(
   // 15:30 sista dagen ska med.
   const periodEnd = startOfDayIn(addDaysInZone(to, 1, timeZone), timeZone);
 
-  const [entries, breakEntries, absences, schedules, start, holidays] = await Promise.all([
+  // Startdagen behövs både för dagarna och för det ingående saldot, och det
+  // ingående saldot räknas samtidigt med resten i stället för efteråt.
+  const startPromise = balanceStart(db, employee, timeZone);
+
+  const [
+    entries,
+    breakEntries,
+    absences,
+    schedules,
+    start,
+    holidays,
+    flexOpening,
+  ] = await Promise.all([
     db.timeEntry.findMany({
       where: {
         employeeId,
@@ -274,8 +286,11 @@ export async function buildPayrollPeriod(
       },
     }),
     schedulesForEmployees(db, [employeeId]),
-    balanceStart(db, employee, timeZone),
+    startPromise,
     holidaysBetween(db, periodStart, periodEnd, timeZone),
+    startPromise.then((since) =>
+      openingFlex(db, employee, since, periodStart, timeZone)
+    ),
   ]);
 
   const schedule = schedules.get(employeeId) ?? null;
@@ -467,14 +482,6 @@ export async function buildPayrollPeriod(
     (row) => row.minutes
   ).map((row) => ({ reason: row.name, minutes: row.minutes }));
 
-  const flexOpening = await openingFlex(
-    db,
-    employee,
-    start,
-    periodStart,
-    timeZone
-  );
-
   // En timanställd har ingen flex, och saldot ska då stå på noll rakt
   // igenom. Ett ingående saldo från tiden som fast anställd räknas inte med —
   // det hör till ett annat anställningsförhållande, och visades det här skulle
@@ -572,26 +579,59 @@ async function openingFlex(
   // stämplingar, eller så börjar perioden på eller före startdagen.
   if (!since || since >= periodStart) return employee.flexOpeningMinutes;
 
-  const beforeStart = { gte: since, lt: periodStart };
+  return (
+    employee.flexOpeningMinutes +
+    (await flexBetween(db, employee.id, since, periodStart, timeZone))
+  );
+}
+
+/**
+ * FLEXEN DAG FÖR DAG, UTAN TIDRAPPORTEN RUNT OMKRING.
+ *
+ * Summan av varje dags flex från och med `from` till (inte med) `toExclusive`.
+ * Samma formel som dagarna i buildPayrollPeriod — arbetad tid som
+ * huvudstämpling, frånvaro som inte drar på flexen, minus planerad tid, och
+ * noll planerat en röd dag — men bara med de fält räkningen behöver: in- och
+ * utstämplingens tid och frånvarons minuter. Inga namn, inga raster och inga
+ * rader att visa.
+ *
+ * Det ingående saldot, saldot idag och förra månadens flex till ATF räknas
+ * alla här (ändrat 2026-10-20). De två senare byggde förut en hel tidrapport
+ * för att få fram ett enda tal, och saldot idag gjorde det från startdatumet:
+ * Tidrapport blev långsammare för varje vecka personen arbetat.
+ * `tests/flex-time.test.ts` fäller en räkning som börjar säga något annat än
+ * tidrapporten.
+ *
+ * Anroparen ser till att `from` inte ligger före personens startdag; före den
+ * har en dag ingen flex alls.
+ */
+async function flexBetween(
+  db: CompanyDb,
+  employeeId: string,
+  from: Date,
+  toExclusive: Date,
+  timeZone: string
+): Promise<number> {
+  const range = { gte: from, lt: toExclusive };
 
   const [entries, absences, schedules, holidays] = await Promise.all([
     db.timeEntry.findMany({
-      where: { employeeId: employee.id, clockInAt: beforeStart },
+      where: { employeeId, clockInAt: range },
       select: { clockInAt: true, clockOutAt: true },
     }),
     db.absence.findMany({
-      where: { employeeId: employee.id, date: beforeStart },
+      where: { employeeId, date: range },
       select: {
         date: true,
         minutes: true,
         reason: { select: { countsAsComp: true } },
       },
     }),
-    schedulesForEmployees(db, [employee.id]),
-    holidaysBetween(db, since, periodStart, timeZone),
+    schedulesForEmployees(db, [employeeId]),
+    holidaysBetween(db, from, toExclusive, timeZone),
   ]);
 
-  const schedule = schedules.get(employee.id) ?? null;
+  const schedule = schedules.get(employeeId) ?? null;
 
   // Schemats tid en dag, och noll en röd dag. Samma regel som dagarna i
   // buildPayrollPeriod, för planerad tid och för frånvaro som täcker dagen.
@@ -627,13 +667,13 @@ async function openingFlex(
     );
   }
 
-  let flex = employee.flexOpeningMinutes;
+  let flex = 0;
 
-  // Varje dag mellan startdagen och periodens början, inklusive dagar helt
-  // utan stämplingar — en oanmäld frånvarodag ska ge minus, inte noll.
+  // Varje dag i spannet, inklusive dagar helt utan stämplingar — en
+  // oanmäld frånvarodag ska ge minus, inte noll.
   for (const date of daysInPeriod(
-    since,
-    addDaysInZone(periodStart, -1, timeZone),
+    from,
+    addDaysInZone(toExclusive, -1, timeZone),
     timeZone
   )) {
     const key = dayNumberIn(date, timeZone);
@@ -646,6 +686,40 @@ async function openingFlex(
   }
 
   return flex;
+}
+
+/**
+ * En periods flex, utan tidrapporten runt omkring.
+ *
+ * Samma tal som `buildPayrollPeriod(...).totals.flex`: dagarna före
+ * startdatumet har ingen flex, och en timanställd har ingen alls. Används
+ * av ATF-underlaget, som bara behöver förra månadens flex. Se flexBetween.
+ */
+export async function periodFlexMinutes(
+  db: CompanyDb,
+  timeZone: string,
+  employeeId: string,
+  from: Date,
+  to: Date
+): Promise<number> {
+  const employee = await db.employee.findFirst({
+    where: { id: employeeId },
+    select: { id: true, balanceOpeningDate: true, hourly: true },
+  });
+
+  if (!employee || employee.hourly) return 0;
+
+  const since = await balanceStart(db, employee, timeZone);
+  if (!since) return 0;
+
+  // Dygnen som i buildPayrollPeriod, och aldrig före startdagen.
+  const periodStart = startOfDayIn(from, timeZone);
+  const periodEnd = startOfDayIn(addDaysInZone(to, 1, timeZone), timeZone);
+  const start = since > periodStart ? since : periodStart;
+
+  if (start >= periodEnd) return 0;
+
+  return flexBetween(db, employee.id, start, periodEnd, timeZone);
 }
 
 /**
@@ -691,9 +765,15 @@ export async function currentFlexMinutes(
   // noll för alla utom den som flyttat in med timmar.
   if (!since || since > now) return employee.flexOpeningMinutes;
 
-  const period = await buildPayrollPeriod(db, timeZone, employeeId, since, now);
+  // Till och med idag, alltså fram till morgondagens början. Samma dagar som
+  // en tidrapport från startdatumet till idag, men utan att bygga den: det
+  // enda som behövs är summan. Se flexBetween.
+  const tomorrow = startOfDayIn(addDaysInZone(now, 1, timeZone), timeZone);
 
-  return period ? period.flex.closing : null;
+  return (
+    employee.flexOpeningMinutes +
+    (await flexBetween(db, employee.id, since, tomorrow, timeZone))
+  );
 }
 
 function sum<T>(rows: T[], pick: (row: T) => number): number {

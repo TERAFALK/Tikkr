@@ -63,15 +63,13 @@ export default async function TimesheetPage({
   const { db, companyId } = session;
   const params = await searchParams;
 
-  const company = await unsafeGlobalPrisma.company.findUnique({
-    where: { id: companyId },
-    select: { timezone: true, atfAgreement: true },
-  });
-
-  const timeZone = company?.timezone ?? "Europe/Stockholm";
-  const now = new Date();
-
-  const [employees, reasons] = await Promise.all([
+  // Företaget och listorna hämtas samtidigt. De väntade förut på varandra,
+  // fast ingen av dem behöver något ur de andra.
+  const [company, employees, reasons] = await Promise.all([
+    unsafeGlobalPrisma.company.findUnique({
+      where: { id: companyId },
+      select: { timezone: true, atfAgreement: true },
+    }),
     db.employee.findMany({
       orderBy: [{ active: "desc" }, { name: "asc" }],
       select: { id: true, name: true, employeeNumber: true, active: true },
@@ -86,6 +84,9 @@ export default async function TimesheetPage({
     }),
   ]);
 
+  const timeZone = company?.timezone ?? "Europe/Stockholm";
+  const now = new Date();
+
   // Förvald period är innevarande vecka. Det är den period en verkstad tänker
   // i, och kundens gamla rapport är också veckovis.
   const weekStart = startOfWeekIn(now, timeZone);
@@ -97,17 +98,18 @@ export default async function TimesheetPage({
 
   const employeeId = params.anstalld || employees[0]?.id || "";
 
-  const period = employeeId
-    ? await buildPayrollPeriod(db, timeZone, employeeId, from, to)
-    : null;
-
   // SALDOT IDAG, och inte periodens utgående. Rutan som justerar saldot
   // ändrar det här talet, och ett annat tal i samma ruta hade gjort
   // justeringen omöjlig att förutse: en period som slutar i framtiden stänger
   // på ett annat saldo än det personen har just nu.
-  const flexToday = employeeId
-    ? await currentFlexMinutes(db, timeZone, employeeId)
-    : null;
+  //
+  // Perioden och saldot hämtas samtidigt. Ingen av dem behöver den andra.
+  const [period, flexToday] = employeeId
+    ? await Promise.all([
+        buildPayrollPeriod(db, timeZone, employeeId, from, to),
+        currentFlexMinutes(db, timeZone, employeeId),
+      ])
+    : [null, null];
 
   // ATF-underlaget, när perioden är en hel kalendermånad och företaget valt
   // ett avtal. Annars null, och rutan visas inte. Se atf.ts.
