@@ -2412,12 +2412,17 @@ function OrderNumberPad({
        På en bred skärm står vägarna vidare i en kolumn till höger, från
        displayen ner till bekräftelseknappen. Under knappsatsen fick de bara
        den höjd som blev över och var de minsta tryckytorna på skärmen, fast
-       Improduktiv tid trycks varje dag. Knappsatsen behåller sin bredd. */
+       Improduktiv tid trycks varje dag. Knappsatsen behåller sin bredd.
+
+       VARJE del har en uttrycklig plats i rutnätet. Fick bara kolumnen till
+       höger en, lade webbläsaren resten i första lediga ruta: displayen
+       hamnade i högerkolumnen och bekräftelseknappen på raden som tar all
+       höjd som blir över. */
     <div className="mx-auto flex min-h-0 w-full max-w-xl flex-1 flex-col lg:grid lg:max-w-none lg:grid-cols-[minmax(0,36rem)_16rem] lg:grid-rows-[auto_auto_auto_minmax(0,1fr)_auto] lg:justify-center lg:gap-x-6">
       {/* Vid byte står det man lämnar i rubriken. Knappsatsen ser likadan ut
           i båda fallen, och den som tryckt fel ska se det innan numret är
           inslaget. */}
-      <h2 className="kiosk-frame-title mb-2 shrink-0 text-xl font-semibold text-neutral-900 sm:mb-4 sm:text-2xl">
+      <h2 className="kiosk-frame-title mb-2 shrink-0 lg:col-start-1 lg:row-start-1 text-xl font-semibold text-neutral-900 sm:mb-4 sm:text-2xl">
         {switchingFrom
           ? `${employee.name}: byter från ${switchingFrom}`
           : `${employee.name}: slå in ordernummer`}
@@ -2425,7 +2430,7 @@ function OrderNumberPad({
 
       {/* Fast höjd på både ruta och besked. Utan den hoppar knappsatsen nedåt
           i samma stund som första siffran trycks in. */}
-      <div className="kiosk-frame-display flex h-16 shrink-0 items-center justify-center rounded-xl border-2 border-neutral-200 bg-white sm:h-24">
+      <div className="kiosk-frame-display flex h-16 lg:col-start-1 lg:row-start-2 shrink-0 items-center justify-center rounded-xl border-2 border-neutral-200 bg-white sm:h-24">
         <span className="text-4xl font-semibold tabular-nums tracking-[0.2em] text-neutral-900">
           {typed || <span className="text-neutral-300">—</span>}
         </span>
@@ -2434,7 +2439,7 @@ function OrderNumberPad({
       {/* Tom när inget slagits in, men raden står kvar och behåller sin höjd.
           Utan den hoppar knappsatsen uppåt i samma stund som första siffran
           trycks in och beskedet dyker upp. */}
-      <div className="kiosk-frame-hint flex h-9 shrink-0 items-center justify-center sm:h-12">
+      <div className="kiosk-frame-hint flex h-9 lg:col-start-1 lg:row-start-3 shrink-0 items-center justify-center sm:h-12">
         {match ? (
           <span className="text-lg font-semibold text-emerald-700">
             {match.customerName ?? "Kund saknas på ordern"}
@@ -2446,7 +2451,7 @@ function OrderNumberPad({
         ) : null}
       </div>
 
-      <div className="grid min-h-0 flex-1 auto-rows-fr grid-cols-3 gap-2 sm:gap-3">
+      <div className="grid min-h-0 flex-1 auto-rows-fr grid-cols-3 lg:col-start-1 lg:row-start-4 gap-2 sm:gap-3">
         {["1", "2", "3", "4", "5", "6", "7", "8", "9"].map((digit) => (
           <button
             key={digit}
@@ -2514,7 +2519,7 @@ function OrderNumberPad({
       <button
         onClick={() => (match ? onPick(match) : typed && onCreate(typed))}
         disabled={!match && !typed}
-        className={`kiosk-frame-cta kiosk-press mt-2 min-h-14 w-full shrink-0 rounded-xl px-4 py-3.5 text-2xl font-semibold disabled:bg-neutral-200 disabled:text-neutral-400 ${
+        className={`kiosk-frame-cta kiosk-press mt-2 lg:col-start-1 lg:row-start-5 min-h-14 w-full shrink-0 rounded-xl px-4 py-3.5 text-2xl font-semibold disabled:bg-neutral-200 disabled:text-neutral-400 ${
           match
             ? "bg-blue-600 text-white active:bg-blue-700"
             : "bg-amber-500 text-white active:bg-amber-600"
