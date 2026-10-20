@@ -342,6 +342,167 @@ dialog {
   }
 }
 
+/* --------------------------------------------------------------------------
+   Rörelse i panelerna (adminpanelen och plattformspanelen), 2026-10-20.
+
+   Samma språk som kioskens vybyte: kort, liten och bara när något kommer in.
+   Ingenting rör sig medan man arbetar i en vy, och ingenting rör sig alls för
+   den som bett datorn om mindre rörelse — se blocket längst ned i avsnittet.
+
+   Tiderna ligger som variabler, så att panelen och kiosken går att hålla i
+   takt utan att jaga siffror i fyra regler.
+   -------------------------------------------------------------------------- */
+
+:root {
+  --motion-fast: 140ms;
+  --motion-base: 220ms;
+  --motion-grow: 700ms;
+  --ease-out-soft: cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/*
+  Innehållet när en sida bytts. Fyra pixlar och en toning: ögat ser att något
+  nytt kommit, men sidan åker ingenstans.
+
+  `.panel-content > *` och inte en klass på sidan. Ramen runt innehållet står
+  kvar mellan sidbytena, och det som läggs in i den är nya element — först
+  skelettet, sedan sidan. En CSS-animation körs när ett element läggs in, så
+  båda tonas in av sig själva. När samma sida ritas om med nya filter
+  återanvänds elementen, och ingenting rör sig.
+*/
+@keyframes panel-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.panel-content > * {
+  animation: panel-in var(--motion-base) var(--ease-out-soft) both;
+}
+
+/*
+  STAPLAR VÄXER FRAM NÄR DE RITAS (produktägarens önskan, 2026-10-20).
+
+  `scale` och inte höjd eller bredd: en transform flyttar inte grannarna, och
+  den ritas av grafikkortet i stället för att lägga om sidan varje bildruta.
+  Stapeln står alltså på sin riktiga plats från början och växer bara synligt
+  dit. `--i` är stapelns plats i raden och ger en kort förskjutning, så att en
+  graf reser sig från vänster i stället för att poppa upp på en gång.
+*/
+@keyframes grow-y {
+  from {
+    transform: scaleY(0);
+  }
+  to {
+    transform: none;
+  }
+}
+
+@keyframes grow-x {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: none;
+  }
+}
+
+.animate-grow-up,
+.animate-grow-down,
+.animate-grow-x {
+  animation-duration: var(--motion-grow);
+  animation-timing-function: var(--ease-out-soft);
+  animation-fill-mode: both;
+  animation-delay: calc(var(--i, 0) * 35ms);
+}
+
+.animate-grow-up {
+  animation-name: grow-y;
+  transform-origin: bottom;
+}
+
+/* Förlust ritas nedåt från nollinjen, och växer därför från toppen. */
+.animate-grow-down {
+  animation-name: grow-y;
+  transform-origin: top;
+}
+
+.animate-grow-x {
+  animation-name: grow-x;
+  transform-origin: left;
+}
+
+/*
+  SKELETT MEDAN EN SIDA LADDAS.
+
+  Syns först efter 150 ms. En sida som svarar fortare ska inte blinka förbi
+  ett skelett på vägen — då är skelettet det enda som syns, och det är mer
+  rörelse än nytta. Fram till dess står ytan tom, vilket ögat inte märker.
+
+  Pulsen är en ljushetsväxling på Lav-skalan, inte ett svep. Ett svep är en
+  rörelse över hela sidan; en puls är bara att något pågår.
+*/
+@keyframes skeleton-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes skeleton-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.55;
+  }
+}
+
+.skeleton-delay {
+  animation: skeleton-in var(--motion-base) ease-out 150ms both;
+}
+
+.skeleton {
+  border-radius: 0.25rem;
+  background-color: var(--color-neutral-100);
+  animation: skeleton-pulse 1.6s ease-in-out infinite;
+}
+
+/* Ett tal som just ändrats lyser upp i accenten och tonar tillbaka. */
+@keyframes value-flash {
+  from {
+    color: var(--color-tick-deep);
+  }
+}
+
+.animate-value {
+  animation: value-flash 1.2s ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .panel-content > *,
+  .animate-grow-up,
+  .animate-grow-down,
+  .animate-grow-x,
+  .skeleton-delay,
+  .animate-value {
+    animation: none;
+  }
+
+  /* Skelettet står kvar, men stilla. Det säger fortfarande att något laddas. */
+  .skeleton {
+    animation: none;
+  }
+}
+
 /*
   KOMPAKT LÄGE PÅ LÅGA SKÄRMAR.
 

@@ -57,7 +57,7 @@ export default function RevenueChart({ points }: { points: MonthPoint[] }) {
 
       <div className="p-5">
         <div className="flex items-end gap-1.5">
-          {points.map((point) => (
+          {points.map((point, index) => (
             <div
               key={point.month}
               className="group flex min-w-0 flex-1 flex-col items-center"
@@ -81,8 +81,9 @@ export default function RevenueChart({ points }: { points: MonthPoint[] }) {
                 style={{ height: PLOT_HEIGHT }}
               >
                 <div
-                  className="w-full rounded-t bg-blue-600/85 transition-colors group-hover:bg-blue-600"
+                  className="animate-grow-up w-full rounded-t bg-blue-600/85 transition-colors group-hover:bg-blue-600"
                   style={{
+                    ["--i" as string]: index,
                     // Minst två pixlar, så att en månad utan intäkt syns som en
                     // rad och inte som ett hål i grafen.
                     height: Math.max(

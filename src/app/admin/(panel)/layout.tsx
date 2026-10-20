@@ -235,7 +235,9 @@ export default async function PanelLayout({
               canBuy={isOwner(session)}
             />
           ) : (
-            children
+            // Ramen som sidbytet tonas in i, se `.panel-content` i
+            // globals.css. Den står kvar; det som byts är innehållet.
+            <div className="panel-content">{children}</div>
           )}
         </main>
       </div>
