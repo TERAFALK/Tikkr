@@ -342,6 +342,25 @@ company_prices   — id, company_id, item, monthly_ore, updated_by_email
   — plattformens egna tabeller, aldrig kundens —
 stripe_prices    — item, month_price_id, year_price_id, updated_by_email
 login_throttles  — scope, key_hash, count, until
+
+  — tillbehören, se § 3.4 —
+company_profiles  — id, company_id, org_number, contact_name, order_email,
+                    phone, address_line, postal_code, city,
+                    delivery_reference, billing_address_line,
+                    billing_postal_code, billing_city, invoice_email
+shop_orders       — id, company_id, number, status, payment_status,
+                    idempotency_key, placed_by_email, ögonblicksbild av
+                    köparen och adresserna, goods_ore, shipping_ore?,
+                    vat_ore, total_ore, carrier?, tracking_url?,
+                    invoice_number?, invoiced_at?, paid_at?
+shop_order_lines  — id, company_id, order_id, product_key, name,
+                    unit_price_ore, vat_rate_percent, quantity,
+                    subtotal_ore, vat_ore, sort_order
+shop_order_events — id, company_id, order_id, kind, from_status, to_status,
+                    detail, customer_message, actor_email, email_state
+shop_order_notes  — id, order_id, target_company_id, body, author_email
+                    (plattformens, ingen relation)
+shop_prices       — product_key, price_ore, updated_by_email (plattformens)
 ```
 
 ### Beslutade regler för stämpling (bestämt 2026-08-10)
@@ -1382,6 +1401,77 @@ som för `CompanyPrice`. Supportläget kan inte skicka, se § 4 punkt 5. Tas en
 användare bort står meddelandet kvar med den kopierade adressen. All logik
 ligger i `src/lib/feedback.ts`, och `tests/feedback.test.ts` fäller den.
 
+### 3.4 Tillbehören (beslutat 2026-10-20)
+
+Vi säljer hårdvara till kunderna, med **stämplingsskärmen** som första
+produkt: pekskärm 23,6 tum i pulverlackerat stativ, uppsatt och provad före
+leverans. Hårdvaran och dess öppna punkter står i `docs/kioskskarm.md`.
+
+**I allt kunden ser heter det BESTÄLLNING, aldrig order.** En order är
+kundens arbetsorder, det allt annat i Tikkr hänger på. I koden heter det
+`Shop…`.
+
+- **Katalogen ligger i koden**, `src/lib/shop/catalog.ts`, som guiderna och
+  modulregistret: texter, specifikationer, bilder, moms och leveranstid. En
+  ny produkt är en post där, och butiken, formuläret, plattformen och mejlen
+  är skrivna över `PRODUCT_KEYS`. **Tillverkarens namn och modell står
+  aldrig i det kunden ser**; produkten säljs som Tikkrs, och
+  `tests/shop-pricing.test.ts` fäller katalogen om namnet dyker upp.
+  Specifikationer som inte är bekräftade står inte med, därför ingen
+  Android-version.
+- **Priset ligger i databasen**, `shop_prices`, och ändras under Artiklar i
+  plattformspanelen. Katalogens belopp är reserv. Allt läser priset genom
+  `shopPrices()`, så att säljsidan och formuläret aldrig visar olika belopp.
+  Priserna är exklusive moms, och momsen räknas bara i `pricing.ts`, per rad
+  som fakturan i Fortnox. Säljsidans priser står annars bara i
+  prisavsnittet; skärmens engångspris står på produktsidan, inte på
+  startsidan.
+- **Bara ägaren beställer**, av samma skäl som prenumerationen (§ 1,
+  Adminflöde): en beställning ändrar vad kunden betalar. Sidan ligger under
+  Inställningar, Tillbehör, eftersom man beställer sällan. Leverans- och
+  fakturauppgifterna står under Inställningar, Företag, och får ändras av
+  varje administratör.
+- **Säljsidans Beställ går genom inloggningen** med `?till=/admin/...`
+  (`safeAdminNext` i `login-ticket.ts`), och den som redan är inloggad går
+  rakt igenom.
+- **En beställning är en ögonblicksbild**: köparens uppgifter, adresserna och
+  varje rads pris kopieras dit. En ändring i företagets uppgifter eller i
+  priset rör aldrig en lagd beställning. Beloppen lagras, till skillnad från
+  orderns beräknade tid, eftersom de är vad fakturan skrivs på; de räknas
+  bara ur raderna och frakten.
+- **Samma formulär två gånger ger en beställning.** Formuläret bär en nyckel
+  som är unik per företag i databasen.
+- **Betalningen sker utanför systemet** (produktägarens val). Fakturan
+  skrivs i Fortnox **vid leverans**, och betalstatusen sätts för hand i
+  plattformen: Ej fakturerad, Fakturerad, Betald, Krediterad. Fakturerad
+  kräver fakturanummer och datum, så att systemet aldrig påstår att en
+  faktura finns. Stripe används inte för tillbehör.
+- **Frakten tillkommer** och varierar. Den står som "Tillkommer" tills vi
+  satt den på beställningen, och totalen räknas då om. Den går inte att
+  ändra efter fakturering.
+- **Orderstatus och betalstatus är skilda.** Mottagen, Bekräftad, Under
+  tillverkning, Klar för leverans, Skickad, Levererad, Avbruten och Kräver
+  åtgärd. Framåt, aldrig bakåt; ett fel går via Kräver åtgärd. En skickad
+  beställning avbryts inte. Systemet sätter aldrig Skickad eller Levererad
+  självt. Varje byte prövas mot läget det utgår från. Reglerna i
+  `status.ts`.
+- **Kunden får mejl** vid Mottagen, Bekräftad, Under tillverkning, Skickad,
+  Avbruten och Kräver åtgärd, varje besked en gång per beställning utom
+  Kräver åtgärd. Mejlet skickas efter att ändringen sparats; går det inte
+  iväg står felet i historiken och kan skickas igen. Se `notify.ts`.
+- **Interna anteckningar** ligger i `shop_order_notes`, utan relation till
+  kunddata, av samma skäl som `PlatformNote`. Historiken kunden ser bär
+  aldrig vem hos oss som ändrade något.
+- **Garantin är tre år på skärm och stativ**, från leveransen (produktägarens
+  val). Tillverkarens garanti räknas från deras faktura till oss, så glappet
+  bär vi; köp därför in när kunden beställt.
+- **Bilderna är illustrationer** tills det finns foton, och märks så. Byt
+  filerna i `public/tillbehor/<produkt>/` och sätt `illustration: false`.
+- **Bara leverans inom Sverige**, moms 25 %. En kund i ett annat EU-land
+  kräver omvänd skattskyldighet och är inte byggt.
+- Ett företag med en beställning som inte är levererad eller avbruten går
+  inte att radera.
+
 ## 4. Kritiska säkerhetskrav
 
 1. **Multi-tenant-isolering** — all databasåtkomst via det gemensamma
@@ -2084,6 +2174,14 @@ registreras (se Provperiod nedan).
 Väntar tills en kund frågar: rabatt för båda tillvalen och ett lägre pris
 från den femte skärmen. Båda går att lägga till utan att någon får ett högre
 pris.
+
+### Pris på stämplingsskärmen (beslutat 2026-10-20, tillfälligt)
+
+**24 900 kr exklusive moms**, frakt tillkommer. Inköpet är ungefär 13 600 kr
+för skärmen och 1 500 kr för stativet, och med förberedelse, emballage och en
+reserv för garantiärenden landar självkostnaden kring 16 900 kr. Priset sätts
+under Artiklar i plattformspanelen och kan ändras innan lansering. Lagda
+beställningar behåller sitt pris.
 
 ### Avtalat pris per kund (tillagt 2026-10-08)
 

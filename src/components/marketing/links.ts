@@ -24,6 +24,7 @@ export const NAV: SiteLink[] = [
   { href: "/#sa-funkar-det", label: "Så fungerar det" },
   { href: "/#underlag", label: "Dokument" },
   { href: "/#funktioner", label: "Innehåll" },
+  { href: "/tillbehor", label: "Stämplingsskärm" },
   { href: "/#pris", label: "Pris" },
   { href: "/#fragor", label: "Frågor" },
 ];

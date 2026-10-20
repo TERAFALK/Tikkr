@@ -30,6 +30,10 @@ export function faqQuestions(modules: ModulePricing): FaqItem[] {
       a: "En pekskärm eller surfplatta med webbläsare. Ingen installation krävs. Skärmen kopplas en gång med en sexsiffrig kod och kräver därefter ingen inloggning.",
     },
     {
+      q: "Måste vi köpa stämplingsskärmen av er?",
+      a: "Nej. En dator eller surfplatta med pekskärm och webbläsare fungerar likadant. Stämplingsskärmen från oss levereras uppsatt för Tikkr i ett stativ, och ljusstyrka och omstart styrs från panelen. Den tillverkas på beställning med en beräknad leveranstid på 3–4 veckor.",
+    },
+    {
       q: "Hur lång tid tar uppsättningen?",
       a: "Cirka femton minuter. Anställda, arbetsmoment och ordrar läggs upp i en guide, och skärmen kopplas genom att koden anges på den enhet som ska användas.",
     },

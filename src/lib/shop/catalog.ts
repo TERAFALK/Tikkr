@@ -182,7 +182,7 @@ export const PRODUCTS: Record<ProductKey, Product> = {
       },
       {
         src: "/tillbehor/stamplingsskarm/detalj.svg",
-        alt: "Skärmens kant och stativets infästning",
+        alt: "Skärmens baksida med VESA-fäste och stativets pelare",
         illustration: true,
       },
     ],

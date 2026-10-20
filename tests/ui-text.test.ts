@@ -253,6 +253,9 @@ const PROSE_FILES = [
   "src/app/plattform/(panel)/bestallningar/page.tsx",
   "src/app/plattform/(panel)/bestallningar/[orderId]/page.tsx",
   "src/app/plattform/(panel)/bestallningar/actions.ts",
+  "src/app/tillbehor/page.tsx",
+  "src/app/tillbehor/[slug]/page.tsx",
+  "src/components/marketing/ShopParts.tsx",
 ];
 
 describe("texterna utanför sidorna", () => {

@@ -1,0 +1,112 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 900" role="img" aria-label="Illustration: stämplingsskärmen i sitt stativ, framifrån">
+  <!--
+    TILLFÄLLIG ILLUSTRATION, INTE ETT FOTO.
+    Byts mot ett riktigt produktfoto med samma filnamn, och flaggan
+    `illustration` i src/lib/shop/catalog.ts sätts då till false.
+    Skärmens proportioner är de verkliga, 576 × 345 mm. Stativets form är inte
+    beslutad, och ritningen visar bara att ett stativ ingår.
+  -->
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#F5F6F2"/>
+      <stop offset="1" stop-color="#ECEEE7"/>
+    </linearGradient>
+    <linearGradient id="glass" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#FFFFFF" stop-opacity="0.16"/>
+      <stop offset="0.45" stop-color="#FFFFFF" stop-opacity="0"/>
+    </linearGradient>
+    <linearGradient id="post" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#212D3D"/>
+      <stop offset="0.5" stop-color="#35404F"/>
+      <stop offset="1" stop-color="#212D3D"/>
+    </linearGradient>
+    <radialGradient id="shadow" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#0E1A2B" stop-opacity="0.22"/>
+      <stop offset="1" stop-color="#0E1A2B" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+
+  <rect width="1200" height="900" fill="url(#bg)"/>
+  <rect y="790" width="1200" height="110" fill="#D9DDD6" opacity="0.45"/>
+
+  <!-- Skuggan under foten -->
+  <ellipse cx="600" cy="800" rx="260" ry="26" fill="url(#shadow)"/>
+
+  <!-- Foten -->
+  <rect x="430" y="768" width="340" height="26" rx="6" fill="#212D3D"/>
+  <rect x="430" y="768" width="340" height="6" rx="3" fill="#485261"/>
+
+  <!-- Pelaren -->
+  <rect x="572" y="470" width="56" height="300" rx="4" fill="url(#post)"/>
+
+  <!-- Skärmens ram -->
+  <rect x="282" y="140" width="636" height="381" rx="16" fill="#0E1A2B"/>
+  <rect x="300" y="158" width="600" height="345" rx="4" fill="#F5F6F2"/>
+
+  <!-- Stämplingen: rubrikrad och namnrutor -->
+  <rect x="300" y="158" width="600" height="46" rx="4" fill="#FFFFFF"/>
+  <rect x="300" y="200" width="600" height="1" fill="#D9DDD6"/>
+  <rect x="324" y="174" width="120" height="14" rx="7" fill="#0E1A2B"/>
+  <rect x="808" y="174" width="68" height="14" rx="7" fill="#D9DDD6"/>
+
+  <g>
+    <g transform="translate(324 222)">
+      <rect width="128" height="76" rx="8" fill="#FFFFFF" stroke="#D9DDD6"/>
+      <circle cx="64" cy="30" r="15" fill="#0E1A2B"/>
+      <rect x="34" y="54" width="60" height="8" rx="4" fill="#858D94"/>
+      <circle cx="114" cy="12" r="5" fill="#2ED196"/>
+    </g>
+    <g transform="translate(468 222)">
+      <rect width="128" height="76" rx="8" fill="#FFFFFF" stroke="#D9DDD6"/>
+      <circle cx="64" cy="30" r="15" fill="#5B6573"/>
+      <rect x="30" y="54" width="68" height="8" rx="4" fill="#858D94"/>
+    </g>
+    <g transform="translate(612 222)">
+      <rect width="128" height="76" rx="8" fill="#FFFFFF" stroke="#D9DDD6"/>
+      <circle cx="64" cy="30" r="15" fill="#35404F"/>
+      <rect x="38" y="54" width="52" height="8" rx="4" fill="#858D94"/>
+      <circle cx="114" cy="12" r="5" fill="#2ED196"/>
+    </g>
+    <g transform="translate(756 222)">
+      <rect width="120" height="76" rx="8" fill="#FFFFFF" stroke="#D9DDD6"/>
+      <circle cx="60" cy="30" r="15" fill="#485261"/>
+      <rect x="28" y="54" width="64" height="8" rx="4" fill="#858D94"/>
+    </g>
+
+    <g transform="translate(324 314)">
+      <rect width="128" height="76" rx="8" fill="#FFFFFF" stroke="#D9DDD6"/>
+      <circle cx="64" cy="30" r="15" fill="#485261"/>
+      <rect x="34" y="54" width="60" height="8" rx="4" fill="#858D94"/>
+    </g>
+    <g transform="translate(468 314)">
+      <rect width="128" height="76" rx="8" fill="#FFFFFF" stroke="#D9DDD6"/>
+      <circle cx="64" cy="30" r="15" fill="#0E1A2B"/>
+      <rect x="36" y="54" width="56" height="8" rx="4" fill="#858D94"/>
+      <circle cx="114" cy="12" r="5" fill="#2ED196"/>
+    </g>
+    <g transform="translate(612 314)">
+      <rect width="128" height="76" rx="8" fill="#FFFFFF" stroke="#D9DDD6"/>
+      <circle cx="64" cy="30" r="15" fill="#5B6573"/>
+      <rect x="32" y="54" width="64" height="8" rx="4" fill="#858D94"/>
+    </g>
+    <g transform="translate(756 314)">
+      <rect width="120" height="76" rx="8" fill="#FFFFFF" stroke="#D9DDD6"/>
+      <circle cx="60" cy="30" r="15" fill="#35404F"/>
+      <rect x="30" y="54" width="60" height="8" rx="4" fill="#858D94"/>
+    </g>
+
+    <g transform="translate(324 406)">
+      <rect width="128" height="76" rx="8" fill="#FFFFFF" stroke="#D9DDD6"/>
+      <circle cx="64" cy="30" r="15" fill="#35404F"/>
+      <rect x="34" y="54" width="60" height="8" rx="4" fill="#858D94"/>
+    </g>
+    <g transform="translate(468 406)">
+      <rect width="128" height="76" rx="8" fill="#FFFFFF" stroke="#D9DDD6"/>
+      <circle cx="64" cy="30" r="15" fill="#485261"/>
+      <rect x="30" y="54" width="68" height="8" rx="4" fill="#858D94"/>
+    </g>
+  </g>
+
+  <!-- Glaset -->
+  <rect x="300" y="158" width="600" height="345" rx="4" fill="url(#glass)"/>
+</svg>

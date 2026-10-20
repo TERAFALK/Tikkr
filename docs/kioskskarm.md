@@ -379,7 +379,40 @@ ingen extra container, inget abonnement.
 
 ---
 
-## 10. Öppna punkter
+## 10. Försäljning och garanti (2026-10-20)
+
+Skärmen säljs i butiken på `/tillbehor` och beställs i panelen, se CLAUDE.md
+§ 3.4. Det kunden ser står i `src/lib/shop/catalog.ts` och nämner aldrig
+tillverkaren eller modellen.
+
+**Specarna i katalogen är avstämda mot databladet för 5024200
+(APPC-24X-R23).** Databladet anger Android **11**, inte 13; därför står ingen
+version i katalogen förrän den är kontrollerad på en enhet (Inställningar, Om
+enheten). Nätadaptern 12 V / 5 A ingår enligt databladet. Databladet anger
+dessutom reflexfritt täckglas 2 mm (över 6H), Bluetooth 5.2, stöd för IEEE
+802.1X på kabel och wifi, och lagringstemperatur −10–55 °C. Certifieringar
+står inte i databladet och nämns därför inte.
+
+**Tillverkarens garanti** (Warranty and Repair Policy rev 3.0):
+
+| | |
+|---|---|
+| Längd | 36 månader för den här produkttypen, räknat från **tillverkarens faktura**, inte från leveransen till kunden |
+| Trasig vid leverans | inom 8 dagar från tillverkarens faktura. Hämtas av tillverkaren, ersättning faktureras och krediteras |
+| Reparation | hos tillverkaren i Nederländerna. Vi betalar frakten dit, de betalar tillbaka. Normalt 10 arbetsdagar, upp till 30 om den måste till fabriken |
+| Gäller inte | fysisk skada, egna ändringar, saknad eller trasig serienummeretikett, mjukvara de inte stödjer, drift utanför specifikationen |
+| Utan garanti | 68 € i timmen plus delar och frakt, 50 € om inget fel hittas |
+
+Vi lovar kunden tre år på skärm och stativ från leveransen. Glappet mellan
+tillverkarens faktura och leveransen bär vi, så skärmen köps in när kunden
+beställt. Stativet får inte täcka serienummeretiketten. Fråga EET om
+ProMGR-appen räknas som mjukvara tillverkaren stödjer; den är deras egen
+variant och borde göra det.
+
+Under en reparation står kunden utan skärm i två till sex veckor. Överväg en
+reservskärm att låna ut.
+
+## 11. Öppna punkter
 
 - [ ] Frågorna ovan till EET
 - [ ] Beställ en 15,6" och en stor för jämförelse
@@ -389,6 +422,9 @@ ingen extra container, inget abonnement.
       raderingsinställningarna avstängda
 - [x] Fjärrstyrning bakom `fully`-detektering — ljusstyrka och omstart från
       adminpanelen. Otestat på hårdvara
+- [ ] Kontrollera Android-versionen på en enhet och lägg in den i katalogen
+- [ ] Riktiga produktfoton i stället för illustrationerna i
+      `public/tillbehor/stamplingsskarm/`
 - [ ] Skriv om [kiosk-lage.md](kiosk-lage.md) punkt 2 när hårdvaran är vald. Den
       rekommenderar idag Chrome plus skärmfästning, vilket är svagare än device
       owner, och nämner Fully bara i förbigående

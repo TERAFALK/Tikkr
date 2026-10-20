@@ -22,6 +22,7 @@ import { faqQuestions } from "./faq-data";
 import type { ModulePricing, ScreenPricing } from "@/lib/stripe";
 import { MODULES, MODULE_KEYS, type ModuleKey } from "@/lib/modules";
 import Reveal from "./Reveal";
+import { PRODUCTS } from "@/lib/shop/catalog";
 
 /**
  * SÄLJSIDANS AVSNITT.
@@ -39,8 +40,8 @@ import Reveal from "./Reveal";
  * Skälet står i Atmosphere: nio avsnitt som var och en skriver sitt eget ljus
  * blir efter tredje ändringen nio olika ljus.
  *
- * YTORNAS ORDNING ÄR MEDVETEN. Fjord, Snö, vit, Fjord, Snö, vit, Fjord, vit,
- * Snö, Tick. Grönt som hel yta exakt en gång, sist: grönt är accent och aldrig
+ * YTORNAS ORDNING ÄR MEDVETEN. Fjord, Snö, vit, Fjord, Snö, vit, Fjord, Snö,
+ * vit, Snö, Tick. Grönt som hel yta exakt en gång, sist: grönt är accent och aldrig
  * huvudfärg, och ett enda grönt block i slutet är vad varumärkets egen
  * delningsbild gör.
  *
@@ -96,7 +97,7 @@ const SHELL = "mx-auto max-w-6xl px-6 py-24 sm:py-32";
  * starkaste yta och den enda som tål ett ljus som vandrar över den; samma band
  * över Fjord blir ett grått streck.
  */
-function Cta({
+export function Cta({
   href,
   children,
   onDark,
@@ -999,7 +1000,85 @@ export function Capabilities() {
 }
 
 /* -------------------------------------------------------------------------- */
-/* 06 Pris                                                                     */
+/* 06 Stämplingsskärmen                                                        */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * SKÄRMEN VI SÄLJER, PÅ SNÖ.
+ *
+ * Står efter innehållet och före priset: den som läst vad systemet gör har
+ * frågan "vad sätter vi upp på väggen", och svaret är både "det ni har" och
+ * "den här". Avsnittet säger det första i ingressen, så att ingen tror att
+ * skärmen krävs.
+ *
+ * INGET PRIS HÄR. Priset står i prisavsnittet och på produktsidan, och
+ * skärmens pris är en engångssumma som inte hör hemma bredvid månadspriset.
+ * Knappen leder till produktsidan, där pris, moms och specifikationer står.
+ *
+ * Fördelarna läses ur katalogen och skrivs inte av här, så att säljsidan och
+ * produktsidan inte kan säga olika saker om samma skärm.
+ *
+ * Bilden är en illustration tills det finns ett foto, och märks som en.
+ */
+export function ScreenHardware() {
+  const product = PRODUCTS.STAMPLINGSSKARM;
+  const image = product.images[0];
+
+  return (
+    <section
+      id="stamplingsskarm"
+      className="relative scroll-mt-16 overflow-hidden bg-neutral-50"
+    >
+      <div className={`relative ${SHELL}`}>
+        <div className="grid items-center gap-14 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)] lg:gap-16">
+          <div>
+            <SectionHead
+              index="06"
+              eyebrow="Stämplingsskärmen"
+              title="Klar att sätta upp"
+              intro="Tikkr fungerar på en dator eller surfplatta med pekskärm. Vill ni ha en skärm som är byggd för verkstaden levererar vi en, uppsatt och provad, i stativ."
+            />
+
+            <dl className="mt-10">
+              {product.benefits.slice(0, 5).map((benefit) => (
+                <SpecRow key={benefit.title} term={benefit.title}>
+                  {benefit.body}
+                </SpecRow>
+              ))}
+              <SpecRow term="Leverans">{product.delivery}</SpecRow>
+            </dl>
+
+            <div className="mt-10">
+              <Cta href={`/tillbehor/${product.slug}`}>Se stämplingsskärmen</Cta>
+            </div>
+          </div>
+
+          <figure className="relative">
+            <div className="overflow-hidden rounded-2xl border border-neutral-200 bg-white shadow-[0_30px_60px_-30px_rgba(14,26,43,0.35)]">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={image.src}
+                alt={image.alt}
+                width={1200}
+                height={900}
+                loading="lazy"
+                className="h-auto w-full"
+              />
+            </div>
+            {image.illustration && (
+              <figcaption className="mt-3 text-[12px] text-neutral-500">
+                Illustration
+              </figcaption>
+            )}
+          </figure>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+/* 07 Pris                                                                     */
 /* -------------------------------------------------------------------------- */
 
 /**
@@ -1056,12 +1135,15 @@ export function Pricing({
   }));
 
   return (
-    <section id="pris" className="relative scroll-mt-16 overflow-hidden bg-white">
+    <section
+      id="pris"
+      className="relative scroll-mt-16 overflow-hidden border-t border-neutral-200 bg-white"
+    >
       <Aurora tone="onLight" className="inset-x-0 top-0 h-[40rem]" />
 
       <div className={`relative ${SHELL}`}>
         <SectionHead
-          index="06"
+          index="07"
           eyebrow="Pris"
           title="Per skärm, inte per anställd"
           intro="Antalet anställda, ordrar och stämplingar påverkar inte priset."
@@ -1190,7 +1272,7 @@ export function Pricing({
 }
 
 /* -------------------------------------------------------------------------- */
-/* 07 Frågor                                                                   */
+/* 08 Frågor                                                                   */
 /* -------------------------------------------------------------------------- */
 
 export function Faq({ modules }: { modules: ModulePricing }) {
@@ -1202,7 +1284,7 @@ export function Faq({ modules }: { modules: ModulePricing }) {
       className="relative scroll-mt-16 overflow-hidden border-t border-neutral-200 bg-neutral-50"
     >
       <div className={`relative ${SHELL}`}>
-        <SectionHead index="07" eyebrow="Frågor" title="Vanliga frågor" />
+        <SectionHead index="08" eyebrow="Frågor" title="Vanliga frågor" />
 
         {/* <details> ger utfällbara svar utan JavaScript. Fungerar även om
             något går fel, och går att söka i med webbläsarens egen funktion.
