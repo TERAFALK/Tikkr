@@ -224,6 +224,12 @@ model Company {
   /// Ändringsloggen. Se AuditEvent.
   auditEvents AuditEvent[]
 
+  /// Tillbehören: leveransuppgifterna och beställningarna. Se ShopOrder.
+  profile         CompanyProfile?
+  shopOrders      ShopOrder[]
+  shopOrderLines  ShopOrderLine[]
+  shopOrderEvents ShopOrderEvent[]
+
   @@map("companies")
 }
 
@@ -2057,4 +2063,294 @@ model AuditEvent {
   @@index([companyId, createdAt])
   @@index([companyId, subjectEmployeeId])
   @@map("audit_events")
+}
+
+// ---------------------------------------------------------------------------
+// TILLBEHÖREN (tillagt 2026-10-20)
+//
+// Fysiska varor vi säljer till kunderna, med stämplingsskärmen som första.
+// Produkterna, deras texter och bilder står i src/lib/shop/catalog.ts och inte
+// här: en produktbeskrivning ändras i samma commit som det den beskriver,
+// som guiderna i hjälpcentret. Bara priset ligger i databasen, så att det går
+// att ändra i plattformspanelen utan en driftsättning.
+//
+// I gränssnittet heter det BESTÄLLNING och aldrig order. En order är kundens
+// arbetsorder, det allt annat i Tikkr hänger på.
+//
+// Betalningen sker utanför systemet, på en faktura från Fortnox vid leverans.
+// Betalstatusen sätts därför för hand i plattformspanelen, och den kan aldrig
+// säga att något är fakturerat utan ett fakturanummer.
+// ---------------------------------------------------------------------------
+
+/// VAR EN BESTÄLLNING STÅR. Skild från betalningen, se ShopPaymentStatus.
+enum ShopOrderStatus {
+  /// Kunden har skickat beställningen.
+  RECEIVED
+  /// Vi har gått igenom den och tagit den.
+  CONFIRMED
+  /// Skärmen förbereds eller tillverkas.
+  IN_PRODUCTION
+  /// Klar, väntar på att skickas.
+  READY
+  /// Lämnad till transportören.
+  SHIPPED
+  /// Kunden har bekräftat att den kommit fram. Sätts bara för hand.
+  DELIVERED
+  CANCELED
+  /// Något kräver att någon tar tag i det för hand.
+  PROBLEM
+}
+
+/// FAKTURAN, så som den står i Fortnox. Sätts bara för hand.
+enum ShopPaymentStatus {
+  NOT_INVOICED
+  INVOICED
+  PAID
+  CREDITED
+}
+
+/// Vad en rad i en beställnings historik gäller.
+enum ShopEventKind {
+  /// Beställningen skapades.
+  CREATED
+  /// Orderstatusen ändrades.
+  STATUS
+  /// Betalstatusen ändrades.
+  PAYMENT
+  /// Transportör, spårningslänk eller frakt ändrades.
+  SHIPPING
+}
+
+/// Om en kundavisering hör till händelsen, och hur det gick.
+enum ShopEmailState {
+  /// Ska skickas.
+  PENDING
+  /// Ett utskick pågår. Hindrar att samma mejl går två gånger.
+  SENDING
+  SENT
+  FAILED
+  /// Samma besked har redan gått ut för den här beställningen.
+  SKIPPED
+}
+
+/// FÖRETAGETS UPPGIFTER FÖR BESTÄLLNINGAR.
+///
+/// Förifyller beställningsformuläret. En beställning kopierar uppgifterna till
+/// sig själv när den läggs, så att en senare ändring här aldrig ändrar en
+/// beställning som redan finns.
+///
+/// En egen tabell och inte fler kolumner på companies: företaget ligger
+/// utanför företagsfiltreringen, och de här uppgifterna är kundens.
+/// Företagets namn står kvar på companies.
+///
+/// Tomma fält är tillåtna här. Det är beställningen som kräver dem.
+model CompanyProfile {
+  id        String @id @default(cuid())
+  companyId String @unique @map("company_id")
+
+  /// Tio siffror, sparat som "556677-8899".
+  orgNumber   String? @map("org_number")
+  contactName String? @map("contact_name")
+  /// Dit orderbekräftelsen och leveransbeskeden går.
+  orderEmail  String? @map("order_email")
+  /// E.164, se phone.ts.
+  phone       String?
+
+  addressLine String? @map("address_line")
+  /// Fem siffror, sparat som "123 45".
+  postalCode  String? @map("postal_code")
+  city        String?
+
+  /// Leveransen märks med den, t.ex. ett namn eller ett kostnadsställe.
+  deliveryReference String? @map("delivery_reference")
+
+  /// FAKTURAADRESSEN. Alla tre tomma betyder samma som leveransadressen.
+  billingAddressLine String? @map("billing_address_line")
+  billingPostalCode  String? @map("billing_postal_code")
+  billingCity        String? @map("billing_city")
+  /// Dit fakturan skickas, om inte till orderEmail.
+  invoiceEmail       String? @map("invoice_email")
+
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@map("company_profiles")
+}
+
+/// EN BESTÄLLNING AV TILLBEHÖR.
+///
+/// Bär en ÖGONBLICKSBILD av allt som gällde när den lades: företagets
+/// uppgifter, adresserna och varje rads pris. Inget läses i efterhand från
+/// företaget eller katalogen, eftersom en adressändring eller en
+/// prishöjning inte får ändra en beställning som redan finns. Samma princip
+/// som satserna på en stämpling (CLAUDE.md § 3 regel 4).
+///
+/// BELOPPEN LAGRAS, till skillnad från orderns beräknade tid. De är vad
+/// fakturan skrivs på, och de räknas ur raderna och frakten i
+/// src/lib/shop/pricing.ts när beställningen skapas och när frakten sätts.
+/// Ingenting annat skriver dem.
+model ShopOrder {
+  id        String @id @default(cuid())
+  companyId String @map("company_id")
+
+  /// Löpnumret kunden ser, "Beställning 1001". Börjar på 1001, se migrationen.
+  number Int @unique @default(autoincrement())
+
+  status        ShopOrderStatus   @default(RECEIVED)
+  paymentStatus ShopPaymentStatus @default(NOT_INVOICED) @map("payment_status")
+
+  /// Satt av formuläret när det ritades. Ett formulär som skickas två gånger
+  /// ger en beställning, inte två.
+  idempotencyKey String @map("idempotency_key")
+
+  /// Vem som lade beställningen. Adressen kopieras, så att den står kvar om
+  /// kontot tas bort.
+  placedByEmail String @map("placed_by_email")
+
+  // Ögonblicksbilden av köparen.
+  companyName String  @map("company_name")
+  orgNumber   String  @map("org_number")
+  contactName String  @map("contact_name")
+  email       String
+  phone       String
+  addressLine String  @map("address_line")
+  postalCode  String  @map("postal_code")
+  city        String
+  country     String  @default("Sverige")
+  reference   String?
+
+  billingAddressLine String? @map("billing_address_line")
+  billingPostalCode  String? @map("billing_postal_code")
+  billingCity        String? @map("billing_city")
+  invoiceEmail       String? @map("invoice_email")
+
+  /// Varornas summa exklusive moms, i öre.
+  goodsOre    Int    @map("goods_ore")
+  /// Frakten exklusive moms, i öre. Tomt tills vi satt den: frakten
+  /// tillkommer och varierar, och okänd frakt är inte noll kronor.
+  shippingOre Int?   @map("shipping_ore")
+  vatOre      Int    @map("vat_ore")
+  totalOre    Int    @map("total_ore")
+  currency    String @default("SEK")
+
+  carrier     String?
+  trackingUrl String?   @map("tracking_url")
+  shippedAt   DateTime? @map("shipped_at")
+
+  /// Fakturan i Fortnox. Numret krävs för att markera beställningen som
+  /// fakturerad: systemet ska aldrig säga att en faktura finns som ingen sett.
+  invoiceNumber String?   @map("invoice_number")
+  invoicedAt    DateTime? @map("invoiced_at")
+  paidAt        DateTime? @map("paid_at")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  company Company          @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  lines   ShopOrderLine[]
+  events  ShopOrderEvent[]
+
+  @@unique([companyId, idempotencyKey])
+  @@index([companyId, createdAt])
+  @@index([status, createdAt])
+  @@map("shop_orders")
+}
+
+/// En produkt och ett antal på en beställning, med priset som det var då.
+model ShopOrderLine {
+  id        String @id @default(cuid())
+  companyId String @map("company_id")
+  orderId   String @map("order_id")
+
+  /// Nyckeln i katalogen. Text och inte en enum: en ny produkt är en post i
+  /// catalog.ts, inte en migration.
+  productKey     String @map("product_key")
+  /// Produktens namn när den beställdes.
+  name           String
+  unitPriceOre   Int    @map("unit_price_ore")
+  vatRatePercent Int    @map("vat_rate_percent")
+  quantity       Int
+  subtotalOre    Int    @map("subtotal_ore")
+  vatOre         Int    @map("vat_ore")
+  sortOrder      Int    @default(0) @map("sort_order")
+
+  company Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  order   ShopOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId])
+  @@index([companyId])
+  @@map("shop_order_lines")
+}
+
+/// HISTORIKEN FÖR EN BESTÄLLNING. Bara tillägg.
+///
+/// Kunden ser raderna för status, med tidpunkt och meddelandet till kunden.
+/// Vem som gjorde ändringen och betalningens rader syns bara i
+/// plattformspanelen. Interna anteckningar ligger inte här alls, se
+/// ShopOrderNote.
+model ShopOrderEvent {
+  id        String @id @default(cuid())
+  companyId String @map("company_id")
+  orderId   String @map("order_id")
+
+  kind       ShopEventKind
+  fromStatus String?       @map("from_status")
+  toStatus   String?       @map("to_status")
+
+  /// Sammanfattning för plattformen, t.ex. "Faktura 1234, 2026-11-02".
+  detail String?
+
+  /// Text som gick till kunden med beskedet.
+  customerMessage String? @map("customer_message")
+
+  /// E-postadressen till den som gjorde ändringen.
+  actorEmail String @map("actor_email")
+
+  /// Tomt betyder att händelsen inte har någon kundavisering.
+  emailState ShopEmailState? @map("email_state")
+  emailedAt  DateTime?       @map("emailed_at")
+  emailError String?         @map("email_error")
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  company Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  order   ShopOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId, createdAt])
+  @@index([companyId])
+  @@map("shop_order_events")
+}
+
+/// INTERN ANTECKNING OM EN BESTÄLLNING. Syns bara i plattformspanelen.
+///
+/// Ingen relation till beställningen eller företaget, med flit, av samma skäl
+/// som PlatformNote: en rad kunden inte kan nå med en relation kan inte heller
+/// följa med i en fråga kunden gör, inte ens med `include`. Priset är att den
+/// inte följer med i kaskaden när ett företag raderas, se deleteCompany.
+model ShopOrderNote {
+  id              String   @id @default(cuid())
+  orderId         String   @map("order_id")
+  targetCompanyId String   @map("target_company_id")
+  body            String
+  authorEmail     String   @map("author_email")
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  @@index([orderId, createdAt])
+  @@index([targetCompanyId])
+  @@map("shop_order_notes")
+}
+
+/// PRISET PÅ ETT TILLBEHÖR, exklusive moms, i öre.
+///
+/// Sätts under Artiklar i plattformspanelen. Saknas raden gäller priset i
+/// catalog.ts. Plattformens egen tabell, som StripePrice: priset gäller alla
+/// kunder och syns aldrig som en rad hos en enskild.
+model ShopPrice {
+  productKey     String   @id @map("product_key")
+  priceOre       Int      @map("price_ore")
+  updatedByEmail String   @map("updated_by_email")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  @@map("shop_prices")
 }

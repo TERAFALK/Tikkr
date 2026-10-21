@@ -14,6 +14,7 @@ import {
   IconMail,
   IconMegaphone,
   IconOverview,
+  IconPackage,
   IconTag,
 } from "@/components/ui/icons";
 import { platformLogout } from "@/app/plattform/login/actions";
@@ -37,6 +38,7 @@ import { platformLogout } from "@/app/plattform/login/actions";
  *   /plattform/kunder       Vilka är kunderna, och var finns den jag söker?
  *   /plattform/kunder/[id]  Allt om ett företag
  *   /plattform/inkorg       Vad har kunderna skrivit till oss?
+ *   /plattform/bestallningar Vilka tillbehör ska förberedas, skickas eller faktureras?
  *   /plattform/meddelanden  Vad ser kunderna för banner just nu?
  *   /plattform/utskick      Mejl till kundernas administratörer
  *   /plattform/artiklar     Vilka artiklar hos Stripe är vad?
@@ -56,6 +58,7 @@ interface NavLink {
 }
 
 const INBOX_HREF = "/plattform/inkorg";
+const ORDERS_HREF = "/plattform/bestallningar";
 
 const SECTIONS: { label: string; links: NavLink[] }[] = [
   {
@@ -69,6 +72,7 @@ const SECTIONS: { label: string; links: NavLink[] }[] = [
       },
       { href: "/plattform/kunder", label: "Kunder", icon: IconBuilding },
       { href: INBOX_HREF, label: "Inkorg", icon: IconInbox },
+      { href: ORDERS_HREF, label: "Beställningar", icon: IconPackage },
       {
         href: "/plattform/meddelanden",
         label: "Meddelanden",
@@ -89,11 +93,14 @@ const SECTIONS: { label: string; links: NavLink[] }[] = [
 export default function PlatformFrame({
   email,
   inboxCount,
+  ordersCount,
   children,
 }: {
   email: string;
   /** Fel och förslag som inte är klarmarkerade, siffran vid Inkorg. */
   inboxCount: number;
+  /** Beställningar som väntar på oss, se needsAttention i shop/status.ts. */
+  ordersCount: number;
   children: ReactNode;
 }) {
   const [open, setOpen] = useState(false);
@@ -102,6 +109,7 @@ export default function PlatformFrame({
     <Nav
       email={email}
       inboxCount={inboxCount}
+      ordersCount={ordersCount}
       onNavigate={() => setOpen(false)}
     />
   );
@@ -163,10 +171,12 @@ export default function PlatformFrame({
 function Nav({
   email,
   inboxCount,
+  ordersCount,
   onNavigate,
 }: {
   email: string;
   inboxCount: number;
+  ordersCount: number;
   onNavigate: () => void;
 }) {
   const pathname = usePathname();
@@ -227,6 +237,11 @@ function Nav({
                       {link.href === INBOX_HREF && inboxCount > 0 && (
                         <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[11px] font-semibold tabular-nums text-amber-700">
                           {inboxCount}
+                        </span>
+                      )}
+                      {link.href === ORDERS_HREF && ordersCount > 0 && (
+                        <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[11px] font-semibold tabular-nums text-amber-700">
+                          {ordersCount}
                         </span>
                       )}
                     </Link>

@@ -11,6 +11,7 @@ import {
   issueTicket,
   rawTicket,
   readTicket,
+  safeAdminNext,
 } from "@/lib/login-ticket";
 import {
   deviceCookie,
@@ -46,6 +47,10 @@ export async function login(
   // Annars går det att lista ut vilka adresser som finns.
   if (!result.ok) return { error: result.error };
 
+  // Sidan personen var på väg till, t.ex. beställningen från säljsidan.
+  // Följer med lappen genom tvåsteget och prövas igen där, se login-ticket.ts.
+  const next = safeAdminNext(String(formData.get("next") ?? ""));
+
   const device = await deviceCookie();
   if (await isTrustedDevice(device, result.userId)) {
     let signedIn = false;
@@ -65,10 +70,10 @@ export async function login(
       if (!(error instanceof AuthError)) throw error;
     }
     // redirect kastar internt och måste ligga utanför try/catch.
-    if (signedIn) redirect("/admin");
+    if (signedIn) redirect(next ?? "/admin");
   }
 
-  await issueTicket("admin", result.userId);
+  await issueTicket("admin", result.userId, next);
   redirect("/admin/login");
 }
 

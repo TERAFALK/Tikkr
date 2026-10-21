@@ -13,6 +13,9 @@ import {
 } from "@/lib/price-book";
 import { isModuleKey } from "@/lib/modules";
 import { forgetPricing, hasStripeKey, stripe } from "@/lib/stripe";
+import { formatCurrency, parseOre } from "@/lib/money";
+import { isProductKey, PRODUCTS } from "@/lib/shop/catalog";
+import { MAX_SHOP_PRICE_ORE, setShopPrice } from "@/lib/shop/prices";
 
 /**
  * SPARAR ARTIKELNUMREN FÖR EN SAK VI SÄLJER.
@@ -119,4 +122,42 @@ export async function savePrices(
   // Beloppet står med i beskedet när det gick att läsa. Att se "Månad 399 kr"
   // är enda sättet att veta att man klistrat in rätt artikel.
   return saved(checked.length > 0 ? checked.join(", ") : undefined);
+}
+
+/**
+ * SPARAR PRISET PÅ ETT TILLBEHÖR, exklusive moms.
+ *
+ * Gäller nya beställningar. En lagd beställning bär sitt eget pris och
+ * påverkas inte. Säljsidan visar det nya priset inom en minut, eftersom den
+ * byggs om så ofta.
+ */
+export async function saveShopPrice(
+  _previous: SaveState,
+  formData: FormData
+): Promise<SaveState> {
+  const { email } = await requirePlatformAdmin();
+
+  const productKey = String(formData.get("productKey") ?? "");
+  if (!isProductKey(productKey)) return { error: "Okänd produkt." };
+
+  const priceOre = parseOre(formData.get("price"));
+
+  if (priceOre === null || priceOre <= 0 || priceOre > MAX_SHOP_PRICE_ORE) {
+    return { error: "Skriv priset i kronor exklusive moms, t.ex. 24 900." };
+  }
+
+  await setShopPrice({ productKey, priceOre, byEmail: email });
+
+  await recordPlatformAction({
+    actorEmail: email,
+    action: "Ändrade pris på tillbehör",
+    detail: `${PRODUCTS[productKey].name} · ${formatCurrency(priceOre)} exkl. moms`,
+  });
+
+  revalidatePath("/plattform/artiklar");
+  revalidatePath("/tillbehor");
+  revalidatePath(`/tillbehor/${PRODUCTS[productKey].slug}`);
+  revalidatePath("/");
+
+  return saved(`${formatCurrency(priceOre)} exkl. moms`);
 }

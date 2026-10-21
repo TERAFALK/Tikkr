@@ -838,6 +838,22 @@ export async function deleteCompany(params: {
     );
   }
 
+  // En beställning som är på väg är något vi är skyldiga kunden, och den ska
+  // avslutas eller avbrytas för sig innan företaget kan försvinna.
+  const openOrders = await unsafeGlobalPrisma.shopOrder.count({
+    where: {
+      companyId: params.companyId,
+      status: { notIn: ["DELIVERED", "CANCELED"] },
+    },
+  });
+
+  if (openOrders > 0) {
+    throw new PlatformActionError(
+      "Företaget har beställningar som inte är levererade eller avbrutna. " +
+        "Avsluta dem under Beställningar först."
+    );
+  }
+
   if (params.confirmName.trim() !== company.name) {
     throw new PlatformActionError(
       `Skriv företagets namn exakt: ${company.name}`
@@ -894,6 +910,10 @@ export async function deleteCompany(params: {
     // den aldrig kan följa med i en fråga kunden själv gör. Priset är att den
     // inte heller följer med i kaskaden.
     unsafeGlobalPrisma.platformNote.deleteMany({
+      where: { targetCompanyId: params.companyId },
+    }),
+    // Samma sak för anteckningarna om beställningarna.
+    unsafeGlobalPrisma.shopOrderNote.deleteMany({
       where: { targetCompanyId: params.companyId },
     }),
     unsafeGlobalPrisma.company.delete({ where: { id: params.companyId } }),

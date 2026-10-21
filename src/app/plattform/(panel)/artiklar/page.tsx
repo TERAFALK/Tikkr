@@ -10,6 +10,9 @@ import {
 import { MODULES, MODULE_KEYS, isModuleKey } from "@/lib/modules";
 import { hasStripeKey } from "@/lib/stripe";
 import PriceForm from "@/components/platform/PriceForm";
+import ShopPriceForm from "@/components/platform/ShopPriceForm";
+import { allProducts } from "@/lib/shop/catalog";
+import { storedShopPrices } from "@/lib/shop/prices";
 import { Alert, Card, CardHeader, PageHeader } from "@/components/ui";
 
 export const dynamic = "force-dynamic";
@@ -33,6 +36,7 @@ export default async function PricesPage() {
   const keyPresent = hasStripeKey();
 
   const book = await priceBook();
+  const shopStored = await storedShopPrices();
 
   // En modul utan årsartikel gör att INGEN kund kan välja årsbetalning med
   // den påslagen. Det märks annars först den dag en kund försöker, och då
@@ -101,6 +105,29 @@ export default async function PricesPage() {
           </Card>
         ))}
 
+        {/* Tillbehören har inget artikelnummer hos Stripe. De faktureras från
+            Fortnox, och priset sätts här i kronor. */}
+        {allProducts().map((product) => {
+          const row = shopStored.get(product.key);
+
+          return (
+            <Card key={product.key}>
+              <CardHeader
+                title={product.name}
+                description="Tillbehör. Gäller nya beställningar."
+              />
+              <div className="p-5">
+                <ShopPriceForm
+                  productKey={product.key}
+                  priceKr={row ? kronor(row.priceOre) : null}
+                  fallbackKr={kronor(product.fallbackPriceOre)}
+                  updatedByEmail={row?.updatedByEmail ?? null}
+                />
+              </div>
+            </Card>
+          );
+        })}
+
         <Card>
           <CardHeader title="Så hänger det ihop" />
           <div className="space-y-2 p-5 text-[13px] leading-relaxed text-neutral-600">
@@ -122,6 +149,11 @@ export default async function PricesPage() {
       </div>
     </>
   );
+}
+
+/** Ören som "24900" eller "24900,50", som fältet tar emot dem. */
+function kronor(ore: number): string {
+  return ore % 100 === 0 ? String(ore / 100) : (ore / 100).toFixed(2).replace(".", ",");
 }
 
 function labelFor(item: string): string {

@@ -79,6 +79,14 @@ export const TENANT_SCOPED_MODELS = [
   // Ett meddelande om ett fel säger mycket om en kunds verksamhet, och kund A
   // ska aldrig se vad kund B skrivit till oss.
   "FeedbackMessage",
+  // Tillbehören. Leveransuppgifterna och beställningarna är kundens, och
+  // plattformens beställningssida läser dem via unsafeGlobalPrisma, som
+  // inkorgen. De interna anteckningarna och priset (ShopOrderNote,
+  // ShopPrice) är plattformens och har ingen company_id.
+  "CompanyProfile",
+  "ShopOrder",
+  "ShopOrderLine",
+  "ShopOrderEvent",
 ] as const;
 
 const TENANT_MODEL_SET: ReadonlySet<string> = new Set(TENANT_SCOPED_MODELS);

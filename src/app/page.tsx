@@ -15,6 +15,7 @@ import {
   HowItWorks,
   Pricing,
   Problem,
+  ScreenHardware,
 } from "@/components/marketing/Sections";
 
 /**
@@ -46,7 +47,8 @@ export const metadata: Metadata = pageMetadata({
  * SIDANS ORDNING OCH DESS YTOR.
  *
  * Avsnitten ligger på var sin yta, och ordningen är satt i `Sections.tsx`:
- * Fjord, Snö, vit, Snö, vit, Fjord, vit, Snö, Tick.
+ * Fjord, Snö, vit, Snö, vit, Fjord, Snö, vit, Snö, Tick. Stämplingsskärmen
+ * ligger på Snö efter innehållet, och priset fick därför en hårlinje.
  *
  * YTORNA MÖTS I EN RAK KANT. Mellan avsnitten låg tidigare en tonad skarv som
  * smetade ut den ena färgen i den andra över ett par centimeter. Den syntes
@@ -95,6 +97,10 @@ export default async function Home() {
 
       <Reveal>
         <Capabilities />
+      </Reveal>
+
+      <Reveal>
+        <ScreenHardware />
       </Reveal>
 
       <Reveal>

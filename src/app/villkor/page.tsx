@@ -96,6 +96,36 @@ const sections: Section[] = [
     ),
   },
   {
+    // Tillagt 2026-10-20 med butiken. Bara det som är beslutat: var man
+    // beställer, vad som gäller för pris, frakt, faktura, leveranstid och
+    // garanti. Granskas av någon med juridisk kunskap före lansering.
+    id: "tillbehor",
+    heading: "Tillbehör",
+    body: (
+      <>
+        <p>
+          Kunder med en arbetsyta i Tikkr kan köpa tillbehör, till exempel
+          stämplingsskärmar. Beställningen görs i tjänsten av arbetsytans ägare.
+          Vi bekräftar beställningen per e-post.
+        </p>
+        <p>
+          Priserna anges exklusive moms. Frakt tillkommer. Tillbehör faktureras
+          vid leverans.
+        </p>
+        <p>
+          Tillbehör tillverkas på beställning. Leveranstiden som anges är
+          beräknad och inte ett åtagande om ett visst datum.
+        </p>
+        <p>
+          Stämplingsskärmen och dess stativ har tre års garanti mot fel i
+          material och tillverkning, räknat från leveransen. Garantin gäller
+          inte skador av yttre åverkan eller användning utanför produktens
+          specifikation. Ett garantiärende anmäls till oss.
+        </p>
+      </>
+    ),
+  },
+  {
     id: "utebliven-betalning",
     heading: "Utebliven betalning",
     body: (

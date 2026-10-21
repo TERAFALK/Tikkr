@@ -3,7 +3,9 @@ import LoginForm from "@/components/admin/LoginForm";
 import TwoStepForm from "@/components/ui/TwoStepForm";
 import AuthShell from "@/components/ui/AuthShell";
 import { Alert } from "@/components/ui";
-import { readTicket } from "@/lib/login-ticket";
+import { redirect } from "next/navigation";
+import { currentAdmin } from "@/lib/admin-session";
+import { readTicket, safeAdminNext } from "@/lib/login-ticket";
 import {
   adminTwoStep,
   EMAIL_CODE_MINUTES,
@@ -55,8 +57,21 @@ const linkClass = "font-medium text-tick-deep hover:underline";
 export default async function LoginPage({
   searchParams,
 }: {
-  searchParams: Promise<{ alternativ?: string; metod?: string; utskick?: string }>;
+  searchParams: Promise<{
+    alternativ?: string;
+    metod?: string;
+    utskick?: string;
+    /** Sidan att landa på efter inloggningen, se safeAdminNext. */
+    till?: string;
+  }>;
 }) {
+  const { till } = await searchParams;
+  const next = safeAdminNext(till);
+
+  // Redan inloggad och på väg någonstans: dit direkt. Säljsidans Beställ-knapp
+  // går alltid hit, eftersom den inte vet om besökaren är inloggad.
+  if (next && (await currentAdmin())) redirect(next);
+
   const ticket = await readTicket("admin");
   const step = ticket ? await adminTwoStep(ticket.sub) : null;
 
@@ -219,7 +234,7 @@ export default async function LoginPage({
         </>
       }
     >
-      <LoginForm />
+      <LoginForm next={next} />
     </AuthShell>
   );
 }

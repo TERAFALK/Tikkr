@@ -129,6 +129,14 @@ export const IconDevice = (props: IconProps) => (
   </Icon>
 );
 
+/** Ett paket. Tillbehören, i inställningarna och i plattformspanelen. */
+export const IconPackage = (props: IconProps) => (
+  <Icon {...props}>
+    <path d="M21 8 12 3 3 8v8l9 5 9-5V8Z" />
+    <path d="m3 8 9 5 9-5M12 13v8M7.5 5.5l9 5" />
+  </Icon>
+);
+
 export const IconSettings = (props: IconProps) => (
   <Icon {...props}>
     <circle cx="12" cy="12" r="3" />

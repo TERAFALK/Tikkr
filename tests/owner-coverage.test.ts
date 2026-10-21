@@ -38,6 +38,8 @@ const BILLING = "src/app/admin/(panel)/installningar/prenumeration/actions.ts";
 /** Åtgärder utanför prenumerationen som också är ägarens. */
 const OWNER_ACTIONS = [
   { file: "src/app/admin/(panel)/installningar/actions.ts", name: "anonymizeEmployee" },
+  // En beställning av tillbehör ändrar vad kunden betalar (2026-10-20).
+  { file: "src/app/admin/(panel)/installningar/tillbehor/actions.ts", name: "placeAccessoryOrder" },
 ];
 
 describe("bara ägaren ändrar fakturan och anonymiserar", () => {
@@ -54,7 +56,7 @@ describe("bara ägaren ändrar fakturan och anonymiserar", () => {
     expect(missing).toEqual([]);
   });
 
-  it("anonymiseringen prövar ägaren", () => {
+  it("anonymiseringen och beställningen prövar ägaren", () => {
     const missing = OWNER_ACTIONS.filter(({ file, name }) => {
       const action = exportedBodies(read(file)).find((entry) => entry.name === name);
       return !action || !/isOwner\(session\)/.test(action.body);
