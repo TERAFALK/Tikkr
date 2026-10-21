@@ -80,7 +80,8 @@ export async function placeOrder(params: {
   const totals = orderTotals(lines, null);
 
   // Utan något att skicka finns ingen märkning och ingen separat
-  // fakturaadress: adressen ÄR fakturaadressen. Se validateProfile.
+  // fakturaadress: adressen ÄR fakturaadressen. Se validateProfile. E-post
+  // för faktura står alltid i formuläret och följer med i båda fallen.
   const delivery = needsDelivery(lines);
   const snapshot: CleanProfile = delivery
     ? profile
@@ -90,7 +91,6 @@ export async function placeOrder(params: {
         billingAddressLine: null,
         billingPostalCode: null,
         billingCity: null,
-        invoiceEmail: null,
       };
 
   // Det som sparas till företaget. Utan leverans skrivs bara kontakt och
@@ -102,6 +102,7 @@ export async function placeOrder(params: {
         orgNumber: profile.orgNumber,
         contactName: profile.contactName,
         orderEmail: profile.orderEmail,
+        invoiceEmail: profile.invoiceEmail,
         phone: profile.phone,
         addressLine: profile.addressLine,
         postalCode: profile.postalCode,

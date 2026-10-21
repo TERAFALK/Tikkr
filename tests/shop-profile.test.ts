@@ -101,6 +101,14 @@ describe("en beställning utan leverans", () => {
     });
   });
 
+  it("behåller e-post för faktura", () => {
+    const { clean } = validateProfile(
+      { values: { ...COMPLETE, invoiceEmail: "faktura@verkstad.se" }, separateBilling: false },
+      { requireForOrder: true, delivery: false }
+    );
+    expect(clean?.invoiceEmail).toBe("faktura@verkstad.se");
+  });
+
   it("kräver fortfarande en adress att fakturera till", () => {
     const { errors } = validateProfile(
       { values: { ...COMPLETE, addressLine: "" }, separateBilling: false },
@@ -136,7 +144,7 @@ describe("inställningarna", () => {
     }
   });
 
-  it("tömmer en bortvald fakturaadress", () => {
+  it("tömmer en bortvald fakturaadress men behåller e-post för faktura", () => {
     const { clean } = validateProfile(
       {
         values: {
@@ -144,7 +152,7 @@ describe("inställningarna", () => {
           billingAddressLine: "Box 12",
           billingPostalCode: "46121",
           billingCity: "Trollhättan",
-          invoiceEmail: "faktura@verkstad.se",
+          invoiceEmail: "Faktura@Verkstad.se",
         },
         separateBilling: false,
       },
@@ -155,8 +163,24 @@ describe("inställningarna", () => {
       billingAddressLine: null,
       billingPostalCode: null,
       billingCity: null,
-      invoiceEmail: null,
+      invoiceEmail: "faktura@verkstad.se",
     });
+  });
+
+  it("e-post för faktura är valfri, men aldrig felskriven", () => {
+    expect(
+      validateProfile({ values: COMPLETE, separateBilling: false }, { requireForOrder: true }).errors
+    ).toEqual({});
+    expect(
+      validateProfile(
+        { values: { ...COMPLETE, invoiceEmail: "faktura.verkstad.se" }, separateBilling: false },
+        { requireForOrder: true }
+      ).errors.invoiceEmail
+    ).toBeDefined();
+  });
+
+  it("e-post för faktura öppnar inte en separat fakturaadress", () => {
+    expect(profileToValues({ invoiceEmail: "faktura@verkstad.se" }).separateBilling).toBe(false);
   });
 
   it("läser formuläret och tillbaka", () => {

@@ -1474,7 +1474,10 @@ kundens arbetsorder, det allt annat i Tikkr hänger på. I koden heter det
   Adminflöde): en beställning ändrar vad kunden betalar. Alla
   administratörer ser butiken och beställningarna. Leverans- och
   fakturauppgifterna står under Inställningar, Företag, och får ändras av
-  varje administratör.
+  varje administratör. **E-post för faktura står alltid i formuläret**,
+  valfri och skild från den separata fakturaadressen (ändrat 2026-10-21):
+  många kunder har en egen adress för fakturor men ingen för post. Systemet
+  skickar ingenting dit; den står på beställningen för fakturan i Fortnox.
 - **Säljsidans Beställ går genom inloggningen** med `?till=/admin/...`
   (`safeAdminNext` i `login-ticket.ts`) till kassan, och den som redan är
   inloggad går rakt igenom.
