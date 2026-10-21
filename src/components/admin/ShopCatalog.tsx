@@ -60,7 +60,7 @@ export default function ShopCatalog({
   );
 
   return (
-    <div className={count > 0 ? "pb-24" : ""}>
+    <div>
       {!canOrder && (
         <p className="mb-6 text-[13px] text-neutral-500">Arbetsytans ägare beställer.</p>
       )}
@@ -154,9 +154,17 @@ export default function ShopCatalog({
         ))}
       </div>
 
+      {/* VARUKORGEN SVÄVAR NEDERST, med luft runt om.
+
+          `sticky` och inte `fixed`. Panelens sidbyte tonar in innehållet med
+          en förflyttning (`.panel-content > *` i globals.css), och ett
+          element med en förflyttning gör att `fixed` räknas mot det i
+          stället för mot fönstret. Listen hamnade då längst ner på sidan,
+          och den som tryckt Lägg till fick skrolla för att hitta den.
+          `sticky` står fast nederst i fönstret oavsett. */}
       {canOrder && count > 0 && (
-        <div className="fixed inset-x-0 bottom-0 z-30 border-t border-neutral-200 bg-white/95 backdrop-blur lg:left-60">
-          <div className="mx-auto flex max-w-7xl flex-wrap items-center gap-x-6 gap-y-2 px-4 py-3 sm:px-6 lg:px-8">
+        <div className="sticky bottom-4 z-30 mt-8">
+          <div className="flex flex-wrap items-center gap-x-6 gap-y-2 rounded-xl border border-neutral-200 bg-white/95 px-5 py-3 shadow-[0_12px_32px_-12px_rgba(14,26,43,0.35)] backdrop-blur">
             <p className="text-[13px] text-neutral-700">
               <span className="font-semibold text-neutral-900">
                 {count} {count === 1 ? "produkt" : "produkter"}
