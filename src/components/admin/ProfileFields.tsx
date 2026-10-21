@@ -78,6 +78,11 @@ export default function ProfileFields({
             hint: "Orderbekräftelse och leveransbesked",
             required: true,
           })}
+          {field("invoiceEmail", "E-post för faktura", {
+            type: "email",
+            inputMode: "email",
+            hint: "Valfritt",
+          })}
           {field("phone", "Telefon", { type: "tel", inputMode: "tel", autoComplete: "tel", required: true })}
         </div>
       </fieldset>
@@ -124,11 +129,6 @@ export default function ProfileFields({
                 {field("billingPostalCode", "Postnummer", { inputMode: "numeric", required: true })}
                 {field("billingCity", "Ort", { required: true })}
               </div>
-              {field("invoiceEmail", "E-post för faktura", {
-                type: "email",
-                inputMode: "email",
-                hint: "Valfritt",
-              })}
             </div>
           )}
         </fieldset>

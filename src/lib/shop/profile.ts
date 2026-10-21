@@ -48,11 +48,15 @@ export const PROFILE_FIELDS: ProfileField[] = [
   "invoiceEmail",
 ];
 
+/**
+ * Den separata fakturaadressen. E-post för faktura hör inte hit: många har
+ * en egen fakturaadress för mejl men ingen för post, och fältet står därför
+ * alltid i formuläret.
+ */
 const BILLING_FIELDS: ProfileField[] = [
   "billingAddressLine",
   "billingPostalCode",
   "billingCity",
-  "invoiceEmail",
 ];
 
 /** Det en beställning inte kan skickas utan. */
@@ -115,7 +119,7 @@ export type CleanProfile = { [K in ProfileField]: string | null };
  *
  * Utan separat fakturaadress töms fakturafälten, så att en adress som en gång
  * skrevs in och sedan valdes bort inte ligger kvar och fakturerar i det tysta.
- * E-post för faktura hör till faktureringen och följer samma val.
+ * E-post för faktura följer inte det valet, se BILLING_FIELDS.
  */
 export function validateProfile(
   input: { values: ProfileValues; separateBilling: boolean },

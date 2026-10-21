@@ -298,6 +298,7 @@ describe("bara tjänster", () => {
         billingAddressLine: "Ska inte med",
         billingPostalCode: "111 11",
         billingCity: "Stockholm",
+        invoiceEmail: "faktura@verkstad.se",
       }),
     });
 
@@ -307,6 +308,7 @@ describe("bara tjänster", () => {
       billingAddressLine: null,
       billingCity: null,
       addressLine: "Industrigatan 4",
+      invoiceEmail: "faktura@verkstad.se",
     });
 
     const stored = await forCompany(companyA).companyProfile.findFirst();
@@ -314,6 +316,25 @@ describe("bara tjänster", () => {
       deliveryReference: "Verkstaden",
       billingAddressLine: "Box 12",
       orgNumber: "556677-8899",
+      invoiceEmail: "faktura@verkstad.se",
+    });
+  });
+});
+
+describe("e-post för faktura", () => {
+  it("följer med utan separat fakturaadress och sparas på företaget", async () => {
+    const { orderId } = await order(companyA, {
+      saveProfile: true,
+      profile: profile({ invoiceEmail: "faktura@verkstad.se" }),
+    });
+
+    expect((await getShopOrder(orderId))!).toMatchObject({
+      billingAddressLine: null,
+      invoiceEmail: "faktura@verkstad.se",
+    });
+    expect(await forCompany(companyA).companyProfile.findFirst()).toMatchObject({
+      billingAddressLine: null,
+      invoiceEmail: "faktura@verkstad.se",
     });
   });
 });
