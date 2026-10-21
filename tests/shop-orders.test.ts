@@ -3,7 +3,8 @@ import { unsafeGlobalPrisma } from "@/lib/db";
 import { forCompany } from "@/lib/tenant";
 import { deleteCompany, PlatformActionError } from "@/lib/platform-admin";
 import { customerOrders, OrderError, placeOrder } from "@/lib/shop/orders";
-import { setShopPrice, shopPrices } from "@/lib/shop/prices";
+import { listProducts } from "@/lib/shop/products";
+import { deleteProduct, ProductError } from "@/lib/shop/product-admin";
 import { deliverEventEmail, deliverPendingForOrder } from "@/lib/shop/notify";
 import {
   addShopNote,
@@ -16,10 +17,13 @@ import {
 import { validateProfile, emptyProfile, type CleanProfile } from "@/lib/shop/profile";
 
 /**
- * BESTÄLLNINGAR AV TILLBEHÖR, FRÅN FORMULÄRET TILL LEVERANSEN.
+ * BESTÄLLNINGAR I BUTIKEN, FRÅN KASSAN TILL LEVERANSEN.
  *
  * Det som måste hålla:
- *   pris, moms och total räknas på servern ur prislistan
+ *   pris, moms och total räknas på servern ur produkten
+ *   en dold produkt går inte att beställa, och en beställd går inte att ta bort
+ *   en beställning med bara tjänster bär ingen märkning och skriver inte
+ *     över företagets sparade fakturaadress
  *   samma formulär två gånger ger en beställning
  *   en beställning bär sina uppgifter och sitt pris, och ändras inte av att
  *     företagets uppgifter eller priset ändras efteråt
@@ -34,6 +38,14 @@ const PLATFORM = "vi@tikkr.se";
 let companyA: string;
 let companyB: string;
 let keyCounter = 0;
+
+/**
+ * Testets egna produkter, med slumpade nycklar. Databasen kan redan ha
+ * stämplingsskärmen från migrationen, och testerna ska varken bero på den
+ * eller ändra den.
+ */
+let PRODUCT: string;
+let SERVICE: string;
 
 function key(): string {
   keyCounter += 1;
@@ -62,7 +74,13 @@ function profile(overrides: Partial<CleanProfile> = {}): CleanProfile {
 
 async function order(
   companyId = companyA,
-  options: { quantity?: number; saveProfile?: boolean; idempotencyKey?: string; profile?: CleanProfile } = {}
+  options: {
+    quantity?: number;
+    items?: { productKey: string; quantity: number }[];
+    saveProfile?: boolean;
+    idempotencyKey?: string;
+    profile?: CleanProfile;
+  } = {}
 ) {
   return placeOrder({
     db: forCompany(companyId),
@@ -70,7 +88,7 @@ async function order(
     companyName: "Verkstaden AB",
     actorEmail: "agare@verkstad.se",
     idempotencyKey: options.idempotencyKey ?? key(),
-    items: [{ productKey: "STAMPLINGSSKARM", quantity: options.quantity ?? 2 }],
+    items: options.items ?? [{ productKey: PRODUCT, quantity: options.quantity ?? 2 }],
     profile: options.profile ?? profile(),
     saveProfile: options.saveProfile ?? false,
   });
@@ -93,12 +111,41 @@ beforeEach(async () => {
   const suffix = Math.random().toString(36).slice(2, 8);
   companyA = (await unsafeGlobalPrisma.company.create({ data: { name: `Butik A ${suffix}` } })).id;
   companyB = (await unsafeGlobalPrisma.company.create({ data: { name: `Butik B ${suffix}` } })).id;
-  await unsafeGlobalPrisma.shopPrice.deleteMany({ where: { productKey: "STAMPLINGSSKARM" } });
+
+  PRODUCT = `TESTSKARM_${suffix.toUpperCase()}`;
+  SERVICE = `TESTKURS_${suffix.toUpperCase()}`;
+
+  await unsafeGlobalPrisma.shopProduct.createMany({
+    data: [
+      {
+        key: PRODUCT,
+        slug: `testskarm-${suffix}`,
+        kind: "GOODS",
+        name: "Stämplingsskärm",
+        summary: "Test.",
+        priceOre: 2_490_000,
+        delivery: "Beräknad leveranstid 3–4 veckor.",
+        inShop: true,
+        updatedByEmail: PLATFORM,
+      },
+      {
+        key: SERVICE,
+        slug: `testkurs-${suffix}`,
+        kind: "SERVICE",
+        name: "Utbildning",
+        summary: "Test.",
+        priceOre: 450_000,
+        inShop: true,
+        updatedByEmail: PLATFORM,
+      },
+    ],
+  });
 });
 
 afterEach(async () => {
   const ids = [companyA, companyB];
-  await unsafeGlobalPrisma.shopPrice.deleteMany({ where: { productKey: "STAMPLINGSSKARM" } });
+  await unsafeGlobalPrisma.shopProduct.deleteMany({ where: { key: { in: [PRODUCT, SERVICE] } } });
+  await unsafeGlobalPrisma.platformAuditLog.deleteMany({ where: { actorEmail: PLATFORM, targetCompanyId: null } });
   await unsafeGlobalPrisma.shopOrderNote.deleteMany({ where: { targetCompanyId: { in: ids } } });
   await unsafeGlobalPrisma.platformAuditLog.deleteMany({ where: { targetCompanyId: { in: ids } } });
   await unsafeGlobalPrisma.company.deleteMany({ where: { id: { in: ids } } });
@@ -185,13 +232,89 @@ describe("att beställa", () => {
   it("ett nytt pris gäller nya beställningar, aldrig lagda", async () => {
     const before = await order(companyA, { quantity: 1 });
 
-    await setShopPrice({ productKey: "STAMPLINGSSKARM", priceOre: 2_690_000, byEmail: PLATFORM });
-    expect((await shopPrices()).STAMPLINGSSKARM).toBe(2_690_000);
+    await unsafeGlobalPrisma.shopProduct.update({
+      where: { key: PRODUCT },
+      data: { priceOre: 2_690_000 },
+    });
+    expect((await listProducts("shop")).find((p) => p.key === PRODUCT)?.priceOre).toBe(2_690_000);
 
     const after = await order(companyA, { quantity: 1 });
 
     expect((await getShopOrder(before.orderId))!.goodsOre).toBe(2_490_000);
     expect((await getShopOrder(after.orderId))!.goodsOre).toBe(2_690_000);
+  });
+});
+
+describe("produkterna", () => {
+  it("en dold produkt går inte att beställa", async () => {
+    await unsafeGlobalPrisma.shopProduct.update({ where: { key: PRODUCT }, data: { inShop: false } });
+    await expect(order()).rejects.toThrow(OrderError);
+  });
+
+  it("raden bär produktens typ som den var", async () => {
+    const { orderId } = await order(companyA, {
+      items: [
+        { productKey: PRODUCT, quantity: 1 },
+        { productKey: SERVICE, quantity: 2 },
+      ],
+    });
+
+    const saved = (await getShopOrder(orderId))!;
+    expect(saved.lines.map((line) => [line.productKey, line.productKind])).toEqual([
+      [PRODUCT, "GOODS"],
+      [SERVICE, "SERVICE"],
+    ]);
+  });
+
+  it("en beställd produkt går inte att ta bort, en aldrig beställd går", async () => {
+    await order();
+    const ordered = await unsafeGlobalPrisma.shopProduct.findUniqueOrThrow({ where: { key: PRODUCT } });
+    const untouched = await unsafeGlobalPrisma.shopProduct.findUniqueOrThrow({ where: { key: SERVICE } });
+
+    await expect(deleteProduct(ordered.id, PLATFORM)).rejects.toThrow(ProductError);
+    await deleteProduct(untouched.id, PLATFORM);
+
+    expect(await unsafeGlobalPrisma.shopProduct.count({ where: { key: SERVICE } })).toBe(0);
+  });
+});
+
+describe("bara tjänster", () => {
+  it("bär ingen märkning eller fakturaadress, och nollar inte de sparade", async () => {
+    await forCompany(companyA).companyProfile.create({
+      data: {
+        companyId: companyA,
+        deliveryReference: "Verkstaden",
+        billingAddressLine: "Box 12",
+        billingPostalCode: "461 21",
+        billingCity: "Trollhättan",
+      },
+    });
+
+    const { orderId } = await order(companyA, {
+      items: [{ productKey: SERVICE, quantity: 1 }],
+      saveProfile: true,
+      profile: profile({
+        deliveryReference: "Ska inte med",
+        billingAddressLine: "Ska inte med",
+        billingPostalCode: "111 11",
+        billingCity: "Stockholm",
+      }),
+    });
+
+    const saved = (await getShopOrder(orderId))!;
+    expect(saved).toMatchObject({
+      reference: null,
+      billingAddressLine: null,
+      billingCity: null,
+      addressLine: "Industrigatan 4",
+    });
+
+    const stored = await forCompany(companyA).companyProfile.findFirst();
+    expect(stored).toMatchObject({
+      deliveryReference: "Verkstaden",
+      billingAddressLine: "Box 12",
+      orgNumber: "556677-8899",
+    });
   });
 });
 

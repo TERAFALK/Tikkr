@@ -6,10 +6,10 @@ import { useState } from "react";
 import { Button, ButtonLink } from "@/components/ui";
 import { formatCurrency } from "@/lib/money";
 import { cartCount, cartQuery, checkoutHref, type Cart } from "@/lib/shop/cart";
-import { KIND_LABEL, type ProductKey, type ProductKind } from "@/lib/shop/catalog";
+import { KIND_LABEL, type ProductKind } from "@/lib/shop/catalog";
 
 export interface ShopProduct {
-  key: ProductKey;
+  key: string;
   kind: ProductKind;
   slug: string;
   name: string;
@@ -18,6 +18,8 @@ export interface ShopProduct {
   maxQuantity: number;
   delivery: string;
   image: { src: string; alt: string; illustration: boolean } | null;
+  /** Har en egen sida på säljsidan, som Om produkten leder till. */
+  onSite: boolean;
 }
 
 /**
@@ -43,12 +45,12 @@ export default function ShopCatalog({
   const router = useRouter();
   const pathname = usePathname();
 
-  const update = (key: ProductKey, quantity: number, max: number) => {
+  const update = (key: string, quantity: number, max: number) => {
     const next = { ...cart, [key]: Math.max(0, Math.min(max, quantity)) };
     setCart(next);
 
     // Adressen följer korgen, utan att sidan laddas om eller hoppar.
-    const query = cartQuery(next);
+    const query = cartQuery(next, products);
     router.replace(`${pathname}${query ? `?${query}` : ""}`, { scroll: false });
   };
 
@@ -116,14 +118,18 @@ export default function ShopCatalog({
                         <p className="mt-0.5 text-xs text-neutral-500">{product.delivery}</p>
 
                         <div className="mt-4 flex flex-1 items-end justify-between gap-3">
-                          <a
-                            href={`/tillbehor/${product.slug}`}
-                            target="_blank"
-                            rel="noopener"
-                            className="text-[13px] text-tick-deep underline-offset-2 hover:underline"
-                          >
-                            Om produkten
-                          </a>
+                          {product.onSite ? (
+                            <a
+                              href={`/tillbehor/${product.slug}`}
+                              target="_blank"
+                              rel="noopener"
+                              className="text-[13px] text-tick-deep underline-offset-2 hover:underline"
+                            >
+                              Om produkten
+                            </a>
+                          ) : (
+                            <span />
+                          )}
 
                           {canOrder &&
                             (quantity === 0 ? (
@@ -171,7 +177,7 @@ export default function ShopCatalog({
               </span>{" "}
               · <span className="tabular-nums">{formatCurrency(goods)}</span> exkl. moms
             </p>
-            <ButtonLink href={checkoutHref(cart)} className="ml-auto">
+            <ButtonLink href={checkoutHref(cart, products)} className="ml-auto">
               Till kassan
             </ButtonLink>
           </div>
@@ -221,8 +227,14 @@ function Stepper({
 }
 
 /** Länk tillbaka till butiken med samma korg, från kassan. */
-export function BackToShop({ cart }: { cart: Cart }) {
-  const query = cartQuery(cart);
+export function BackToShop({
+  cart,
+  products,
+}: {
+  cart: Cart;
+  products: { key: string; slug: string; maxQuantity: number }[];
+}) {
+  const query = cartQuery(cart, products);
   return (
     <Link
       href={`/admin/butik${query ? `?${query}` : ""}`}

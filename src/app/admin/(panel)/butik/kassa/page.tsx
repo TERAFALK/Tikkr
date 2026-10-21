@@ -2,8 +2,7 @@ import { randomUUID } from "node:crypto";
 import { isOwner, requireAdmin } from "@/lib/admin-session";
 import { formatCurrency } from "@/lib/money";
 import { cartFromParams, cartItems } from "@/lib/shop/cart";
-import { PRODUCTS } from "@/lib/shop/catalog";
-import { shopPrices } from "@/lib/shop/prices";
+import { listProducts } from "@/lib/shop/products";
 import {
   needsDelivery,
   orderTotals,
@@ -35,13 +34,13 @@ export default async function CheckoutPage({
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const session = await requireAdmin();
-  const [params, prices, profile] = await Promise.all([
+  const [params, products, profile] = await Promise.all([
     searchParams,
-    shopPrices(),
+    listProducts("shop"),
     session.db.companyProfile.findFirst(),
   ]);
 
-  const cart = cartFromParams(params);
+  const cart = cartFromParams(params, products);
   const items = cartItems(cart);
 
   if (items.length === 0) {
@@ -55,7 +54,7 @@ export default async function CheckoutPage({
 
   let lines: PricedLine[];
   try {
-    lines = priceLines(items, prices);
+    lines = priceLines(items, products);
   } catch (error) {
     if (!(error instanceof PricingError)) throw error;
     return (
@@ -73,12 +72,19 @@ export default async function CheckoutPage({
   const form = profileToValues(profile);
   const canOrder = isOwner(session) && !session.support;
 
-  const deliveryTexts = [...new Set(lines.map((line) => PRODUCTS[line.productKey].delivery))];
+  const deliveryTexts = [
+    ...new Set(
+      products
+        .filter((product) => lines.some((line) => line.productKey === product.key))
+        .map((product) => product.delivery)
+        .filter(Boolean)
+    ),
+  ];
 
   return (
     <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_22rem]">
       <Card className="lg:order-2 lg:sticky lg:top-6">
-        <CardHeader title="Varukorg" action={<BackToShop cart={cart} />} />
+        <CardHeader title="Varukorg" action={<BackToShop cart={cart} products={products} />} />
         <dl className="space-y-1.5 px-5 py-4 text-[13px]">
           {lines.map((line) => (
             <Row

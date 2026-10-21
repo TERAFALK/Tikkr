@@ -2270,6 +2270,8 @@ model ShopOrderLine {
   name           String
   unitPriceOre   Int    @map("unit_price_ore")
   vatRatePercent Int    @map("vat_rate_percent")
+  /// Vara eller tjänst när den beställdes. Avgör om beställningen skickas.
+  productKind    ShopProductKind @default(GOODS) @map("product_kind")
   quantity       Int
   subtotalOre    Int    @map("subtotal_ore")
   vatOre         Int    @map("vat_ore")
@@ -2353,4 +2355,91 @@ model ShopPrice {
   updatedAt      DateTime @updatedAt @map("updated_at")
 
   @@map("shop_prices")
+}
+
+/// VARA ELLER TJÄNST. En vara skickas och kräver leveransadress, en tjänst,
+/// t.ex. en utbildning, gör det inte.
+enum ShopProductKind {
+  GOODS
+  SERVICE
+}
+
+/// EN PRODUKT I BUTIKEN (tillagt 2026-10-21, ersätter katalogen i koden).
+///
+/// Läggs upp och ändras under Produkter i plattformspanelen. Plattformens
+/// egen tabell, utan company_id: produkten är densamma för alla kunder.
+///
+/// EN BESTÄLLD PRODUKT RADERAS ALDRIG, den döljs. Beställningsraderna bär
+/// sitt eget namn och pris och pekar hit med `key`, som därför aldrig ändras
+/// efter att produkten skapats.
+///
+/// Texterna i listorna (fördelar, specifikationer) ligger som JSON. De läses
+/// och skrivs bara i src/lib/shop/products.ts, som prövar formen.
+model ShopProduct {
+  id   String @id @default(cuid())
+  /// Nyckeln beställningsraderna bär, t.ex. "STAMPLINGSSKARM". Ändras aldrig.
+  key  String @unique
+  /// Adressen, /tillbehor/<slug> och ?<slug>=2 i varukorgen.
+  slug String @unique
+  kind ShopProductKind @default(GOODS)
+
+  name        String
+  /// En mening, under namnet i butiken.
+  summary     String
+  /// Stycken, åtskilda av en tom rad.
+  description String @default("")
+
+  /// Pris exklusive moms, i öre. Gäller nya beställningar.
+  priceOre       Int @map("price_ore")
+  vatRatePercent Int @default(25) @map("vat_rate_percent")
+  maxQuantity    Int @default(20) @map("max_quantity")
+
+  /// T.ex. "Tillverkas på beställning. Beräknad leveranstid 3–4 veckor."
+  delivery String @default("")
+  warranty String @default("")
+
+  /// [{ title, body }]
+  benefits     Json     @default("[]")
+  included     String[] @default([])
+  requirements String[] @default([])
+  /// [{ title, rows: [{ label, value }] }]
+  specs        Json     @default("[]")
+
+  /// Var produkten syns. Båda av betyder dold, och så skapas en ny.
+  inShop Boolean @default(false) @map("in_shop")
+  onSite Boolean @default(false) @map("on_site")
+
+  sortOrder      Int      @default(0) @map("sort_order")
+  updatedByEmail String   @map("updated_by_email")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  images ShopProductImage[]
+
+  @@index([sortOrder])
+  @@map("shop_products")
+}
+
+/// EN BILD PÅ EN PRODUKT.
+///
+/// Uppladdade bilder ligger i databasen, som kundernas logotyper, så att de
+/// följer med i backupen. `staticPath` pekar i stället på en fil under
+/// public/, och finns för illustrationerna som fanns innan produkterna kom
+/// till databasen.
+model ShopProductImage {
+  id         String  @id @default(cuid())
+  productId  String  @map("product_id")
+  data       Bytes?
+  mimeType   String? @map("mime_type")
+  staticPath String? @map("static_path")
+  alt        String  @default("")
+  /// En ritning och inte ett foto. Märks "Illustration" där den visas.
+  illustration Boolean @default(false)
+  sortOrder    Int     @default(0) @map("sort_order")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  product ShopProduct @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@index([productId, sortOrder])
+  @@map("shop_product_images")
 }

@@ -3,7 +3,7 @@ import { appUrl } from "../app-url";
 import { unsafeGlobalPrisma } from "../db";
 import { sendEmail } from "../email";
 import { hasShopEmail, shopOrderEmail } from "../emails";
-import { isProductKey, PRODUCTS } from "./catalog";
+import { productsByKeys } from "./products";
 import { needsDelivery } from "./pricing";
 import { notifiesOnce } from "./status";
 
@@ -60,7 +60,13 @@ export async function deliverEventEmail(eventId: string): Promise<DeliveryOutcom
           trackingUrl: true,
           lines: {
             orderBy: { sortOrder: "asc" },
-            select: { productKey: true, name: true, quantity: true, subtotalOre: true },
+            select: {
+              productKey: true,
+              productKind: true,
+              name: true,
+              quantity: true,
+              subtotalOre: true,
+            },
           },
         },
       },
@@ -92,14 +98,12 @@ export async function deliverEventEmail(eventId: string): Promise<DeliveryOutcom
 
   const { order } = event;
 
-  // Leveranstiden ur katalogen, en gång per text. Två produkter med samma
-  // tid ska inte ge samma mening två gånger.
+  // Leveranstiden ur produkterna, en gång per text. Två produkter med samma
+  // tid ska inte ge samma mening två gånger. Den är inte en ögonblicksbild:
+  // en ändrad leveranstid gäller också det som redan är beställt.
+  const products = await productsByKeys(order.lines.map((line) => line.productKey));
   const delivery = [
-    ...new Set(
-      order.lines
-        .map((line) => (isProductKey(line.productKey) ? PRODUCTS[line.productKey].delivery : null))
-        .filter((text): text is string => Boolean(text))
-    ),
+    ...new Set(products.map((product) => product.delivery).filter(Boolean)),
   ].join(" ");
 
   try {

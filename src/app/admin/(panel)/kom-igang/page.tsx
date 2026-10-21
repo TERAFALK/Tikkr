@@ -19,7 +19,7 @@ import {
 } from "@/components/ui";
 import SearchSelect from "@/components/admin/SearchSelect";
 import { customerOptions } from "@/lib/customers";
-import { checkoutHref } from "@/lib/shop/cart";
+import { checkoutHrefFor } from "@/lib/shop/cart";
 import { addEmployees, addMoments, addOrder } from "./actions";
 
 export const dynamic = "force-dynamic";
@@ -229,7 +229,7 @@ export default async function OnboardingPage() {
               Se CLAUDE.md § 3.4. */}
           {!state.steps[3].done && (
             <Link
-              href={checkoutHref({ STAMPLINGSSKARM: 1 })}
+              href={checkoutHrefFor("stamplingsskarm")}
               className="text-[13px] font-medium text-tick-deep hover:underline"
             >
               Beställ en stämplingsskärm
