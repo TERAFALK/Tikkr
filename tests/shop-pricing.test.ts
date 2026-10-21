@@ -1,19 +1,20 @@
 import { describe, expect, it } from "vitest";
-import { PRODUCT_KEYS, PRODUCTS, isProductKey, productBySlug } from "@/lib/shop/catalog";
+import type { ProductForPricing } from "@/lib/shop/catalog";
 import {
+  needsDelivery,
   orderTotals,
   priceLines,
   PricingError,
   vatOf,
   withVat,
-  type PriceList,
 } from "@/lib/shop/pricing";
 
 /**
- * TILLBEHÖRENS BELOPP.
+ * BUTIKENS BELOPP.
  *
  * Det som måste hålla:
- *   priset kommer ur prislistan, aldrig ur det som skickats in
+ *   priset kommer ur produkten, aldrig ur det som skickats in
+ *   en produkt som inte ligger i butiken går inte att beställa
  *   momsen räknas per rad och summeras, som fakturan i Fortnox
  *   frakten är okänd tills den satts, och okänd är inte noll
  *   orimliga antal avvisas i stället för att avrundas
@@ -21,51 +22,38 @@ import {
  * Behöver ingen databas.
  */
 
-const PRICES: PriceList = { STAMPLINGSSKARM: 2_490_000 };
+const SCREEN: ProductForPricing = {
+  key: "SKARM",
+  slug: "skarm",
+  kind: "GOODS",
+  name: "Stämplingsskärm",
+  priceOre: 2_490_000,
+  vatRatePercent: 25,
+  maxQuantity: 20,
+  inShop: true,
+};
 
-describe("katalogen", () => {
-  it("varje produkt har en unik adress och går att slå upp", () => {
-    const slugs = PRODUCT_KEYS.map((key) => PRODUCTS[key].slug);
-    expect(new Set(slugs).size).toBe(slugs.length);
+const COURSE: ProductForPricing = {
+  key: "UTBILDNING",
+  slug: "utbildning",
+  kind: "SERVICE",
+  name: "Utbildning",
+  priceOre: 450_000,
+  vatRatePercent: 25,
+  maxQuantity: 5,
+  inShop: true,
+};
 
-    for (const key of PRODUCT_KEYS) {
-      expect(productBySlug(PRODUCTS[key].slug)?.key).toBe(key);
-      expect(isProductKey(key)).toBe(true);
-    }
-  });
-
-  it("varje produkt har ett pris, moms, leveranstid och minst en bild", () => {
-    for (const key of PRODUCT_KEYS) {
-      const product = PRODUCTS[key];
-      expect(product.fallbackPriceOre).toBeGreaterThan(0);
-      expect(product.vatRatePercent).toBe(25);
-      expect(product.delivery).toMatch(/3–4 veckor/);
-      expect(product.images.length).toBeGreaterThan(0);
-    }
-  });
-
-  it("nämner aldrig tillverkaren", () => {
-    // Produkten säljs som Tikkrs. Tillverkarens namn hör till docs/kioskskarm.md.
-    const text = JSON.stringify(PRODUCTS).toLowerCase();
-    for (const name of ["prodvx", "appc", "fully", "promgr", "eet"]) {
-      expect(text).not.toContain(name);
-    }
-  });
-
-  it("okända nycklar är inga produkter", () => {
-    expect(isProductKey("SKARM")).toBe(false);
-    expect(isProductKey(undefined)).toBe(false);
-    expect(productBySlug("finns-inte")).toBeNull();
-  });
-});
+const PRODUCTS = [SCREEN, COURSE];
 
 describe("raderna", () => {
-  it("tar priset ur prislistan", () => {
-    const [line] = priceLines([{ productKey: "STAMPLINGSSKARM", quantity: 2 }], PRICES);
+  it("tar priset, namnet och typen ur produkten", () => {
+    const [line] = priceLines([{ productKey: "SKARM", quantity: 2 }], PRODUCTS);
 
     expect(line).toMatchObject({
-      productKey: "STAMPLINGSSKARM",
+      productKey: "SKARM",
       name: "Stämplingsskärm",
+      productKind: "GOODS",
       unitPriceOre: 2_490_000,
       quantity: 2,
       subtotalOre: 4_980_000,
@@ -74,47 +62,78 @@ describe("raderna", () => {
     });
   });
 
-  it("ett annat pris i listan ger ett annat belopp, och ingenting annat påverkar", () => {
+  it("ett annat pris på produkten ger ett annat belopp", () => {
     const [line] = priceLines(
-      [{ productKey: "STAMPLINGSSKARM", quantity: 1 }],
-      { STAMPLINGSSKARM: 1_990_000 }
+      [{ productKey: "SKARM", quantity: 1 }],
+      [{ ...SCREEN, priceOre: 1_990_000 }]
     );
     expect(line.subtotalOre).toBe(1_990_000);
   });
 
-  it("hoppar över noll", () => {
-    expect(priceLines([{ productKey: "STAMPLINGSSKARM", quantity: 0 }], PRICES)).toEqual([]);
+  it("flera produkter i samma beställning, i den ordning de kom", () => {
+    const lines = priceLines(
+      [
+        { productKey: "UTBILDNING", quantity: 2 },
+        { productKey: "SKARM", quantity: 1 },
+      ],
+      PRODUCTS
+    );
+    expect(lines.map((line) => [line.productKey, line.sortOrder])).toEqual([
+      ["UTBILDNING", 0],
+      ["SKARM", 1],
+    ]);
   });
 
-  it("avvisar okända produkter, dubbletter och orimliga antal", () => {
-    expect(() => priceLines([{ productKey: "SKARM", quantity: 1 }], PRICES)).toThrow(PricingError);
+  it("hoppar över noll", () => {
+    expect(priceLines([{ productKey: "SKARM", quantity: 0 }], PRODUCTS)).toEqual([]);
+  });
+
+  it("avvisar okända och dolda produkter", () => {
+    expect(() => priceLines([{ productKey: "OKAND", quantity: 1 }], PRODUCTS)).toThrow(PricingError);
+    expect(() =>
+      priceLines([{ productKey: "SKARM", quantity: 1 }], [{ ...SCREEN, inShop: false }])
+    ).toThrow(PricingError);
+  });
+
+  it("avvisar dubbletter och orimliga antal", () => {
     expect(() =>
       priceLines(
         [
-          { productKey: "STAMPLINGSSKARM", quantity: 1 },
-          { productKey: "STAMPLINGSSKARM", quantity: 1 },
+          { productKey: "SKARM", quantity: 1 },
+          { productKey: "SKARM", quantity: 1 },
         ],
-        PRICES
+        PRODUCTS
       )
     ).toThrow(PricingError);
 
-    for (const quantity of [-1, 1.5, Number.NaN, PRODUCTS.STAMPLINGSSKARM.maxQuantity + 1]) {
-      expect(() =>
-        priceLines([{ productKey: "STAMPLINGSSKARM", quantity }], PRICES)
-      ).toThrow(PricingError);
+    for (const quantity of [-1, 1.5, Number.NaN, SCREEN.maxQuantity + 1]) {
+      expect(() => priceLines([{ productKey: "SKARM", quantity }], PRODUCTS)).toThrow(PricingError);
     }
   });
 
   it("vägrar sälja en produkt utan pris", () => {
     expect(() =>
-      priceLines([{ productKey: "STAMPLINGSSKARM", quantity: 1 }], { STAMPLINGSSKARM: 0 })
+      priceLines([{ productKey: "SKARM", quantity: 1 }], [{ ...SCREEN, priceOre: 0 }])
     ).toThrow(PricingError);
+  });
+});
+
+describe("leveransen", () => {
+  it("en vara skickas, en tjänst gör det inte", () => {
+    expect(needsDelivery([{ productKind: "GOODS" }])).toBe(true);
+    expect(needsDelivery([{ productKind: "SERVICE" }])).toBe(false);
+    expect(needsDelivery([{ productKind: "SERVICE" }, { productKind: "GOODS" }])).toBe(true);
+    expect(needsDelivery([])).toBe(false);
+  });
+
+  it("en okänd typ räknas som en vara, så att ingen adress tappas", () => {
+    expect(needsDelivery([{ productKind: "OKAND" }])).toBe(true);
   });
 });
 
 describe("summorna", () => {
   it("utan frakt: varor plus moms, frakten är okänd", () => {
-    const lines = priceLines([{ productKey: "STAMPLINGSSKARM", quantity: 3 }], PRICES);
+    const lines = priceLines([{ productKey: "SKARM", quantity: 3 }], PRODUCTS);
 
     expect(orderTotals(lines, null)).toEqual({
       goodsOre: 7_470_000,
@@ -125,7 +144,7 @@ describe("summorna", () => {
   });
 
   it("med frakt: frakten får moms och läggs till", () => {
-    const lines = priceLines([{ productKey: "STAMPLINGSSKARM", quantity: 1 }], PRICES);
+    const lines = priceLines([{ productKey: "SKARM", quantity: 1 }], PRODUCTS);
 
     expect(orderTotals(lines, 45_000)).toEqual({
       goodsOre: 2_490_000,
@@ -136,23 +155,29 @@ describe("summorna", () => {
   });
 
   it("noll i frakt är ett pris, inte okänt", () => {
-    const lines = priceLines([{ productKey: "STAMPLINGSSKARM", quantity: 1 }], PRICES);
+    const lines = priceLines([{ productKey: "SKARM", quantity: 1 }], PRODUCTS);
     expect(orderTotals(lines, 0).shippingOre).toBe(0);
   });
 
   it("momsen avrundas per rad till hela ören", () => {
     expect(vatOf(101, 25)).toBe(25);
     expect(vatOf(102, 25)).toBe(26);
-    expect(orderTotals([{ subtotalOre: 101, vatOre: 25 }, { subtotalOre: 101, vatOre: 25 }], null).vatOre).toBe(50);
+    expect(
+      orderTotals(
+        [
+          { subtotalOre: 101, vatOre: 25 },
+          { subtotalOre: 101, vatOre: 25 },
+        ],
+        null
+      ).vatOre
+    ).toBe(50);
   });
 
   it("räknar om ur de lagrade raderna, inte ur dagens pris", () => {
-    // En beställning som lades för 19 900 behåller sin summa när frakten
-    // sätts, även om priset sedan höjts.
-    const stored = priceLines([{ productKey: "STAMPLINGSSKARM", quantity: 1 }], {
-      STAMPLINGSSKARM: 1_990_000,
-    });
-
+    const stored = priceLines(
+      [{ productKey: "SKARM", quantity: 1 }],
+      [{ ...SCREEN, priceOre: 1_990_000 }]
+    );
     expect(orderTotals(stored, 0).goodsOre).toBe(1_990_000);
   });
 

@@ -360,7 +360,13 @@ shop_order_events — id, company_id, order_id, kind, from_status, to_status,
                     detail, customer_message, actor_email, email_state
 shop_order_notes  — id, order_id, target_company_id, body, author_email
                     (plattformens, ingen relation)
-shop_prices       — product_key, price_ore, updated_by_email (plattformens)
+shop_products     — id, key, slug, kind, name, summary, description,
+                    price_ore, vat_rate_percent, max_quantity, delivery,
+                    warranty, benefits, included, requirements, specs,
+                    in_shop, on_site, sort_order (plattformens)
+shop_product_images — id, product_id, data?, mime_type?, static_path?, alt,
+                    illustration, sort_order
+shop_prices       — död, ersatt av shop_products.price_ore (se § 3.4)
 ```
 
 ### Beslutade regler för stämpling (bestämt 2026-08-10)
@@ -1424,7 +1430,7 @@ Beställningar i `next.config.ts`, eftersom de första mejlen länkade dit.
 - **Ingångar där behovet uppstår:** en länk på Stämplingsskärmar och i Kom
   igång, båda till kassan med en skärm i korgen. Säljsidans Beställ leder
   dit genom inloggningen.
-- **Vara eller tjänst** (`kind` i katalogen). Kassan frågar efter
+- **Vara eller tjänst** (`kind` på produkten). Kassan frågar efter
   leveransadress bara när något ska skickas. Med bara tjänster är adressen
   fakturaadressen, och märkning och frakt finns inte. Ingen tjänst säljs än;
   tjänsternas egna lägen (bokad, genomförd) byggs när den första finns.
@@ -1433,21 +1439,37 @@ Beställningar i `next.config.ts`, eftersom de första mejlen länkade dit.
 kundens arbetsorder, det allt annat i Tikkr hänger på. I koden heter det
 `Shop…`.
 
-- **Katalogen ligger i koden**, `src/lib/shop/catalog.ts`, som guiderna och
-  modulregistret: texter, specifikationer, bilder, moms och leveranstid. En
-  ny produkt är en post där, och butiken, formuläret, plattformen och mejlen
-  är skrivna över `PRODUCT_KEYS`. **Tillverkarens namn och modell står
-  aldrig i det kunden ser**; produkten säljs som Tikkrs, och
-  `tests/shop-pricing.test.ts` fäller katalogen om namnet dyker upp.
-  Specifikationer som inte är bekräftade står inte med, därför ingen
-  Android-version.
-- **Priset ligger i databasen**, `shop_prices`, och ändras under Artiklar i
-  plattformspanelen. Katalogens belopp är reserv. Allt läser priset genom
-  `shopPrices()`, så att säljsidan och formuläret aldrig visar olika belopp.
-  Priserna är exklusive moms, och momsen räknas bara i `pricing.ts`, per rad
-  som fakturan i Fortnox. Säljsidans priser står annars bara i
-  prisavsnittet; skärmens engångspris står på produktsidan, inte på
-  startsidan.
+- **Produkterna läggs upp under Produkter i plattformspanelen** (ändrat
+  2026-10-21, produktägarens val; låg som en katalog i koden till dess).
+  De ligger i `shop_products` och `shop_product_images`: namn, texter,
+  typ, pris, moms, högsta antal, leveranstext, garanti, fördelar, vad som
+  ingår, vad kunden behöver, specifikationer och bilder. En ny produkt är
+  dold tills den kryssas i för **butiken** och/eller **säljsidan**.
+  Skälet är att butiken ska kunna bära utbildningar och annat utan att varje
+  produkt kräver en driftsättning. Priset är att texterna inte längre
+  granskas i en PR innan de syns, och att ingen test längre stoppar
+  tillverkarens namn; det valde produktägaren bort.
+- **Allt läser produkterna genom `products.ts`**: säljsidan, butiken,
+  kassan, servern som räknar beställningen och mejlen. Säljsidan och kassan
+  kan därför aldrig visa olika pris. Priserna är exklusive moms, och momsen
+  räknas bara i `pricing.ts`, per rad som fakturan i Fortnox. Säljsidans
+  priser står annars bara i prisavsnittet; skärmens engångspris står på
+  produktsidan, inte på startsidan, och startsidans avsnitt om skärmen
+  visas bara när produkten `stamplingsskarm` syns på säljsidan.
+- **Nyckeln sätts en gång.** Den bildas ur adressen när produkten skapas
+  (`stamplingsskarm` → `STAMPLINGSSKARM`) och ändras aldrig, eftersom
+  beställningsraderna pekar på den. Adressen får ändras.
+- **En beställd produkt raderas aldrig, den döljs.** En som aldrig
+  beställts går att ta bort, samma avvägning som för improduktiva moment.
+- **Bilderna laddas upp i plattformen** och ligger i databasen, som
+  kundernas logotyper, så att de följer med i backupen. Uppladdningen går
+  genom en egen rutt, `/api/plattform/produkter/bild`, eftersom
+  serveråtgärder tar emot högst 1 MB; gränsen där är 5 MB, och typen prövas
+  på filens innehåll. `/api/butik/bild/<id>` lämnar ut bilderna, och bara
+  för produkter som syns. Stämplingsskärmens illustrationer ligger kvar som
+  filer under `public/` och pekas ut med `static_path`.
+- `shop_prices` läses inte längre men ligger kvar (§ 0 punkt 7), och tas
+  bort i en senare release. Migrationen tog priset därifrån.
 - **Bara ägaren beställer**, av samma skäl som prenumerationen (§ 1,
   Adminflöde): en beställning ändrar vad kunden betalar. Alla
   administratörer ser butiken och beställningarna. Leverans- och
@@ -2202,7 +2224,7 @@ pris.
 **24 900 kr exklusive moms**, frakt tillkommer. Inköpet är ungefär 13 600 kr
 för skärmen och 1 500 kr för stativet, och med förberedelse, emballage och en
 reserv för garantiärenden landar självkostnaden kring 16 900 kr. Priset sätts
-under Artiklar i plattformspanelen och kan ändras innan lansering. Lagda
+på produkten under Produkter i plattformspanelen och kan ändras innan lansering. Lagda
 beställningar behåller sitt pris.
 
 ### Avtalat pris per kund (tillagt 2026-10-08)

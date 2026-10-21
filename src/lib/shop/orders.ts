@@ -1,5 +1,5 @@
 import type { CompanyDb } from "../tenant";
-import { shopPrices } from "./prices";
+import { listProducts } from "./products";
 import {
   needsDelivery,
   orderTotals,
@@ -17,8 +17,8 @@ import type { CleanProfile } from "./profile";
  * ändrar status och betalning, ligger i admin.ts.
  *
  * PRIS, MOMS OCH TOTAL KOMMER ALDRIG FRÅN FORMULÄRET. Anroparen lämnar
- * produktnycklar och antal, och priset slås upp i shopPrices() här, i samma
- * anrop som beställningen skapas.
+ * produktnycklar och antal, och produkterna slås upp i listProducts() här, i
+ * samma anrop som beställningen skapas.
  */
 
 export class OrderError extends Error {
@@ -65,7 +65,7 @@ export async function placeOrder(params: {
 
   let lines;
   try {
-    lines = priceLines(params.items, await shopPrices());
+    lines = priceLines(params.items, await listProducts("shop"));
   } catch (error) {
     if (error instanceof PricingError) throw new OrderError(error.message);
     throw error;
@@ -228,6 +228,7 @@ export async function customerOrders(db: CompanyDb) {
         orderBy: { sortOrder: "asc" },
         select: {
           productKey: true,
+          productKind: true,
           name: true,
           quantity: true,
           unitPriceOre: true,

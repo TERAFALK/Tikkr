@@ -22,7 +22,7 @@ import { faqQuestions } from "./faq-data";
 import type { ModulePricing, ScreenPricing } from "@/lib/stripe";
 import { MODULES, MODULE_KEYS, type ModuleKey } from "@/lib/modules";
 import Reveal from "./Reveal";
-import { PRODUCTS } from "@/lib/shop/catalog";
+import type { Product } from "@/lib/shop/catalog";
 
 /**
  * SÄLJSIDANS AVSNITT.
@@ -1015,13 +1015,13 @@ export function Capabilities() {
  * skärmens pris är en engångssumma som inte hör hemma bredvid månadspriset.
  * Knappen leder till produktsidan, där pris, moms och specifikationer står.
  *
- * Fördelarna läses ur katalogen och skrivs inte av här, så att säljsidan och
- * produktsidan inte kan säga olika saker om samma skärm.
+ * Fördelarna läses ur produkten och skrivs inte av här, så att säljsidan och
+ * produktsidan inte kan säga olika saker om samma skärm. Är skärmen dold på
+ * säljsidan visas inte avsnittet alls, se page.tsx.
  *
  * Bilden är en illustration tills det finns ett foto, och märks som en.
  */
-export function ScreenHardware() {
-  const product = PRODUCTS.STAMPLINGSSKARM;
+export function ScreenHardware({ product }: { product: Product }) {
   const image = product.images[0];
 
   return (
@@ -1045,7 +1045,7 @@ export function ScreenHardware() {
                   {benefit.body}
                 </SpecRow>
               ))}
-              <SpecRow term="Leverans">{product.delivery}</SpecRow>
+              {product.delivery && <SpecRow term="Leverans">{product.delivery}</SpecRow>}
             </dl>
 
             <div className="mt-10">
@@ -1053,24 +1053,26 @@ export function ScreenHardware() {
             </div>
           </div>
 
-          <figure className="relative">
-            <div className="overflow-hidden rounded-2xl border border-neutral-200 bg-white shadow-[0_30px_60px_-30px_rgba(14,26,43,0.35)]">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={image.src}
-                alt={image.alt}
-                width={1200}
-                height={900}
-                loading="lazy"
-                className="h-auto w-full"
-              />
-            </div>
-            {image.illustration && (
-              <figcaption className="mt-3 text-[12px] text-neutral-500">
-                Illustration
-              </figcaption>
-            )}
-          </figure>
+          {image && (
+            <figure className="relative">
+              <div className="overflow-hidden rounded-2xl border border-neutral-200 bg-white shadow-[0_30px_60px_-30px_rgba(14,26,43,0.35)]">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={image.src}
+                  alt={image.alt}
+                  width={1200}
+                  height={900}
+                  loading="lazy"
+                  className="h-auto w-full"
+                />
+              </div>
+              {image.illustration && (
+                <figcaption className="mt-3 text-[12px] text-neutral-500">
+                  Illustration
+                </figcaption>
+              )}
+            </figure>
+          )}
         </div>
       </div>
     </section>

@@ -1,4 +1,4 @@
-import { isProductKey, PRODUCTS, type ProductKey } from "./catalog";
+import type { ProductForPricing, ProductKind } from "./catalog";
 
 /**
  * BESTÄLLNINGENS BELOPP, RÄKNADE PÅ ETT STÄLLE.
@@ -12,14 +12,12 @@ import { isProductKey, PRODUCTS, type ProductKey } from "./catalog";
  * fakturaprogrammen gör, och då blir beloppet på beställningen detsamma som
  * på fakturan från Fortnox.
  *
- * Filen läser inga priser själv. Den får dem som argument, från shopPrices(),
- * så att den går att pröva utan databas.
+ * Filen läser inga priser själv. Den får produkterna som argument, från
+ * listProducts() i products.ts, så att den går att pröva utan databas.
  */
 
 /** Moms på frakten. Följer varan, som i Sverige är 25 %. */
 export const SHIPPING_VAT_PERCENT = 25;
-
-export type PriceList = Record<ProductKey, number>;
 
 export interface RequestedItem {
   productKey: string;
@@ -27,10 +25,11 @@ export interface RequestedItem {
 }
 
 export interface PricedLine {
-  productKey: ProductKey;
+  productKey: string;
   name: string;
   unitPriceOre: number;
   vatRatePercent: number;
+  productKind: ProductKind;
   quantity: number;
   subtotalOre: number;
   vatOre: number;
@@ -60,17 +59,24 @@ export function vatOf(amountOre: number, ratePercent: number): number {
  * Raderna en beställning består av, med priserna som gäller nu.
  *
  * Tar bara nyckel och antal från anroparen. Pris, namn och moms slås upp i
- * katalogen och prislistan, aldrig i det som kom in med formuläret. Rader med
- * antal noll faller bort; ett okänt eller orimligt antal är ett fel och
- * avrundas inte tyst.
+ * produkterna, aldrig i det som kom in med formuläret. Rader med antal noll
+ * faller bort; ett okänt eller orimligt antal är ett fel och avrundas inte
+ * tyst. En produkt som inte ligger i butiken går inte att beställa, även om
+ * någon skriver dess nyckel i adressen.
  */
-export function priceLines(items: RequestedItem[], prices: PriceList): PricedLine[] {
+export function priceLines(
+  items: RequestedItem[],
+  products: ProductForPricing[]
+): PricedLine[] {
+  const byKey = new Map(products.map((product) => [product.key, product]));
   const seen = new Set<string>();
   const lines: PricedLine[] = [];
 
   for (const item of items) {
-    if (!isProductKey(item.productKey)) {
-      throw new PricingError("Produkten finns inte.");
+    const product = byKey.get(item.productKey);
+
+    if (!product || !product.inShop) {
+      throw new PricingError("Produkten finns inte i butiken.");
     }
 
     if (seen.has(item.productKey)) {
@@ -78,7 +84,6 @@ export function priceLines(items: RequestedItem[], prices: PriceList): PricedLin
     }
     seen.add(item.productKey);
 
-    const product = PRODUCTS[item.productKey];
     const quantity = item.quantity;
 
     if (!Number.isInteger(quantity) || quantity < 0) {
@@ -91,7 +96,7 @@ export function priceLines(items: RequestedItem[], prices: PriceList): PricedLin
     }
     if (quantity === 0) continue;
 
-    const unitPriceOre = prices[item.productKey];
+    const unitPriceOre = product.priceOre;
     if (!Number.isInteger(unitPriceOre) || unitPriceOre <= 0) {
       throw new PricingError(`${product.name} saknar pris och går inte att beställa just nu.`);
     }
@@ -99,10 +104,11 @@ export function priceLines(items: RequestedItem[], prices: PriceList): PricedLin
     const subtotalOre = unitPriceOre * quantity;
 
     lines.push({
-      productKey: item.productKey,
+      productKey: product.key,
       name: product.name,
       unitPriceOre,
       vatRatePercent: product.vatRatePercent,
+      productKind: product.kind,
       quantity,
       subtotalOre,
       vatOre: vatOf(subtotalOre, product.vatRatePercent),
@@ -139,12 +145,11 @@ export function orderTotals(
  * Om något i beställningen ska skickas.
  *
  * Avgör om kassan frågar efter leveransadress och om beställningen kräver
- * den. En beställning med bara tjänster har ingen adress att leverera till.
+ * den. Läser typen på raden, som är en ögonblicksbild: en produkt som byter
+ * typ efteråt ändrar inte en lagd beställning.
  */
-export function needsDelivery(lines: { productKey: string }[]): boolean {
-  return lines.some(
-    (line) => !isProductKey(line.productKey) || PRODUCTS[line.productKey].kind === "GOODS"
-  );
+export function needsDelivery(lines: { productKind: string }[]): boolean {
+  return lines.some((line) => line.productKind !== "SERVICE");
 }
 
 /** Pris inklusive moms för en produkt, för säljsidan. */

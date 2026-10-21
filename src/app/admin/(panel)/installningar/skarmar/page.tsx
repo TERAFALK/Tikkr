@@ -17,7 +17,7 @@ import {
   Tr,
 } from "@/components/ui";
 import { formatDateTime } from "@/lib/format";
-import { checkoutHref } from "@/lib/shop/cart";
+import { checkoutHrefFor } from "@/lib/shop/cart";
 import { getLicenseState } from "@/lib/licenses";
 import { deviceState } from "@/lib/kiosk-auth";
 import {
@@ -249,7 +249,7 @@ export default async function DevicesPage() {
       <p className="text-[13px] text-neutral-500">
         Stämplingsskärm i stativ, uppsatt för Tikkr.{" "}
         <Link
-          href={checkoutHref({ STAMPLINGSSKARM: 1 })}
+          href={checkoutHrefFor("stamplingsskarm")}
           className="font-medium text-tick-deep hover:underline"
         >
           Beställ i butiken

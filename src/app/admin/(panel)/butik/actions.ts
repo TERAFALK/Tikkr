@@ -3,10 +3,10 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { assertWritable, isOwner, requireAdmin } from "@/lib/admin-session";
-import { PRODUCT_KEYS } from "@/lib/shop/catalog";
 import { deliverPendingForOrder } from "@/lib/shop/notify";
 import { OrderError, placeOrder } from "@/lib/shop/orders";
-import { needsDelivery } from "@/lib/shop/pricing";
+import { needsDelivery, priceLines, PricingError } from "@/lib/shop/pricing";
+import { listProducts } from "@/lib/shop/products";
 import {
   readProfileForm,
   validateProfile,
@@ -45,10 +45,25 @@ export async function placeShopOrder(
   await assertWritable(session);
   if (!isOwner(session)) return { error: "Bara arbetsytans ägare kan beställa." };
 
-  const items = PRODUCT_KEYS.map((key) => ({
-    productKey: key,
-    quantity: Number(formData.get(`qty-${key}`) ?? 0),
-  })).filter((item) => item.quantity !== 0);
+  // Antal per produkt, ur kassans dolda fält. Bara produkter i butiken
+  // räknas, och priset tas aldrig härifrån.
+  const products = await listProducts("shop");
+  const items = products
+    .map((product) => ({
+      productKey: product.key,
+      quantity: Number(formData.get(`qty-${product.key}`) ?? 0),
+    }))
+    .filter((item) => item.quantity !== 0);
+
+  // Leveransadressen krävs bara när något ska skickas. Raderna räknas här
+  // för att veta det, och igen i placeOrder när beställningen skapas.
+  let delivery: boolean;
+  try {
+    delivery = needsDelivery(priceLines(items, products));
+  } catch (error) {
+    if (error instanceof PricingError) return { error: error.message };
+    throw error;
+  }
 
   const profileInput = readProfileForm(formData);
   const saveProfile = formData.get("saveProfile") === "on";
@@ -61,7 +76,7 @@ export async function placeShopOrder(
 
   const { errors, clean } = validateProfile(profileInput, {
     requireForOrder: true,
-    delivery: needsDelivery(items),
+    delivery,
   });
 
   if (!clean) {

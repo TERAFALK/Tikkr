@@ -1,5 +1,3 @@
-import { PRODUCT_KEYS, PRODUCTS, type ProductKey } from "./catalog";
-
 /**
  * VARUKORGEN STÅR I ADRESSEN.
  *
@@ -11,14 +9,17 @@ import { PRODUCT_KEYS, PRODUCTS, type ProductKey } from "./catalog";
  * Adressen är bara ett förslag. Antalet prövas igen när beställningen läggs,
  * och priset kommer aldrig härifrån.
  *
- * Inga databasanrop och inga React-beroenden, så att både sidorna och
- * klientkomponenterna kan använda den.
+ * Produkterna kommer som argument, så att filen saknar databasanrop och
+ * React-beroenden och kan användas av både sidorna och klientkomponenterna.
  */
 
-export type Cart = Record<ProductKey, number>;
+/** Antal per produktnyckel. Saknad nyckel betyder noll. */
+export type Cart = Record<string, number>;
 
-export function emptyCart(): Cart {
-  return Object.fromEntries(PRODUCT_KEYS.map((key) => [key, 0])) as Cart;
+interface CartProduct {
+  key: string;
+  slug: string;
+  maxQuantity: number;
 }
 
 /**
@@ -30,17 +31,17 @@ export function emptyCart(): Cart {
  * 50 i adressfältet hjälper ingen.
  */
 export function cartFromParams(
-  params: Record<string, string | string[] | undefined>
+  params: Record<string, string | string[] | undefined>,
+  products: CartProduct[]
 ): Cart {
-  const cart = emptyCart();
+  const cart: Cart = {};
 
-  for (const key of PRODUCT_KEYS) {
-    const product = PRODUCTS[key];
+  for (const product of products) {
     const raw = params[product.slug];
     const value = Number(Array.isArray(raw) ? raw[0] : raw);
 
     if (Number.isInteger(value) && value > 0) {
-      cart[key] = Math.min(value, product.maxQuantity);
+      cart[product.key] = Math.min(value, product.maxQuantity);
     }
   }
 
@@ -48,30 +49,38 @@ export function cartFromParams(
 }
 
 /** Adressens frågedel för en varukorg, utan frågetecken. Tom korg ger "". */
-export function cartQuery(cart: Partial<Cart>): string {
+export function cartQuery(cart: Cart, products: CartProduct[]): string {
   const query = new URLSearchParams();
 
-  for (const key of PRODUCT_KEYS) {
-    const quantity = cart[key] ?? 0;
-    if (quantity > 0) query.set(PRODUCTS[key].slug, String(quantity));
+  for (const product of products) {
+    const quantity = cart[product.key] ?? 0;
+    if (quantity > 0) query.set(product.slug, String(quantity));
   }
 
   return query.toString();
 }
 
-export function cartCount(cart: Partial<Cart>): number {
-  return PRODUCT_KEYS.reduce((sum, key) => sum + (cart[key] ?? 0), 0);
+export function cartCount(cart: Cart): number {
+  return Object.values(cart).reduce((sum, quantity) => sum + (quantity > 0 ? quantity : 0), 0);
 }
 
-export function cartItems(cart: Partial<Cart>): { productKey: ProductKey; quantity: number }[] {
-  return PRODUCT_KEYS.filter((key) => (cart[key] ?? 0) > 0).map((key) => ({
-    productKey: key,
-    quantity: cart[key]!,
-  }));
+export function cartItems(cart: Cart): { productKey: string; quantity: number }[] {
+  return Object.entries(cart)
+    .filter(([, quantity]) => quantity > 0)
+    .map(([productKey, quantity]) => ({ productKey, quantity }));
 }
 
-/** Adressen till kassan med en varukorg, t.ex. från knappen på Stämplingsskärmar. */
-export function checkoutHref(cart: Partial<Cart>): string {
-  const query = cartQuery(cart);
+/**
+ * Adressen till kassan med en produkt i korgen, efter dess adressnamn.
+ * Används av knapparna där behovet uppstår, som inte känner produkternas
+ * nycklar.
+ */
+export function checkoutHrefFor(slug: string, quantity = 1): string {
+  return `/admin/butik/kassa?${new URLSearchParams({ [slug]: String(quantity) })}`;
+}
+
+/** Adressen till kassan med en hel varukorg. */
+export function checkoutHref(cart: Cart, products: CartProduct[]): string {
+  const query = cartQuery(cart, products);
   return `/admin/butik/kassa${query ? `?${query}` : ""}`;
 }

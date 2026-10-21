@@ -382,7 +382,7 @@ ingen extra container, inget abonnement.
 ## 10. Försäljning och garanti (2026-10-20)
 
 Skärmen säljs i butiken på `/tillbehor` och beställs i panelen, se CLAUDE.md
-§ 3.4. Det kunden ser står i `src/lib/shop/catalog.ts` och nämner aldrig
+§ 3.4. Det kunden ser läggs upp under Produkter i plattformspanelen och nämner aldrig
 tillverkaren eller modellen.
 
 **Specarna i katalogen är avstämda mot databladet för 5024200

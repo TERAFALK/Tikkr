@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { pageMetadata } from "@/lib/seo";
 import { getModulePricing, getScreenPricing } from "@/lib/stripe";
+import { productBySlug } from "@/lib/shop/products";
 import Reveal from "@/components/marketing/Reveal";
 import { SiteFooter, SiteHeader } from "@/components/marketing/SiteChrome";
 import StructuredData from "@/components/marketing/StructuredData";
@@ -64,9 +65,12 @@ export const metadata: Metadata = pageMetadata({
 export default async function Home() {
   // Hämtas parallellt. Båda ligger bakom samma korta minne i stripe.ts, så
   // det är en fråga till betaltjänsten och inte två.
-  const [pricing, modules] = await Promise.all([
+  const [pricing, modules, screen] = await Promise.all([
     getScreenPricing(),
     getModulePricing(),
+    // Stämplingsskärmen ur butiken. Utan databas, som när sidan byggs, eller
+    // när skärmen är dold på säljsidan, visas inte avsnittet.
+    productBySlug("stamplingsskarm", "site").catch(() => null),
   ]);
 
   return (
@@ -99,9 +103,11 @@ export default async function Home() {
         <Capabilities />
       </Reveal>
 
-      <Reveal>
-        <ScreenHardware />
-      </Reveal>
+      {screen && (
+        <Reveal>
+          <ScreenHardware product={screen} />
+        </Reveal>
+      )}
 
       <Reveal>
         <Pricing pricing={pricing} modules={modules} />
