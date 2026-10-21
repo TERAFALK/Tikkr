@@ -76,6 +76,40 @@ describe("en beställning", () => {
   });
 });
 
+describe("en beställning utan leverans", () => {
+  it("kräver adressen men tömmer märkning och separat fakturaadress", () => {
+    const { errors, clean } = validateProfile(
+      {
+        values: {
+          ...COMPLETE,
+          deliveryReference: "Verkstaden",
+          billingAddressLine: "Box 12",
+          billingPostalCode: "46121",
+          billingCity: "Trollhättan",
+        },
+        separateBilling: true,
+      },
+      { requireForOrder: true, delivery: false }
+    );
+
+    expect(errors).toEqual({});
+    expect(clean).toMatchObject({
+      addressLine: "Industrigatan 4",
+      deliveryReference: null,
+      billingAddressLine: null,
+      billingCity: null,
+    });
+  });
+
+  it("kräver fortfarande en adress att fakturera till", () => {
+    const { errors } = validateProfile(
+      { values: { ...COMPLETE, addressLine: "" }, separateBilling: false },
+      { requireForOrder: true, delivery: false }
+    );
+    expect(errors.addressLine).toBeDefined();
+  });
+});
+
 describe("inställningarna", () => {
   it("sparar halvt ifyllt", () => {
     const { errors, clean } = validateProfile(
@@ -178,8 +212,8 @@ describe("spårningslänken", () => {
 
 describe("returadressen efter inloggning", () => {
   it("bara sidor i panelen", () => {
-    expect(safeAdminNext("/admin/installningar/tillbehor?produkt=stamplingsskarm")).toBe(
-      "/admin/installningar/tillbehor?produkt=stamplingsskarm"
+    expect(safeAdminNext("/admin/butik/kassa?stamplingsskarm=1")).toBe(
+      "/admin/butik/kassa?stamplingsskarm=1"
     );
     expect(safeAdminNext("/admin")).toBe("/admin");
   });

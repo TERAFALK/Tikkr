@@ -77,7 +77,7 @@ const MISSING: Record<ProfileField, string> = {
   contactName: "Skriv kontaktpersonens namn.",
   orderEmail: "Skriv en e-postadress.",
   phone: "Skriv ett telefonnummer.",
-  addressLine: "Skriv leveransadressen.",
+  addressLine: "Skriv adressen.",
   postalCode: "Skriv postnumret.",
   city: "Skriv orten.",
   deliveryReference: "",
@@ -119,17 +119,28 @@ export type CleanProfile = { [K in ProfileField]: string | null };
  */
 export function validateProfile(
   input: { values: ProfileValues; separateBilling: boolean },
-  options: { requireForOrder: boolean }
+  options: {
+    requireForOrder: boolean;
+    /**
+     * false när inget i beställningen ska skickas, t.ex. bara en utbildning.
+     * Adressen är då den fakturan går till, och märkningen och en separat
+     * fakturaadress har ingenting att göra. Utelämnad betyder leverans.
+     */
+    delivery?: boolean;
+  }
 ): { errors: ProfileErrors; clean: CleanProfile | null } {
   const values = { ...input.values };
   const errors: ProfileErrors = {};
+  const delivery = options.delivery ?? true;
+  const separateBilling = delivery && input.separateBilling;
 
-  if (!input.separateBilling) {
+  if (!separateBilling) {
     for (const field of BILLING_FIELDS) values[field] = "";
   }
+  if (!delivery) values.deliveryReference = "";
 
   const required = options.requireForOrder
-    ? [...REQUIRED_FOR_ORDER, ...(input.separateBilling ? REQUIRED_BILLING : [])]
+    ? [...REQUIRED_FOR_ORDER, ...(separateBilling ? REQUIRED_BILLING : [])]
     : [];
 
   for (const field of PROFILE_FIELDS) {

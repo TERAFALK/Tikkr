@@ -1,120 +1,58 @@
-import { randomUUID } from "node:crypto";
-import { isOwner, requireAdmin } from "@/lib/admin-session";
+import { requireAdmin } from "@/lib/admin-session";
 import { formatDate } from "@/lib/format";
 import { formatCurrency } from "@/lib/money";
-import { allProducts, productBySlug } from "@/lib/shop/catalog";
 import { customerOrders, type CustomerOrder } from "@/lib/shop/orders";
-import { shopPrices } from "@/lib/shop/prices";
-import { profileToValues } from "@/lib/shop/profile";
+import { needsDelivery } from "@/lib/shop/pricing";
 import { PAYMENT_LABEL, STATUS_LABEL, orderLabel } from "@/lib/shop/status";
-import AccessoryOrderForm from "@/components/admin/AccessoryOrderForm";
-import { Alert, Badge, Card, CardHeader, EmptyState } from "@/components/ui";
+import { Alert, Badge, ButtonLink, Card, EmptyState } from "@/components/ui";
 import type { ShopOrderStatus } from "@prisma/client";
 
 export const dynamic = "force-dynamic";
-export const metadata = { title: "Tillbehör · Tikkr" };
+export const metadata = { title: "Beställningar · Butik · Tikkr" };
 
 /**
- * TILLBEHÖR: beställa och följa sina beställningar.
+ * FÖRETAGETS BESTÄLLNINGAR, nyast först.
  *
- * Alla administratörer ser produkterna och beställningarna. Bara ägaren får
- * formuläret, och åtgärden bakom det prövar ägaren själv, se actions.ts.
- *
- * Säljsidans Beställ-knapp leder hit genom inloggningen, med produkten i
- * adressen (`?produkt=stamplingsskarm`), så att den man kom för redan står
- * på en.
+ * Alla administratörer ser dem. Historiken visar läget, tiden och det vi
+ * skrivit till kunden, aldrig vem hos oss som ändrade något, se
+ * customerOrders. Mejlens länk "Visa beställningen" leder hit.
  */
-export default async function AccessoriesPage({
+export default async function ShopOrdersPage({
   searchParams,
 }: {
-  searchParams: Promise<{ produkt?: string; bestallning?: string }>;
+  searchParams: Promise<{ bestallning?: string }>;
 }) {
   const session = await requireAdmin();
   const params = await searchParams;
-
-  const [profile, prices, orders] = await Promise.all([
-    session.db.companyProfile.findFirst(),
-    shopPrices(),
-    customerOrders(session.db),
-  ]);
-
-  const products = allProducts().map((product) => ({
-    key: product.key,
-    slug: product.slug,
-    name: product.name,
-    summary: product.summary,
-    priceOre: prices[product.key],
-    vatRatePercent: product.vatRatePercent,
-    maxQuantity: product.maxQuantity,
-    delivery: product.delivery,
-    image: product.images[0] ?? null,
-  }));
-
-  const form = profileToValues(profile);
-  const preselect = params.produkt ? (productBySlug(params.produkt)?.key ?? null) : null;
+  const orders = await customerOrders(session.db);
 
   const placedNumber = Number(params.bestallning);
   const placed = Number.isInteger(placedNumber)
     ? orders.find((order) => order.number === placedNumber)
     : undefined;
 
-  const canOrder = isOwner(session) && !session.support;
-
   return (
     <div className="space-y-6">
       {placed && (
         <Alert tone="info">
-          {orderLabel(placed.number)} är skickad. Orderbekräftelsen går till{" "}
-          {placed.email}.
+          {orderLabel(placed.number)} är skickad. Orderbekräftelsen går till {placed.email}.
         </Alert>
       )}
 
-      <Card>
-        <CardHeader title="Beställ" />
-        {canOrder ? (
-          <AccessoryOrderForm
-            products={products}
-            profile={form.values}
-            separateBilling={form.separateBilling}
-            idempotencyKey={randomUUID()}
-            preselect={preselect}
-          />
-        ) : (
-          <div className="space-y-4 p-5">
-            <ul className="divide-y divide-neutral-100 rounded-lg border border-neutral-200">
-              {products.map((product) => (
-                <li key={product.key} className="flex flex-wrap items-baseline justify-between gap-2 p-4">
-                  <div>
-                    <p className="text-sm font-semibold text-neutral-900">{product.name}</p>
-                    <p className="text-[13px] text-neutral-500">{product.summary}</p>
-                  </div>
-                  <p className="text-[13px] tabular-nums text-neutral-700">
-                    {formatCurrency(product.priceOre)} exkl. moms
-                  </p>
-                </li>
-              ))}
-            </ul>
-            <p className="text-[13px] text-neutral-500">
-              Arbetsytans ägare beställer.
-            </p>
-          </div>
-        )}
-      </Card>
-
-      <Card>
-        <CardHeader title="Beställningar" />
-        {orders.length === 0 ? (
-          <div className="p-5">
-            <EmptyState title="Inga beställningar" />
-          </div>
-        ) : (
+      {orders.length === 0 ? (
+        <EmptyState
+          title="Inga beställningar"
+          action={<ButtonLink href="/admin/butik">Till produkterna</ButtonLink>}
+        />
+      ) : (
+        <Card>
           <ul className="divide-y divide-neutral-100">
             {orders.map((order) => (
               <OrderItem key={order.id} order={order} open={order.number === placed?.number} />
             ))}
           </ul>
-        )}
-      </Card>
+        </Card>
+      )}
     </div>
   );
 }
@@ -133,6 +71,8 @@ const TONE: Record<ShopOrderStatus, "neutral" | "active" | "warning" | "muted"> 
 function OrderItem({ order, open }: { order: CustomerOrder; open: boolean }) {
   const lines = order.lines.map((line) => `${line.quantity} × ${line.name}`).join(", ");
   const shippingKnown = order.shippingOre !== null;
+  const ships = needsDelivery(order.lines);
+  const shippingPending = ships && !shippingKnown;
 
   return (
     <li>
@@ -156,14 +96,16 @@ function OrderItem({ order, open }: { order: CustomerOrder; open: boolean }) {
                   value={formatCurrency(line.subtotalOre)}
                 />
               ))}
-              <Row label="Summa varor, exkl. moms" value={formatCurrency(order.goodsOre)} />
-              <Row
-                label={shippingKnown ? "Frakt, exkl. moms" : "Frakt"}
-                value={shippingKnown ? formatCurrency(order.shippingOre!) : "Tillkommer"}
-              />
+              <Row label="Summa, exkl. moms" value={formatCurrency(order.goodsOre)} />
+              {(ships || shippingKnown) && (
+                <Row
+                  label={shippingKnown ? "Frakt, exkl. moms" : "Frakt"}
+                  value={shippingKnown ? formatCurrency(order.shippingOre!) : "Tillkommer"}
+                />
+              )}
               <Row label="Moms" value={formatCurrency(order.vatOre)} />
               <Row
-                label={shippingKnown ? "Totalt inkl. moms" : "Summa inkl. moms, exkl. frakt"}
+                label={shippingPending ? "Summa inkl. moms, exkl. frakt" : "Totalt inkl. moms"}
                 value={formatCurrency(order.totalOre)}
                 strong
               />
@@ -176,7 +118,7 @@ function OrderItem({ order, open }: { order: CustomerOrder; open: boolean }) {
 
           <div className="space-y-4">
             <div>
-              <p className="font-medium text-neutral-900">Leverans</p>
+              <p className="font-medium text-neutral-900">{ships ? "Leverans" : "Faktureras till"}</p>
               <p className="mt-1 leading-relaxed text-neutral-600">
                 {order.contactName}
                 <br />

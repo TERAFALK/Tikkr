@@ -21,12 +21,18 @@ export default function ProfileFields({
   separateBilling: initialSeparate,
   errors = {},
   requireForOrder = false,
+  delivery = true,
 }: {
   values: ProfileValues;
   separateBilling: boolean;
   errors?: ProfileErrors;
   /** Markerar fälten en beställning kräver. */
   requireForOrder?: boolean;
+  /**
+   * false när inget ska skickas. Adressen blir då fakturaadressen, och
+   * märkningen och den separata fakturaadressen döljs. Se validateProfile.
+   */
+  delivery?: boolean;
 }) {
   const [separate, setSeparate] = useState(initialSeparate);
 
@@ -78,7 +84,7 @@ export default function ProfileFields({
 
       <fieldset className="space-y-4">
         <legend className="mb-3 text-[13px] font-semibold text-neutral-900">
-          Leveransadress
+          {delivery ? "Leveransadress" : "Fakturaadress"}
         </legend>
         {field("addressLine", "Adress", { autoComplete: "street-address", required: true })}
         <div className="grid gap-4 sm:grid-cols-[10rem_1fr]">
@@ -90,40 +96,43 @@ export default function ProfileFields({
             <span className="mb-1 block text-[13px] font-medium text-neutral-700">Land</span>
             <p className="py-1.5 text-[13px] text-neutral-900">Sverige</p>
           </div>
-          {field("deliveryReference", "Märkning", {
-            hint: "Valfritt. T.ex. namn eller kostnadsställe",
-          })}
+          {delivery &&
+            field("deliveryReference", "Märkning", {
+              hint: "Valfritt. T.ex. namn eller kostnadsställe",
+            })}
         </div>
       </fieldset>
 
-      <fieldset className="space-y-4">
-        <legend className="sr-only">Fakturaadress</legend>
-        <label className="flex items-center gap-2 text-[13px] text-neutral-700">
-          <input
-            type="checkbox"
-            name="separateBilling"
-            checked={separate}
-            onChange={(event) => setSeparate(event.target.checked)}
-            className="h-3.5 w-3.5 rounded border-neutral-300 text-blue-600 focus:ring-blue-600"
-          />
-          Annan fakturaadress
-        </label>
+      {delivery && (
+        <fieldset className="space-y-4">
+          <legend className="sr-only">Fakturaadress</legend>
+          <label className="flex items-center gap-2 text-[13px] text-neutral-700">
+            <input
+              type="checkbox"
+              name="separateBilling"
+              checked={separate}
+              onChange={(event) => setSeparate(event.target.checked)}
+              className="h-3.5 w-3.5 rounded border-neutral-300 text-blue-600 focus:ring-blue-600"
+            />
+            Annan fakturaadress
+          </label>
 
-        {separate && (
-          <div className="space-y-4 border-l-2 border-neutral-200 pl-4">
-            {field("billingAddressLine", "Fakturaadress", { required: true })}
-            <div className="grid gap-4 sm:grid-cols-[10rem_1fr]">
-              {field("billingPostalCode", "Postnummer", { inputMode: "numeric", required: true })}
-              {field("billingCity", "Ort", { required: true })}
+          {separate && (
+            <div className="space-y-4 border-l-2 border-neutral-200 pl-4">
+              {field("billingAddressLine", "Fakturaadress", { required: true })}
+              <div className="grid gap-4 sm:grid-cols-[10rem_1fr]">
+                {field("billingPostalCode", "Postnummer", { inputMode: "numeric", required: true })}
+                {field("billingCity", "Ort", { required: true })}
+              </div>
+              {field("invoiceEmail", "E-post för faktura", {
+                type: "email",
+                inputMode: "email",
+                hint: "Valfritt",
+              })}
             </div>
-            {field("invoiceEmail", "E-post för faktura", {
-              type: "email",
-              inputMode: "email",
-              hint: "Valfritt",
-            })}
-          </div>
-        )}
-      </fieldset>
+          )}
+        </fieldset>
+      )}
     </div>
   );
 }

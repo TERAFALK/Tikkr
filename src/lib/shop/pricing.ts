@@ -135,6 +135,18 @@ export function orderTotals(
   };
 }
 
+/**
+ * Om något i beställningen ska skickas.
+ *
+ * Avgör om kassan frågar efter leveransadress och om beställningen kräver
+ * den. En beställning med bara tjänster har ingen adress att leverera till.
+ */
+export function needsDelivery(lines: { productKey: string }[]): boolean {
+  return lines.some(
+    (line) => !isProductKey(line.productKey) || PRODUCTS[line.productKey].kind === "GOODS"
+  );
+}
+
 /** Pris inklusive moms för en produkt, för säljsidan. */
 export function withVat(priceOre: number, ratePercent: number): number {
   return priceOre + vatOf(priceOre, ratePercent);

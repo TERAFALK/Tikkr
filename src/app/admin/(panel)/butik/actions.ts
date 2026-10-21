@@ -6,6 +6,7 @@ import { assertWritable, isOwner, requireAdmin } from "@/lib/admin-session";
 import { PRODUCT_KEYS } from "@/lib/shop/catalog";
 import { deliverPendingForOrder } from "@/lib/shop/notify";
 import { OrderError, placeOrder } from "@/lib/shop/orders";
+import { needsDelivery } from "@/lib/shop/pricing";
 import {
   readProfileForm,
   validateProfile,
@@ -13,46 +14,41 @@ import {
   type ProfileValues,
 } from "@/lib/shop/profile";
 
-const PAGE = "/admin/installningar/tillbehor";
-
-/** Det formuläret får tillbaka när något inte gick, med det som skrevs. */
-export interface OrderFormState {
+/** Det kassan får tillbaka när något inte gick, med det som skrevs. */
+export interface CheckoutState {
   error?: string;
   fieldErrors?: ProfileErrors;
   values?: ProfileValues;
   separateBilling?: boolean;
-  quantities?: Record<string, string>;
   saveProfile?: boolean;
 }
 
 /**
- * LÄGGER EN BESTÄLLNING.
+ * LÄGGER EN BESTÄLLNING FRÅN KASSAN.
  *
  * BARA ÄGAREN (beslutat 2026-10-20), av samma skäl som prenumerationen: en
  * beställning ändrar vad kunden betalar. Prövas här och inte bara genom att
- * knappen döljs, eftersom en serveråtgärd nås även utan sidan. Bevisas av
+ * formuläret döljs, eftersom en serveråtgärd nås även utan sidan. Bevisas av
  * tests/owner-coverage.test.ts.
  *
- * Formuläret skickar antal per produkt och uppgifterna. Pris och moms räknas
- * i placeOrder, ur prislistan, aldrig ur formuläret.
+ * Kassan skickar antal per produkt, ur varukorgen, och uppgifterna. Pris och
+ * moms räknas i placeOrder, ur prislistan, aldrig ur formuläret.
  *
  * Mejlet skickas efter att beställningen sparats. Går det inte iväg står
  * beställningen kvar, och felet syns för oss i plattformspanelen.
  */
-export async function placeAccessoryOrder(
-  _previous: OrderFormState,
+export async function placeShopOrder(
+  _previous: CheckoutState,
   formData: FormData
-): Promise<OrderFormState> {
+): Promise<CheckoutState> {
   const session = await requireAdmin();
   await assertWritable(session);
   if (!isOwner(session)) return { error: "Bara arbetsytans ägare kan beställa." };
 
-  const quantities: Record<string, string> = {};
-  const items = PRODUCT_KEYS.map((key) => {
-    const raw = String(formData.get(`qty-${key}`) ?? "0").trim();
-    quantities[key] = raw;
-    return { productKey: key, quantity: raw === "" ? 0 : Number(raw) };
-  });
+  const items = PRODUCT_KEYS.map((key) => ({
+    productKey: key,
+    quantity: Number(formData.get(`qty-${key}`) ?? 0),
+  })).filter((item) => item.quantity !== 0);
 
   const profileInput = readProfileForm(formData);
   const saveProfile = formData.get("saveProfile") === "on";
@@ -60,11 +56,13 @@ export async function placeAccessoryOrder(
   const echo = {
     values: profileInput.values,
     separateBilling: profileInput.separateBilling,
-    quantities,
     saveProfile,
   };
 
-  const { errors, clean } = validateProfile(profileInput, { requireForOrder: true });
+  const { errors, clean } = validateProfile(profileInput, {
+    requireForOrder: true,
+    delivery: needsDelivery(items),
+  });
 
   if (!clean) {
     return { ...echo, error: "Kontrollera uppgifterna nedan.", fieldErrors: errors };
@@ -92,11 +90,11 @@ export async function placeAccessoryOrder(
   } catch (error) {
     // Beställningen är sparad. Ett mejl som inte gick iväg ska inte se ut som
     // att beställningen misslyckades, för då beställer kunden en gång till.
-    console.error(`[tillbehör] Orderbekräftelsen för ${result.number} gick inte iväg`, error);
+    console.error(`[butik] Orderbekräftelsen för ${result.number} gick inte iväg`, error);
   }
 
-  revalidatePath(PAGE);
+  revalidatePath("/admin/butik/bestallningar");
   revalidatePath("/admin/installningar");
 
-  redirect(`${PAGE}?bestallning=${result.number}`);
+  redirect(`/admin/butik/bestallningar?bestallning=${result.number}`);
 }

@@ -512,6 +512,8 @@ export interface ShopEmailOrder {
   totalOre: number;
   carrier: string | null;
   trackingUrl: string | null;
+  /** Om något i beställningen skickas. Utan det nämns varken frakt eller leverans. */
+  ships: boolean;
 }
 
 /** Ämne, rubrik och första stycket per läge. Läget avgör, inte anroparen. */
@@ -584,20 +586,26 @@ export function shopOrderEmail(params: {
 
   const n = order.number;
   const shippingKnown = order.shippingOre !== null;
+  // Frakten är okänd bara när något ska skickas och vi inte satt den än.
+  const shippingPending = order.ships && !shippingKnown;
 
   const rows = [
     ...order.lines.map((line) => ({
       label: `${line.quantity} × ${line.name}`,
       value: formatCurrency(line.subtotalOre),
     })),
-    { label: "Summa varor, exkl. moms", value: formatCurrency(order.goodsOre) },
-    {
-      label: shippingKnown ? "Frakt, exkl. moms" : "Frakt",
-      value: shippingKnown ? formatCurrency(order.shippingOre!) : "Tillkommer",
-    },
+    { label: "Summa, exkl. moms", value: formatCurrency(order.goodsOre) },
+    ...(order.ships || shippingKnown
+      ? [
+          {
+            label: shippingKnown ? "Frakt, exkl. moms" : "Frakt",
+            value: shippingKnown ? formatCurrency(order.shippingOre!) : "Tillkommer",
+          },
+        ]
+      : []),
     { label: "Moms 25 %", value: formatCurrency(order.vatOre) },
     {
-      label: shippingKnown ? "Totalt inkl. moms" : "Summa inkl. moms, exkl. frakt",
+      label: shippingPending ? "Summa inkl. moms, exkl. frakt" : "Totalt inkl. moms",
       value: formatCurrency(order.totalOre),
       strong: true,
     },
@@ -616,11 +624,15 @@ export function shopOrderEmail(params: {
     order.reference ? `Märkning: ${order.reference}` : null,
   ].filter((part): part is string => Boolean(part));
 
-  const addressLine = `Levereras till ${order.companyName}, ${address.join(", ")}.`;
+  const addressLine = order.ships
+    ? `Levereras till ${order.companyName}, ${address.join(", ")}.`
+    : null;
 
   const invoiceLine =
     status === "RECEIVED"
-      ? "Frakten tillkommer. Beställningen faktureras vid leverans."
+      ? order.ships
+        ? "Frakten tillkommer. Beställningen faktureras vid leverans."
+        : "Beställningen faktureras separat."
       : status === "SHIPPED"
         ? "Fakturan kommer separat."
         : null;
@@ -653,8 +665,7 @@ export function shopOrderEmail(params: {
     ...(tracking ? ["", `Följ leveransen: ${tracking.href}`] : []),
     "",
     ...rows.map((row) => `${row.label}: ${row.value}`),
-    "",
-    addressLine,
+    ...(addressLine ? ["", addressLine] : []),
     ...(invoiceLine ? ["", invoiceLine] : []),
     "",
     `Beställningen i Tikkr: ${params.link}`,
@@ -673,7 +684,7 @@ export function shopOrderEmail(params: {
       rows,
       button: tracking ?? { label: "Visa beställningen", href: params.link },
       afterword: [
-        escape(addressLine),
+        ...(addressLine ? [escape(addressLine)] : []),
         ...(invoiceLine ? [escape(invoiceLine)] : []),
         ...(tracking ? [`Beställningen i Tikkr: ${escape(params.link)}`] : []),
         reply,

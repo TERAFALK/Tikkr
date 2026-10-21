@@ -39,7 +39,7 @@ const BILLING = "src/app/admin/(panel)/installningar/prenumeration/actions.ts";
 const OWNER_ACTIONS = [
   { file: "src/app/admin/(panel)/installningar/actions.ts", name: "anonymizeEmployee" },
   // En beställning av tillbehör ändrar vad kunden betalar (2026-10-20).
-  { file: "src/app/admin/(panel)/installningar/tillbehor/actions.ts", name: "placeAccessoryOrder" },
+  { file: "src/app/admin/(panel)/butik/actions.ts", name: "placeShopOrder" },
 ];
 
 describe("bara ägaren ändrar fakturan och anonymiserar", () => {
