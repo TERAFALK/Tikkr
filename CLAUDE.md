@@ -1383,7 +1383,7 @@ meddelanden, våra svar, status och en prick i menyn. Den blev ett
 supportärende i stället för en brevlåda, och togs bort samma dag. Ingen
 mejlavisering åt något håll.
 
-**Nyheter, Hjälp och pratbubblan är ikoner i menyns fot**, bredvid
+**Nyheter, Butik, Hjälp och pratbubblan är ikoner i menyns fot**, bredvid
 Tikkr-märket, och inte rader i menyn. De handlar om Tikkr och inte om
 arbetsytan, och den nedre delen av menyn ska bara bära kontot, Inställningar
 och Logga ut. Versionen står inte i foten, utan på sidan Nyheter.
@@ -1401,11 +1401,33 @@ som för `CompanyPrice`. Supportläget kan inte skicka, se § 4 punkt 5. Tas en
 användare bort står meddelandet kvar med den kopierade adressen. All logik
 ligger i `src/lib/feedback.ts`, och `tests/feedback.test.ts` fäller den.
 
-### 3.4 Tillbehören (beslutat 2026-10-20)
+### 3.4 Butiken (beslutat 2026-10-20, flyttad 2026-10-21)
 
 Vi säljer hårdvara till kunderna, med **stämplingsskärmen** som första
 produkt: pekskärm 23,6 tum i pulverlackerat stativ, uppsatt och provad före
 leverans. Hårdvaran och dess öppna punkter står i `docs/kioskskarm.md`.
+
+**Butiken är en egen sida, `/admin/butik`, och nås från en ikon i menyns
+fot** bredvid Nyheter och Hjälp (ändrat 2026-10-21, produktägarens val). Den
+låg en dag under Inställningar, Tillbehör, och formuläret var det första man
+såg. Ett köp är inte en inställning, och en utbildning är inte ett tillbehör.
+Foten bär det som handlar om Tikkr och inte om arbetsytan (§ 3.3), och en
+butik är just det. En egen rad i vänstermenyn valdes bort: menyn bär det man
+öppnar varje dag eller vecka. Den gamla adressen skickas vidare till
+Beställningar i `next.config.ts`, eftersom de första mejlen länkade dit.
+
+- **Butik, varukorg, kassa.** Produkterna visas som kort, grupperade som
+  varor och tjänster, med Lägg till. Varukorgen står i adressen
+  (`?stamplingsskarm=2`, se `src/lib/shop/cart.ts`) och behöver ingen
+  lagring. Kassan är en egen sida med sammanställningen och uppgifterna.
+  Beställningarna är en egen flik.
+- **Ingångar där behovet uppstår:** en länk på Stämplingsskärmar och i Kom
+  igång, båda till kassan med en skärm i korgen. Säljsidans Beställ leder
+  dit genom inloggningen.
+- **Vara eller tjänst** (`kind` i katalogen). Kassan frågar efter
+  leveransadress bara när något ska skickas. Med bara tjänster är adressen
+  fakturaadressen, och märkning och frakt finns inte. Ingen tjänst säljs än;
+  tjänsternas egna lägen (bokad, genomförd) byggs när den första finns.
 
 **I allt kunden ser heter det BESTÄLLNING, aldrig order.** En order är
 kundens arbetsorder, det allt annat i Tikkr hänger på. I koden heter det
@@ -1427,13 +1449,13 @@ kundens arbetsorder, det allt annat i Tikkr hänger på. I koden heter det
   prisavsnittet; skärmens engångspris står på produktsidan, inte på
   startsidan.
 - **Bara ägaren beställer**, av samma skäl som prenumerationen (§ 1,
-  Adminflöde): en beställning ändrar vad kunden betalar. Sidan ligger under
-  Inställningar, Tillbehör, eftersom man beställer sällan. Leverans- och
+  Adminflöde): en beställning ändrar vad kunden betalar. Alla
+  administratörer ser butiken och beställningarna. Leverans- och
   fakturauppgifterna står under Inställningar, Företag, och får ändras av
   varje administratör.
 - **Säljsidans Beställ går genom inloggningen** med `?till=/admin/...`
-  (`safeAdminNext` i `login-ticket.ts`), och den som redan är inloggad går
-  rakt igenom.
+  (`safeAdminNext` i `login-ticket.ts`) till kassan, och den som redan är
+  inloggad går rakt igenom.
 - **En beställning är en ögonblicksbild**: köparens uppgifter, adresserna och
   varje rads pris kopieras dit. En ändring i företagets uppgifter eller i
   priset rör aldrig en lagd beställning. Beloppen lagras, till skillnad från

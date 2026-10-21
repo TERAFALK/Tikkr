@@ -43,6 +43,25 @@ export interface ProductImage {
   illustration: boolean;
 }
 
+/**
+ * VARA ELLER TJÄNST (tillagt 2026-10-21).
+ *
+ * En vara skickas och kräver leveransadress. En tjänst, t.ex. en utbildning,
+ * gör det inte. Kassan frågar efter adressen bara när något i varukorgen är
+ * en vara, se needsDelivery i pricing.ts.
+ *
+ * Ingen tjänst säljs än. Typen finns så att den första inte kräver att
+ * kassan och beställningen byggs om, men tjänsternas egna lägen (bokad,
+ * genomförd) byggs först när det finns en att sälja.
+ */
+export type ProductKind = "GOODS" | "SERVICE";
+
+/** Rubrikerna butiken grupperar under, i den här ordningen. */
+export const KIND_LABEL: Record<ProductKind, string> = {
+  GOODS: "Hårdvara",
+  SERVICE: "Utbildning och tjänster",
+};
+
 export interface SpecGroup {
   title: string;
   rows: { label: string; value: string }[];
@@ -50,7 +69,8 @@ export interface SpecGroup {
 
 export interface Product {
   key: ProductKey;
-  /** Adressen under /tillbehor. */
+  kind: ProductKind;
+  /** Adressen under /tillbehor på säljsidan, och nyckeln i butikens varukorg. */
   slug: string;
   name: string;
   /** En mening, under namnet i butiken. */
@@ -75,6 +95,7 @@ export interface Product {
 export const PRODUCTS: Record<ProductKey, Product> = {
   STAMPLINGSSKARM: {
     key: "STAMPLINGSSKARM",
+    kind: "GOODS",
     slug: "stamplingsskarm",
     name: "Stämplingsskärm",
     summary:

@@ -20,6 +20,7 @@ import {
 } from "@/lib/shop/status";
 import { formatDate, formatDateTime } from "@/lib/format";
 import { formatCurrency } from "@/lib/money";
+import { needsDelivery } from "@/lib/shop/pricing";
 import { formatPhone } from "@/lib/phone";
 import { toDateInput } from "@/lib/time-zone";
 import ActionDialog from "@/components/ui/ActionDialog";
@@ -401,6 +402,8 @@ function Lines({ order }: { order: ShopOrderDetail }) {
 
 function Customer({ order }: { order: ShopOrderDetail }) {
   const separateBilling = Boolean(order.billingAddressLine);
+  // Med bara tjänster finns inget att skicka, och adressen är fakturans.
+  const ships = needsDelivery(order.lines);
 
   return (
     <Card>
@@ -419,7 +422,7 @@ function Customer({ order }: { order: ShopOrderDetail }) {
         />
         <Row label="Telefon" value={formatPhone(order.phone)} />
         <Row
-          label="Leveransadress"
+          label={ships ? "Leveransadress" : "Adress"}
           value={
             <>
               {order.addressLine}
@@ -431,20 +434,22 @@ function Customer({ order }: { order: ShopOrderDetail }) {
           }
         />
         {order.reference && <Row label="Märkning" value={order.reference} />}
-        <Row
-          label="Fakturaadress"
-          value={
-            separateBilling ? (
-              <>
-                {order.billingAddressLine}
-                <br />
-                {order.billingPostalCode} {order.billingCity}
-              </>
-            ) : (
-              "Samma som leveransadressen"
-            )
-          }
-        />
+        {ships && (
+          <Row
+            label="Fakturaadress"
+            value={
+              separateBilling ? (
+                <>
+                  {order.billingAddressLine}
+                  <br />
+                  {order.billingPostalCode} {order.billingCity}
+                </>
+              ) : (
+                "Samma som leveransadressen"
+              )
+            }
+          />
+        )}
         {order.invoiceEmail && <Row label="E-post för faktura" value={order.invoiceEmail} />}
       </dl>
     </Card>

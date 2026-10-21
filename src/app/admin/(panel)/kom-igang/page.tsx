@@ -19,6 +19,7 @@ import {
 } from "@/components/ui";
 import SearchSelect from "@/components/admin/SearchSelect";
 import { customerOptions } from "@/lib/customers";
+import { checkoutHref } from "@/lib/shop/cart";
 import { addEmployees, addMoments, addOrder } from "./actions";
 
 export const dynamic = "force-dynamic";
@@ -220,9 +221,21 @@ export default async function OnboardingPage() {
         done={state.steps[3].done}
         last
       >
-        <ButtonLink href="/admin/installningar/skarmar">
-          {state.steps[3].done ? "Hantera skärmar" : "Skapa skärm"}
-        </ButtonLink>
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+          <ButtonLink href="/admin/installningar/skarmar">
+            {state.steps[3].done ? "Hantera skärmar" : "Skapa skärm"}
+          </ButtonLink>
+          {/* Den som saknar en pekskärm frågar sig det här, i det här steget.
+              Se CLAUDE.md § 3.4. */}
+          {!state.steps[3].done && (
+            <Link
+              href={checkoutHref({ STAMPLINGSSKARM: 1 })}
+              className="text-[13px] font-medium text-tick-deep hover:underline"
+            >
+              Beställ en stämplingsskärm
+            </Link>
+          )}
+        </div>
       </StepCard>
 
       {state.ready && (

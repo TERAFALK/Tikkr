@@ -4,6 +4,7 @@ import { unsafeGlobalPrisma } from "../db";
 import { sendEmail } from "../email";
 import { hasShopEmail, shopOrderEmail } from "../emails";
 import { isProductKey, PRODUCTS } from "./catalog";
+import { needsDelivery } from "./pricing";
 import { notifiesOnce } from "./status";
 
 /**
@@ -106,10 +107,10 @@ export async function deliverEventEmail(eventId: string): Promise<DeliveryOutcom
       shopOrderEmail({
         to: order.email,
         status,
-        order: { ...order, lines: order.lines },
+        order: { ...order, ships: needsDelivery(order.lines) },
         message: event.customerMessage,
         delivery: delivery || null,
-        link: `${appUrl()}/admin/installningar/tillbehor`,
+        link: `${appUrl()}/admin/butik/bestallningar`,
       })
     );
 

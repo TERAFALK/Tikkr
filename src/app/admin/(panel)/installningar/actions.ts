@@ -46,7 +46,7 @@ export async function saveCompany(
  * felskrivet postnummer upptäcks här och inte i formuläret om ett halvår.
  *
  * Varje administratör får ändra dem. Att beställa är ägarens, se
- * placeAccessoryOrder.
+ * placeShopOrder i butiken.
  */
 export async function saveCompanyProfile(
   _previous: SaveState,
@@ -69,7 +69,7 @@ export async function saveCompanyProfile(
   });
 
   revalidatePath("/admin/installningar");
-  revalidatePath("/admin/installningar/tillbehor");
+  revalidatePath("/admin/butik/kassa");
 
   return saved();
 }

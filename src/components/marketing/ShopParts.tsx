@@ -49,10 +49,10 @@ export function kronor(ore: number): string {
 
 /**
  * Adressen beställningen börjar på: inloggningen, som skickar vidare till
- * Tillbehör i panelen med produkten förvald. Den som redan är inloggad går
- * rakt igenom, se login/page.tsx.
+ * butikens kassa i panelen med en av produkten i korgen. Den som redan är
+ * inloggad går rakt igenom, se login/page.tsx.
  */
 export function orderHref(slug: string): string {
-  const target = `/admin/installningar/tillbehor?produkt=${slug}`;
+  const target = `/admin/butik/kassa?${slug}=1`;
   return `/admin/login?till=${encodeURIComponent(target)}`;
 }

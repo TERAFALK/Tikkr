@@ -125,6 +125,9 @@ const nextConfig: NextConfig = {
       ["/admin/improduktivt", "/admin/installningar/improduktivt"],
       ["/admin/skarmar", "/admin/installningar/skarmar"],
       ["/admin/planering/stationer", "/admin/installningar/stationer"],
+      // Butiken låg under Inställningar, Tillbehör, en dag (2026-10-20). Mejlen
+      // som skickades då länkar dit. Se CLAUDE.md § 3.4.
+      ["/admin/installningar/tillbehor", "/admin/butik/bestallningar"],
     ].map(([source, destination]) => ({ source, destination, permanent: false }));
   },
 };

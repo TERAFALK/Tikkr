@@ -17,6 +17,7 @@ import {
   Tr,
 } from "@/components/ui";
 import { formatDateTime } from "@/lib/format";
+import { checkoutHref } from "@/lib/shop/cart";
 import { getLicenseState } from "@/lib/licenses";
 import { deviceState } from "@/lib/kiosk-auth";
 import {
@@ -241,6 +242,19 @@ export default async function DevicesPage() {
           </Table>
         )}
       </Card>
+
+      {/* Där behovet uppstår: den som lägger upp skärmar är den som undrar
+          vad som ska sitta på väggen. Leder till kassan med en skärm i
+          korgen, se CLAUDE.md § 3.4. */}
+      <p className="text-[13px] text-neutral-500">
+        Stämplingsskärm i stativ, uppsatt för Tikkr.{" "}
+        <Link
+          href={checkoutHref({ STAMPLINGSSKARM: 1 })}
+          className="font-medium text-tick-deep hover:underline"
+        >
+          Beställ i butiken
+        </Link>
+      </p>
     </div>
   );
 }

@@ -8,6 +8,7 @@ import {
   IconBuilding,
   IconClock,
   IconHelp,
+  IconPackage,
   IconLogout,
   IconOrder,
   IconOverview,
@@ -144,6 +145,7 @@ export default function AdminSidebar({
   // nästa omladdning. Utan det här tändes pricken igen så fort man lämnade
   // sidan som just markerat allt som läst.
   const onNews = pathname.startsWith("/admin/nyheter");
+  const onShop = pathname.startsWith("/admin/butik");
   const [newsOpened, setNewsOpened] = useState(false);
   useEffect(() => {
     if (onNews) setNewsOpened(true);
@@ -317,7 +319,12 @@ export default function AdminSidebar({
             växte till en vägg. Hjälpen nås dessutom från rubriken på varje
             sida den gäller. Adressen är relativ av samma skäl som i HelpLink.
 
-            Pricken vid Nyheter sitter kvar, nu i ikonens hörn. */}
+            Pricken vid Nyheter sitter kvar, nu i ikonens hörn.
+
+            BUTIKEN står här av samma skäl (2026-10-21): den säljer Tikkrs
+            tillbehör och tjänster, och ingen öppnar den varje vecka. Där
+            behovet uppstår finns dessutom en knapp, t.ex. på sidan
+            Stämplingsskärmar. Se CLAUDE.md § 3.4. */}
         <div className="relative flex items-center gap-2 px-2 pt-2.5 text-neutral-400">
           <LogoMark size={22} />
           <WordmarkOnly height={10} tone="current" />
@@ -334,6 +341,16 @@ export default function AdminSidebar({
               {showNewsDot && (
                 <span className="absolute right-1 top-1 size-2 rounded-full bg-tick-deep ring-2 ring-white" />
               )}
+            </Link>
+            <Link
+              href="/admin/butik"
+              onClick={() => setOpen(false)}
+              aria-label="Butik"
+              title="Butik"
+              aria-current={onShop ? "page" : undefined}
+              className={onShop ? footerIconActive : footerIcon}
+            >
+              <IconPackage />
             </Link>
             <a
               href="/support"

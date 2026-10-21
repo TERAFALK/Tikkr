@@ -1,6 +1,12 @@
 import type { CompanyDb } from "../tenant";
 import { shopPrices } from "./prices";
-import { priceLines, orderTotals, PricingError, type RequestedItem } from "./pricing";
+import {
+  needsDelivery,
+  orderTotals,
+  priceLines,
+  PricingError,
+  type RequestedItem,
+} from "./pricing";
 import type { CleanProfile } from "./profile";
 
 /**
@@ -73,6 +79,35 @@ export async function placeOrder(params: {
 
   const totals = orderTotals(lines, null);
 
+  // Utan något att skicka finns ingen märkning och ingen separat
+  // fakturaadress: adressen ÄR fakturaadressen. Se validateProfile.
+  const delivery = needsDelivery(lines);
+  const snapshot: CleanProfile = delivery
+    ? profile
+    : {
+        ...profile,
+        deliveryReference: null,
+        billingAddressLine: null,
+        billingPostalCode: null,
+        billingCity: null,
+        invoiceEmail: null,
+      };
+
+  // Det som sparas till företaget. Utan leverans skrivs bara kontakt och
+  // adress, så att en sparad märkning eller fakturaadress inte nollas av en
+  // beställning som aldrig frågade efter dem.
+  const toSave: Partial<CleanProfile> = delivery
+    ? profile
+    : {
+        orgNumber: profile.orgNumber,
+        contactName: profile.contactName,
+        orderEmail: profile.orderEmail,
+        phone: profile.phone,
+        addressLine: profile.addressLine,
+        postalCode: profile.postalCode,
+        city: profile.city,
+      };
+
   try {
     const order = await db.$transaction(async (tx) => {
       const created = await tx.shopOrder.create({
@@ -88,11 +123,11 @@ export async function placeOrder(params: {
           addressLine: profile.addressLine!,
           postalCode: profile.postalCode!,
           city: profile.city!,
-          reference: profile.deliveryReference,
-          billingAddressLine: profile.billingAddressLine,
-          billingPostalCode: profile.billingPostalCode,
-          billingCity: profile.billingCity,
-          invoiceEmail: profile.invoiceEmail,
+          reference: snapshot.deliveryReference,
+          billingAddressLine: snapshot.billingAddressLine,
+          billingPostalCode: snapshot.billingPostalCode,
+          billingCity: snapshot.billingCity,
+          invoiceEmail: snapshot.invoiceEmail,
           goodsOre: totals.goodsOre,
           shippingOre: null,
           vatOre: totals.vatOre,
@@ -118,8 +153,8 @@ export async function placeOrder(params: {
       if (params.saveProfile) {
         await tx.companyProfile.upsert({
           where: { companyId },
-          create: { companyId, ...profile },
-          update: { ...profile },
+          create: { companyId, ...toSave },
+          update: { ...toSave },
         });
       }
 
@@ -191,7 +226,13 @@ export async function customerOrders(db: CompanyDb) {
       createdAt: true,
       lines: {
         orderBy: { sortOrder: "asc" },
-        select: { name: true, quantity: true, unitPriceOre: true, subtotalOre: true },
+        select: {
+          productKey: true,
+          name: true,
+          quantity: true,
+          unitPriceOre: true,
+          subtotalOre: true,
+        },
       },
       events: {
         where: { kind: { in: ["CREATED", "STATUS"] } },
