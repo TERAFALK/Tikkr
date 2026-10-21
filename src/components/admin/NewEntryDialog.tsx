@@ -66,9 +66,20 @@ export default function NewEntryDialog({
   }, [openOnMount]);
 
   // Stängs först när posten faktiskt skapats.
+  //
+  // JÄMFÖR SVARET SOM OBJEKT, inte dess text (ändrat 2026-10-21). Åtgärden
+  // svarar med samma mening varje gång, så när effekten lyssnade på texten
+  // stängdes rutan bara efter första posten. Från den andra stod den kvar
+  // öppen med tömda fält, och pilotkunden trodde att ingenting sparats. Samma
+  // rättelse som i ActionDialog, se tests/dialog-close.test.ts.
+  const handled = useRef<EntryFormState | null>(null);
+
   useEffect(() => {
-    if (state.ok) dialog.current?.close();
-  }, [state.ok]);
+    if (!state.ok || handled.current === state) return;
+
+    handled.current = state;
+    dialog.current?.close();
+  }, [state]);
 
   return (
     <>
