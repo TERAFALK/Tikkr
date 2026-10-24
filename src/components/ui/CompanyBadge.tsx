@@ -1,3 +1,5 @@
+import ImageWithFallback from "@/components/ui/ImageWithFallback";
+
 /**
  * Företagsmärket — logotyp om kunden laddat upp en, annars initialen.
  *
@@ -26,23 +28,7 @@ export default function CompanyBadge({
 }) {
   const initial = companyName.trim().charAt(0).toUpperCase() || "T";
 
-  if (hasLogo) {
-    return (
-      <span
-        className="block shrink-0 overflow-hidden rounded-lg border border-neutral-200 bg-white"
-        style={{ width: size, height: size }}
-      >
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src={`/api/company/logo?variant=square&v=${version ?? ""}`}
-          alt=""
-          className="h-full w-full object-cover"
-        />
-      </span>
-    );
-  }
-
-  return (
+  const letter = (
     <span
       className="flex shrink-0 items-center justify-center rounded-lg bg-neutral-900 font-semibold text-white"
       style={{ width: size, height: size, fontSize: size * 0.4 }}
@@ -50,5 +36,18 @@ export default function CompanyBadge({
     >
       {initial}
     </span>
+  );
+
+  if (!hasLogo) return letter;
+
+  // Initialen är också reserven när logotypen inte går att hämta. En vit
+  // ruta såg ut som en tom logotyp, inte som en som saknas.
+  return (
+    <ImageWithFallback
+      src={`/api/company/logo?variant=square&v=${version ?? ""}`}
+      style={{ width: size, height: size }}
+      className="block shrink-0 overflow-hidden rounded-lg border border-neutral-200 bg-white object-cover"
+      fallback={letter}
+    />
   );
 }
