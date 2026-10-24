@@ -261,7 +261,11 @@ bland dem som ska vara av, med skälet att Tikkr skickar kön själv. På den
 första skärmen visade sig motsatsen: startade skärmen utan nät lade ProMGR ett
 felläge ("ERR … disconnected") över sidan, och när nätet kom tillbaka låg det
 kvar och tog emot varje tryck. Inte ens de fem trycken som öppnar ProMGR kom
-fram, och bara en omstart med nät hjälpte. Omladdningen tar bort det.
+fram, och bara en omstart med nät hjälpte. Med omladdningen påslagen hände
+det mer sällan, men inte aldrig. ⟨verifiera⟩ orsaken: misstanken är att
+ProMGR saknar PLUS-licens och inte kan kontrollera den utan nät vid start. Den
+fristående Fully-appen startade om utan nät flera gånger 2026-10-19 utan att
+låsa sig.
 
 Den är ofarlig sedan 2026-10-19: kön skrivs till disken innan trycket räknas
 som sparat, och skärmen lägger tillbaka sin bild efter en omladdning. Det var
