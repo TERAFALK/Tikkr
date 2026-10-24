@@ -1,3 +1,5 @@
+import ImageWithFallback from "@/components/ui/ImageWithFallback";
+
 /**
  * PORTRÄTT PÅ EN ANSTÄLLD.
  *
@@ -73,23 +75,7 @@ export default function EmployeeAvatar({
 }) {
   const style = { width: size, height: size };
 
-  if (hasPhoto) {
-    return (
-      // Vanlig img och inte next/image: bilden ligger bakom en behörighets-
-      // kontroll och kan inte optimeras i förväg av ramverket.
-      // eslint-disable-next-line @next/next/no-img-element
-      <img
-        src={`/api/anstallda/${employeeId}/foto`}
-        alt=""
-        style={style}
-        className={`shrink-0 rounded-full object-cover ${
-          onDark ? "ring-2 ring-white/40" : "ring-1 ring-neutral-200"
-        } ${className}`}
-      />
-    );
-  }
-
-  return (
+  const initials = (
     <span
       aria-hidden="true"
       style={{ ...style, fontSize: Math.round(size * 0.36) }}
@@ -99,5 +85,20 @@ export default function EmployeeAvatar({
     >
       {initialsOf(name)}
     </span>
+  );
+
+  if (!hasPhoto) return initials;
+
+  // Initialerna är också reserven när fotot inte går att hämta, till exempel
+  // på en skärm utan nät som inte hunnit spara det.
+  return (
+    <ImageWithFallback
+      src={`/api/anstallda/${employeeId}/foto`}
+      style={style}
+      className={`shrink-0 rounded-full object-cover ${
+        onDark ? "ring-2 ring-white/40" : "ring-1 ring-neutral-200"
+      } ${className}`}
+      fallback={initials}
+    />
   );
 }
