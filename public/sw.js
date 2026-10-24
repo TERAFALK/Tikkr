@@ -22,6 +22,52 @@
 */
 const CACHE = "tikkr-v2";
 
+/*
+  Logotypen och porträtten på stämplingsskärmen, i en egen cache.
+
+  De ligger under /api/ och gick därför förbi allt här, och webbläsarens egen
+  cache släpper dem efter fem minuter. En skärm som laddades om utan nät visade
+  då namnen utan bilder och utan logotyp. Egen cache och inte CACHE, så att en
+  ny version av sidorna inte kastar bilderna, och tvärtom.
+*/
+const IMAGES = "tikkr-bilder-v1";
+
+/** Bilderna stämplingsskärmen visar. Allt annat under /api/ rörs inte. */
+function isKioskImage(pathname) {
+  return (
+    pathname === "/api/company/logo" ||
+    /^\/api\/anstallda\/[^/]+\/foto$/.test(pathname)
+  );
+}
+
+/**
+ * Färsk bild när nätet fungerar, den sparade när det inte gör det.
+ *
+ * Ett nytt porträtt syns därmed direkt, och en bild som tagits bort (404)
+ * raderas också här: ett foto är en personuppgift, och en skärm ska inte
+ * fortsätta visa någon som anonymiserats bara för att den en gång varit
+ * offline.
+ */
+async function imageFromNetworkThenCache(request) {
+  const cache = await caches.open(IMAGES);
+
+  let response;
+  try {
+    response = await fetch(request);
+  } catch (error) {
+    const hit = await cache.match(request);
+    if (hit) return hit;
+    throw error;
+  }
+
+  if (response.ok) {
+    await cache.put(request, response.clone());
+  } else if (response.status === 404) {
+    await cache.delete(request);
+  }
+  return response;
+}
+
 self.addEventListener("install", (event) => {
   event.waitUntil(
     caches.open(CACHE).then((cache) => cache.addAll(["/kiosk", "/icon.svg"]))
@@ -35,7 +81,11 @@ self.addEventListener("activate", (event) => {
     caches
       .keys()
       .then((keys) =>
-        Promise.all(keys.filter((key) => key !== CACHE).map((key) => caches.delete(key)))
+        Promise.all(
+          keys
+            .filter((key) => key !== CACHE && key !== IMAGES)
+            .map((key) => caches.delete(key))
+        )
       )
       .then(() => self.clients.claim())
   );
@@ -49,6 +99,12 @@ self.addEventListener("fetch", (event) => {
 
   const url = new URL(request.url);
   if (url.origin !== self.location.origin) return;
+
+  if (isKioskImage(url.pathname)) {
+    event.respondWith(imageFromNetworkThenCache(request));
+    return;
+  }
+
   if (url.pathname.startsWith("/api/")) return;
 
   // Byggda filer får ett nytt namn vid varje bygge och kan därför cachas hårt.
