@@ -5,9 +5,9 @@ gärna använda egen hårdvara — en dator med pekskärm eller en surfplatta �
 appen fungerar identiskt. Det här dokumentet gäller den skärm vi själva
 levererar.
 
-> **Inget här är testat på hårdvara än.** Allt under Val och Specar kommer från
-> tillverkarens datablad. Rader märkta **⟨verifiera⟩** ska bekräftas på den
-> första fysiska enheten innan de får stå som sanning.
+> **Den första skärmen, en APPC-24X, kom 2026-10-19.** Uppsättningen,
+> inställningarna och offline-proven är gjorda på den. Specarna kommer från
+> tillverkarens datablad. Rader märkta **⟨verifiera⟩** är fortfarande obekräftade.
 
 ---
 
@@ -155,49 +155,60 @@ och dra en kabel, inget mer.
 
 ### Kioskmjukvara
 
-**Fully Kiosk Browser.** ProDVX egen `ProMGR Kiosk` är samma app under annat
-namn — uppsättningskommandot i ProDVX manual avslöjar det:
+**ProMGR Kiosk**, ProDVX egen variant av Fully Kiosk Browser. Paketet heter
+`com.prodvx.promgr` men bygger på `de.ozerov.fully`, och inställningarna och
+JavaScript-gränssnittet är Fullys. Den är **förinstallerad** på skärmar med
+firmware A24 eller nyare; den första skärmen kom med `ProDVX_013.A26_02` och
+ProMGR 1.3e.
 
-```
-adb shell dpm set-device-owner com.prodvx.promgr/de.ozerov.fully.DeviceOwnerReceiver
-```
+**Licensen.** Enligt ProDVX användarmanual får skärmar i R23-serien eller nyare
+en kostnadsfri ProMGR Kiosk-licens. Den kopplas till skärmens serienummer av
+ProDVX och går inte att aktivera själv. **PLUS-licensen** krävs för
+JavaScript-gränssnittet, och därmed för Fjärrstyrning. ⟨verifiera⟩ att PLUS
+ingår utan kostnad och om en volymnyckel finns; frågat ProDVX 2026-10-24.
 
-`de.ozerov.fully` är Fully Kiosk Browser. Att det är leverantörens egen
-supportade väg är ett skäl att köra ProMGR-varianten framför den fristående.
+**ProMGR Cloud** (portalen hos ProDVX) är en årsprenumeration och behövs inte:
+fjärrstyrningen sköter Tikkr. Utan prenumeration går det ändå att skapa
+konfigurationer och provisioneringsprofiler. *Get Configuration from Device*
+saknas då, och konfigurationen flyttas till portalen med en USB-sticka.
 
-Kostnad: Fully PLUS, **7,90 € per enhet en gång**. Ingen prenumeration.
+### Steg (provat 2026-10-24)
 
-### Steg
+Mallen ligger i ProMGR-portalen: konfigurationen **Tikkr kiosk** och
+profilen **Tikkr Kiosk**, metod *Pre-Install Devices*, som läser in
+konfigurationen automatiskt. Profilen har en **aktiveringskod**, densamma för
+varje skärm. Koden, kiosk-PIN:en och Remote Admin-lösenordet ligger i
+lösenordshanteraren och aldrig i repot.
 
-Enheten måste vara **fabriksfärsk eller fabriksåterställd**, och inget
-Google-konto får vara tillagt — device owner kan inte sättas annars.
+1. Fabriksåterställ skärmen, eller starta en ny.
+2. I startguiden: **Start**, **Enable ProMGR**, och **Disable** för både ProDVX
+   API och Autostart. Inte *Skip wizard*.
+3. Efter omstarten: skriv in aktiveringskoden.
+4. **Get permissions**, och godkänn allt utom kamera och mikrofon.
+5. Skärmen hämtar konfigurationen och öppnar kiosken. Koppla den till
+   företaget, se nedan.
+
+Ingen ADB, ingen kabel och inget Google-konto. Startguidens *Start and upload
+configuration* tar inte en Fully-export; filen kallades korrupt.
+
+**Att ändra mallen:** ställ in skärmen, exportera under **Settings → Other
+Settings → Export Settings** till en USB-sticka, och klistra in filen i
+konfigurationen med **Edit JSON** i portalen. Exporten bär PIN-koden, svagt
+krypterad, och läggs aldrig i repot.
+
+**Tryck aldrig Push Configuration to Device** på en skärm som ställts in för
+hand: den skriver över skärmen med portalens version. Ett kommando som skickas
+medan skärmen är offline väntar och körs när den kommer tillbaka.
+
+**Reservväg med kabel**, om startguiden saknar ProMGR:
 
 ```bash
-adb devices
 adb install ProMGR-Kiosk-Browser.apk
 adb shell dpm set-device-owner com.prodvx.promgr/de.ozerov.fully.DeviceOwnerReceiver
-adb push fully-settings.json /sdcard/Download/fully-settings.json
 adb reboot
 ```
 
-⟨verifiera⟩ exakt sökväg för inställningsfilen, och att ADB över USB är öppet på
-enheten från fabrik.
-
-Fully läser tre filnamn:
-
-| Fil | Beteende |
-|---|---|
-| `fully-settings.json` | manuell import |
-| `fully-auto-settings.json` | läses vid **varje** appstart |
-| `fully-once-settings.json` | läses en gång |
-
-Filen kan också hämtas **från en URL**. Från version 1.43 krypteras PIN-koder
-och lösenord i exporten.
-
-**Alternativ utan kabel:** appen *Fully Kiosk Provisioner* genererar en QR-kod
-som kopplar wifi, hämtar APK och inställningsfil från egna adresser och sätter
-device owner i ett svep. Enheten startas i guiden genom att trycka sex gånger på
-välkomstskärmen. Användbar när en kund ska rigga en ersättningsskärm själv.
+Konfigurationen stänger av ADB, så vägen finns bara på en återställd skärm.
 
 ### Koppla skärmen till företaget
 
@@ -208,40 +219,65 @@ vid uppstart.
 
 ---
 
-## 7. Inställningar som måste vara AV
+## 7. Inställningarna
 
-Åtta inställningar i Fully stoppar eller raderar var och en något som Tikkr
-förlitar sig på. Det är den enskilt viktigaste tabellen i det här dokumentet.
+Konfigurationsformuläret i portalen har bara ett tjugotal fält. Resten ställs
+in på skärmen och följer sedan med i exporten. Inställningen nedan står under
+menyn i parentes.
+
+### Ska vara AV
+
+Var och en stoppar eller raderar något som Tikkr förlitar sig på. Det är den
+enskilt viktigaste tabellen i det här dokumentet.
 
 | Inställning | Vad som går sönder |
 |---|---|
-| **Delete Cookies on Auto Reload** | Raderar kiosk-cookien. Skärmen tappar sin device-token och måste kopplas om |
-| **Delete Webstorage on Auto Reload** | Raderar IndexedDB. **Hela offline-kön försvinner**, och ostämplad tid går inte att rekonstruera |
-| **Delete Cache on Auto Reload** | Tömmer service worker-cachen. Skärmen är död vid wifi-glapp |
-| **Clear Cache After Each Page** | Samma, vid varje sidladdning |
-| **Pause Webview while in Background** | Kan stoppa synkförsök när skärmen går i vila |
-| **Wait for Network Connection** | Fully laddar ingen sida alls utan nät, och visar "Waiting for network". Tikkr får aldrig starta från skärmens egen kopia |
-| **Auto Reload on Network Reconnect** | Laddar om sidan när nätet kommer tillbaka. Tikkr skickar kön själv och behöver ingen omladdning |
-| **Auto Reload on Internet Reconnect** | Samma |
+| **Delete Cookies on Auto Reload** (Web Auto Reload) | Raderar kiosk-cookien. Skärmen tappar sin device-token och måste kopplas om |
+| **Delete Webstorage on Auto Reload** (Web Auto Reload) | Raderar IndexedDB. **Hela offline-kön försvinner**, och ostämplad tid går inte att rekonstruera |
+| **Delete Cache on Auto Reload** (Web Auto Reload) | Tömmer service worker-cachen. Skärmen är död vid wifi-glapp |
+| **Clear Cache After Each Page** (Advanced Web Settings) | Samma, vid varje sidladdning |
+| **Pause Webview while in Background** (Advanced Web Settings) | Kan stoppa synkförsök när skärmen går i vila |
+| **Wait for Network Connection** (Web Browsing Settings) | Fully laddar ingen sida alls utan nät, och visar "Waiting for network". Tikkr får aldrig starta från skärmens egen kopia |
+| **Motion Detection** | Använder kameran |
 
-De tre sista hittades 2026-10-19 på den första ProDVX-skärmen: utan nät startade
-den aldrig om. Samma prov visade att kön tappade väntande tryck när sladden
-drogs ur, vilket var ett fel i `offline-queue.ts` och inte i Fully.
+**Cache Mode** står på *Default*. *Prefer cache* kan hålla kvar gammal kod
+efter en ny version.
 
-Två fjärrkommandon får aldrig tryckas på en skärm med osynkad kö: **Clear Cache**
-och **Clear Web Cookies**. Det senare återkallar i praktiken skärmens koppling.
+### Ska vara PÅ
 
-Ska vara PÅ:
+- **Start URL**, se nedan
+- **Enable Kiosk Mode** med **Kiosk Mode PIN** (Kiosk Mode)
+- **Disable Status Bar**, **Disable Power Button**, **Disable Camera** (Kiosk Mode)
+- **Enable Lock Task Mode** (Device Owner Settings), med hemknapp, senaste
+  appar och notiser av. Det är det täta låset; utan det går Androids meny att
+  dra ner
+- **Enable JavaScript Interface** (Advanced Web Settings), se Fjärrstyrning
+- **Keep Screen On**, **Launch on Boot**, **Force Screen Orientation**
+  Landscape (Device Management)
+- **Auto Reload on Network Reconnect** (Web Auto Reload), se nedan
 
-- **Start URL** — se nedan
-- **Enable Kiosk Mode** med **Kiosk Mode PIN**
-- **Disable Power Button**
-- **Enable JavaScript Interface** — se Fjärrstyrning
-- Schemalagd nattlig omstart
-- Skärmen släcks aldrig, eller rörelsedetektering som väcker den
+**Auto Reload on Network Reconnect är PÅ** (ändrat 2026-10-24). Den stod
+bland dem som ska vara av, med skälet att Tikkr skickar kön själv. På den
+första skärmen visade sig motsatsen: startade skärmen utan nät lade ProMGR ett
+felläge ("ERR … disconnected") över sidan, och när nätet kom tillbaka låg det
+kvar och tog emot varje tryck. Inte ens de fem trycken som öppnar ProMGR kom
+fram, och bara en omstart med nät hjälpte. Med omladdningen påslagen hände
+det mer sällan, men inte aldrig. ⟨verifiera⟩ orsaken: misstanken är att
+ProMGR saknar PLUS-licens och inte kan kontrollera den utan nät vid start. Den
+fristående Fully-appen startade om utan nät flera gånger 2026-10-19 utan att
+låsa sig.
 
-Autostart behövs inte separat. ProDVX manual säger uttryckligen att ProMGR Kiosk
-Browser sköter det själv.
+Den är ofarlig sedan 2026-10-19: kön skrivs till disken innan trycket räknas
+som sparat, och skärmen lägger tillbaka sin bild efter en omladdning. Det var
+de två felen som gjorde att omladdningen en gång kostade väntande tryck.
+*Auto Reload on Internet Reconnect* står kvar av; en omladdning räcker.
+
+Två fjärrkommandon får aldrig skickas till en skärm med osynkad kö: **Clear
+Cache** och **Clear Web Cookies**. Det senare återkallar i praktiken skärmens
+koppling.
+
+Den nattliga omstarten finns bara som schema i ProMGR Cloud och är inte satt.
+Skärmen klarar sig utan.
 
 ---
 
@@ -417,11 +453,14 @@ reservskärm att låna ut.
 - [ ] Frågorna ovan till EET
 - [ ] Beställ en 15,6" och en stor för jämförelse
 - [ ] Testen på första skärmen, allihop
-- [ ] `scripts/provision-kiosk.ps1` när ADB-flödet är bekräftat på en enhet
-- [ ] Rutt som genererar `fully-settings.json` per skärm, med rätt Start URL och
-      raderingsinställningarna avstängda
+- [x] Uppsättning utan kabel: ProMGR:s startguide med aktiveringskod, se § 6.
+      Ersätter skriptet och rutten för inställningsfiler som stod här
+- [ ] PLUS-licensen på första skärmen, och svar från ProDVX om kostnad och
+      volymnyckel
+- [ ] Prova en andra fabriksåterställning med den uppdaterade mallen
 - [x] Fjärrstyrning bakom `fully`-detektering — ljusstyrka och omstart från
-      adminpanelen. Otestat på hårdvara
+      adminpanelen. Provad med fristående Fully 2026-10-19; med ProMGR väntar
+      den på PLUS-licensen
 - [ ] Kontrollera Android-versionen på en enhet och lägg in den i katalogen
 - [ ] Riktiga produktfoton i stället för illustrationerna i
       `public/tillbehor/stamplingsskarm/`
