@@ -44,8 +44,12 @@ export async function POST(request: NextRequest) {
   }
 
   // Adressen byggs ur APP_URL, aldrig ur anropet, som mejlade länkar.
+  //
+  // Den slutar på .json. Utan ändelsen vägrade appen filen med "json file
+  // must be in json format", fast innehållet var JSON. Provfilen, som hette
+  // .json, gick igenom, och ändelsen är den troliga skillnaden.
   return NextResponse.json(
-    { url: `${appUrl()}/api/kiosk/config/${token}` },
+    { url: `${appUrl()}/api/kiosk/config/${token}.json` },
     { headers: { "cache-control": "no-store" } }
   );
 }
