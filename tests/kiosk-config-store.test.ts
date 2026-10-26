@@ -167,7 +167,7 @@ describe("engångsadressen", () => {
     return (await versionForDevice(companyA, deviceA))!;
   }
 
-  it("lämnar ut filen en gång, med hemligheterna och märket", async () => {
+  it("lämnar ut filen, med hemligheterna och märket", async () => {
     const versionId = await wantedVersion();
     const token = await createDownload({ companyId: companyA, deviceId: deviceA, versionId });
     expect(token).toBeTruthy();
@@ -175,6 +175,27 @@ describe("engångsadressen", () => {
     const file = await redeemDownload(token!);
     expect(file?.kioskPin).toBe(FAKE_PIN);
     expect(file?.customVariable).toBe(`tikkr-config:${versionId}`);
+  });
+
+  it("går att hämta igen strax efter, som appen gör", async () => {
+    // Appen gav "file download failed with 404" när adressen bara gick att
+    // använda en gång.
+    const versionId = await wantedVersion();
+    const token = await createDownload({ companyId: companyA, deviceId: deviceA, versionId });
+
+    expect(await redeemDownload(token!)).not.toBeNull();
+    expect(await redeemDownload(token!)).not.toBeNull();
+  });
+
+  it("men inte en minut efter första hämtningen", async () => {
+    const versionId = await wantedVersion();
+    const token = await createDownload({ companyId: companyA, deviceId: deviceA, versionId });
+    await redeemDownload(token!);
+
+    await unsafeGlobalPrisma.kioskConfigDownload.updateMany({
+      where: { deviceId: deviceA },
+      data: { usedAt: new Date(Date.now() - 61_000) },
+    });
 
     expect(await redeemDownload(token!)).toBeNull();
   });
