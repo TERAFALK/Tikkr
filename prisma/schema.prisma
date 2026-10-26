@@ -208,6 +208,7 @@ model Company {
   breakEntries    BreakEntry[]
   absenceReasons  AbsenceReason[]
   prices          CompanyPrice[]
+  kioskSettings   CompanyKioskSetting[]
   absences        Absence[]
   compAdjustments CompAdjustment[]
   holidays        Holiday[]
@@ -1243,6 +1244,48 @@ model CompanyPrice {
   @@unique([companyId, item])
   @@index([companyId])
   @@map("company_prices")
+}
+
+/// STANDARDINSTÄLLNINGARNA FÖR SKÄRMARNA VI SÄLJER.
+///
+/// Gäller varje såld skärm hos varje kund som inte har ett eget värde, se
+/// CompanyKioskSetting. Nycklarna och vad de betyder står i
+/// src/lib/kiosk-settings.ts. Saknas raden gäller värdet där.
+///
+/// Ingen company_id: raden gäller hela plattformen, som StripePrice.
+model KioskSettingDefault {
+  /// En nyckel ur KIOSK_SETTING_KEYS.
+  key   String @id
+  value String
+
+  updatedByEmail String   @map("updated_by_email")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  @@map("kiosk_setting_defaults")
+}
+
+/// EN KUNDS EGET VÄRDE FÖR EN SKÄRMINSTÄLLNING.
+///
+/// Går före plattformens standard för just den kundens skärmar. Saknas raden
+/// gäller standarden. Skrivs bara av plattformspanelen, men hör till kunden
+/// och filtreras därför som CompanyPrice.
+model CompanyKioskSetting {
+  id        String @id @default(cuid())
+  companyId String @map("company_id")
+
+  /// En nyckel ur KIOSK_SETTING_KEYS.
+  key   String
+  value String
+
+  updatedByEmail String   @map("updated_by_email")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@unique([companyId, key])
+  @@index([companyId])
+  @@map("company_kiosk_settings")
 }
 
 /// En inbjudan att bli administratör.

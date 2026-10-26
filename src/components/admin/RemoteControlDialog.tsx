@@ -222,7 +222,7 @@ function RestartButton({ name }: { name: string }) {
       type="submit"
       tone="secondary"
       disabled={pending}
-      question={`Starta om ${name}? Skärmen är borta i några sekunder.`}
+      question={`Starta om ${name}? Skärmen är borta i ungefär en minut.`}
     >
       Starta om
     </ConfirmButton>

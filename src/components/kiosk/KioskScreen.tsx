@@ -13,10 +13,12 @@ import {
 } from "@/lib/offline-queue";
 import {
   applyBrightness,
+  applyKioskSettings,
   hasFully,
   readDeviceInfo,
-  restartApp,
+  restartDevice,
 } from "@/lib/fully";
+import type { KioskSettings as DeviceSettings } from "@/lib/kiosk-settings";
 import CompanyBadge from "@/components/ui/CompanyBadge";
 import { LogoMark, WordmarkOnly } from "@/components/ui/Logo";
 import NoticeBanner from "@/components/ui/NoticeBanner";
@@ -789,9 +791,30 @@ export default function KioskScreen({
   const brightnessRef = useRef<number | null | undefined>(undefined);
   const restartRef = useRef<string | null | undefined>(undefined);
 
+  /**
+   * Inställningarna från plattformen, som text, senast de sattes.
+   *
+   * Sätts en gång när sidan laddats och sedan bara när något ändrats. Appen
+   * skriver varje inställning till disken, och var femte sekund hade varit
+   * att slita på minnet för ingenting.
+   */
+  const settingsRef = useRef<string | null>(null);
+
   const applyDeviceSettings = useCallback(
-    (device?: { brightness: number | null; restartRequestedAt: string | null }) => {
+    (device?: {
+      brightness: number | null;
+      restartRequestedAt: string | null;
+      settings?: DeviceSettings | null;
+    }) => {
       if (!device || !hasFully()) return;
+
+      if (device.settings) {
+        const text = JSON.stringify(device.settings);
+        if (text !== settingsRef.current) {
+          applyKioskSettings(device.settings);
+          settingsRef.current = text;
+        }
+      }
 
       if (device.brightness !== null && device.brightness !== brightnessRef.current) {
         applyBrightness(device.brightness);
@@ -803,7 +826,7 @@ export default function KioskScreen({
 
       // Första svaret sätter bara utgångsläget. Se kommentaren ovan.
       if (seen !== undefined && device.restartRequestedAt !== seen) {
-        restartApp();
+        restartDevice();
       }
     },
     []
@@ -871,6 +894,7 @@ export default function KioskScreen({
         device?: {
           brightness: number | null;
           restartRequestedAt: string | null;
+          settings?: DeviceSettings | null;
         };
       };
 

@@ -16,6 +16,7 @@ import {
   IconOverview,
   IconPackage,
   IconTag,
+  IconDevice,
 } from "@/components/ui/icons";
 import { platformLogout } from "@/app/plattform/login/actions";
 
@@ -43,6 +44,7 @@ import { platformLogout } from "@/app/plattform/login/actions";
  *   /plattform/utskick      Mejl till kundernas administratörer
  *   /plattform/produkter    Vad säljs i butiken, och till vilket pris?
  *   /plattform/artiklar     Vilka artiklar hos Stripe är vad?
+ *   /plattform/skarmar      Hur beter sig skärmarna vi sålt?
  *   /plattform/handelser    Vad har gjorts härifrån?
  *
  * Grupperna speglar vem man är när man klickar: kundarbete respektive drift av
@@ -87,6 +89,7 @@ const SECTIONS: { label: string; links: NavLink[] }[] = [
     links: [
       { href: "/plattform/produkter", label: "Produkter", icon: IconPackage },
       { href: "/plattform/artiklar", label: "Artiklar", icon: IconTag },
+      { href: "/plattform/skarmar", label: "Skärmar", icon: IconDevice },
       { href: "/plattform/handelser", label: "Händelser", icon: IconHistory },
     ],
   },
