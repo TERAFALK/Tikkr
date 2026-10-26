@@ -17,15 +17,19 @@ export async function GET(
   _request: Request,
   { params }: { params: Promise<{ token: string }> }
 ) {
+  // Adressen slutar på .json för appens skull, se ../route.ts.
   const { token } = await params;
-  const file = await redeemDownload(token);
+  const file = await redeemDownload(token.replace(/\.json$/, ""));
 
   if (!file) return new NextResponse(null, { status: 404 });
 
-  return NextResponse.json(file, {
+  return new NextResponse(JSON.stringify(file, null, 2), {
     headers: {
-      // Får aldrig sparas någonstans på vägen: den bär hemligheter.
-      "cache-control": "no-store",
+      "content-type": "application/json; charset=utf-8",
+      "content-disposition": 'attachment; filename="fully-settings.json"',
+      // Får aldrig sparas någonstans på vägen: den bär hemligheter. Och ska
+      // inte packas om: appen läser filen som den kommer.
+      "cache-control": "no-store, no-transform",
     },
   });
 }
