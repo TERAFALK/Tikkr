@@ -161,11 +161,17 @@ JavaScript-gränssnittet är Fullys. Den är **förinstallerad** på skärmar me
 firmware A24 eller nyare; den första skärmen kom med `ProDVX_013.A26_02` och
 ProMGR 1.3e.
 
-**Licensen.** Enligt ProDVX användarmanual får skärmar i R23-serien eller nyare
-en kostnadsfri ProMGR Kiosk-licens. Den kopplas till skärmens serienummer av
-ProDVX och går inte att aktivera själv. **PLUS-licensen** krävs för
-JavaScript-gränssnittet, och därmed för Fjärrstyrning. ⟨verifiera⟩ att PLUS
-ingår utan kostnad och om en volymnyckel finns; frågat ProDVX 2026-10-24.
+**Licensen är en volymnyckel i konfigurationen** (löst 2026-10-26). Skärmar i
+R23-serien eller nyare får en kostnadsfri ProMGR-licens med PLUS. Den ligger
+som `volumeLicenseKey` med `volumeLicenseOption: "1"` i den konfiguration som
+skärmen läser in vid provisioneringen. ProDVX lade den i en standardkonfiguration
+i portalen, `!defaultConfig`, och när den togs bort förlorade varje ny skärm
+licensen. Nyckeln gäller kontot, inte en skärm, och är en hemlighet som
+PIN-koden: den står i portalen och lösenordshanteraren, aldrig i repot.
+
+Utan licens fungerar allt, även JavaScript-gränssnittet, men skärmen bär
+ProMGR:s vattenstämpel och kan inte levereras. Enhetskortet i portalen visar
+licensen under *PLUS License*.
 
 **ProMGR Cloud** (portalen hos ProDVX) är en årsprenumeration och behövs inte:
 fjärrstyrningen sköter Tikkr. Utan prenumeration går det ändå att skapa
@@ -262,10 +268,9 @@ första skärmen visade sig motsatsen: startade skärmen utan nät lade ProMGR e
 felläge ("ERR … disconnected") över sidan, och när nätet kom tillbaka låg det
 kvar och tog emot varje tryck. Inte ens de fem trycken som öppnar ProMGR kom
 fram, och bara en omstart med nät hjälpte. Med omladdningen påslagen hände
-det mer sällan, men inte aldrig. ⟨verifiera⟩ orsaken: misstanken är att
-ProMGR saknar PLUS-licens och inte kan kontrollera den utan nät vid start. Den
-fristående Fully-appen startade om utan nät flera gånger 2026-10-19 utan att
-låsa sig.
+det mer sällan, och **när licensen kom på plats 2026-10-26 slutade det**. En
+olicensierad ProMGR som inte når sin licenskontroll vid start var alltså den
+troliga orsaken. Omladdningen står kvar på, eftersom den inte kostar något.
 
 Den är ofarlig sedan 2026-10-19: kön skrivs till disken innan trycket räknas
 som sparat, och skärmen lägger tillbaka sin bild efter en omladdning. Det var
@@ -351,9 +356,10 @@ värdet den såg sist och startar om när det ändrats medan den varit igång. E
 önskemål som redan låg där när sidan laddades verkställs aldrig — annars hade
 varje omstart lett till nästa.
 
-Ljusstyrkan lagras 0–100 och räknas om till appens skala i `fully.ts`.
-⟨verifiera⟩ att skalan är 0–255 och att `WRITE_SETTINGS` beviljas av device
-owner. Blir det fel är det en rad som ändras.
+Ljusstyrkan lagras 0–100 och räknas om till appens skala 0–255 i `fully.ts`.
+Bekräftat 2026-10-26: 100 i panelen gav 95 % i Androids reglage, vilket är max,
+eftersom reglaget inte följer värdet rakt av. Ljusstyrka och omstart fungerar
+med ProMGR, som har samma `fully`-objekt som den fristående appen.
 
 **Serienumret syns först när Fully är device owner.** Modern Android ger inte
 en vanlig app tillgång till det, vilket Fully skriver själva. Platshållare som
@@ -455,12 +461,13 @@ reservskärm att låna ut.
 - [ ] Testen på första skärmen, allihop
 - [x] Uppsättning utan kabel: ProMGR:s startguide med aktiveringskod, se § 6.
       Ersätter skriptet och rutten för inställningsfiler som stod här
-- [ ] PLUS-licensen på första skärmen, och svar från ProDVX om kostnad och
-      volymnyckel
-- [ ] Prova en andra fabriksåterställning med den uppdaterade mallen
+- [x] Licensen: volymnyckel i konfigurationen, se § 6
+- [x] En andra fabriksåterställning med den uppdaterade mallen, 2026-10-26
 - [x] Fjärrstyrning bakom `fully`-detektering — ljusstyrka och omstart från
-      adminpanelen. Provad med fristående Fully 2026-10-19; med ProMGR väntar
-      den på PLUS-licensen
+      adminpanelen. Provad med fristående Fully 2026-10-19 och med ProMGR
+      2026-10-26
+- [ ] Androids låsskärm syns sju sekunder vid start; prova Disable Keyguard
+- [ ] Serienumret och wifisignalen i Fjärrstyrning på skärmen
 - [ ] Kontrollera Android-versionen på en enhet och lägg in den i katalogen
 - [ ] Riktiga produktfoton i stället för illustrationerna i
       `public/tillbehor/stamplingsskarm/`

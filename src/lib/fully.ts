@@ -65,9 +65,10 @@ interface FullyBridge {
 /**
  * Appens skala för ljusstyrka.
  *
- * ⟨verifiera⟩ på första fysiska enheten. Dokumentationen säger bara att
- * `setScreenBrightness` tar ett heltal, och Android räknar själv 0–255. Blir
- * det fel är det den här raden som ändras, och ingenting annat.
+ * Dokumentationen säger bara att `setScreenBrightness` tar ett heltal, och
+ * Android räknar själv 0–255. Bekräftat på den första skärmen 2026-10-26: 100 %
+ * i panelen gav full ljusstyrka. Blir det fel på en annan modell är det den
+ * här raden som ändras, och ingenting annat.
  */
 const BRIGHTNESS_MAX = 255;
 
