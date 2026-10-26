@@ -2,7 +2,6 @@ import { NextResponse, type NextRequest } from "next/server";
 import { getKioskSession } from "@/lib/kiosk-auth";
 import { forCompany } from "@/lib/tenant";
 import { parseDeviceReport } from "@/lib/kiosk-report";
-import { recordAppliedVersion } from "@/lib/kiosk-config-store";
 
 /**
  * SKÄRMEN BERÄTTAR VAD DEN ÄR.
@@ -42,22 +41,10 @@ export async function POST(request: NextRequest) {
   // Skrivs mot skärmens eget id ur sessionen, aldrig mot något ur anropet.
   // Ett id i en kropp hade varit en väg att skriva på en annan kunds skärm.
   // Går dessutom genom företagsfiltret, så även ett id på villovägar stannar.
-  const { configVersionId, ...report } = parseDeviceReport(body);
-
   await forCompany(session.companyId).kioskDevice.updateMany({
     where: { id: session.deviceId },
-    data: { ...report, reportedAt: new Date() },
+    data: { ...parseDeviceReport(body), reportedAt: new Date() },
   });
-
-  // Vilken konfiguration skärmen läst in. Skrivs bara om versionen finns, och
-  // tidpunkten bara när den är ny.
-  if (configVersionId) {
-    await recordAppliedVersion({
-      companyId: session.companyId,
-      deviceId: session.deviceId,
-      versionId: configVersionId,
-    });
-  }
 
   return NextResponse.json({ ok: true });
 }

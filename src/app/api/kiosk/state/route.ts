@@ -4,7 +4,6 @@ import { forCompany } from "@/lib/tenant";
 import { describeEntry } from "@/lib/entry-label";
 import { getOpenBreaks } from "@/lib/breaks";
 import { hasModule } from "@/lib/company-modules";
-import { versionForDevice } from "@/lib/kiosk-config-store";
 import type { KioskActiveJob } from "@/components/kiosk/KioskScreen";
 
 /**
@@ -49,15 +48,8 @@ export async function GET() {
   // pollningsanrop hade kostat dubbelt för samma sak.
   const device = await db.kioskDevice.findFirst({
     where: { id: session.deviceId },
-    select: { brightness: true, restartRequestedAt: true, fullyVersion: true },
+    select: { brightness: true, restartRequestedAt: true },
   });
-
-  // Konfigurationen skärmen ska ha, bara till skärmar som kör kioskappen.
-  // En kunds egen dator har ingenting att göra med den och slipper uppslagen.
-  // Bara versionens id: filen hämtas för sig, och bara när den ändrats.
-  const configVersionId = device?.fullyVersion
-    ? await versionForDevice(session.companyId, session.deviceId)
-    : null;
 
   // Rasterna hämtas samtidigt. En person på lunch har inga öppna stämplingar
   // och skulle annars se ledig ut på de andra skärmarna — och någon skulle
@@ -149,7 +141,6 @@ export async function GET() {
       device: {
         brightness: device?.brightness ?? null,
         restartRequestedAt: device?.restartRequestedAt?.toISOString() ?? null,
-        configVersionId,
       },
     },
     // Får aldrig mellanlagras. En cachad bild av vem som arbetar är exakt det

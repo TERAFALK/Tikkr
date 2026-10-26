@@ -210,7 +210,7 @@ model Company {
   prices          CompanyPrice[]
   kioskSettings   CompanyKioskSetting[]
 
-  /// Kundens skärmkonfiguration, eller null för standarden. Se KioskConfig.
+  /// DÖD sedan 2026-10-26, se KioskConfig.
   kioskConfigId String?      @map("kiosk_config_id")
   kioskConfig   KioskConfig? @relation(fields: [kioskConfigId], references: [id], onDelete: SetNull)
   absences        Absence[]
@@ -1250,8 +1250,10 @@ model CompanyPrice {
   @@map("company_prices")
 }
 
-/// DÖD sedan 2026-10-26, ersatt av KioskConfig. Läses och skrivs inte längre,
-/// och tas bort i en senare release (CLAUDE.md § 0 punkt 7).
+/// DÖD sedan 2026-10-26. Fjärrstyrningen av skärmarnas inställningar och
+/// konfigurationer byggdes och togs bort samma dag (produktägarens val, se
+/// CLAUDE.md). Läses och skrivs inte, och tas bort i en senare release
+/// (CLAUDE.md § 0 punkt 7).
 ///
 /// STANDARDINSTÄLLNINGARNA FÖR SKÄRMARNA VI SÄLJER.
 ///
@@ -1271,7 +1273,10 @@ model KioskSettingDefault {
   @@map("kiosk_setting_defaults")
 }
 
-/// DÖD sedan 2026-10-26, ersatt av KioskConfig, som KioskSettingDefault.
+/// DÖD sedan 2026-10-26. Fjärrstyrningen av skärmarnas inställningar och
+/// konfigurationer byggdes och togs bort samma dag (produktägarens val, se
+/// CLAUDE.md). Läses och skrivs inte, och tas bort i en senare release
+/// (CLAUDE.md § 0 punkt 7).
 ///
 /// EN KUNDS EGET VÄRDE FÖR EN SKÄRMINSTÄLLNING.
 ///
@@ -1297,6 +1302,11 @@ model CompanyKioskSetting {
   @@map("company_kiosk_settings")
 }
 
+/// DÖD sedan 2026-10-26. Fjärrstyrningen av skärmarnas inställningar och
+/// konfigurationer byggdes och togs bort samma dag (produktägarens val, se
+/// CLAUDE.md). Läses och skrivs inte, och tas bort i en senare release
+/// (CLAUDE.md § 0 punkt 7).
+///
 /// EN KONFIGURATION FÖR SKÄRMARNA VI SÄLJER.
 ///
 /// En hel inställningsfil för kioskappen, i versioner. Plattformens egen
@@ -1320,6 +1330,11 @@ model KioskConfig {
   @@map("kiosk_configs")
 }
 
+/// DÖD sedan 2026-10-26. Fjärrstyrningen av skärmarnas inställningar och
+/// konfigurationer byggdes och togs bort samma dag (produktägarens val, se
+/// CLAUDE.md). Läses och skrivs inte, och tas bort i en senare release
+/// (CLAUDE.md § 0 punkt 7).
+///
 /// EN VERSION AV EN KONFIGURATION. Skrivs en gång och ändras aldrig.
 ///
 /// Att backa är att spara en gammal version som en ny. Skärmen läser in den
@@ -1346,6 +1361,11 @@ model KioskConfigVersion {
   @@map("kiosk_config_versions")
 }
 
+/// DÖD sedan 2026-10-26. Fjärrstyrningen av skärmarnas inställningar och
+/// konfigurationer byggdes och togs bort samma dag (produktägarens val, se
+/// CLAUDE.md). Läses och skrivs inte, och tas bort i en senare release
+/// (CLAUDE.md § 0 punkt 7).
+///
 /// EN ENGÅNGSADRESS TILL EN KONFIGURATIONSFIL.
 ///
 /// Appen hämtar filen själv, utan sidans kakor, och kan därför inte visa vem
@@ -1478,8 +1498,7 @@ model KioskDevice {
   /// aldrig ur anropet.
   reportedAt DateTime? @map("reported_at")
 
-  /// En egen konfiguration för just den här skärmen, för att prova en innan
-  /// den når alla. Går före kundens och standarden. Se KioskConfig.
+  /// DÖD sedan 2026-10-26, se KioskConfig. Även de tre fälten nedan.
   kioskConfigId String?      @map("kiosk_config_id")
   kioskConfig   KioskConfig? @relation(fields: [kioskConfigId], references: [id], onDelete: SetNull)
 

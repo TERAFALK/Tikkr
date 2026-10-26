@@ -89,14 +89,6 @@ describe("parseDeviceReport", () => {
     ).toEqual({});
   });
 
-  it("tar emot konfigurationens version, men bara ett id", () => {
-    expect(parseDeviceReport({ configVersionId: "cmh1abcdef0123456789" })).toEqual({
-      configVersionId: "cmh1abcdef0123456789",
-    });
-    expect(parseDeviceReport({ configVersionId: "'; drop table" })).toEqual({});
-    expect(parseDeviceReport({ configVersionId: 42 })).toEqual({});
-  });
-
   it("klarar ett anrop som inte är ett objekt", () => {
     expect(parseDeviceReport(null)).toEqual({});
     expect(parseDeviceReport("text")).toEqual({});

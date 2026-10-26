@@ -1,5 +1,3 @@
-import { versionFromMarker } from "./kiosk-config";
-
 /**
  * BRYGGAN TILL KIOSKAPPEN.
  *
@@ -64,14 +62,6 @@ interface FullyBridge {
   restartApp?: () => void;
   /** Hela enheten. Kräver att appen är device owner. */
   reboot?: () => void;
-  /** Ändringen gäller direkt. */
-  setStringSetting?: (key: string, value: string) => void;
-  setBooleanSetting?: (key: string, value: boolean) => void;
-  getStringSetting?: (key: string) => string;
-  /** Dokumenterad som String, trots namnet. */
-  getBooleanSetting?: (key: string) => string | boolean;
-  /** Läser in en hel inställningsfil, som importen från en USB-sticka. */
-  importSettingsFile?: (url: string) => void;
 }
 
 /**
@@ -107,8 +97,6 @@ export interface FullyDeviceInfo {
   webviewVersion: string | null;
   serialNumber: string | null;
   network: FullyNetwork | null;
-  /** Konfigurationsversionen skärmen läst in, ur appens märke. */
-  configVersionId: string | null;
 }
 
 /** Ett ifyllt strängvärde, eller null för allt annat. */
@@ -206,7 +194,6 @@ export function readDeviceInfo(): FullyDeviceInfo | null {
     webviewVersion: text(safely(() => api.getWebviewVersion?.())),
     serialNumber: readSerialNumber(api),
     network: readNetwork(api),
-    configVersionId: readConfigVersion(),
   };
 }
 
@@ -257,50 +244,4 @@ export function restartApp(): void {
   } catch {
     // Se applyBrightness.
   }
-}
-
-/**
- * Läser en inställning som text, eller null utan appen.
- *
- * Av- och på-inställningar ger "true" eller "false". Appen dokumenterar båda
- * läsarna som text, och vad den faktiskt lämnar skiljer mellan versioner.
- */
-export function readSetting(key: string, kind: "string" | "boolean"): string | null {
-  const api = bridge();
-  if (!api) return null;
-
-  const value =
-    kind === "boolean"
-      ? safely(() => api.getBooleanSetting?.(key))
-      : safely(() => api.getStringSetting?.(key));
-
-  return value === null || value === undefined ? null : String(value);
-}
-
-/**
- * Läser in en hel inställningsfil från en adress. Gör ingenting utan appen.
- *
- * Appen hämtar filen själv, utanför sidan, och därmed utan sidans kakor.
- * Adressen måste alltså fungera utan inloggning.
- */
-export function importSettingsFile(url: string): boolean {
-  const api = bridge();
-  if (typeof api?.importSettingsFile !== "function") return false;
-
-  try {
-    api.importSettingsFile(url);
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-/**
- * Konfigurationsversionen skärmen läst in, eller null.
- *
- * Varje konfigurationsfil sätter appens `customVariable` till sin version, se
- * CONFIG_MARKER i kiosk-config.ts. Står den där har just den filen lästs in.
- */
-export function readConfigVersion(): string | null {
-  return versionFromMarker(readSetting("customVariable", "string"));
 }

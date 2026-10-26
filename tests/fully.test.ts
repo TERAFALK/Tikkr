@@ -2,10 +2,7 @@ import { describe, it, expect, afterEach } from "vitest";
 import {
   applyBrightness,
   hasFully,
-  importSettingsFile,
-  readConfigVersion,
   readDeviceInfo,
-  readSetting,
   restartApp,
   restartDevice,
 } from "@/lib/fully";
@@ -50,10 +47,7 @@ function javaBridge(methods: Record<string, (...args: never[]) => unknown>) {
     };
   }
 
-  (globalThis as { window?: unknown }).window = {
-    fully: bridge,
-    location: { origin: "https://portal.tikkr.se" },
-  };
+  (globalThis as { window?: unknown }).window = { fully: bridge };
   return calls;
 }
 
@@ -114,7 +108,6 @@ describe("med kioskappen", () => {
       webviewVersion: null,
       serialNumber: null,
       network: null,
-      configVersionId: null,
     });
   });
 
@@ -223,7 +216,6 @@ describe("med kioskappen", () => {
       webviewVersion: "142.0",
       serialNumber: null,
       network: null,
-      configVersionId: null,
     });
   });
 
@@ -314,64 +306,5 @@ describe("omstart av hela skärmen", () => {
 
   it("gör tyst ingenting utan appen", () => {
     expect(() => restartDevice()).not.toThrow();
-  });
-});
-
-describe("konfigurationen", () => {
-  it("läser in en fil med appens egen import", () => {
-    const calls = javaBridge({ importSettingsFile: () => undefined });
-
-    expect(importSettingsFile("https://portal.tikkr.se/api/kiosk/config/abc")).toBe(true);
-    expect(calls).toEqual([
-      { name: "importSettingsFile", args: ["https://portal.tikkr.se/api/kiosk/config/abc"] },
-    ]);
-  });
-
-  it("säger ifrån när appen saknar importen eller den kastar", () => {
-    javaBridge({});
-    expect(importSettingsFile("x")).toBe(false);
-
-    javaBridge({
-      importSettingsFile: () => {
-        throw new Error("nej");
-      },
-    });
-    expect(importSettingsFile("x")).toBe(false);
-  });
-
-  it("läser en inställning som text", () => {
-    javaBridge({
-      getStringSetting: ((key: string) => (key === "startURL" ? "https://portal.tikkr.se/kiosk" : "")) as never,
-      getBooleanSetting: (() => true) as never,
-    });
-
-    expect(readSetting("startURL", "string")).toBe("https://portal.tikkr.se/kiosk");
-    expect(readSetting("kioskMode", "boolean")).toBe("true");
-  });
-
-  it("läser versionen ur appens märke", () => {
-    javaBridge({
-      getStringSetting: (() => "tikkr-config:cmh1abcdef0123456789") as never,
-    });
-    expect(readConfigVersion()).toBe("cmh1abcdef0123456789");
-  });
-
-  it("ett annat värde i fältet är ingen version", () => {
-    javaBridge({ getStringSetting: (() => "något kunden skrivit") as never });
-    expect(readConfigVersion()).toBeNull();
-  });
-
-  it("rapporten bär versionen", () => {
-    javaBridge({
-      getFullyVersion: () => "1.61.4",
-      getStringSetting: (() => "tikkr-config:cmh1abcdef0123456789") as never,
-    });
-    expect(readDeviceInfo()?.configVersionId).toBe("cmh1abcdef0123456789");
-  });
-
-  it("gör tyst ingenting utan appen", () => {
-    expect(importSettingsFile("x")).toBe(false);
-    expect(readSetting("startURL", "string")).toBeNull();
-    expect(readConfigVersion()).toBeNull();
   });
 });
