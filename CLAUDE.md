@@ -231,24 +231,36 @@ känner appen, och hårdvaran står i `docs/kioskskarm.md`.
 `fully.reboot()`, och appen om enheten inte går att starta om. Skärmen är
 borta i ungefär en minut, och startar som förut aldrig om med tryck i kön.
 
-**Skärmarnas inställningar styrs från plattformspanelen** (beslutat
-2026-10-26, produktägarens val). Skärmsläckaren, dess ljusstyrka och den
-dagliga omstarten sattes förut i ProDVX portal, och att ändra dem på en
-levererad skärm krävde en molnprenumeration eller ett besök. Nu skickar
-Tikkr dem med svaret skärmen ändå hämtar var femte sekund, och skärmen
-sätter dem med appens egna funktioner.
+**Skärmarnas konfiguration styrs från plattformspanelen** (beslutat
+2026-10-26, produktägarens val, ersätter de tre inställningarna från samma
+dag). En konfiguration är en hel inställningsfil för kioskappen, samma format
+som ProMGR:s export, under **Skärmar** i plattformspanelen. Att ändra något
+på en levererad skärm krävde förut en molnprenumeration hos ProDVX eller ett
+besök med en USB-sticka.
 
-- **Två nivåer:** standarden under Skärmar gäller alla sålda skärmar, och ett
-  eget värde på kundens sida gäller bara den kunden. Saknas båda gäller
-  registrets värde. Raden är tillståndet, som för avtalade priser.
-- **Inte per skärm.** Två skärmar hos samma kund står i samma hall. Per
-  skärm finns bara det kunden själv styr, ljusstyrka och omstart.
-- **Kunden ser inte inställningarna.** De är våra.
-- **Registret i `src/lib/kiosk-settings.ts` är hela listan**, och den är
-  avsiktligt kort. PIN-koden, startadressen och kioskläget ska aldrig stå
-  där: en hemlighet hör inte hemma i vår databas, och ett fel i de andra två
-  gör skärmen omöjlig att nå på distans. Vad appen kallar inställningarna
-  vet bara `fully.ts`, som också bara sätter nycklar ur registret.
+- **Namngivna och versionerade.** Varje sparning blir en ny version, och en
+  äldre återställs genom att sparas som en ny. Versionerna ändras aldrig.
+- **Tre nivåer:** en skärms egen (för att prova) går före kundens, som går
+  före standarden. Standarden är en markering på en konfiguration.
+- **Skärmen läser in filen själv**, med appens `importSettingsFile`, från en
+  engångsadress som gäller en skärm, en version, två minuter och en gång.
+  Importen sätter bara det som står i filen, provat på hårdvara. Filen märker
+  appens `customVariable` med versionen, och skärmen rapporterar vad den kör.
+- **HELA FILEN, ÄVEN HEMLIGHETERNA.** PIN-koden, lösenorden och volymnyckeln
+  lagras krypterade med en nyckel ur `AUTH_SECRET` (`secret-box.ts`), visas
+  aldrig i listor och skrivs aldrig i händelseloggen. Det ersätter beslutet
+  att en hemlighet aldrig skulle ligga hos oss: produktägaren ville kunna
+  skjuta ut hela konfigurationen, som i ProMGR.
+- **Inget spärras, men varnas för.** En startadress utanför Tikkr, ett
+  avstängt JavaScript-gränssnitt, kiosk- eller Lock Task-läge, och en ny
+  PIN-kod kräver en extra bekräftelse innan versionen sparas. De tre första
+  kan göra en skärm omöjlig att nå på distans.
+- **Kunden ser inte konfigurationerna.** De är våra. Kunden har kvar
+  ljusstyrka och omstart under Fjärrstyrning.
+
+Regler och format i `src/lib/kiosk-config.ts`, lagringen i
+`kiosk-config-store.ts`, och vad appen kallar sina funktioner vet bara
+`fully.ts`.
 
 ### Multi-tenant
 
@@ -294,7 +306,7 @@ admin-UI m.m.). Kraftfullt, men det motsäger målet om *ett* enkelt paket.
 
 ```
 companies      — id, name, subscription_status, created_at, atf_agreement?,
-                 planning_mode
+                 planning_mode, kiosk_config_id?
 employees      — id, company_id, name, active, cost_rate_ore,
                  schedule_id?, flex_opening_minutes, flex_code_hash?, hourly,
                  balance_opening_date?, atf_work_form?
@@ -323,7 +335,8 @@ kiosk_devices  — id, company_id, name, token_hash?, pairing_code_hash?,
                  pairing_expires_at?, last_seen_at?,
                  fully_version?, webview_version?, brightness?,
                  restart_requested_at?, serial_number?, network_type?,
-                 wifi_ssid?, wifi_signal?, reported_at?
+                 wifi_ssid?, wifi_signal?, reported_at?, kiosk_config_id?,
+                 applied_config_version_id?, config_applied_at?
 support_visits — id, company_id, email, started_at, last_seen_at
 feedback_messages — id, company_id, author_user_id?, author_email, author_name?,
                  kind, area?, page?, body, done_at?, done_note?, done_by_email?
@@ -361,11 +374,16 @@ company_modules  — id, company_id, module, source, stripe_item_id,
                    enabled_by, enabled_at
 
 company_prices   — id, company_id, item, monthly_ore, updated_by_email
-company_kiosk_settings — id, company_id, key, value, updated_by_email
+company_kiosk_settings — död sedan 2026-10-26, ersatt av kiosk_configs
 
   — plattformens egna tabeller, aldrig kundens —
 stripe_prices    — item, month_price_id, year_price_id, updated_by_email
-kiosk_setting_defaults — key, value, updated_by_email
+kiosk_setting_defaults — död sedan 2026-10-26, ersatt av kiosk_configs
+kiosk_configs    — id, name, is_default
+kiosk_config_versions — id, config_id, version, settings, secrets_sealed?,
+                   created_by_email
+kiosk_config_downloads — id, token_hash, device_id, version_id, expires_at,
+                   used_at?
 login_throttles  — scope, key_hash, count, until
 
   — tillbehören, se § 3.4 —

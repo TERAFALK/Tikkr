@@ -1,9 +1,11 @@
 import { describe, it, expect, afterEach } from "vitest";
 import {
   applyBrightness,
-  applyKioskSettings,
   hasFully,
+  importSettingsFile,
+  readConfigVersion,
   readDeviceInfo,
+  readSetting,
   restartApp,
   restartDevice,
 } from "@/lib/fully";
@@ -112,6 +114,7 @@ describe("med kioskappen", () => {
       webviewVersion: null,
       serialNumber: null,
       network: null,
+      configVersionId: null,
     });
   });
 
@@ -220,6 +223,7 @@ describe("med kioskappen", () => {
       webviewVersion: "142.0",
       serialNumber: null,
       network: null,
+      configVersionId: null,
     });
   });
 
@@ -313,93 +317,61 @@ describe("omstart av hela skärmen", () => {
   });
 });
 
-describe("inställningarna från panelen", () => {
-  const SETTINGS = {
-    screensaverMinutes: "15",
-    screensaverBrightness: "15",
-    dailyRestart: "03:00",
-  };
+describe("konfigurationen", () => {
+  it("läser in en fil med appens egen import", () => {
+    const calls = javaBridge({ importSettingsFile: () => undefined });
 
-  function settingCalls(calls: { name: string; args: unknown[] }[]) {
-    return Object.fromEntries(
-      calls
-        .filter((c) => c.name === "setStringSetting" || c.name === "setBooleanSetting")
-        .map((c) => [c.args[0], c.args[1]])
-    );
-  }
-
-  it("översätts till appens nycklar och skalor", () => {
-    const calls = javaBridge({
-      setStringSetting: () => undefined,
-      setBooleanSetting: () => undefined,
-    });
-
-    applyKioskSettings(SETTINGS);
-
-    expect(settingCalls(calls)).toEqual({
-      // Appen räknar sekunder och 0–255.
-      timeToScreensaverV2: "900",
-      screensaverBrightness: "38",
-      screensaverWallpaperURL:
-        "https://portal.tikkr.se/brand/tikkr-skarmslackare-1920x1080.png",
-      mdmRebootTime: "03:00",
-      reloadOnWifiOn: true,
-    });
+    expect(importSettingsFile("https://portal.tikkr.se/api/kiosk/config/abc")).toBe(true);
+    expect(calls).toEqual([
+      { name: "importSettingsFile", args: ["https://portal.tikkr.se/api/kiosk/config/abc"] },
+    ]);
   });
 
-  it("en avstängd omstart skickas som tom text", () => {
-    const calls = javaBridge({
-      setStringSetting: () => undefined,
-      setBooleanSetting: () => undefined,
-    });
+  it("säger ifrån när appen saknar importen eller den kastar", () => {
+    javaBridge({});
+    expect(importSettingsFile("x")).toBe(false);
 
-    applyKioskSettings({ ...SETTINGS, dailyRestart: "" });
-    expect(settingCalls(calls).mdmRebootTime).toBe("");
-  });
-
-  it("skickar aldrig något annat än det som står i bryggan", () => {
-    const calls = javaBridge({
-      setStringSetting: () => undefined,
-      setBooleanSetting: () => undefined,
-    });
-
-    // En server som skickar mer än registret får ändå inte nå appen.
-    applyKioskSettings({
-      ...SETTINGS,
-      kioskPin: "0000",
-      startURL: "https://annan.example",
-    } as typeof SETTINGS);
-
-    const keys = Object.keys(settingCalls(calls));
-    expect(keys).not.toContain("kioskPin");
-    expect(keys).not.toContain("startURL");
-    expect(keys.sort()).toEqual(
-      [
-        "mdmRebootTime",
-        "reloadOnWifiOn",
-        "screensaverBrightness",
-        "screensaverWallpaperURL",
-        "timeToScreensaverV2",
-      ].sort()
-    );
-  });
-
-  it("en inställning som kastar kostar inte de andra", () => {
-    const set: string[] = [];
     javaBridge({
-      setStringSetting: ((key: string) => {
-        if (key === "mdmRebootTime") throw new Error("nej");
-        set.push(key);
-      }) as never,
-      setBooleanSetting: () => undefined,
+      importSettingsFile: () => {
+        throw new Error("nej");
+      },
+    });
+    expect(importSettingsFile("x")).toBe(false);
+  });
+
+  it("läser en inställning som text", () => {
+    javaBridge({
+      getStringSetting: ((key: string) => (key === "startURL" ? "https://portal.tikkr.se/kiosk" : "")) as never,
+      getBooleanSetting: (() => true) as never,
     });
 
-    expect(() => applyKioskSettings(SETTINGS)).not.toThrow();
-    expect(set).toContain("timeToScreensaverV2");
-    expect(set).toContain("screensaverWallpaperURL");
+    expect(readSetting("startURL", "string")).toBe("https://portal.tikkr.se/kiosk");
+    expect(readSetting("kioskMode", "boolean")).toBe("true");
+  });
+
+  it("läser versionen ur appens märke", () => {
+    javaBridge({
+      getStringSetting: (() => "tikkr-config:cmh1abcdef0123456789") as never,
+    });
+    expect(readConfigVersion()).toBe("cmh1abcdef0123456789");
+  });
+
+  it("ett annat värde i fältet är ingen version", () => {
+    javaBridge({ getStringSetting: (() => "något kunden skrivit") as never });
+    expect(readConfigVersion()).toBeNull();
+  });
+
+  it("rapporten bär versionen", () => {
+    javaBridge({
+      getFullyVersion: () => "1.61.4",
+      getStringSetting: (() => "tikkr-config:cmh1abcdef0123456789") as never,
+    });
+    expect(readDeviceInfo()?.configVersionId).toBe("cmh1abcdef0123456789");
   });
 
   it("gör tyst ingenting utan appen", () => {
-    expect(() => applyKioskSettings(SETTINGS)).not.toThrow();
+    expect(importSettingsFile("x")).toBe(false);
+    expect(readSetting("startURL", "string")).toBeNull();
+    expect(readConfigVersion()).toBeNull();
   });
 });
