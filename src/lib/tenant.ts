@@ -72,6 +72,9 @@ export const TENANT_SCOPED_MODELS = [
   // kundens egen prenumerationssida — och kund A ska aldrig kunna läsa vad
   // kund B förhandlat fram.
   "CompanyPrice",
+  // Skärminställningar per kund. Skrivs bara av plattformspanelen, och läses
+  // av kundens egna skärmar.
+  "CompanyKioskSetting",
   // Ändringsloggen. Kundens egen historik, och lika isolerad som resten.
   "AuditEvent",
   // Fel och förslag. Kunden skriver sina meddelanden här; plattformens

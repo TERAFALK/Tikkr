@@ -1,9 +1,11 @@
 import { describe, it, expect, afterEach } from "vitest";
 import {
   applyBrightness,
+  applyKioskSettings,
   hasFully,
   readDeviceInfo,
   restartApp,
+  restartDevice,
 } from "@/lib/fully";
 
 /**
@@ -46,7 +48,10 @@ function javaBridge(methods: Record<string, (...args: never[]) => unknown>) {
     };
   }
 
-  (globalThis as { window?: unknown }).window = { fully: bridge };
+  (globalThis as { window?: unknown }).window = {
+    fully: bridge,
+    location: { origin: "https://portal.tikkr.se" },
+  };
   return calls;
 }
 
@@ -273,5 +278,128 @@ describe("med kioskappen", () => {
     expect(() => applyBrightness(50)).not.toThrow();
     expect(() => restartApp()).not.toThrow();
     expect(readDeviceInfo()).toBeNull();
+  });
+});
+
+describe("omstart av hela skärmen", () => {
+  it("startar om enheten när appen kan", () => {
+    const calls = javaBridge({ reboot: () => undefined, restartApp: () => undefined });
+
+    restartDevice();
+    expect(calls.map((c) => c.name)).toEqual(["reboot"]);
+  });
+
+  it("startar om appen när enheten inte går", () => {
+    const calls = javaBridge({
+      reboot: () => {
+        throw new Error("inte device owner");
+      },
+      restartApp: () => undefined,
+    });
+
+    restartDevice();
+    expect(calls.map((c) => c.name)).toEqual(["reboot", "restartApp"]);
+  });
+
+  it("startar om appen när funktionen saknas", () => {
+    const calls = javaBridge({ restartApp: () => undefined });
+
+    restartDevice();
+    expect(calls.map((c) => c.name)).toEqual(["restartApp"]);
+  });
+
+  it("gör tyst ingenting utan appen", () => {
+    expect(() => restartDevice()).not.toThrow();
+  });
+});
+
+describe("inställningarna från panelen", () => {
+  const SETTINGS = {
+    screensaverMinutes: "15",
+    screensaverBrightness: "15",
+    dailyRestart: "03:00",
+  };
+
+  function settingCalls(calls: { name: string; args: unknown[] }[]) {
+    return Object.fromEntries(
+      calls
+        .filter((c) => c.name === "setStringSetting" || c.name === "setBooleanSetting")
+        .map((c) => [c.args[0], c.args[1]])
+    );
+  }
+
+  it("översätts till appens nycklar och skalor", () => {
+    const calls = javaBridge({
+      setStringSetting: () => undefined,
+      setBooleanSetting: () => undefined,
+    });
+
+    applyKioskSettings(SETTINGS);
+
+    expect(settingCalls(calls)).toEqual({
+      // Appen räknar sekunder och 0–255.
+      timeToScreensaverV2: "900",
+      screensaverBrightness: "38",
+      screensaverWallpaperURL:
+        "https://portal.tikkr.se/brand/tikkr-skarmslackare-1920x1080.png",
+      mdmRebootTime: "03:00",
+      reloadOnWifiOn: true,
+    });
+  });
+
+  it("en avstängd omstart skickas som tom text", () => {
+    const calls = javaBridge({
+      setStringSetting: () => undefined,
+      setBooleanSetting: () => undefined,
+    });
+
+    applyKioskSettings({ ...SETTINGS, dailyRestart: "" });
+    expect(settingCalls(calls).mdmRebootTime).toBe("");
+  });
+
+  it("skickar aldrig något annat än det som står i bryggan", () => {
+    const calls = javaBridge({
+      setStringSetting: () => undefined,
+      setBooleanSetting: () => undefined,
+    });
+
+    // En server som skickar mer än registret får ändå inte nå appen.
+    applyKioskSettings({
+      ...SETTINGS,
+      kioskPin: "0000",
+      startURL: "https://annan.example",
+    } as typeof SETTINGS);
+
+    const keys = Object.keys(settingCalls(calls));
+    expect(keys).not.toContain("kioskPin");
+    expect(keys).not.toContain("startURL");
+    expect(keys.sort()).toEqual(
+      [
+        "mdmRebootTime",
+        "reloadOnWifiOn",
+        "screensaverBrightness",
+        "screensaverWallpaperURL",
+        "timeToScreensaverV2",
+      ].sort()
+    );
+  });
+
+  it("en inställning som kastar kostar inte de andra", () => {
+    const set: string[] = [];
+    javaBridge({
+      setStringSetting: ((key: string) => {
+        if (key === "mdmRebootTime") throw new Error("nej");
+        set.push(key);
+      }) as never,
+      setBooleanSetting: () => undefined,
+    });
+
+    expect(() => applyKioskSettings(SETTINGS)).not.toThrow();
+    expect(set).toContain("timeToScreensaverV2");
+    expect(set).toContain("screensaverWallpaperURL");
+  });
+
+  it("gör tyst ingenting utan appen", () => {
+    expect(() => applyKioskSettings(SETTINGS)).not.toThrow();
   });
 });

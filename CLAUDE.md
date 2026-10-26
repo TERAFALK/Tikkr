@@ -227,6 +227,29 @@ syns på stämplingsskärmen, som saknar inloggning: ett reglage där hade låti
 vem som helst släcka stämpelklockan. `src/lib/fully.ts` är enda filen som
 känner appen, och hårdvaran står i `docs/kioskskarm.md`.
 
+**Starta om startar om hela skärmen** (ändrat 2026-10-26), med
+`fully.reboot()`, och appen om enheten inte går att starta om. Skärmen är
+borta i ungefär en minut, och startar som förut aldrig om med tryck i kön.
+
+**Skärmarnas inställningar styrs från plattformspanelen** (beslutat
+2026-10-26, produktägarens val). Skärmsläckaren, dess ljusstyrka och den
+dagliga omstarten sattes förut i ProDVX portal, och att ändra dem på en
+levererad skärm krävde en molnprenumeration eller ett besök. Nu skickar
+Tikkr dem med svaret skärmen ändå hämtar var femte sekund, och skärmen
+sätter dem med appens egna funktioner.
+
+- **Två nivåer:** standarden under Skärmar gäller alla sålda skärmar, och ett
+  eget värde på kundens sida gäller bara den kunden. Saknas båda gäller
+  registrets värde. Raden är tillståndet, som för avtalade priser.
+- **Inte per skärm.** Två skärmar hos samma kund står i samma hall. Per
+  skärm finns bara det kunden själv styr, ljusstyrka och omstart.
+- **Kunden ser inte inställningarna.** De är våra.
+- **Registret i `src/lib/kiosk-settings.ts` är hela listan**, och den är
+  avsiktligt kort. PIN-koden, startadressen och kioskläget ska aldrig stå
+  där: en hemlighet hör inte hemma i vår databas, och ett fel i de andra två
+  gör skärmen omöjlig att nå på distans. Vad appen kallar inställningarna
+  vet bara `fully.ts`, som också bara sätter nycklar ur registret.
+
 ### Multi-tenant
 
 Flera kundföretag delar samma app-instans, men deras data är **helt isolerad**
@@ -338,9 +361,11 @@ company_modules  — id, company_id, module, source, stripe_item_id,
                    enabled_by, enabled_at
 
 company_prices   — id, company_id, item, monthly_ore, updated_by_email
+company_kiosk_settings — id, company_id, key, value, updated_by_email
 
   — plattformens egna tabeller, aldrig kundens —
 stripe_prices    — item, month_price_id, year_price_id, updated_by_email
+kiosk_setting_defaults — key, value, updated_by_email
 login_throttles  — scope, key_hash, count, until
 
   — tillbehören, se § 3.4 —

@@ -1,3 +1,5 @@
+import type { KioskSettings } from "./kiosk-settings";
+
 /**
  * BRYGGAN TILL KIOSKAPPEN.
  *
@@ -60,6 +62,11 @@ interface FullyBridge {
   /** `-1` betyder enhetens standard. */
   setScreenBrightness?: (level: number) => void;
   restartApp?: () => void;
+  /** Hela enheten. Kräver att appen är device owner. */
+  reboot?: () => void;
+  /** Ändringen gäller direkt. */
+  setStringSetting?: (key: string, value: string) => void;
+  setBooleanSetting?: (key: string, value: boolean) => void;
 }
 
 /**
@@ -207,6 +214,87 @@ export function applyBrightness(percent: number): void {
   } catch {
     // Saknad behörighet, troligen WRITE_SETTINGS. Inget att göra åt härifrån,
     // och absolut inget att fälla skärmen för.
+  }
+}
+
+/**
+ * Startar om hela skärmen, och appen om det inte går.
+ *
+ * En omstart av enheten tar omkring en minut men rensar allt, även det som
+ * bara Android håller i. `reboot()` kräver att appen är device owner. Saknas
+ * funktionen eller kastar den startas bara appen om, som förut. En enhet utan
+ * device owner kan också svara utan att göra något; det går inte att se
+ * härifrån, och skärmarna vi säljer är alltid provisionerade.
+ */
+export function restartDevice(): void {
+  const api = bridge();
+  if (typeof api?.reboot === "function") {
+    try {
+      api.reboot();
+      return;
+    } catch {
+      // Faller tillbaka på appen nedan.
+    }
+  }
+  restartApp();
+}
+
+/**
+ * Inställningarna från panelen, i appens egna nycklar och skalor.
+ *
+ * Här och bara här står vad appen kallar dem. Listan är registrets och
+ * ingenting annat: en nyckel som inte står här når aldrig appen, vad servern
+ * än skickar.
+ *
+ * Skärmsläckarens bild och omladdningen när nätet kommer tillbaka är fasta.
+ * Bilden pekar på samma värd som sidan, så att en skärm som pekats om till en
+ * annan server tar bilden därifrån. Omladdningen tar bort ett felläge appen
+ * annars lämnar kvar efter en start utan nät, se docs/kioskskarm.md § 7.
+ */
+function toAppSettings(settings: KioskSettings): {
+  strings: Record<string, string>;
+  booleans: Record<string, boolean>;
+} {
+  const brightness = Math.round(
+    (Math.min(100, Math.max(0, Number(settings.screensaverBrightness) || 0)) / 100) *
+      BRIGHTNESS_MAX
+  );
+
+  return {
+    strings: {
+      // Appen räknar sekunder, panelen minuter.
+      timeToScreensaverV2: String((Number(settings.screensaverMinutes) || 0) * 60),
+      screensaverBrightness: String(brightness),
+      screensaverWallpaperURL: `${window.location.origin}${SCREENSAVER_IMAGE}`,
+      // "Daily System Restart", HH:MM eller tomt för av.
+      mdmRebootTime: settings.dailyRestart,
+    },
+    booleans: {
+      reloadOnWifiOn: true,
+    },
+  };
+}
+
+/** Skärmsläckarens bild, se scripts/screensaver-image.mjs. */
+const SCREENSAVER_IMAGE = "/brand/tikkr-skarmslackare-1920x1080.png";
+
+/**
+ * Sätter inställningarna. Gör ingenting utan appen.
+ *
+ * Varje inställning för sig: en nyckel som en äldre appversion inte känner
+ * ska inte kosta de andra.
+ */
+export function applyKioskSettings(settings: KioskSettings): void {
+  const api = bridge();
+  if (!api) return;
+
+  const { strings, booleans } = toAppSettings(settings);
+
+  for (const [key, value] of Object.entries(strings)) {
+    safely(() => api.setStringSetting?.(key, value));
+  }
+  for (const [key, value] of Object.entries(booleans)) {
+    safely(() => api.setBooleanSetting?.(key, value));
   }
 }
 

@@ -20,9 +20,13 @@ import {
   setModule,
   setSubscriptionStatus,
   type SubscriptionStatus,
+  recordPlatformAction,
 } from "@/lib/platform-admin";
 import { SCREEN_ITEM, type PriceItem } from "@/lib/price-book";
 import { isModuleKey, moduleName } from "@/lib/modules";
+import type { DialogState } from "@/components/ui/ActionDialog";
+import { KIOSK_SETTINGS, isKioskSettingKey } from "@/lib/kiosk-settings";
+import { setCompanyKioskSetting } from "@/lib/kiosk-settings-store";
 
 const STATUSES: SubscriptionStatus[] = [
   "TRIALING",
@@ -375,4 +379,55 @@ export async function changeAgreedPrice(
         ? "Listpriset gäller igen."
         : `Priset är satt till ${amount} kr/mån.`,
   };
+}
+
+/**
+ * SÄTTER ELLER TAR BORT EN KUNDS EGET VÄRDE FÖR EN SKÄRMINSTÄLLNING.
+ *
+ * Går före standarden under Skärmar, bara för den här kundens skärmar. Tomt
+ * fält tar bort värdet, och kunden följer standarden igen.
+ */
+export async function changeKioskSetting(
+  _previous: DialogState,
+  formData: FormData
+): Promise<DialogState> {
+  const { email } = await requirePlatformAdmin();
+
+  const companyId = String(formData.get("companyId") ?? "");
+  const key = String(formData.get("key") ?? "");
+  const raw = String(formData.get("value") ?? "").trim();
+
+  if (!companyId) return { error: "Okänt företag." };
+  if (!isKioskSettingKey(key)) return { error: "Okänd inställning." };
+
+  const company = await unsafeGlobalPrisma.company.findUnique({
+    where: { id: companyId },
+    select: { id: true },
+  });
+  if (!company) return { error: "Okänt företag." };
+
+  const result = await setCompanyKioskSetting({
+    companyId,
+    key,
+    raw: raw === "" ? null : raw,
+    byEmail: email,
+  });
+
+  if ("error" in result) return { error: result.error };
+
+  const definition = KIOSK_SETTINGS[key];
+  const shown =
+    result.value === null ? "standarden" : definition.describe(result.value);
+
+  await recordPlatformAction({
+    actorEmail: email,
+    action: "Ändrade skärminställning",
+    targetCompanyId: companyId,
+    detail: `${definition.label}: ${shown}`,
+  });
+
+  revalidatePath(`/plattform/kunder/${companyId}`);
+  revalidatePath("/plattform/skarmar");
+
+  return { ok: `${definition.label}: ${shown}.` };
 }

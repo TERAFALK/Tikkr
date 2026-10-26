@@ -42,7 +42,18 @@ import {
   Section,
   SubscriptionBadge,
 } from "@/components/platform/Pieces";
-import { resetTwoStep, startSupport, updateNote } from "./actions";
+import {
+  changeKioskSetting,
+  resetTwoStep,
+  startSupport,
+  updateNote,
+} from "./actions";
+import KioskSettingsList from "@/components/platform/KioskSettingsList";
+import { KIOSK_SETTING_KEYS, resolveKioskSettings } from "@/lib/kiosk-settings";
+import {
+  storedCompanyKioskSettings,
+  storedKioskDefaults,
+} from "@/lib/kiosk-settings-store";
 import ConfirmButton from "@/components/admin/ConfirmButton";
 import { unsafeGlobalPrisma } from "@/lib/db";
 import { getModulePricing, getScreenPricing } from "@/lib/stripe";
@@ -104,6 +115,18 @@ export default async function CompanyPage({
   const owner = admins
     .filter((admin) => admin.role === "OWNER")
     .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime())[0];
+
+  // Skärminställningarna: det som gäller, och vad som är kundens eget.
+  const [kioskDefaults, kioskOwn] = await Promise.all([
+    storedKioskDefaults(),
+    storedCompanyKioskSettings(company.id),
+  ]);
+  const kioskEffective = resolveKioskSettings(kioskDefaults, kioskOwn);
+  const kioskRows = KIOSK_SETTING_KEYS.map((key) => ({
+    key,
+    value: kioskEffective[key],
+    own: key in kioskOwn ? kioskOwn[key] : null,
+  }));
 
   const screenPricing = await getScreenPricing();
   const modulePricing = await getModulePricing();
@@ -506,6 +529,20 @@ export default async function CompanyPage({
                   </tbody>
                 </Table>
               )}
+            </Card>
+
+            <Card>
+              <CardHeader
+                title="Skärminställningar"
+                description="Gäller kundens skärmar som kör kioskappen."
+              />
+              <KioskSettingsList
+                rows={kioskRows}
+                action={changeKioskSetting}
+                hidden={{ companyId: company.id }}
+                inheritedLabel="Standard"
+                emptyHint="Tomt följer standarden"
+              />
             </Card>
           </div>
         </Section>

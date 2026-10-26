@@ -290,17 +290,26 @@ Två fjärrkommandon får aldrig skickas till en skärm med osynkad kö: **Clear
 Cache** och **Clear Web Cookies**. Det senare återkallar i praktiken skärmens
 koppling.
 
-**Med licensen sätts tre saker till** (2026-10-26, provas): `mdmDisableKeyguard`
-stänger Androids låsskärm, som annars syntes sju sekunder vid start;
-`rebootTime` startar om skärmen 03:00, vilket också är när den får en ny
-version av Tikkr; och en skärmsläckare med logotypen efter femton minuter, i
-låg ljusstyrka. Skärmsläckaren väcks av ett tryck som inte stämplar, till
+**Med licensen sätts tre saker till** (2026-10-26): `mdmDisableKeyguard`
+stänger Androids låsskärm, som annars syntes sju sekunder vid start, och är
+bekräftad. `mdmRebootTime`, i appen *Daily System Restart*, startar om skärmen
+03:00, vilket också är när den får en ny version av Tikkr. `rebootTime`
+gör det inte; den kräver root. Och en skärmsläckare med logotypen efter femton
+minuter, i låg ljusstyrka, som väcks av ett tryck som inte stämplar, till
 skillnad från ett viloläge, där skärmen är av och inte tar emot tryck.
+Ljusstyrkan går tillbaka när skärmen vaknar, bekräftat.
+
+**Skärmsläckaren och omstarten styrs från plattformspanelen** sedan
+2026-10-26, under Skärmar och på kundens sida, se CLAUDE.md. Skärmen sätter
+dem med `setStringSetting` och `setBooleanSetting` i appens JavaScript-
+gränssnitt, som slår igenom direkt. Konfigurationen i ProDVX portal behöver
+därför bara ändras för det som inte står i registret. ⟨verifiera⟩ att
+`mdmRebootTime` slår igenom när den sätts från sidan och inte bara ur
+konfigurationen.
 Skärmsläckaren pekar på `https://portal.tikkr.se/brand/tikkr-skarmslackare-1920x1080.png`,
 logotypen mitt på Fjord i skärmens upplösning. Logotypens SVG visade ProMGR
 som en webbsida, på vit botten i övre vänstra hörnet.
-⟨verifiera⟩ att omstarten sker och att ljusstyrkan går tillbaka när skärmen
-vaknar.
+
 
 **Huvud-PIN:en är densamma på varje skärm**, eftersom konfigurationen delas. Den
 lämnas aldrig ut till en kund. En konfiguration per kund, med egna koder, när
@@ -406,6 +415,9 @@ JavaScript-gränssnittet:
 | `fully.getWifiSignalLevel()` | signalen, som sträng |
 | `fully.setScreenBrightness(int)` | ljusstyrka, `-1` för enhetens standard |
 | `fully.restartApp()` | starta om appen |
+| `fully.reboot()` | starta om hela enheten, kräver device owner |
+| `fully.setStringSetting(key, value)` | sätta en inställning, gäller direkt |
+| `fully.setBooleanSetting(key, value)` | samma, för av och på |
 
 Första versionen byggde på `fully.getDeviceInfo()`. Den finns bara i Fullys
 fjärr-API, inte för webbsidan, och den första fysiska skärmen rapporterade
@@ -488,7 +500,9 @@ reservskärm att låna ut.
 - [x] Fjärrstyrning bakom `fully`-detektering — ljusstyrka och omstart från
       adminpanelen. Provad med fristående Fully 2026-10-19 och med ProMGR
       2026-10-26
-- [ ] Låsskärmen, nattlig omstart och skärmsläckaren, se § 7
+- [x] Låsskärmen, nattlig omstart och skärmsläckaren, se § 7
+- [ ] Inställningarna från plattformspanelen på skärmen, och omstart av hela
+      skärmen från Fjärrstyrning
 - [ ] Serienumret och wifisignalen i Fjärrstyrning på skärmen
 - [ ] Kontrollera Android-versionen på en enhet och lägg in den i katalogen
 - [ ] Riktiga produktfoton i stället för illustrationerna i
