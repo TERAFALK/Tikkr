@@ -13,9 +13,7 @@ import {
 } from "@/lib/offline-queue";
 import {
   applyBrightness,
-  importSettingsFile,
   hasFully,
-  readConfigVersion,
   readDeviceInfo,
   restartDevice,
 } from "@/lib/fully";
@@ -791,80 +789,9 @@ export default function KioskScreen({
   const brightnessRef = useRef<number | null | undefined>(undefined);
   const restartRef = useRef<string | null | undefined>(undefined);
 
-  /** Berättar för servern vad skärmen är. Se effekten längre ner. */
-  const reportDevice = useCallback(() => {
-    const info = readDeviceInfo();
-    if (!info) return;
-
-    void fetch("/api/kiosk/device", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify(info),
-    }).catch(() => {
-      // Nätet är nere. Rapporten är inte värd en omsändning — nästa gör om
-      // den, och ingen arbetstid hänger på den.
-    });
-  }, []);
-
-  /**
-   * Konfigurationsversionen skärmen senast försökte läsa in under den här
-   * sidladdningen.
-   *
-   * Ett försök per version och laddning. Går inläsningen inte igenom försöker
-   * skärmen igen nästa gång sidan laddas, i stället för var femte sekund.
-   */
-  const configTriedRef = useRef<string | null>(null);
-
-  /**
-   * LÄSER IN KONFIGURATIONEN FRÅN PLATTFORMEN, när den ändrats.
-   *
-   * Skärmen får versionens id med sitt vanliga läge. Har appen inte redan
-   * den versionen ber skärmen om en engångsadress, och appen hämtar och läser
-   * in filen själv. Importen sätter bara det som står i filen.
-   *
-   * Ljusstyrkan sätts om efteråt: en export bär appens egen ljusstyrka, och
-   * den ska inte vinna över den som valts i panelen.
-   */
-  const loadConfig = useCallback(
-    async (versionId: string) => {
-      try {
-        const response = await fetch("/api/kiosk/config", {
-          method: "POST",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify({ versionId }),
-        });
-        if (!response.ok) return;
-
-        const { url } = (await response.json()) as { url?: string };
-        if (!url || !importSettingsFile(url)) return;
-
-        brightnessRef.current = undefined;
-        // Berättar vilken version som gäller när appen hunnit läsa in den.
-        setTimeout(reportDevice, 15_000);
-      } catch {
-        // Nätet är nere. Nästa sidladdning försöker igen.
-      }
-    },
-    [reportDevice]
-  );
-
   const applyDeviceSettings = useCallback(
-    (device?: {
-      brightness: number | null;
-      restartRequestedAt: string | null;
-      configVersionId?: string | null;
-    }) => {
+    (device?: { brightness: number | null; restartRequestedAt: string | null }) => {
       if (!device || !hasFully()) return;
-
-      const wanted = device.configVersionId;
-      if (
-        wanted &&
-        wanted !== configTriedRef.current &&
-        readConfigVersion() !== wanted
-      ) {
-        configTriedRef.current = wanted;
-        void loadConfig(wanted);
-      }
 
       if (device.brightness !== null && device.brightness !== brightnessRef.current) {
         applyBrightness(device.brightness);
@@ -879,7 +806,7 @@ export default function KioskScreen({
         restartDevice();
       }
     },
-    [loadConfig]
+    []
   );
 
   /**
@@ -894,16 +821,30 @@ export default function KioskScreen({
    * när nätet kommer tillbaka också, eftersom det är just då frågan ställs.
    */
   useEffect(() => {
-    reportDevice();
+    const report = () => {
+      const info = readDeviceInfo();
+      if (!info) return;
 
-    const timer = setInterval(reportDevice, DEVICE_REPORT_MS);
-    window.addEventListener("online", reportDevice);
+      void fetch("/api/kiosk/device", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(info),
+      }).catch(() => {
+        // Nätet är nere. Rapporten är inte värd en omsändning — nästa gör om
+        // den, och ingen arbetstid hänger på den.
+      });
+    };
+
+    report();
+
+    const timer = setInterval(report, DEVICE_REPORT_MS);
+    window.addEventListener("online", report);
 
     return () => {
       clearInterval(timer);
-      window.removeEventListener("online", reportDevice);
+      window.removeEventListener("online", report);
     };
-  }, [reportDevice]);
+  }, []);
 
   /**
    * Hämtar vem som är instämplad, från servern.
@@ -930,7 +871,6 @@ export default function KioskScreen({
         device?: {
           brightness: number | null;
           restartRequestedAt: string | null;
-          configVersionId?: string | null;
         };
       };
 

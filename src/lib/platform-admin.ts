@@ -440,8 +440,6 @@ export class PlatformActionError extends Error {
 export async function recordPlatformAction(params: {
   actorEmail: string;
   action: string;
-  /** Företaget åtgärden gällde, så att den syns på kundens sida. */
-  targetCompanyId?: string;
   detail?: string;
 }) {
   await record(params);

@@ -299,13 +299,11 @@ minuter, i låg ljusstyrka, som väcks av ett tryck som inte stämplar, till
 skillnad från ett viloläge, där skärmen är av och inte tar emot tryck.
 Ljusstyrkan går tillbaka när skärmen vaknar, bekräftat.
 
-**Konfigurationen styrs från plattformspanelen** sedan 2026-10-26, under
-Skärmar, se CLAUDE.md. En export från ProMGR laddas upp som en konfiguration,
-och skärmen läser in den med appens `importSettingsFile`. Provat 2026-10-26:
-en fil med en enda inställning ändrade bara den, och PIN-koden, startadressen,
-kioskläget och licensen stod kvar. Portalens konfiguration hos ProDVX behövs
-fortfarande vid provisioneringen; ladda ner versionen härifrån och lägg in
-den där, så att en ny skärm startar med samma fil som den sedan får.
+**Konfigurationen ändras i ProDVX portal och med USB-stickan**, inte från
+Tikkr. Ett försök att skicka ut konfigurationer från plattformspanelen
+byggdes och togs bort 2026-10-26, se CLAUDE.md. Två saker lärde det oss:
+`importSettingsFile` sätter bara det som står i filen, och appen vägrade en
+fil vars adress inte slutade på `.json`.
 
 
 **Huvud-PIN:en är densamma på varje skärm**, eftersom konfigurationen delas. Den
@@ -413,10 +411,6 @@ JavaScript-gränssnittet:
 | `fully.setScreenBrightness(int)` | ljusstyrka, `-1` för enhetens standard |
 | `fully.restartApp()` | starta om appen |
 | `fully.reboot()` | starta om hela enheten, kräver device owner |
-| `fully.setStringSetting(key, value)` | sätta en inställning, gäller direkt |
-| `fully.setBooleanSetting(key, value)` | samma, för av och på |
-| `fully.getStringSetting(key)` | läsa en inställning, t.ex. versionen i `customVariable` |
-| `fully.importSettingsFile(url)` | läsa in en hel inställningsfil, bara det som står i den |
 
 Första versionen byggde på `fully.getDeviceInfo()`. Den finns bara i Fullys
 fjärr-API, inte för webbsidan, och den första fysiska skärmen rapporterade
@@ -500,8 +494,7 @@ reservskärm att låna ut.
       adminpanelen. Provad med fristående Fully 2026-10-19 och med ProMGR
       2026-10-26
 - [x] Låsskärmen, nattlig omstart och skärmsläckaren, se § 7
-- [ ] Konfigurationerna på skärmen: inläsning, rapporterad version, och
-      omstart av hela skärmen från Fjärrstyrning
+- [ ] Omstart av hela skärmen från Fjärrstyrning
 - [ ] Serienumret och wifisignalen i Fjärrstyrning på skärmen
 - [ ] Kontrollera Android-versionen på en enhet och lägg in den i katalogen
 - [ ] Riktiga produktfoton i stället för illustrationerna i

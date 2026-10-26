@@ -43,10 +43,6 @@ import {
   SubscriptionBadge,
 } from "@/components/platform/Pieces";
 import { resetTwoStep, startSupport, updateNote } from "./actions";
-import {
-  CompanyConfigChooser,
-  DeviceConfigChooser,
-} from "@/components/platform/KioskConfigForms";
 import ConfirmButton from "@/components/admin/ConfirmButton";
 import { unsafeGlobalPrisma } from "@/lib/db";
 import { getModulePricing, getScreenPricing } from "@/lib/stripe";
@@ -108,33 +104,6 @@ export default async function CompanyPage({
   const owner = admins
     .filter((admin) => admin.role === "OWNER")
     .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime())[0];
-
-  // Skärmkonfigurationerna: vad kunden valt, och vad varje såld skärm kör.
-  const [kioskConfigs, kioskCompany, kioskDevices] = await Promise.all([
-    unsafeGlobalPrisma.kioskConfig.findMany({
-      select: { id: true, name: true, isDefault: true },
-      orderBy: { name: "asc" },
-    }),
-    unsafeGlobalPrisma.company.findUnique({
-      where: { id: company.id },
-      select: { kioskConfigId: true },
-    }),
-    unsafeGlobalPrisma.kioskDevice.findMany({
-      where: { companyId: company.id, fullyVersion: { not: null } },
-      select: {
-        id: true,
-        name: true,
-        kioskConfigId: true,
-        configAppliedAt: true,
-        appliedConfigVersion: {
-          select: { version: true, config: { select: { name: true } } },
-        },
-      },
-      orderBy: { name: "asc" },
-    }),
-  ]);
-  const defaultKioskConfig = kioskConfigs.find((config) => config.isDefault) ?? null;
-  const kioskOptions = kioskConfigs.map(({ id, name }) => ({ id, name }));
 
   const screenPricing = await getScreenPricing();
   const modulePricing = await getModulePricing();
@@ -531,61 +500,6 @@ export default async function CompanyPage({
                           {device.lastSeenAt
                             ? formatDateTime(device.lastSeenAt)
                             : "Aldrig kopplad"}
-                        </Td>
-                      </Tr>
-                    ))}
-                  </tbody>
-                </Table>
-              )}
-            </Card>
-
-            <Card>
-              <CardHeader
-                title="Skärmkonfiguration"
-                description="Gäller kundens skärmar som kör kioskappen."
-              />
-              <div className="border-b border-neutral-100 p-5">
-                <CompanyConfigChooser
-                  companyId={company.id}
-                  options={kioskOptions}
-                  current={kioskCompany?.kioskConfigId ?? null}
-                  defaultName={defaultKioskConfig?.name ?? null}
-                />
-              </div>
-              {kioskDevices.length === 0 ? (
-                <p className="p-5 text-[13px] text-neutral-500">
-                  Ingen skärm kör kioskappen.
-                </p>
-              ) : (
-                <Table>
-                  <thead>
-                    <tr>
-                      <Th>Skärm</Th>
-                      <Th>Kör</Th>
-                      <Th>Egen konfiguration</Th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {kioskDevices.map((device) => (
-                      <Tr key={device.id}>
-                        <Td>{device.name}</Td>
-                        <Td muted>
-                          {device.appliedConfigVersion
-                            ? `${device.appliedConfigVersion.config.name}, version ${device.appliedConfigVersion.version}`
-                            : "Ingen inläst än"}
-                          {device.configAppliedAt && (
-                            <span className="block text-xs">
-                              {formatDateTime(device.configAppliedAt)}
-                            </span>
-                          )}
-                        </Td>
-                        <Td>
-                          <DeviceConfigChooser
-                            companyId={company.id}
-                            deviceId={device.id}
-                            options={kioskOptions}
-                            current={device.kioskConfigId}
-                          />
                         </Td>
                       </Tr>
                     ))}
