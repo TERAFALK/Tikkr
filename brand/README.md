@@ -99,6 +99,7 @@ Kopior, inte original. Byts materialet ut kopieras de om.
 | `/icon-maskable-512.png` | `02-app-icon-favicon/tikkr-app-icon-dark-square-1024.png` | Android, som själv lägger på sin mask |
 | `/og.png` | `03-social/tikkr-linkedin-share-image-1200x627-dark.png` | Delningsbild när säljsidans länk delas |
 | `/brand/*.svg` | `01-logo/svg/` | Att länka till utanför appen, t.ex. i en mejlsignatur |
+| `/brand/tikkr-skarmslackare-1920x1080.png` | ritas ur `01-logo/svg/tikkr-logo-stacked-reversed.svg` av `scripts/screensaver-image.mjs` | Stämplingsskärmens skärmsläckare i ProMGR |
 
 Gränssnittet ritar logotypen som kod i stället för att hämta en fil — se
 `src/components/ui/Logo.tsx`. Banorna där är hämtade ur det här materialet

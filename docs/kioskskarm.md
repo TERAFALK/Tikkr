@@ -296,8 +296,11 @@ stänger Androids låsskärm, som annars syntes sju sekunder vid start;
 version av Tikkr; och en skärmsläckare med logotypen efter femton minuter, i
 låg ljusstyrka. Skärmsläckaren väcks av ett tryck som inte stämplar, till
 skillnad från ett viloläge, där skärmen är av och inte tar emot tryck.
-⟨verifiera⟩ att omstarten sker, att logotypen visas som SVG, och att
-ljusstyrkan går tillbaka när skärmen vaknar.
+Skärmsläckaren pekar på `https://portal.tikkr.se/brand/tikkr-skarmslackare-1920x1080.png`,
+logotypen mitt på Fjord i skärmens upplösning. Logotypens SVG visade ProMGR
+som en webbsida, på vit botten i övre vänstra hörnet.
+⟨verifiera⟩ att omstarten sker och att ljusstyrkan går tillbaka när skärmen
+vaknar.
 
 **Huvud-PIN:en är densamma på varje skärm**, eftersom konfigurationen delas. Den
 lämnas aldrig ut till en kund. En konfiguration per kund, med egna koder, när
