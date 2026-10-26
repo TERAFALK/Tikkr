@@ -391,10 +391,21 @@ export async function createDownload(params: {
 }
 
 /**
+ * Hur länge adressen går att hämta igen efter första hämtningen.
+ *
+ * Appen hämtar inte filen en gång: på den första skärmen svarade den "file
+ * download failed with 404" när adressen bara gick att använda en gång. Den
+ * frågar troligen först om filen finns och hämtar den sedan, eller försöker
+ * igen. En minut räcker för det och är kort nog för att en adress som läckt
+ * efteråt är värdelös.
+ */
+const REUSE_MS = 60_000;
+
+/**
  * Löser in en engångsadress och lämnar ut filen, eller null.
  *
- * Biljetten markeras som använd i samma fråga som den prövas, så att två
- * hämtningar i samma ögonblick inte båda får filen.
+ * Första hämtningen markerar biljetten, i samma fråga som den prövas. Därefter
+ * går den att hämta igen i en minut, och aldrig efter att den gått ut.
  */
 export async function redeemDownload(token: string): Promise<ConfigValues | null> {
   if (!/^[A-Za-z0-9_-]{20,100}$/.test(token)) return null;
@@ -406,13 +417,32 @@ export async function redeemDownload(token: string): Promise<ConfigValues | null
     where: { tokenHash, usedAt: null, expiresAt: { gt: now } },
     data: { usedAt: now },
   });
-  if (count === 0) return null;
 
-  const download = await unsafeGlobalPrisma.kioskConfigDownload.findUnique({
-    where: { tokenHash },
+  const download = await unsafeGlobalPrisma.kioskConfigDownload.findFirst({
+    where:
+      count > 0
+        ? { tokenHash }
+        : {
+            tokenHash,
+            expiresAt: { gt: now },
+            usedAt: { gt: new Date(now.getTime() - REUSE_MS) },
+          },
     select: { versionId: true },
   });
-  if (!download) return null;
+
+  if (!download) {
+    // Skälet står i serverns logg, aldrig i svaret: den som gissar adresser
+    // ska inte få veta om en adress funnits.
+    const row = await unsafeGlobalPrisma.kioskConfigDownload.findUnique({
+      where: { tokenHash },
+      select: { expiresAt: true, usedAt: true },
+    });
+    console.warn(
+      "[konfiguration] Hämtning nekad:",
+      !row ? "okänd adress" : row.expiresAt <= now ? "utgången" : "redan hämtad"
+    );
+    return null;
+  }
 
   const parts = await versionParts(download.versionId);
   return parts ? buildConfigFile(parts, download.versionId) : null;
