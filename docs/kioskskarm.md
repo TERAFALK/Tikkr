@@ -144,6 +144,15 @@ så en prototyp passar båda — bara basvikten skiljer.
 
 **Wifi är `802.11 a/b/g/n` med extern antenn.** Inget ac eller ax. Dra kabel.
 
+**Skärmen säljs för kabel, och wifi marknadsförs inte** (beslutat 2026-10-26,
+produktägarens val). En verkstadshall är en dålig miljö för wifi, och kunden
+som ser "väntar" ringer oss. Wifi kräver dessutom antingen kundens lösenord hos
+oss eller en wifi-kod på skärmen, och koderna i konfigurationen är gemensamma
+för alla kunder. Frågar en kund går det ändå: vi ansluter skärmen till deras
+wifi i startguidens nätverkssteg före leverans, eller föreslår en wifi-brygga
+som ger skärmen kabel. Wifi-koden (`kioskWifiPin`) och ett fält i kassan byggs
+om fler än enstaka kunder frågar.
+
 **Klockbatteriet är en CR1220**, utbytbart och icke laddningsbart.
 
 ---
@@ -281,8 +290,18 @@ Två fjärrkommandon får aldrig skickas till en skärm med osynkad kö: **Clear
 Cache** och **Clear Web Cookies**. Det senare återkallar i praktiken skärmens
 koppling.
 
-Den nattliga omstarten finns bara som schema i ProMGR Cloud och är inte satt.
-Skärmen klarar sig utan.
+**Med licensen sätts tre saker till** (2026-10-26, provas): `mdmDisableKeyguard`
+stänger Androids låsskärm, som annars syntes sju sekunder vid start;
+`rebootTime` startar om skärmen 03:00, vilket också är när den får en ny
+version av Tikkr; och en skärmsläckare med logotypen efter femton minuter, i
+låg ljusstyrka. Skärmsläckaren väcks av ett tryck som inte stämplar, till
+skillnad från ett viloläge, där skärmen är av och inte tar emot tryck.
+⟨verifiera⟩ att omstarten sker, att logotypen visas som SVG, och att
+ljusstyrkan går tillbaka när skärmen vaknar.
+
+**Huvud-PIN:en är densamma på varje skärm**, eftersom konfigurationen delas. Den
+lämnas aldrig ut till en kund. En konfiguration per kund, med egna koder, när
+kunderna blir fler.
 
 ---
 
@@ -466,7 +485,7 @@ reservskärm att låna ut.
 - [x] Fjärrstyrning bakom `fully`-detektering — ljusstyrka och omstart från
       adminpanelen. Provad med fristående Fully 2026-10-19 och med ProMGR
       2026-10-26
-- [ ] Androids låsskärm syns sju sekunder vid start; prova Disable Keyguard
+- [ ] Låsskärmen, nattlig omstart och skärmsläckaren, se § 7
 - [ ] Serienumret och wifisignalen i Fjärrstyrning på skärmen
 - [ ] Kontrollera Android-versionen på en enhet och lägg in den i katalogen
 - [ ] Riktiga produktfoton i stället för illustrationerna i
