@@ -25,10 +25,10 @@ const PURPOSE = "kiosk-config";
 /** Hur länge en engångsadress gäller. Appen hämtar den inom sekunder. */
 const DOWNLOAD_TTL_MS = 2 * 60_000;
 
-function sealSecrets(secrets: ConfigValues): string | null {
-  return Object.keys(secrets).length === 0
+function seal(hidden: ConfigValues): string | null {
+  return Object.keys(hidden).length === 0
     ? null
-    : sealText(JSON.stringify(secrets), PURPOSE);
+    : sealText(JSON.stringify(hidden), PURPOSE);
 }
 
 function openSecrets(sealed: string | null): ConfigValues {
@@ -181,7 +181,7 @@ export async function createConfig(params: {
         configId: config.id,
         version: 1,
         settings: params.parts.settings,
-        secretsSealed: sealSecrets(params.parts.secrets),
+        secretsSealed: seal(params.parts.secrets),
         createdByEmail: params.byEmail,
       },
     });
@@ -210,7 +210,7 @@ export async function saveVersion(params: {
         configId: params.configId,
         version,
         settings: params.parts.settings,
-        secretsSealed: sealSecrets(params.parts.secrets),
+        secretsSealed: seal(params.parts.secrets),
         createdByEmail: params.byEmail,
       },
     });
@@ -335,8 +335,11 @@ export async function versionForDevice(
     }),
   ]);
 
+  // En skärm som inte hör till företaget får ingenting, inte ens standarden.
+  if (!device) return null;
+
   const configId = resolveConfigId(
-    device?.kioskConfigId ?? null,
+    device.kioskConfigId,
     company?.kioskConfigId ?? null,
     standard?.id ?? null
   );
