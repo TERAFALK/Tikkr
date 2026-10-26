@@ -209,6 +209,10 @@ model Company {
   absenceReasons  AbsenceReason[]
   prices          CompanyPrice[]
   kioskSettings   CompanyKioskSetting[]
+
+  /// Kundens skärmkonfiguration, eller null för standarden. Se KioskConfig.
+  kioskConfigId String?      @map("kiosk_config_id")
+  kioskConfig   KioskConfig? @relation(fields: [kioskConfigId], references: [id], onDelete: SetNull)
   absences        Absence[]
   compAdjustments CompAdjustment[]
   holidays        Holiday[]
@@ -1246,6 +1250,9 @@ model CompanyPrice {
   @@map("company_prices")
 }
 
+/// DÖD sedan 2026-10-26, ersatt av KioskConfig. Läses och skrivs inte längre,
+/// och tas bort i en senare release (CLAUDE.md § 0 punkt 7).
+///
 /// STANDARDINSTÄLLNINGARNA FÖR SKÄRMARNA VI SÄLJER.
 ///
 /// Gäller varje såld skärm hos varje kund som inte har ett eget värde, se
@@ -1264,6 +1271,8 @@ model KioskSettingDefault {
   @@map("kiosk_setting_defaults")
 }
 
+/// DÖD sedan 2026-10-26, ersatt av KioskConfig, som KioskSettingDefault.
+///
 /// EN KUNDS EGET VÄRDE FÖR EN SKÄRMINSTÄLLNING.
 ///
 /// Går före plattformens standard för just den kundens skärmar. Saknas raden
@@ -1286,6 +1295,76 @@ model CompanyKioskSetting {
   @@unique([companyId, key])
   @@index([companyId])
   @@map("company_kiosk_settings")
+}
+
+/// EN KONFIGURATION FÖR SKÄRMARNA VI SÄLJER.
+///
+/// En hel inställningsfil för kioskappen, i versioner. Plattformens egen
+/// tabell, som StripePrice: en konfiguration hör inte till en kund, kunderna
+/// pekar på den. Regler och format i src/lib/kiosk-config.ts.
+///
+/// Högst en är standarden. Det vaktas i kiosk-config-store.ts, eftersom ett
+/// villkor på en enda rad inte går att uttrycka här.
+model KioskConfig {
+  id        String  @id @default(cuid())
+  name      String  @unique
+  isDefault Boolean @default(false) @map("is_default")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  versions  KioskConfigVersion[]
+  companies Company[]
+  devices   KioskDevice[]
+
+  @@map("kiosk_configs")
+}
+
+/// EN VERSION AV EN KONFIGURATION. Skrivs en gång och ändras aldrig.
+///
+/// Att backa är att spara en gammal version som en ny. Skärmen läser in den
+/// senaste versionen av sin konfiguration.
+///
+/// Hemligheterna (PIN-koden, lösenorden, volymnyckeln) ligger krypterade med
+/// AUTH_SECRET i `secrets_sealed`, aldrig i `settings`. Se secret-box.ts.
+model KioskConfigVersion {
+  id       String @id @default(cuid())
+  configId String @map("config_id")
+  version  Int
+
+  /// Inställningarna utan hemligheter, som ett JSON-objekt.
+  settings      Json
+  secretsSealed String? @map("secrets_sealed")
+
+  createdByEmail String   @map("created_by_email")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  config         KioskConfig   @relation(fields: [configId], references: [id], onDelete: Cascade)
+  appliedDevices KioskDevice[]
+
+  @@unique([configId, version])
+  @@map("kiosk_config_versions")
+}
+
+/// EN ENGÅNGSADRESS TILL EN KONFIGURATIONSFIL.
+///
+/// Appen hämtar filen själv, utan sidans kakor, och kan därför inte visa vem
+/// den är. Adressen bär i stället ett slumpat värde som gäller en skärm, en
+/// version, i två minuter och en gång. Bara värdets SHA-256 sparas.
+///
+/// Ingen company_id och ingen relation: raden är en biljett, som
+/// login_throttles, och raderas när den löpt ut.
+model KioskConfigDownload {
+  id        String    @id @default(cuid())
+  tokenHash String    @unique @map("token_hash")
+  deviceId  String    @map("device_id")
+  versionId String    @map("version_id")
+  expiresAt DateTime  @map("expires_at")
+  usedAt    DateTime? @map("used_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  @@index([expiresAt])
+  @@map("kiosk_config_downloads")
 }
 
 /// En inbjudan att bli administratör.
@@ -1398,6 +1477,17 @@ model KioskDevice {
   /// När skärmen senast rapporterade uppgifterna ovan. Sätts av servern,
   /// aldrig ur anropet.
   reportedAt DateTime? @map("reported_at")
+
+  /// En egen konfiguration för just den här skärmen, för att prova en innan
+  /// den når alla. Går före kundens och standarden. Se KioskConfig.
+  kioskConfigId String?      @map("kiosk_config_id")
+  kioskConfig   KioskConfig? @relation(fields: [kioskConfigId], references: [id], onDelete: SetNull)
+
+  /// Versionen skärmen senast rapporterat att den läst in, och när. Läses ur
+  /// märket i appen, se CONFIG_MARKER i kiosk-config.ts.
+  appliedConfigVersionId String?             @map("applied_config_version_id")
+  appliedConfigVersion   KioskConfigVersion? @relation(fields: [appliedConfigVersionId], references: [id], onDelete: SetNull)
+  configAppliedAt        DateTime?           @map("config_applied_at")
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")

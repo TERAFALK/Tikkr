@@ -31,6 +31,8 @@ export interface DeviceReportData {
   networkType?: KioskNetworkType | null;
   wifiSsid?: string | null;
   wifiSignal?: string | null;
+  /** Konfigurationsversionen skärmen läst in. Skrivs inte på raden här. */
+  configVersionId?: string | null;
 }
 
 function clean(value: unknown): string | null {
@@ -51,6 +53,14 @@ export function parseDeviceReport(body: unknown): DeviceReportData {
 
   for (const key of ["fullyVersion", "webviewVersion", "serialNumber"] as const) {
     if (key in report) data[key] = clean(report[key]);
+  }
+
+  // Ett id, och ingenting annat. Om versionen finns prövar rutten.
+  if (
+    typeof report.configVersionId === "string" &&
+    /^[a-z0-9]{10,40}$/i.test(report.configVersionId)
+  ) {
+    data.configVersionId = report.configVersionId;
   }
 
   if ("network" in report) {

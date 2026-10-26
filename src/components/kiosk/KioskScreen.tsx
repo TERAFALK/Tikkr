@@ -13,12 +13,12 @@ import {
 } from "@/lib/offline-queue";
 import {
   applyBrightness,
-  applyKioskSettings,
+  importSettingsFile,
   hasFully,
+  readConfigVersion,
   readDeviceInfo,
   restartDevice,
 } from "@/lib/fully";
-import type { KioskSettings as DeviceSettings } from "@/lib/kiosk-settings";
 import CompanyBadge from "@/components/ui/CompanyBadge";
 import { LogoMark, WordmarkOnly } from "@/components/ui/Logo";
 import NoticeBanner from "@/components/ui/NoticeBanner";
@@ -791,29 +791,79 @@ export default function KioskScreen({
   const brightnessRef = useRef<number | null | undefined>(undefined);
   const restartRef = useRef<string | null | undefined>(undefined);
 
+  /** Berättar för servern vad skärmen är. Se effekten längre ner. */
+  const reportDevice = useCallback(() => {
+    const info = readDeviceInfo();
+    if (!info) return;
+
+    void fetch("/api/kiosk/device", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(info),
+    }).catch(() => {
+      // Nätet är nere. Rapporten är inte värd en omsändning — nästa gör om
+      // den, och ingen arbetstid hänger på den.
+    });
+  }, []);
+
   /**
-   * Inställningarna från plattformen, som text, senast de sattes.
+   * Konfigurationsversionen skärmen senast försökte läsa in under den här
+   * sidladdningen.
    *
-   * Sätts en gång när sidan laddats och sedan bara när något ändrats. Appen
-   * skriver varje inställning till disken, och var femte sekund hade varit
-   * att slita på minnet för ingenting.
+   * Ett försök per version och laddning. Går inläsningen inte igenom försöker
+   * skärmen igen nästa gång sidan laddas, i stället för var femte sekund.
    */
-  const settingsRef = useRef<string | null>(null);
+  const configTriedRef = useRef<string | null>(null);
+
+  /**
+   * LÄSER IN KONFIGURATIONEN FRÅN PLATTFORMEN, när den ändrats.
+   *
+   * Skärmen får versionens id med sitt vanliga läge. Har appen inte redan
+   * den versionen ber skärmen om en engångsadress, och appen hämtar och läser
+   * in filen själv. Importen sätter bara det som står i filen.
+   *
+   * Ljusstyrkan sätts om efteråt: en export bär appens egen ljusstyrka, och
+   * den ska inte vinna över den som valts i panelen.
+   */
+  const loadConfig = useCallback(
+    async (versionId: string) => {
+      try {
+        const response = await fetch("/api/kiosk/config", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ versionId }),
+        });
+        if (!response.ok) return;
+
+        const { url } = (await response.json()) as { url?: string };
+        if (!url || !importSettingsFile(url)) return;
+
+        brightnessRef.current = undefined;
+        // Berättar vilken version som gäller när appen hunnit läsa in den.
+        setTimeout(reportDevice, 15_000);
+      } catch {
+        // Nätet är nere. Nästa sidladdning försöker igen.
+      }
+    },
+    [reportDevice]
+  );
 
   const applyDeviceSettings = useCallback(
     (device?: {
       brightness: number | null;
       restartRequestedAt: string | null;
-      settings?: DeviceSettings | null;
+      configVersionId?: string | null;
     }) => {
       if (!device || !hasFully()) return;
 
-      if (device.settings) {
-        const text = JSON.stringify(device.settings);
-        if (text !== settingsRef.current) {
-          applyKioskSettings(device.settings);
-          settingsRef.current = text;
-        }
+      const wanted = device.configVersionId;
+      if (
+        wanted &&
+        wanted !== configTriedRef.current &&
+        readConfigVersion() !== wanted
+      ) {
+        configTriedRef.current = wanted;
+        void loadConfig(wanted);
       }
 
       if (device.brightness !== null && device.brightness !== brightnessRef.current) {
@@ -829,7 +879,7 @@ export default function KioskScreen({
         restartDevice();
       }
     },
-    []
+    [loadConfig]
   );
 
   /**
@@ -844,30 +894,16 @@ export default function KioskScreen({
    * när nätet kommer tillbaka också, eftersom det är just då frågan ställs.
    */
   useEffect(() => {
-    const report = () => {
-      const info = readDeviceInfo();
-      if (!info) return;
+    reportDevice();
 
-      void fetch("/api/kiosk/device", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify(info),
-      }).catch(() => {
-        // Nätet är nere. Rapporten är inte värd en omsändning — nästa gör om
-        // den, och ingen arbetstid hänger på den.
-      });
-    };
-
-    report();
-
-    const timer = setInterval(report, DEVICE_REPORT_MS);
-    window.addEventListener("online", report);
+    const timer = setInterval(reportDevice, DEVICE_REPORT_MS);
+    window.addEventListener("online", reportDevice);
 
     return () => {
       clearInterval(timer);
-      window.removeEventListener("online", report);
+      window.removeEventListener("online", reportDevice);
     };
-  }, []);
+  }, [reportDevice]);
 
   /**
    * Hämtar vem som är instämplad, från servern.
@@ -894,7 +930,7 @@ export default function KioskScreen({
         device?: {
           brightness: number | null;
           restartRequestedAt: string | null;
-          settings?: DeviceSettings | null;
+          configVersionId?: string | null;
         };
       };
 

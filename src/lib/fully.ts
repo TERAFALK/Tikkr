@@ -1,4 +1,4 @@
-import type { KioskSettings } from "./kiosk-settings";
+import { versionFromMarker } from "./kiosk-config";
 
 /**
  * BRYGGAN TILL KIOSKAPPEN.
@@ -107,6 +107,8 @@ export interface FullyDeviceInfo {
   webviewVersion: string | null;
   serialNumber: string | null;
   network: FullyNetwork | null;
+  /** Konfigurationsversionen skärmen läst in, ur appens märke. */
+  configVersionId: string | null;
 }
 
 /** Ett ifyllt strängvärde, eller null för allt annat. */
@@ -204,6 +206,7 @@ export function readDeviceInfo(): FullyDeviceInfo | null {
     webviewVersion: text(safely(() => api.getWebviewVersion?.())),
     serialNumber: readSerialNumber(api),
     network: readNetwork(api),
+    configVersionId: readConfigVersion(),
   };
 }
 
@@ -242,65 +245,6 @@ export function restartDevice(): void {
     }
   }
   restartApp();
-}
-
-/**
- * Inställningarna från panelen, i appens egna nycklar och skalor.
- *
- * Här och bara här står vad appen kallar dem. Listan är registrets och
- * ingenting annat: en nyckel som inte står här når aldrig appen, vad servern
- * än skickar.
- *
- * Skärmsläckarens bild och omladdningen när nätet kommer tillbaka är fasta.
- * Bilden pekar på samma värd som sidan, så att en skärm som pekats om till en
- * annan server tar bilden därifrån. Omladdningen tar bort ett felläge appen
- * annars lämnar kvar efter en start utan nät, se docs/kioskskarm.md § 7.
- */
-function toAppSettings(settings: KioskSettings): {
-  strings: Record<string, string>;
-  booleans: Record<string, boolean>;
-} {
-  const brightness = Math.round(
-    (Math.min(100, Math.max(0, Number(settings.screensaverBrightness) || 0)) / 100) *
-      BRIGHTNESS_MAX
-  );
-
-  return {
-    strings: {
-      // Appen räknar sekunder, panelen minuter.
-      timeToScreensaverV2: String((Number(settings.screensaverMinutes) || 0) * 60),
-      screensaverBrightness: String(brightness),
-      screensaverWallpaperURL: `${window.location.origin}${SCREENSAVER_IMAGE}`,
-      // "Daily System Restart", HH:MM eller tomt för av.
-      mdmRebootTime: settings.dailyRestart,
-    },
-    booleans: {
-      reloadOnWifiOn: true,
-    },
-  };
-}
-
-/** Skärmsläckarens bild, se scripts/screensaver-image.mjs. */
-const SCREENSAVER_IMAGE = "/brand/tikkr-skarmslackare-1920x1080.png";
-
-/**
- * Sätter inställningarna. Gör ingenting utan appen.
- *
- * Varje inställning för sig: en nyckel som en äldre appversion inte känner
- * ska inte kosta de andra.
- */
-export function applyKioskSettings(settings: KioskSettings): void {
-  const api = bridge();
-  if (!api) return;
-
-  const { strings, booleans } = toAppSettings(settings);
-
-  for (const [key, value] of Object.entries(strings)) {
-    safely(() => api.setStringSetting?.(key, value));
-  }
-  for (const [key, value] of Object.entries(booleans)) {
-    safely(() => api.setBooleanSetting?.(key, value));
-  }
 }
 
 /** Startar om kioskappen. Gör ingenting utan appen. */
@@ -349,4 +293,14 @@ export function importSettingsFile(url: string): boolean {
   } catch {
     return false;
   }
+}
+
+/**
+ * Konfigurationsversionen skärmen läst in, eller null.
+ *
+ * Varje konfigurationsfil sätter appens `customVariable` till sin version, se
+ * CONFIG_MARKER i kiosk-config.ts. Står den där har just den filen lästs in.
+ */
+export function readConfigVersion(): string | null {
+  return versionFromMarker(readSetting("customVariable", "string"));
 }

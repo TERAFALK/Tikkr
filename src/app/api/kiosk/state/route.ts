@@ -4,7 +4,7 @@ import { forCompany } from "@/lib/tenant";
 import { describeEntry } from "@/lib/entry-label";
 import { getOpenBreaks } from "@/lib/breaks";
 import { hasModule } from "@/lib/company-modules";
-import { kioskSettingsFor } from "@/lib/kiosk-settings-store";
+import { versionForDevice } from "@/lib/kiosk-config-store";
 import type { KioskActiveJob } from "@/components/kiosk/KioskScreen";
 
 /**
@@ -52,11 +52,11 @@ export async function GET() {
     select: { brightness: true, restartRequestedAt: true, fullyVersion: true },
   });
 
-  // Inställningarna från plattformen, bara till skärmar som kör kioskappen.
-  // En kunds egen dator har ingenting att göra med dem, och slipper två
-  // uppslag var femte sekund.
-  const settings = device?.fullyVersion
-    ? await kioskSettingsFor(session.companyId)
+  // Konfigurationen skärmen ska ha, bara till skärmar som kör kioskappen.
+  // En kunds egen dator har ingenting att göra med den och slipper uppslagen.
+  // Bara versionens id: filen hämtas för sig, och bara när den ändrats.
+  const configVersionId = device?.fullyVersion
+    ? await versionForDevice(session.companyId, session.deviceId)
     : null;
 
   // Rasterna hämtas samtidigt. En person på lunch har inga öppna stämplingar
@@ -149,7 +149,7 @@ export async function GET() {
       device: {
         brightness: device?.brightness ?? null,
         restartRequestedAt: device?.restartRequestedAt?.toISOString() ?? null,
-        settings,
+        configVersionId,
       },
     },
     // Får aldrig mellanlagras. En cachad bild av vem som arbetar är exakt det
