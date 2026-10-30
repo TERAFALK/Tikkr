@@ -43,6 +43,48 @@ interface PunchBody {
   queued?: boolean;
 }
 
+/**
+ * FÄLTEN SOM ÄR TEXT, OCH INGET ANNAT.
+ *
+ * Kroppen är JSON, och typen ovan är ett löfte ingen håller i kontroll. Ett
+ * objekt i ett id-fält gick annars rakt in i Prismas `where` och tolkades som
+ * ett filter: ett anrop som såg ut att gälla en person gällde hela företaget.
+ *
+ * Ett 400 tar bort trycket ur offline-kön, men kan inte träffa ett riktigt
+ * tryck. Skärmen skickar alltid text eller inget alls. `null` släpps igenom,
+ * som `undefined`: det betyder att fältet saknas.
+ *
+ * Tiderna har ingen längdgräns. En trasig klocka ska flaggas och inte avvisas,
+ * se punch-time.ts, som kortar texten själv.
+ */
+const ID_FIELDS = [
+  "employeeId",
+  "orderId",
+  "momentId",
+  "indirectMomentId",
+  "breakTypeId",
+  "clientPunchId",
+] as const;
+
+const TIME_FIELDS = ["at", "sentAt"] as const;
+
+/** Långt över ett id och ett uuid, och långt under vad som kostar något. */
+const MAX_ID_LENGTH = 200;
+
+function isTextOrMissing(value: unknown): boolean {
+  return value === undefined || value === null || typeof value === "string";
+}
+
+function hasValidFields(body: PunchBody): boolean {
+  return (
+    TIME_FIELDS.every((field) => isTextOrMissing(body[field])) &&
+    ID_FIELDS.every((field) => {
+      const value = body[field];
+      return isTextOrMissing(value) && (value?.length ?? 0) <= MAX_ID_LENGTH;
+    })
+  );
+}
+
 export async function POST(request: NextRequest) {
   const session = await getKioskSession();
   if (!session) {
@@ -66,7 +108,7 @@ export async function POST(request: NextRequest) {
     body?.action === "break" ||
     body?.action === "break-end";
 
-  if (!body?.employeeId || !knownAction) {
+  if (!body?.employeeId || !knownAction || !hasValidFields(body)) {
     return NextResponse.json({ error: "Ofullständigt anrop." }, { status: 400 });
   }
 
