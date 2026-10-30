@@ -2,6 +2,7 @@
 
 import { useRef, useState } from "react";
 import { unpairThisDevice } from "@/app/kiosk/actions";
+import { hasFully, restartDevice } from "@/lib/fully";
 
 /**
  * KUGGHJULET PÅ STÄMPLINGSSKÄRMEN.
@@ -19,6 +20,12 @@ import { unpairThisDevice } from "@/app/kiosk/actions";
  *
  * 3. **Koppla loss.** Bakom en bekräftelse, eftersom den som trycker fel
  *    annars gör skärmen oanvändbar tills någon hämtar en ny kod.
+ *
+ * 4. **Starta om**, en ikon i rutans överkant. Bara på skärmar vi sålt: på en
+ *    kunds egen dator eller surfplatta finns inget att starta om härifrån.
+ *    Bakom en fråga, och aldrig med tryck i kön, samma regel som omstarten
+ *    från panelen. Att stänga av skärmen går inte: appen kan det bara på en
+ *    rotad enhet, se docs/kioskskarm.md.
  *
  * Knappen är liten och dämpad men inte gömd. Den som letar efter den ska hitta
  * den; den som stämplar ska inte råka trycka på den.
@@ -38,12 +45,18 @@ export default function KioskSettings({
 }) {
   const dialog = useRef<HTMLDialogElement>(null);
   const [confirming, setConfirming] = useState(false);
+  const [confirmingRestart, setConfirmingRestart] = useState(false);
+  // Läses när rutan öppnas och inte vid ritningen: `fully` finns bara i
+  // webbläsaren, och servern hade ritat något annat.
+  const [canRestart, setCanRestart] = useState(false);
 
   return (
     <>
       <button
         onClick={() => {
           setConfirming(false);
+          setConfirmingRestart(false);
+          setCanRestart(hasFully());
           dialog.current?.showModal();
         }}
         aria-label="Inställningar"
@@ -68,11 +81,64 @@ export default function KioskSettings({
         ref={dialog}
         className="w-[min(40rem,calc(100vw-2rem))] rounded-xl border border-neutral-200 bg-white p-0 shadow-xl backdrop:bg-neutral-900/50"
       >
-        <div className="border-b border-neutral-200 px-6 py-5">
+        <div className="flex items-center justify-between gap-4 border-b border-neutral-200 px-6 py-4">
           <h2 className="text-lg font-semibold text-neutral-900">
             Om den här skärmen
           </h2>
+
+          {canRestart && (
+            <button
+              onClick={() => setConfirmingRestart(true)}
+              aria-label="Starta om skärmen"
+              className="kiosk-press -mr-2 shrink-0 rounded-lg p-3 text-neutral-500 active:bg-neutral-100"
+            >
+              <svg
+                viewBox="0 0 24 24"
+                className="h-6 w-6"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth={1.75}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
+              >
+                <path d="M21 12a9 9 0 1 1-2.64-6.36L21 8" />
+                <path d="M21 3v5h-5" />
+              </svg>
+            </button>
+          )}
         </div>
+
+        {confirmingRestart && (
+          <div className="space-y-2 border-b border-neutral-200 px-6 py-5">
+            {waiting > 0 ? (
+              <p className="rounded-lg bg-amber-50 px-4 py-3 text-[15px] leading-relaxed text-amber-900">
+                Stämplingar väntar på att skickas. Starta om när de skickats.
+              </p>
+            ) : (
+              <>
+                <p className="text-[15px] leading-relaxed text-neutral-900">
+                  Starta om skärmen? Den är borta i ungefär en minut.
+                </p>
+                <button
+                  onClick={() => {
+                    dialog.current?.close();
+                    restartDevice();
+                  }}
+                  className="kiosk-press w-full rounded-xl bg-blue-600 px-6 py-4 text-lg font-semibold text-white active:bg-blue-700"
+                >
+                  Ja, starta om
+                </button>
+              </>
+            )}
+            <button
+              onClick={() => setConfirmingRestart(false)}
+              className="kiosk-press w-full rounded-xl border border-neutral-200 px-6 py-4 text-lg font-semibold text-neutral-600"
+            >
+              Avbryt
+            </button>
+          </div>
+        )}
 
         <dl className="divide-y divide-neutral-100 px-6 text-[15px]">
           <Row label="Skärm" value={deviceName} />
