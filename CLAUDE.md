@@ -640,10 +640,20 @@ shop_prices       — död, ersatt av shop_products.price_ore (se § 3.4)
      som är fel.
 
    **Tikkr håller inget ATF-saldo.** Tidbanken, uttagen och det som vid
-   årsskiftet blir pensionspremie hör till lönesystemet. Underlaget står på
-   tidrapporten och på Löneunderlaget, se § 3.2, med en rad som
-   visar talen det räknats på. Allt räknas i `src/lib/atf.ts`, och
-   `tests/atf.test.ts` fäller det.
+   årsskiftet blir pensionspremie hör till lönesystemet. Allt räknas i
+   `src/lib/atf.ts`, och `tests/atf.test.ts` fäller det.
+
+   **Underlaget står bara på Löneunderlaget, inte på tidrapportens papper**
+   (ändrat 2026-10-30, kundens begäran), se § 3.2. Raden heter Intjänad ATF
+   Period. Flexen från föregående månad står på en egen rad, eftersom den
+   annars bara syntes i den finstilta raden med talen. Rutan Intjänad ATF står
+   kvar på sidan Tidrapport (produktägarens val), så att en persons ATF går att
+   kontrollera utan att skriva ut hela personalen.
+
+   **Ett ATF-uttag är frånvaro på kundens egen orsak** (beslutat 2026-10-30,
+   produktägarens val). Löneunderlaget summerar frånvaron per orsak, och där
+   syns uttaget för perioden. Listan vet inte vad orsakerna heter, så det
+   krävdes ingen ny kolumn, och något saldo uppstår inte.
 
    Det är inte ett avsteg från avgränsningen överst: ATF är timmar, inte
    kronor. Det avtalet styr är hur många timmar, och därför står avtalets tal
