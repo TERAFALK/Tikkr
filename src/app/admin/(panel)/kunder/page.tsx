@@ -19,6 +19,8 @@ import {
 } from "@/components/ui";
 import { createCustomer, toggleCustomer } from "./actions";
 
+export const metadata = { title: "Kunder · Tikkr" };
+
 /**
  * KUNDREGISTRET.
  *
@@ -91,6 +93,7 @@ export default async function CustomersPage({
             action={
               <SearchForm
                 query={query}
+                label="Sök kunder"
                 placeholder="Namn, kundnr, org.nr…"
                 clearHref="/admin/kunder"
                 perPage={page.take}

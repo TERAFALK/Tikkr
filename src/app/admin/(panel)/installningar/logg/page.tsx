@@ -7,6 +7,8 @@ import { listPaging } from "@/lib/paging";
 import Pager from "@/components/platform/Pager";
 import { Card, CardHeader, EmptyState, Table, Td, Th, Tr } from "@/components/ui";
 
+export const metadata = { title: "Ändringslogg · Tikkr" };
+
 export const dynamic = "force-dynamic";
 
 /**

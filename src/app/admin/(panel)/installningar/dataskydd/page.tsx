@@ -13,6 +13,8 @@ import {
 } from "@/components/ui";
 import { anonymizeEmployee } from "../actions";
 
+export const metadata = { title: "Dataskydd · Tikkr" };
+
 export const dynamic = "force-dynamic";
 
 export default async function DataProtectionPage() {

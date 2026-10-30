@@ -325,10 +325,10 @@ export default function AdminSidebar({
             tillbehör och tjänster, och ingen öppnar den varje vecka. Där
             behovet uppstår finns dessutom en knapp, t.ex. på sidan
             Stämplingsskärmar. Se CLAUDE.md § 3.4. */}
-        <div className="relative flex items-center gap-2 px-2 pt-2.5 text-neutral-400">
+        <div className="relative flex flex-wrap items-center gap-2 px-2 pt-2.5 text-neutral-400">
           <LogoMark size={22} />
           <WordmarkOnly height={10} tone="current" />
-          <span className="ml-auto flex shrink-0 items-center">
+          <span className="flex w-full items-center justify-between lg:ml-auto lg:w-auto lg:justify-start">
             <Link
               href="/admin/nyheter"
               onClick={() => setOpen(false)}
@@ -338,6 +338,7 @@ export default function AdminSidebar({
               className={`relative ${onNews ? footerIconActive : footerIcon}`}
             >
               <IconSparkle />
+              <FooterLabel>Nyheter</FooterLabel>
               {showNewsDot && (
                 <span className="absolute right-1 top-1 size-2 rounded-full bg-tick-deep ring-2 ring-white" />
               )}
@@ -351,6 +352,7 @@ export default function AdminSidebar({
               className={onShop ? footerIconActive : footerIcon}
             >
               <IconPackage />
+              <FooterLabel>Butik</FooterLabel>
             </Link>
             <a
               href="/support"
@@ -361,6 +363,7 @@ export default function AdminSidebar({
               className={footerIcon}
             >
               <IconHelp />
+              <FooterLabel>Hjälp</FooterLabel>
             </a>
             {showAccount && (
               <FeedbackButton pathname={pathname} className={footerIcon} />
@@ -378,7 +381,7 @@ export default function AdminSidebar({
         <button
           onClick={() => setOpen((value) => !value)}
           className="rounded-md p-1.5 text-neutral-600 hover:bg-neutral-100"
-          aria-label="Visa meny"
+          aria-label={open ? "Dölj meny" : "Visa meny"}
           aria-expanded={open}
         >
           <svg viewBox="0 0 24 24" width={20} height={20} fill="none" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round">
@@ -406,10 +409,19 @@ export default function AdminSidebar({
 
 /** Ikonknapparna i menyns fot. Stora nog att träffa, tysta tills man pekar. */
 const footerIcon =
-  "rounded-md p-1.5 text-neutral-400 transition-colors hover:bg-neutral-100 hover:text-neutral-900";
+  "inline-flex items-center gap-1.5 rounded-md p-1.5 text-neutral-400 transition-colors hover:bg-neutral-100 hover:text-neutral-900";
 
 /** Samma ikon när man står på sidan den leder till. Grönt som i listan ovanför. */
-const footerIconActive = "rounded-md bg-neutral-100 p-1.5 text-tick-deep";
+const footerIconActive =
+  "inline-flex items-center gap-1.5 rounded-md bg-neutral-100 p-1.5 text-tick-deep";
+
+/**
+ * Ikonens namn, bara på telefon. Skrivbordet har ett `title` vid hovring, som
+ * inte finns på en pekskärm.
+ */
+function FooterLabel({ children }: { children: React.ReactNode }) {
+  return <span className="text-xs lg:hidden">{children}</span>;
+}
 
 function CompanyHeader({
   companyName,

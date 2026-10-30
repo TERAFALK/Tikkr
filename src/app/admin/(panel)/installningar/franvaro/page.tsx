@@ -26,6 +26,8 @@ import {
   type ReasonState,
 } from "./actions";
 
+export const metadata = { title: "Frånvaroorsaker · Tikkr" };
+
 /**
  * FRÅNVAROORSAKER.
  *
@@ -64,7 +66,7 @@ export default async function AbsenceReasonsPage() {
     },
   });
 
-  // ActionDialog och inte FormDialog: ett namn som redan finns ska svara i
+  // ActionDialog: ett namn som redan finns ska svara i
   // rutan i stället för att stänga den som om allt gått bra.
   const newReason = (
     <ActionDialog<ReasonState>
@@ -185,7 +187,7 @@ export default async function AbsenceReasonsPage() {
 
                 <Td>
                   <div className="flex items-center justify-end gap-2">
-                    {/* ActionDialog och inte FormDialog: ett namn som redan
+                    {/* ActionDialog: ett namn som redan
                         finns ska svara inuti rutan. */}
                     <ActionDialog<ReasonState>
                       trigger="Ändra"

@@ -11,6 +11,8 @@ import {
 } from "@/components/ui";
 import { saveTimeSettings } from "../actions";
 
+export const metadata = { title: "Tid och automatik · Tikkr" };
+
 export const dynamic = "force-dynamic";
 
 const TIMEZONES = [

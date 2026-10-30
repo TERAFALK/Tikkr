@@ -1,5 +1,5 @@
 import { requireAdmin } from "@/lib/admin-session";
-import FormDialog from "@/components/admin/FormDialog";
+import ActionDialog from "@/components/ui/ActionDialog";
 import ConfirmButton from "@/components/admin/ConfirmButton";
 import {
   Alert,
@@ -22,6 +22,8 @@ import {
   toggleIndirectMoment,
 } from "./actions";
 
+export const metadata = { title: "Improduktiv tid · Tikkr" };
+
 export const dynamic = "force-dynamic";
 
 export default async function IndirectMomentsPage() {
@@ -38,16 +40,18 @@ export default async function IndirectMomentsPage() {
   });
 
   const newMoment = (
-    <FormDialog
+    <ActionDialog
       trigger="Nytt improduktivt moment"
+      triggerTone="primary"
       title="Lägg till improduktivt moment"
       action={createIndirectMoment}
+      initial={{}}
       submitLabel="Lägg till"
     >
       <Field label="Namn">
         <Input name="name" placeholder="Städning" required autoFocus />
       </Field>
-    </FormDialog>
+    </ActionDialog>
   );
 
   return (
@@ -106,11 +110,12 @@ export default async function IndirectMomentsPage() {
                   </Td>
                   <Td>
                     <div className="flex justify-end gap-2">
-                      <FormDialog
+                      <ActionDialog
                         trigger="Ändra"
                         triggerTone="ghost"
                         title="Ändra improduktivt moment"
                         action={renameIndirectMoment}
+                        initial={{}}
                         submitLabel="Spara"
                       >
                         <input type="hidden" name="id" value={moment.id} />
@@ -122,7 +127,7 @@ export default async function IndirectMomentsPage() {
                             autoFocus
                           />
                         </Field>
-                      </FormDialog>
+                      </ActionDialog>
 
                       <form action={toggleIndirectMoment}>
                         <input type="hidden" name="id" value={moment.id} />

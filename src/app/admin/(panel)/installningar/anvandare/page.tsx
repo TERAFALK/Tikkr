@@ -8,6 +8,8 @@ import { formatDate, formatDateTime } from "@/lib/format";
 import { cancelInvite, deleteAdmin, resetTwoStep } from "./actions";
 import { fullName } from "@/lib/person-name";
 
+export const metadata = { title: "Användare · Tikkr" };
+
 /**
  * VILKA ANDRA SOM HAR ÅTKOMST. Inte det egna kontot, se /admin/konto.
  */

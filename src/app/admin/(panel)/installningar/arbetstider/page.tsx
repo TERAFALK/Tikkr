@@ -7,6 +7,8 @@ import ScheduleForm, {
 } from "@/components/admin/ScheduleForm";
 import { saveSchedule } from "./actions";
 
+export const metadata = { title: "Arbetstider · Tikkr" };
+
 /**
  * FÖRETAGETS ARBETSTIDER (beslutat 2026-10-17).
  *

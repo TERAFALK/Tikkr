@@ -17,7 +17,7 @@ import type { SearchSelectOption } from "./SearchSelect";
 /**
  * RUTAN SOM LÄGGER UPP EN NY ORDER.
  *
- * Egen ruta och inte den allmänna FormDialog, av ett skäl: den här åtgärden
+ * Egen ruta och inte den allmänna ActionDialog, av ett skäl: den här åtgärden
  * kan avvisas. Ett påslag skrivet som "40" när man menade "1,4" ska inte
  * sparas tyst, och då måste rutan stå kvar med felet i stället för att stänga
  * sig och se ut som att allt gick bra.

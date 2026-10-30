@@ -20,6 +20,8 @@ import { isoWeekdayIn } from "@/lib/schedule";
 import { parseLocalDate, startOfDayIn, wallTimeIn } from "@/lib/time-zone";
 import { addHolidayAction, deleteHolidayAction, type HolidayState } from "./actions";
 
+export const metadata = { title: "Röda dagar · Tikkr" };
+
 /**
  * RÖDA DAGAR (tillagt 2026-10-13).
  *

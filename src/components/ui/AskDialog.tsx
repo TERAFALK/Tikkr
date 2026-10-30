@@ -6,7 +6,7 @@ import { Button, dialogEdge, dialogSurface } from ".";
 /**
  * EN FRÅGA SOM STÄLLS AV SIG SJÄLV.
  *
- * Till skillnad från FormDialog och ActionDialog öppnas den inte av en knapp
+ * Till skillnad från ActionDialog öppnas den inte av en knapp
  * utan av att något hänt: en efterkalkyl har tagits ut, och nästa fråga är om
  * ordern ska avslutas.
  *
