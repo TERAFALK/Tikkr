@@ -6,6 +6,7 @@ import FilterForm from "@/components/admin/FilterForm";
 import TimesheetView from "@/components/admin/TimesheetView";
 import WeekStepper from "@/components/admin/WeekStepper";
 import PrintButton from "@/components/admin/PrintButton";
+import { ExportGroup, ExportLink } from "@/components/admin/ExportButtons";
 import { datePresets } from "@/lib/date-presets";
 import { weekStep } from "@/lib/week-nav";
 import type { TimesheetDayRow } from "@/components/admin/TimesheetTable";
@@ -276,63 +277,7 @@ export default async function TimesheetPage({
           from,
           timeZone
         )} – ${formatDate(to, timeZone)}`}
-        action={
-          <div className="flex flex-wrap gap-2">
-            {/* JUSTERA SALDOT FÖR HAND. Skriv vad det ska vara; servern
-                räknar ut skillnaden mot det framräknade och flyttar det
-                ingående saldot. Se adjustFlexBalance.
-
-                Inte för en timanställd: det finns inget saldo att justera. */}
-            {!period.employee.hourly && (
-            <ActionDialog<BalanceState>
-              trigger="Justera flexsaldo"
-              title={`Flexsaldo för ${period.employee.name}`}
-              description={
-                flexToday === null
-                  ? undefined
-                  : `Saldot är ${formatSignedDuration(flexToday)} idag.`
-              }
-              action={adjustFlexBalance}
-              initial={{}}
-              submitLabel="Spara"
-            >
-              <input type="hidden" name="employeeId" value={employeeId} />
-              <Field label="Nytt saldo" hint="Timmar, t.ex. 2,25 eller −0,75">
-                <Input
-                  name="flex"
-                  inputMode="decimal"
-                  autoComplete="off"
-                  placeholder="0"
-                />
-              </Field>
-            </ActionDialog>
-            )}
-
-            {/* Skriver ut direkt i stället för att ladda ner. Utskriften är
-                det den finns för, och den som ändå vill ha en fil väljer
-                "Spara som PDF" i skrivardialogen. */}
-            <PrintButton
-              href={lastWeekHref}
-              label="Tidrapport föregående vecka"
-            />
-
-            <PrintButton
-              href={lastMonthHref}
-              label="Löneunderlag föregående månad"
-            />
-
-            <PrintButton
-              href={selectedPeriodHref}
-              label="Löneunderlag vald period"
-              disabled={to < from}
-            />
-
-            <ButtonLink href={exportHref} tone="secondary">
-              PDF
-            </ButtonLink>
-          </div>
-        }
-      />
+        />
 
       {!period.schedule && (
         <div className="mb-4">
@@ -351,6 +296,35 @@ export default async function TimesheetPage({
 
       {filters}
 
+      {/* VEMS PAPPER DET ÄR STÅR VID KNAPPARNA. Sidan visar en person, men tre av
+          utskrifterna gäller hela personalen, också när en person är vald. De
+          stod på en rad utan skillnad, och det var lätt att skriva ut allas
+          frånvaro när man ville ha ett papper. Skriv ut går direkt till
+          skrivaren, se PrintButton.
+
+          Frågan är inte vilken knapp utan vilket dokument, som i Ordrar. */}
+      <Card className="mb-6 p-5">
+        <div className="flex flex-wrap items-end gap-x-4 gap-y-4">
+          <ExportGroup label={`${period.employee.name}, vald period`}>
+            <PrintButton href={exportHref} />
+            <ExportLink href={exportHref}>Ladda ner</ExportLink>
+          </ExportGroup>
+
+          <ExportGroup label="Hela personalen">
+            <PrintButton href={lastWeekHref} label="Tidrapport föregående vecka" />
+            <PrintButton
+              href={lastMonthHref}
+              label="Löneunderlag föregående månad"
+            />
+            <PrintButton
+              href={selectedPeriodHref}
+              label="Löneunderlag vald period"
+              disabled={to < from}
+            />
+          </ExportGroup>
+        </div>
+      </Card>
+
       <div
         className={`mb-6 grid gap-4 ${
           atf ? "sm:grid-cols-2 lg:grid-cols-4" : "sm:grid-cols-3"
@@ -362,7 +336,7 @@ export default async function TimesheetPage({
           hint="timmar"
         />
         <Stat
-          label="Närvarotid"
+          label="Arbetad tid"
           value={formatDuration(period.totals.worked)}
           hint="timmar"
         />
@@ -376,6 +350,34 @@ export default async function TimesheetPage({
             value={formatSignedDuration(period.totals.flex)}
             tone={period.totals.flex >= 0 ? "active" : "warning"}
             hint={`saldo ${formatSignedDuration(period.flex.closing)}`}
+            action={
+              // SALDOT RÄTTAS DÄR DET STÅR. Skriv vad det ska vara; servern
+              // räknar ut skillnaden mot det framräknade och flyttar det
+              // ingående saldot. Se adjustFlexBalance.
+              <ActionDialog<BalanceState>
+                trigger="Justera flexsaldo"
+                triggerTone="ghost"
+                title={`Flexsaldo för ${period.employee.name}`}
+                description={
+                  flexToday === null
+                    ? undefined
+                    : `Saldot är ${formatSignedDuration(flexToday)} idag.`
+                }
+                action={adjustFlexBalance}
+                initial={{}}
+                submitLabel="Spara"
+              >
+                <input type="hidden" name="employeeId" value={employeeId} />
+                <Field label="Nytt saldo" hint="Timmar, t.ex. 2,25 eller −0,75">
+                  <Input
+                    name="flex"
+                    inputMode="decimal"
+                    autoComplete="off"
+                    placeholder="0"
+                  />
+                </Field>
+              </ActionDialog>
+            }
           />
         )}
         {atf && (

@@ -97,7 +97,7 @@ export default async function OrderPage({
 
         <div className="mt-6 grid gap-4 sm:grid-cols-3">
           <Stat
-            label="Upparbetad tid"
+            label="Registrerad tid"
             value={formatDuration(order.minutes)}
           />
           <Stat
@@ -150,12 +150,20 @@ export default async function OrderPage({
             <CardHeader
               title="Tid per arbetsmoment"
               action={
-                <Link
-                  href={`/admin/rapporter?orderId=${order.id}`}
-                  className="text-[13px] font-medium text-link hover:underline"
-                >
-                  Stämplingar i Rapporter
-                </Link>
+                <span className="flex gap-3 text-[13px] font-medium">
+                  <Link
+                    href={`/admin/stamplingar?orderId=${order.id}`}
+                    className="text-link hover:underline"
+                  >
+                    Stämplingar
+                  </Link>
+                  <Link
+                    href={`/admin/rapporter?orderId=${order.id}`}
+                    className="text-link hover:underline"
+                  >
+                    Rapport
+                  </Link>
+                </span>
               }
             />
             {momentRows.length === 0 ? (
@@ -167,7 +175,7 @@ export default async function OrderPage({
                 <thead>
                   <tr>
                     <Th>Arbetsmoment</Th>
-                    <Th numeric>Upparbetad tid (timmar)</Th>
+                    <Th numeric>Registrerad tid (timmar)</Th>
                     <Th>Mot beräknad tid</Th>
                   </tr>
                 </thead>

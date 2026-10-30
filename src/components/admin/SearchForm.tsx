@@ -14,6 +14,7 @@ export default function SearchForm({
   placeholder,
   clearHref,
   perPage = PER_PAGE,
+  keep = {},
 }: {
   /** Sökningen som gäller nu. Tom när ingen gjorts. */
   query: string;
@@ -24,10 +25,16 @@ export default function SearchForm({
   clearHref: string;
   /** Rader per sida just nu. Se Pager. */
   perPage?: number;
+  /** Andra filter på sidan, som ska gälla också efter en sökning. */
+  keep?: Record<string, string | undefined>;
 }) {
   return (
     <form className="flex w-full gap-2 sm:w-auto">
       <PerPageField perPage={perPage} />
+      {Object.entries(keep).map(
+        ([name, value]) =>
+          value && <input key={name} type="hidden" name={name} value={value} />
+      )}
       <input
         type="search"
         name="q"

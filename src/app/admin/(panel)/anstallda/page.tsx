@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { requireAdmin } from "@/lib/admin-session";
 import { hasModule, hasWorkHours } from "@/lib/company-modules";
 import { companyTimeZone } from "@/lib/company";
@@ -26,7 +27,9 @@ import {
   Td,
   Th,
   Tr,
+  rowLink,
 } from "@/components/ui";
+import { personHref } from "@/lib/person-link";
 import { createEmployee, toggleEmployee, updateEmployee } from "./actions";
 
 export const metadata = { title: "Anställda · Tikkr" };
@@ -196,7 +199,7 @@ export default async function EmployeesPage({
               </thead>
               <tbody>
                 {employees.map((employee) => (
-                  <Tr key={employee.id} dimmed={!employee.active}>
+                  <Tr key={employee.id} dimmed={!employee.active} linked>
                     <Td>
                       <span className="flex items-center gap-3">
                         <EmployeeAvatar
@@ -205,7 +208,12 @@ export default async function EmployeesPage({
                           hasPhoto={Boolean(employee.photoMimeType)}
                           size={36}
                         />
-                        <span className="font-medium">{employee.name}</span>
+                        <Link
+                          href={personHref(employee.id, payroll)}
+                          className={rowLink}
+                        >
+                          {employee.name}
+                        </Link>
                       </span>
                     </Td>
                     <Td muted>
@@ -233,7 +241,7 @@ export default async function EmployeesPage({
                       {employee._count.timeEntries}
                     </Td>
                     <Td>
-                      <div className="flex justify-end gap-2">
+                      <div className="relative z-10 flex justify-end gap-2">
                         <EmployeeDialog
                           trigger="Ändra"
                           triggerTone="secondary"

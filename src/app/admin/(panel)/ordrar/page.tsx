@@ -3,11 +3,12 @@ import { hasModule } from "@/lib/company-modules";
 import NewOrderDialog from "@/components/admin/NewOrderDialog";
 import OrdersTable from "@/components/admin/OrdersTable";
 import SearchForm from "@/components/admin/SearchForm";
+import { FilterChip } from "@/components/admin/FilterBar";
 import Pager from "@/components/ui/Pager";
 import { Alert, EmptyState, PageHeader } from "@/components/ui";
 import { orderCount, orderRows } from "@/lib/orders";
 import { customerOptions } from "@/lib/customers";
-import { listPaging } from "@/lib/paging";
+import { listHref, listPaging } from "@/lib/paging";
 import { closeOrders, createOrder } from "./actions";
 
 export const metadata = { title: "Ordrar · Tikkr" };
@@ -24,13 +25,16 @@ export default async function OrdersPage({
   searchParams: Promise<{
     ny?: string;
     q?: string;
+    status?: string;
     sida?: string;
     antal?: string;
   }>;
 }) {
   const { db, companyId } = await requireAdmin();
-  const { ny, q, sida, antal } = await searchParams;
+  const { ny, q, status: statusParam, sida, antal } = await searchParams;
   const query = q?.trim() ?? "";
+  const status =
+    statusParam === "OPEN" || statusParam === "CLOSED" ? statusParam : undefined;
 
   // Leveransdatumet i orderrutan hör till tillvalet Planering. Att det döljs
   // här är kosmetik — serveråtgärden frågar om modulen själv, se actions.ts.
@@ -38,7 +42,7 @@ export default async function OrdersPage({
   const planning = await hasModule(companyId, "PLANNING");
 
   // Antalet först, så att ett sidnummer bortom slutet kan visa sista sidan.
-  const total = await orderCount(db, { query });
+  const total = await orderCount(db, { query, status });
   const page = listPaging(total, { sida, antal });
 
   // Hämtas parallellt: kundväljaren behöver hela registret, och en fråga till
@@ -49,7 +53,7 @@ export default async function OrdersPage({
       orderBy: [{ active: "desc" }, { name: "asc" }],
       select: { id: true, name: true, active: true },
     }),
-    orderRows(db, { query, skip: page.skip, take: page.take }),
+    orderRows(db, { query, status, skip: page.skip, take: page.take }),
     // Räknas för sig och inte ur listan: en sökning ska inte ändra hur många
     // ordrar som väntar på att kompletteras.
     db.order.count({ where: { isQuickJob: true } }),
@@ -90,7 +94,7 @@ export default async function OrdersPage({
         </div>
       )}
 
-      {total === 0 && !query ? (
+      {total === 0 && !query && !status ? (
         <EmptyState
           title="Inga ordrar upplagda"
           action={newOrder(false)}
@@ -102,13 +106,37 @@ export default async function OrdersPage({
           closeAction={closeOrders}
           query={query}
           search={
-            <SearchForm
-              query={query}
-              label="Sök ordrar"
-              placeholder="Ordernr, kund, kundnr…"
-              clearHref="/admin/ordrar"
-              perPage={page.take}
-            />
+            <>
+              <div className="flex gap-1">
+                {(
+                  [
+                    [undefined, "Alla"],
+                    ["OPEN", "Öppna"],
+                    ["CLOSED", "Stängda"],
+                  ] as const
+                ).map(([value, label]) => (
+                  <FilterChip
+                    key={label}
+                    href={listHref("/admin/ordrar", {
+                      keep: { q: query, status: value },
+                      page: 1,
+                      perPage: page.take,
+                    })}
+                    active={status === value}
+                  >
+                    {label}
+                  </FilterChip>
+                ))}
+              </div>
+              <SearchForm
+                query={query}
+                label="Sök ordrar"
+                placeholder="Ordernr, kund, kundnr…"
+                clearHref="/admin/ordrar"
+                perPage={page.take}
+                keep={{ status }}
+              />
+            </>
           }
           pager={
             <Pager
@@ -116,7 +144,7 @@ export default async function OrdersPage({
               total={total}
               unit="ordrar"
               path="/admin/ordrar"
-              keep={{ q: query }}
+              keep={{ q: query, status }}
             />
           }
         />

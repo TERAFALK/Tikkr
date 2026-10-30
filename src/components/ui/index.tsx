@@ -224,6 +224,7 @@ export function Stat({
   tone = "neutral",
   icon,
   href,
+  action,
 }: {
   label: string;
   /** Ett tal, eller `LiveValue` runt talet där det uppdateras medan man tittar. */
@@ -233,6 +234,8 @@ export function Stat({
   icon?: ReactNode;
   /** Sidan talet kommer från. Hela rutan blir en länk dit. */
   href?: string;
+  /** En åtgärd som hör till talet. Inte tillsammans med `href`. */
+  action?: ReactNode;
 }) {
   const valueTone = {
     neutral: "text-neutral-900",
@@ -256,6 +259,7 @@ export function Stat({
         {value}
       </p>
       {hint && <p className="mt-0.5 text-xs text-neutral-500">{hint}</p>}
+      {action && <div className="mt-1">{action}</div>}
     </Card>
   );
 

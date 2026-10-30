@@ -160,6 +160,26 @@ Administratör loggar in separat i en adminpanel, hanterar anställda/ordrar/
 moment och tar ut rapporter (tid per order, person, moment) med export till
 Excel/PDF.
 
+**Filtren i Rapporter och Stämplingar är en rad, och de gäller direkt** (beslutat
+2026-10-30, UX-granskningen). `FilterBar` har perioden överst, de vanligaste
+fälten under, och resten bakom Fler filter, som står öppet så länge något i det
+är valt. Ett snabbval byter bara datumen. Summeringarna i Rapporter ligger bakom
+ett tryck, så att listan börjar på första skärmen.
+
+**Ett namn och ett ordernummer leder vidare** (beslutat 2026-10-30, produktägarens
+val). Ordernumret öppnar ordern på varje sida. Namnet leder till personens
+tidrapport med löneunderlaget, och annars till personens stämplingar
+(`person-link.ts`). En anställd har ingen egen sida.
+
+**Stämplingar går att filtrera på order, och Ordrar på status** (beslutat
+2026-10-30, produktägarens val). Ordersidan länkar till orderns stämplingar, där
+de går att rätta.
+
+**Tidrapportens utskrifter står i två grupper** (beslutat 2026-10-30,
+UX-granskningen): den valda personen och hela personalen. Sidan visar en person,
+men tre av utskrifterna gäller alla, och frånvaro är känsliga uppgifter (§ 4
+punkt 9). Justera flexsaldo står vid saldot.
+
 **Menyn bär det man arbetar i, Inställningar det man sätter upp** (beslutat
 2026-10-14, issue #17). Vänstermenyn har två avsnitt: **Dagligen** (Översikt,
 Granskning, Stämplingar, Veckovy, Planering, Tidrapport, Rapporter) och
@@ -1040,7 +1060,7 @@ shop_prices       — död, ersatt av shop_products.price_ore (se § 3.4)
      och **egna tider** under Anställda, i personens ruta. Båda syns med
      löneunderlaget eller planeringen, eller båda (`WORK_HOURS_MODULES` i
      `modules.ts`, `requireWorkHours` i `company-modules.ts`). Rasttyperna för
-     stämplingsskärmen är löneunderlagets och står kvar där, under **Raster**.
+     stämplingsskärmen är löneunderlagets och står kvar där, under **Rasttyper**.
    - **En enda läsare**, `src/lib/work-hours.ts`, som är neutral som
      `weekly-hours.ts`. `schedule.ts` och `staff-hours.ts` läser båda därifrån,
      och `tests/planning-boundary.test.ts` fäller ett annat bibliotek som

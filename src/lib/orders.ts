@@ -76,6 +76,8 @@ interface OrderSelection {
    */
   ids?: string[];
   query?: string;
+  /** Bara öppna eller bara stängda. Utelämnad visar alla. */
+  status?: "OPEN" | "CLOSED";
 }
 
 function orderFilter(options: OrderSelection) {
@@ -83,6 +85,7 @@ function orderFilter(options: OrderSelection) {
 
   return {
     ...(options.customerId ? { customerId: options.customerId } : {}),
+    ...(options.status ? { status: options.status } : {}),
     ...(options.onlyQuickJobs ? { isQuickJob: true } : {}),
     ...(options.ids ? { id: { in: options.ids } } : {}),
     ...(needle

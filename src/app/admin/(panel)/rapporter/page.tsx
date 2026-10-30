@@ -1,5 +1,7 @@
 import Link from "next/link";
-import FilterForm from "@/components/admin/FilterForm";
+import FilterBar from "@/components/admin/FilterBar";
+import { ExportGroup, ExportLink } from "@/components/admin/ExportButtons";
+import PrintButton from "@/components/admin/PrintButton";
 import SearchSelect from "@/components/admin/SearchSelect";
 import { requireAdmin } from "@/lib/admin-session";
 import { unsafeGlobalPrisma } from "@/lib/db";
@@ -11,8 +13,6 @@ import {
 } from "@/lib/time-zone";
 import {
   Badge,
-  Button,
-  ButtonLink,
   Card,
   CardHeader,
   EmptyState,
@@ -173,150 +173,107 @@ export default async function ReportsPage({
         title="Rapporter"
         help="rapporter"
         action={
-          <div className="flex flex-wrap gap-2">
-            {report.rows.length > 0 && (
-              <>
-                <ButtonLink
-                  href={`${exportHref}&format=pdf`}
-                  tone="secondary"
-                >
-                  PDF
-                </ButtonLink>
-                <ButtonLink href={exportHref}>Excel</ButtonLink>
-              </>
-            )}
-          </div>
+          report.rows.length > 0 && (
+            <ExportGroup label="Rapport">
+              <PrintButton href={`${exportHref}&format=pdf`} />
+              <ExportLink href={`${exportHref}&format=pdf`}>
+                Ladda ner PDF
+              </ExportLink>
+              <ExportLink href={exportHref}>Ladda ner Excel</ExportLink>
+            </ExportGroup>
+          )
         }
       />
 
-      <Card className="mb-6">
-        <CardHeader
-          title="Filter"
-          action={
-            // Snabbval istället för att skriva datum för hand. Det är det man
-            // gör oftast, och två datumfält per gång blir många knapptryck.
-            //
-            // Veckostegaren bredvid: snabbvalen tar en till en bestämd period,
-            // pilarna bläddrar därifrån. Utan dem var "veckan före förra"
-            // två datum att skriva in för hand.
-            <div className="flex flex-wrap items-center gap-2">
-              <WeekStepper {...week} />
+      {/* GET-formulär: filtren hamnar i adressen, så en rapport går att
+          spara som bokmärke eller skicka vidare till någon annan. */}
+      <FilterBar
+        week={week}
+        presets={presets}
+        current={params}
+        presetHref={(preset) =>
+          presetHref("/admin/rapporter", { ...params }, preset, page.take)
+        }
+        resetHref="/admin/rapporter"
+        columns="lg:grid-cols-3 xl:grid-cols-6"
+        moreActive={(kind !== "ALL" ? 1 : 0) + (params.momentId ? 1 : 0)}
+        more={
+          <>
+            <Field label="Sorts tid">
+              <Select name="kind" defaultValue={kind}>
+                <option value="ORDER">Ordertid</option>
+                <option value="INDIRECT">Improduktiv tid</option>
+                <option value="ALL">Båda</option>
+              </Select>
+            </Field>
 
-              <div className="flex flex-wrap gap-1">
-                {presets.map((preset) => {
-                  const active =
-                    params.from === preset.from && params.to === preset.to;
+            <Field label="Arbetsmoment">
+              <Select name="momentId" defaultValue={params.momentId ?? ""}>
+                <option value="">Alla arbetsmoment</option>
+                {moments.map((moment) => (
+                  <option key={moment.id} value={moment.id}>
+                    {moment.name}
+                  </option>
+                ))}
+              </Select>
+            </Field>
+          </>
+        }
+      >
+        <PerPageField perPage={page.take} />
 
-                  return (
-                    <Link
-                      key={preset.label}
-                      href={presetHref(
-                        "/admin/rapporter",
-                        { ...params },
-                        preset,
-                        page.take
-                      )}
-                      className={`rounded-md px-2.5 py-1 text-xs font-medium transition-colors ${
-                        active
-                          ? "bg-neutral-900 text-white"
-                          : "bg-neutral-100 text-neutral-600 hover:bg-neutral-200"
-                      }`}
-                    >
-                      {preset.label}
-                    </Link>
-                  );
-                })}
-              </div>
-            </div>
-          }
-        />
-        {/* GET-formulär: filtren hamnar i adressen, så en rapport går att
-            spara som bokmärke eller skicka vidare till någon annan. Det
-            tillämpas direkt när ett fält ändras — se FilterForm. */}
-        <FilterForm className="grid gap-4 p-5 sm:grid-cols-2 lg:grid-cols-6">
-          <PerPageField perPage={page.take} />
+        <Field label="Från">
+          <Input type="date" name="from" defaultValue={params.from ?? ""} />
+        </Field>
 
-          <Field label="Från">
-            <Input type="date" name="from" defaultValue={params.from ?? ""} />
-          </Field>
+        <Field label="Till">
+          <Input type="date" name="to" defaultValue={params.to ?? ""} />
+        </Field>
 
-          <Field label="Till">
-            <Input type="date" name="to" defaultValue={params.to ?? ""} />
-          </Field>
+        <Field label="Order">
+          <SearchSelect
+            name="orderId"
+            options={orders.map((order) => ({
+              id: order.id,
+              label: order.orderNumber,
+              hint: order.customer?.name,
+            }))}
+            defaultValue={params.orderId}
+            placeholder="Sök order…"
+            emptyLabel="Alla ordrar"
+          />
+        </Field>
 
-          <Field label="Order">
-            <SearchSelect
-              name="orderId"
-              options={orders.map((order) => ({
-                id: order.id,
-                label: order.orderNumber,
-                hint: order.customer?.name,
-              }))}
-              defaultValue={params.orderId}
-              placeholder="Sök order…"
-              emptyLabel="Alla ordrar"
-            />
-          </Field>
+        <Field label="Kund">
+          <SearchSelect
+            name="customerId"
+            options={customers}
+            defaultValue={params.customerId}
+            placeholder="Sök kund…"
+            emptyLabel="Alla kunder"
+          />
+        </Field>
 
-          <Field label="Kund">
-            <SearchSelect
-              name="customerId"
-              options={customers}
-              defaultValue={params.customerId}
-              placeholder="Sök kund…"
-              emptyLabel="Alla kunder"
-            />
-          </Field>
-
-          <Field label="Anställd">
-            <Select name="employeeId" defaultValue={params.employeeId ?? ""}>
-              <option value="">Alla anställda</option>
-              {employees.map((employee) => (
-                <option key={employee.id} value={employee.id}>
-                  {employee.name}
-                </option>
-              ))}
-            </Select>
-          </Field>
-
-          <Field label="Visning">
-            <Select name="visning" defaultValue={params.visning ?? "detalj"}>
-              <option value="detalj">Varje stämpling</option>
-              <option value="persondetalj">
-                Varje stämpling, per anställd
+        <Field label="Anställd">
+          <Select name="employeeId" defaultValue={params.employeeId ?? ""}>
+            <option value="">Alla anställda</option>
+            {employees.map((employee) => (
+              <option key={employee.id} value={employee.id}>
+                {employee.name}
               </option>
-              <option value="person">Summerat per anställd</option>
-              <option value="kund">Summerat per kund</option>
-            </Select>
-          </Field>
+            ))}
+          </Select>
+        </Field>
 
-          <Field label="Sorts tid">
-            <Select name="kind" defaultValue={kind}>
-              <option value="ORDER">Fakturerbar tid</option>
-              <option value="INDIRECT">Improduktiv tid</option>
-              <option value="ALL">Båda</option>
-            </Select>
-          </Field>
-
-          <Field label="Arbetsmoment">
-            <Select name="momentId" defaultValue={params.momentId ?? ""}>
-              <option value="">Alla moment</option>
-              {moments.map((moment) => (
-                <option key={moment.id} value={moment.id}>
-                  {moment.name}
-                </option>
-              ))}
-            </Select>
-          </Field>
-
-          <div className="flex items-end gap-2">
-            <Button type="submit">Visa</Button>
-            <ButtonLink href="/admin/rapporter" tone="secondary">
-              Rensa
-            </ButtonLink>
-          </div>
-        </FilterForm>
-      </Card>
+        <Field label="Visning">
+          <Select name="visning" defaultValue={params.visning ?? "detalj"}>
+            <option value="detalj">Varje stämpling</option>
+            <option value="persondetalj">Varje stämpling, per anställd</option>
+            <option value="person">Summerat per anställd</option>
+            <option value="kund">Summerat per kund</option>
+          </Select>
+        </Field>
+      </FilterBar>
 
       <div className="mb-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <Stat
@@ -343,7 +300,13 @@ export default async function ReportsPage({
         />
       ) : (
         <>
-          <div className="mb-6 grid gap-4 lg:grid-cols-3">
+          {/* Summeringarna stod öppna före listan, som då började långt under
+              första skärmen. De finns kvar ett tryck bort. */}
+          <details className="mb-6">
+            <summary className="mb-3 cursor-pointer text-[13px] font-medium text-neutral-700">
+              Summeringar
+            </summary>
+          <div className="grid gap-4 lg:grid-cols-3">
             <Summary title="Per order" groups={report.byOrder} />
             {report.byCustomer.length > 0 && (
               <Summary title="Per kund" groups={report.byCustomer} />
@@ -354,6 +317,7 @@ export default async function ReportsPage({
               <Summary title="Improduktiv tid" groups={report.byIndirect} />
             )}
           </div>
+          </details>
 
           {view === "kund" ? (
             <Card>
@@ -451,7 +415,7 @@ export default async function ReportsPage({
                     <thead>
                       <tr>
                         <Th>Order</Th>
-                        <Th>Moment</Th>
+                        <Th>Arbetsmoment</Th>
                         <Th>In</Th>
                         <Th>Ut</Th>
                         <Th numeric>Tid (timmar)</Th>
@@ -492,7 +456,7 @@ export default async function ReportsPage({
                 <tr>
                   <Th>Anställd</Th>
                   <Th>Order</Th>
-                  <Th>Moment</Th>
+                  <Th>Arbetsmoment</Th>
                   <Th>In</Th>
                   <Th>Ut</Th>
                   <Th numeric>Tid (timmar)</Th>
@@ -548,7 +512,7 @@ function Summary({ title, groups }: { title: string; groups: ReportGroup[] }) {
         ))}
         {groups.length > 8 && (
           <li className="pt-1 text-neutral-500">
-            och {groups.length - 8} till. Samtliga finns i Excel-exporten
+            och {groups.length - 8} till. Samtliga finns i Excel-arket
           </li>
         )}
       </ul>
@@ -583,7 +547,16 @@ function EntryRow({
         </Td>
       )}
       <Td>
-        {row.orderNumber ?? <Badge tone="muted">Improduktiv</Badge>}
+        {row.orderId ? (
+          <Link
+            href={`/admin/ordrar/${row.orderId}`}
+            className="text-link hover:underline"
+          >
+            {row.orderNumber}
+          </Link>
+        ) : (
+          <Badge tone="muted">Improduktiv</Badge>
+        )}
         {row.customerName && (
           <span className="ml-2 text-neutral-500">{row.customerName}</span>
         )}
