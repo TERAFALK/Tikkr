@@ -53,10 +53,10 @@ jobs:
       DATABASE_URL: postgresql://tikkr:tikkr@localhost:5432/tikkr_test?schema=public
 
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
       # Node 22, samma som Docker-imagen. Inte laptopens version.
-      - uses: actions/setup-node@v5
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: npm
@@ -103,7 +103,7 @@ jobs:
     timeout-minutes: 20
 
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
       # Hela Dockerfilen, med next build inuti. Fångar det som bara går sönder
       # i imagen och inte vid en vanlig build: Alpine i stället för Ubuntu,
