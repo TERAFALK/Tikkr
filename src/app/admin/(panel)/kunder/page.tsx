@@ -2,10 +2,10 @@ import Link from "next/link";
 import { requireAdmin } from "@/lib/admin-session";
 import { searchCustomers } from "@/lib/customers";
 import CustomerDialog from "@/components/admin/CustomerDialog";
+import SearchForm from "@/components/admin/SearchForm";
 import {
   Badge,
   Button,
-  ButtonLink,
   Card,
   CardHeader,
   EmptyState,
@@ -83,25 +83,11 @@ export default async function CustomersPage({
             }
             description={query ? `Sökning på ”${query}”` : `${active} aktiva`}
             action={
-              /* Vanligt GET-formulär, utan JavaScript. Sökningen hamnar i
-                 adressen och går därmed att spara som bokmärke. */
-              <form className="flex gap-2">
-                <input
-                  type="search"
-                  name="q"
-                  defaultValue={query}
-                  placeholder="Namn, kundnr, org.nr…"
-                  className="w-52 rounded-md border-0 bg-white px-2.5 py-1.5 text-[13px] text-neutral-900 ring-1 ring-inset ring-neutral-400 placeholder:text-neutral-400 focus:outline-hidden focus:ring-2 focus:ring-inset focus:ring-blue-600"
-                />
-                <Button type="submit" tone="secondary">
-                  Sök
-                </Button>
-                {query && (
-                  <ButtonLink href="/admin/kunder" tone="ghost">
-                    Rensa
-                  </ButtonLink>
-                )}
-              </form>
+              <SearchForm
+                query={query}
+                placeholder="Namn, kundnr, org.nr…"
+                clearHref="/admin/kunder"
+              />
             }
           />
 

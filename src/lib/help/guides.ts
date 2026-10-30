@@ -209,7 +209,7 @@ export const GUIDES = [
       },
       {
         title: "Kontoret kompletterar ordern",
-        body: "Snabbjobbet står överst under Granskning. Tryck Ändra för att sätta rätt ordernummer och kund.",
+        body: "Snabbjobbet står överst under Granskning. Tryck på ordernumret och sedan Ändra för att sätta rätt ordernummer och kund.",
       },
     ],
     notes: [
@@ -306,7 +306,7 @@ export const GUIDES = [
     title: "Lägg upp en order",
     summary:
       "Ordernummer, kund och beräknad tid per arbetsmoment. Påslag och fast pris om underlaget ska visa belopp.",
-    keywords: ["order", "beräknad tid", "budget", "fast pris", "påslag", "leveransdatum", "stäng order"],
+    keywords: ["order", "beräknad tid", "budget", "fast pris", "påslag", "leveransdatum", "stäng order", "öppna order", "sök order"],
     steps: [
       {
         title: "Öppna Ordrar och tryck Ny order",
@@ -325,6 +325,7 @@ export const GUIDES = [
       },
     ],
     notes: [
+      "Tryck på ordernumret för att öppna ordern. Där ändras och stängs den, och där tas efterkalkyl och underlag ut.",
       "En order med registrerad tid går inte att radera. Den stängs, och försvinner då från stämplingsskärmen.",
       "Stämplingen stoppas aldrig för att den beräknade tiden överskrids.",
     ],
@@ -428,7 +429,7 @@ export const GUIDES = [
       },
       {
         title: "Komplettera snabbjobben",
-        body: "Tryck Ändra och sätt rätt ordernummer och kund.",
+        body: "Tryck på ordernumret och Ändra, och sätt rätt ordernummer och kund.",
       },
       {
         title: "Rätta sluttiden eller godkänn den beräknade",
@@ -490,7 +491,7 @@ export const GUIDES = [
       },
       {
         title: "Kryssa i Visa belopp och rabatt vid behov",
-        body: "Utan kryss visas bara tid. Valet finns i menyn på en enskild order.",
+        body: "Utan kryss visas bara tid. Valet finns på sidan för en enskild order.",
       },
     ],
     notes: [

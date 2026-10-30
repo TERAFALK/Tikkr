@@ -2,21 +2,26 @@ import { requireAdmin } from "@/lib/admin-session";
 import { hasModule } from "@/lib/company-modules";
 import NewOrderDialog from "@/components/admin/NewOrderDialog";
 import OrdersTable from "@/components/admin/OrdersTable";
+import SearchForm from "@/components/admin/SearchForm";
 import { Alert, EmptyState, PageHeader } from "@/components/ui";
 import { orderRows } from "@/lib/orders";
 import { customerOptions } from "@/lib/customers";
-import { closeOrders, createOrder, toggleOrder, updateOrder } from "./actions";
+import { closeOrders, createOrder } from "./actions";
 
 export const dynamic = "force-dynamic";
 
 export default async function OrdersPage({
   searchParams,
 }: {
-  /** `ny=1` öppnar Ny order direkt. Genvägen på översikten. */
-  searchParams: Promise<{ ny?: string }>;
+  /**
+   * `ny=1` öppnar Ny order direkt, genvägen på översikten. `q` är sökningen,
+   * som i kundregistret: den ligger i adressen och går att spara.
+   */
+  searchParams: Promise<{ ny?: string; q?: string }>;
 }) {
   const { db, companyId } = await requireAdmin();
-  const { ny } = await searchParams;
+  const { ny, q } = await searchParams;
+  const query = q?.trim() ?? "";
 
   // Leveransdatumet i orderrutan hör till tillvalet Planering. Att det döljs
   // här är kosmetik — serveråtgärden frågar om modulen själv, se actions.ts.
@@ -25,13 +30,16 @@ export default async function OrdersPage({
 
   // Hämtas parallellt: kundväljaren behöver hela registret, och en fråga till
   // kostar mindre än att sidan väntar på två i följd.
-  const [customerList, moments, rows] = await Promise.all([
+  const [customerList, moments, rows, quickJobs] = await Promise.all([
     customerOptions(db),
     db.workMoment.findMany({
       orderBy: [{ active: "desc" }, { name: "asc" }],
       select: { id: true, name: true, active: true },
     }),
-    orderRows(db),
+    orderRows(db, { query }),
+    // Räknas för sig och inte ur listan: en sökning ska inte ändra hur många
+    // ordrar som väntar på att kompletteras.
+    db.order.count({ where: { isQuickJob: true } }),
   ]);
 
   // Två ställen, men bara rubrikens öppnas av genvägen. Öppnades båda
@@ -45,8 +53,6 @@ export default async function OrdersPage({
       openOnMount={openOnMount}
     />
   );
-
-  const quickJobs = rows.filter((order) => order.isQuickJob).length;
 
   return (
     <>
@@ -71,7 +77,7 @@ export default async function OrdersPage({
         </div>
       )}
 
-      {rows.length === 0 ? (
+      {rows.length === 0 && !query ? (
         <EmptyState
           title="Inga ordrar upplagda"
           action={newOrder(false)}
@@ -79,12 +85,15 @@ export default async function OrdersPage({
       ) : (
         <OrdersTable
           orders={rows}
-          customers={customerList}
-          moments={moments}
-          updateAction={updateOrder}
-          toggleAction={toggleOrder}
           closeAction={closeOrders}
-          planning={planning}
+          query={query}
+          search={
+            <SearchForm
+              query={query}
+              placeholder="Ordernr, kund, kundnr…"
+              clearHref="/admin/ordrar"
+            />
+          }
         />
       )}
     </>

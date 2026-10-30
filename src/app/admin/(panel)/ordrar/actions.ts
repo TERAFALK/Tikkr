@@ -11,14 +11,15 @@ import { readBudgetRows, saveOrderBudgets } from "@/lib/order-budget";
 const PATH = "/admin/ordrar";
 
 /**
- * Ordrarna ritas på två ställen: under Ordrar och på kundens sida. Båda måste
- * ritas om, annars visar kundsidan ett ordernummer som just ändrats.
+ * Ordrarna ritas på tre ställen: under Ordrar, på orderns egen sida och på
+ * kundens sida. Alla måste ritas om, annars visar kundsidan ett ordernummer
+ * som just ändrats.
  *
- * Kundsidan tas om hand som "layout", vilket täcker varje kund utan att vi
- * behöver veta vilken order som flyttats — och en ändrad kund berör ju två.
+ * Båda tas om hand som "layout", vilket täcker varje order och kund utan att
+ * vi behöver veta vilken order som flyttats — och en ändrad kund berör ju två.
  */
 function revalidateOrders() {
-  revalidatePath(PATH);
+  revalidatePath(PATH, "layout");
   revalidatePath("/admin/kunder", "layout");
 }
 

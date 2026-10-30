@@ -55,12 +55,26 @@ export interface OrderRow {
   plannedDueDate: Date | null;
 }
 
+/** Tiden på ett arbetsmoment på en order, med beräkningen bredvid. */
+export interface OrderMomentRow {
+  momentId: string;
+  momentName: string;
+  /** Upparbetad tid i minuter. */
+  minutes: number;
+  /** Beräknad tid i minuter, eller null för ett moment utan beräkning. */
+  budgetMinutes: number | null;
+}
+
 /**
  * Ordrarna med upparbetad tid, beräkning och utfall per arbetsmoment.
  *
  * `customerId` begränsar till en kunds ordrar. Utelämnad ger företagets alla.
  * `onlyQuickJobs` ger bara de som skapats från en stämplingsskärm och ännu
  * inte kompletterats — det granskningssidan visar.
+ *
+ * `query` söker i ordernummer, kundens namn och kundnummer, skiftlägesokänsligt
+ * som kundregistret. Den som har ordernumret på en följesedel ska hitta ordern,
+ * och den som bara minns kunden likaså. Tom sökning ger alla.
  */
 export async function orderRows(
   db: CompanyDb,
@@ -73,13 +87,36 @@ export async function orderRows(
      * stämpling på varje order för att visa åtta av dem.
      */
     ids?: string[];
+    query?: string;
   } = {}
 ): Promise<OrderRow[]> {
+  const needle = options.query?.trim();
+
   const orders = await db.order.findMany({
     where: {
       ...(options.customerId ? { customerId: options.customerId } : {}),
       ...(options.onlyQuickJobs ? { isQuickJob: true } : {}),
       ...(options.ids ? { id: { in: options.ids } } : {}),
+      ...(needle
+        ? {
+            OR: [
+              { orderNumber: { contains: needle, mode: "insensitive" as const } },
+              {
+                customer: {
+                  name: { contains: needle, mode: "insensitive" as const },
+                },
+              },
+              {
+                customer: {
+                  customerNumber: {
+                    contains: needle,
+                    mode: "insensitive" as const,
+                  },
+                },
+              },
+            ],
+          }
+        : {}),
     },
     orderBy: [{ status: "asc" }, { orderNumber: "asc" }],
     select: {
@@ -150,4 +187,56 @@ export async function orderRows(
       ),
     };
   });
+}
+
+/**
+ * Tiden per arbetsmoment på en order, för orderns egen sida.
+ *
+ * `budgets` räcker inte: den bär bara momenten som fått en beräkning, och tid
+ * på ett annat moment hade då saknats i tabellen utan att något sa det. De
+ * beräknade momenten står först, i orderns egen ordning, och resten efter namn.
+ */
+export async function orderMoments(
+  db: CompanyDb,
+  order: Pick<OrderRow, "id" | "budgets">
+): Promise<OrderMomentRow[]> {
+  const entries = await db.timeEntry.findMany({
+    where: { orderId: order.id },
+    select: {
+      clockInAt: true,
+      clockOutAt: true,
+      momentId: true,
+      moment: { select: { name: true } },
+    },
+  });
+
+  const budgeted = new Set(order.budgets.map((budget) => budget.momentId));
+  const others = new Map<string, OrderMomentRow>();
+
+  for (const entry of entries) {
+    if (!entry.momentId || !entry.moment) continue;
+    if (budgeted.has(entry.momentId)) continue;
+
+    const row = others.get(entry.momentId) ?? {
+      momentId: entry.momentId,
+      momentName: entry.moment.name,
+      minutes: 0,
+      budgetMinutes: null,
+    };
+
+    row.minutes += minutesBetween(entry.clockInAt, entry.clockOutAt);
+    others.set(entry.momentId, row);
+  }
+
+  return [
+    ...order.budgets.map((budget) => ({
+      momentId: budget.momentId,
+      momentName: budget.momentName,
+      minutes: budget.usedMinutes,
+      budgetMinutes: budget.minutes,
+    })),
+    ...[...others.values()].sort((a, b) =>
+      a.momentName.localeCompare(b.momentName, "sv")
+    ),
+  ];
 }

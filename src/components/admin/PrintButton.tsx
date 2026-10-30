@@ -32,8 +32,6 @@ export default function PrintButton({
   href,
   label = "Skriv ut",
   tone = "secondary",
-  variant = "button",
-  description,
   disabled = false,
   onPrint,
 }: {
@@ -41,12 +39,8 @@ export default function PrintButton({
   href: string;
   label?: string;
   tone?: "primary" | "secondary" | "ghost";
-  /** "menu" ritar raden som ett menyval, som länkarna i ordermenyn. */
-  variant?: "button" | "menu";
-  /** Undertext i menyläget. */
-  description?: string;
   disabled?: boolean;
-  /** Körs när utskriften startats. Används för att stänga menyn. */
+  /** Körs när utskriften startats. Används för frågan om att avsluta ordern. */
   onPrint?: () => void;
 }) {
   const [busy, setBusy] = useState(false);
@@ -113,29 +107,6 @@ export default function PrintButton({
     element.src = printUrl();
     document.body.appendChild(element);
     frame.current = element;
-  }
-
-  if (variant === "menu") {
-    return (
-      <button
-        type="button"
-        onClick={start}
-        disabled={disabled || busy}
-        className="flex w-full items-start gap-3 rounded-lg px-3 py-2.5 text-left hover:bg-neutral-50 disabled:cursor-not-allowed disabled:opacity-50"
-      >
-        <span className="mt-0.5 text-neutral-400">
-          <IconPrinter />
-        </span>
-        <span>
-          <span className="block text-[13px] font-medium text-neutral-900">
-            {busy ? "Förbereder…" : label}
-          </span>
-          {description && (
-            <span className="block text-xs text-neutral-500">{description}</span>
-          )}
-        </span>
-      </button>
-    );
   }
 
   return (

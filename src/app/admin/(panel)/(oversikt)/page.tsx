@@ -486,10 +486,11 @@ async function OrdersInProgress({ db }: { db: CompanyDb }) {
               className="flex flex-wrap items-center gap-x-6 gap-y-1.5 border-b border-neutral-100 px-5 py-3 last:border-0"
             >
               <span className="min-w-0 flex-1 truncate text-[13px]">
-                {/* Ordernumret leder till rapporten för ordern: den som ser
-                    att en order dragit över vill veta vad tiden gick till. */}
+                {/* Ordernumret öppnar ordern (ändrat 2026-10-30, ledde till
+                    rapporten). Där stängs den och där tas underlagen ut, och
+                    rapporten ligger ett tryck bort. */}
                 <Link
-                  href={`/admin/rapporter?orderId=${order.id}`}
+                  href={`/admin/ordrar/${order.id}`}
                   className="font-medium text-tick-deep hover:underline"
                 >
                   {order.orderNumber}

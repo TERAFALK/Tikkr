@@ -1,16 +1,11 @@
 "use client";
 
-import { useActionState, useState } from "react";
-import type {
-  BulkCloseState,
-  OrderFormState,
-  OrderToggleState,
-} from "@/app/admin/(panel)/ordrar/actions";
-import OrderActions from "./OrderActions";
+import Link from "next/link";
+import { useActionState, useState, type ReactNode } from "react";
+import type { BulkCloseState } from "@/app/admin/(panel)/ordrar/actions";
+import { ExportGroup, ExportLink } from "./ExportButtons";
 import PrintButton from "./PrintButton";
 import AskDialog from "@/components/ui/AskDialog";
-import type { SearchSelectOption } from "./SearchSelect";
-import type { BudgetMomentOption } from "./BudgetMoments";
 import type { OrderRow } from "@/lib/orders";
 import BudgetBar from "./BudgetBar";
 import {
@@ -39,23 +34,21 @@ import { formatDuration } from "@/lib/format";
  * enskild order, vilket betydde tjugo besök i tjugo menyer för en vecka av
  * färdiga jobb. Utskriften tar alla markerade i ett svep, och nedladdningen
  * ger en fil per order.
+ *
+ * ORDERNUMRET ÖPPNAR ORDERN (ändrat 2026-10-30). Det öppnade en meny, nu en
+ * egen sida som en kund har. Se ordrar/[orderId]/page.tsx.
  */
 
 export default function OrdersTable({
   orders,
-  updateAction,
-  toggleAction,
-  customers,
-  moments,
   title,
   hideCustomer = false,
   selectable = true,
   closeAction,
-  planning = false,
+  query = "",
+  search,
 }: {
   orders: OrderRow[];
-  /** Kunderna som går att välja i ändra-rutan. */
-  customers: SearchSelectOption[];
   /** Rubrik över tabellen. Utelämnad ger antalet ordrar. */
   title?: string;
   /**
@@ -68,10 +61,6 @@ export default function OrdersTable({
    * listan är en uppgift att beta av och inte ett urval att exportera.
    */
   selectable?: boolean;
-  /** Arbetsmomenten som går att beräkna tid på. */
-  moments: BudgetMomentOption[];
-  /** Visar leveransdatumet i ändra-rutan. Sätts när Planering är på. */
-  planning?: boolean;
   /**
    * Avslutar flera markerade ordrar. Utelämnad döljer frågan helt, vilket
    * gäller listan på granskningssidan där inget markeringsläge finns.
@@ -80,14 +69,13 @@ export default function OrdersTable({
     state: BulkCloseState,
     formData: FormData
   ) => Promise<BulkCloseState>;
-  updateAction: (
-    state: OrderFormState,
-    formData: FormData
-  ) => Promise<OrderFormState>;
-  toggleAction: (
-    state: OrderToggleState,
-    formData: FormData
-  ) => Promise<OrderToggleState>;
+  /** Sökningen som gäller nu. Ändrar rubriken och det tomma läget. */
+  query?: string;
+  /**
+   * Sökrutan. Göms i markeringsläget: en sökning laddar om sidan, och den som
+   * markerat tio ordrar ska inte tappa dem på vägen.
+   */
+  search?: ReactNode;
 }) {
   const [selecting, setSelecting] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -145,7 +133,9 @@ export default function OrdersTable({
       <CardHeader
         title={
           title ??
-          `${orders.length} ${orders.length === 1 ? "order" : "ordrar"}`
+          (query
+            ? `${orders.length} ${orders.length === 1 ? "träff" : "träffar"}`
+            : `${orders.length} ${orders.length === 1 ? "order" : "ordrar"}`)
         }
         /* SÄGER ATT DET BLIR ETT ZIP-ARKIV, och vad som ligger i det.
            
@@ -159,7 +149,9 @@ export default function OrdersTable({
         description={
           selecting && count > 1
             ? "Du får en PDF per order, samlade i ett zip-arkiv."
-            : undefined
+            : query
+              ? `Sökning på ”${query}”`
+              : undefined
         }
         action={
           selecting ? (
@@ -217,15 +209,20 @@ export default function OrdersTable({
                 Avbryt
               </Button>
             </div>
-          ) : selectable ? (
-            <Button
-              type="button"
-              tone="secondary"
-              onClick={() => setSelecting(true)}
-            >
-              Markera ordrar
-            </Button>
-          ) : undefined
+          ) : (
+            <div className="flex flex-wrap items-center justify-end gap-2">
+              {search}
+              {selectable && orders.length > 0 && (
+                <Button
+                  type="button"
+                  tone="secondary"
+                  onClick={() => setSelecting(true)}
+                >
+                  Markera ordrar
+                </Button>
+              )}
+            </div>
+          )
         }
       />
 
@@ -256,147 +253,91 @@ export default function OrdersTable({
         kvar, och en order med pågående stämplingar står kvar öppen.
       </AskDialog>
 
-      <Table>
-        <thead>
-          <tr>
-            {selecting && (
-              <Th>
-                <span className="sr-only">Markera</span>
-              </Th>
-            )}
-            <Th>Order</Th>
-            {!hideCustomer && <Th>Kund</Th>}
-            <Th>Status</Th>
-            <Th numeric>Stämplingar</Th>
-            <Th numeric>Upparbetad tid (timmar)</Th>
-            <Th>Mot beräknad tid</Th>
-          </tr>
-        </thead>
-        <tbody>
-          {orders.map((order) => {
-            const isOpen = order.status === "OPEN";
+      {orders.length === 0 ? (
+        <p className="px-5 py-6 text-[13px] text-neutral-500">
+          Ingen order matchar ”{query}”. Sökningen tittar på ordernummer, kund
+          och kundnummer.
+        </p>
+      ) : (
+        <Table>
+          <thead>
+            <tr>
+              {selecting && (
+                <Th>
+                  <span className="sr-only">Markera</span>
+                </Th>
+              )}
+              <Th>Order</Th>
+              {!hideCustomer && <Th>Kund</Th>}
+              <Th>Status</Th>
+              <Th numeric>Stämplingar</Th>
+              <Th numeric>Upparbetad tid (timmar)</Th>
+              <Th>Mot beräknad tid</Th>
+            </tr>
+          </thead>
+          <tbody>
+            {orders.map((order) => {
+              const isOpen = order.status === "OPEN";
 
-            return (
-              <Tr key={order.id} dimmed={!isOpen}>
-                {selecting && (
+              return (
+                <Tr key={order.id} dimmed={!isOpen}>
+                  {selecting && (
+                    <Td>
+                      <input
+                        type="checkbox"
+                        checked={selected.has(order.id)}
+                        onChange={() => toggle(order.id)}
+                        aria-label={`Markera order ${order.orderNumber}`}
+                        className="h-4 w-4 rounded border-neutral-300 text-blue-600 focus:ring-blue-600"
+                      />
+                    </Td>
+                  )}
+
                   <Td>
-                    <input
-                      type="checkbox"
-                      checked={selected.has(order.id)}
-                      onChange={() => toggle(order.id)}
-                      aria-label={`Markera order ${order.orderNumber}`}
-                      className="h-4 w-4 rounded border-neutral-300 text-blue-600 focus:ring-blue-600"
+                    {selecting ? (
+                      <span className="font-medium">{order.orderNumber}</span>
+                    ) : (
+                      <Link
+                        href={`/admin/ordrar/${order.id}`}
+                        className="font-medium text-tick-deep hover:underline"
+                      >
+                        {order.orderNumber}
+                      </Link>
+                    )}
+                    {/* Brickan sitter på ordern och inte på kunden: ett
+                        snabbjobb saknar ofta kund, och kolumnen finns inte alls
+                        på kundens sida. */}
+                    {order.isQuickJob && (
+                      <span className="ml-2">
+                        <Badge tone="warning">Snabbjobb</Badge>
+                      </span>
+                    )}
+                  </Td>
+
+                  {!hideCustomer && <Td muted>{order.customerName ?? "—"}</Td>}
+                  <Td>
+                    {isOpen ? (
+                      <Badge tone="active">Öppen</Badge>
+                    ) : (
+                      <Badge tone="muted">Stängd</Badge>
+                    )}
+                  </Td>
+                  <Td numeric muted>
+                    {order.entries}
+                  </Td>
+                  <Td numeric>{formatDuration(order.minutes)}</Td>
+                  <Td>
+                    <BudgetBar
+                      budgetMinutes={order.budgetMinutes}
+                      usedMinutes={order.minutes}
                     />
                   </Td>
-                )}
-
-                <Td>
-                  {selecting ? (
-                    <span className="font-medium">{order.orderNumber}</span>
-                  ) : (
-                    <OrderActions
-                      order={order}
-                      customers={customers}
-                      moments={moments}
-                      updateAction={updateAction}
-                      toggleAction={toggleAction}
-                      planning={planning}
-                    />
-                  )}
-                  {/* Brickan sitter på ordern och inte på kunden: ett
-                      snabbjobb saknar ofta kund, och kolumnen finns inte alls
-                      på kundens sida. */}
-                  {order.isQuickJob && (
-                    <span className="ml-2">
-                      <Badge tone="warning">Snabbjobb</Badge>
-                    </span>
-                  )}
-                </Td>
-
-                {!hideCustomer && <Td muted>{order.customerName ?? "—"}</Td>}
-                <Td>
-                  {isOpen ? (
-                    <Badge tone="active">Öppen</Badge>
-                  ) : (
-                    <Badge tone="muted">Stängd</Badge>
-                  )}
-                </Td>
-                <Td numeric muted>
-                  {order.entries}
-                </Td>
-                <Td numeric>{formatDuration(order.minutes)}</Td>
-                <Td>
-                  <BudgetBar
-                    budgetMinutes={order.budgetMinutes}
-                    usedMinutes={order.minutes}
-                  />
-                </Td>
-              </Tr>
-            );
-          })}
-        </tbody>
-      </Table>
+                </Tr>
+              );
+            })}
+          </tbody>
+        </Table>
+      )}
     </Card>
-  );
-}
-
-/**
- * En nedladdningslänk i markeringsläget.
- *
- * Länk och inte knapp: filen hämtas av webbläsaren, och en länk går att öppna
- * i en ny flik som vilken annan. Utan markerade ordrar leder den ingenstans,
- * och ser ut därefter.
- */
-/** Ett dokument och vägarna till det: namnet över, knapparna under. */
-function ExportGroup({
-  label,
-  children,
-}: {
-  label: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <div>
-      <p className="mb-1 text-xs font-medium text-neutral-500">{label}</p>
-      <div className="flex items-center gap-2">{children}</div>
-    </div>
-  );
-}
-
-function ExportLink({
-  href,
-  disabled,
-  primary = false,
-  onPick,
-  children,
-}: {
-  href: string;
-  disabled: boolean;
-  primary?: boolean;
-  /** Körs när filen begärts. Används för frågan om att avsluta ordrarna. */
-  onPick?: () => void;
-  children: React.ReactNode;
-}) {
-  const tone = disabled
-    ? "cursor-not-allowed text-neutral-400 ring-1 ring-inset ring-neutral-200"
-    : primary
-      ? "bg-blue-600 text-white hover:bg-blue-700"
-      : "bg-white text-neutral-700 ring-1 ring-inset ring-neutral-200 hover:bg-neutral-50";
-
-  return (
-    <a
-      href={disabled ? undefined : href}
-      onClick={(event) => {
-        if (disabled) {
-          event.preventDefault();
-          return;
-        }
-        onPick?.();
-      }}
-      aria-disabled={disabled}
-      className={`inline-flex items-center rounded-md px-3 py-1.5 text-[13px] font-medium transition-colors ${tone}`}
-    >
-      {children}
-    </a>
   );
 }
