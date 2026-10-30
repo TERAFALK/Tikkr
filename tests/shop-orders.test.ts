@@ -1,3 +1,5 @@
+import { readdirSync, readFileSync } from "node:fs";
+import path from "node:path";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { unsafeGlobalPrisma } from "@/lib/db";
 import { forCompany } from "@/lib/tenant";
@@ -151,11 +153,35 @@ afterEach(async () => {
   await unsafeGlobalPrisma.company.deleteMany({ where: { id: { in: ids } } });
 });
 
+describe("beställningsnumret", () => {
+  /**
+   * STARTVÄRDET LIGGER I MIGRATIONEN, och testas där.
+   *
+   * `scripts/test.sh` och en lokal testdatabas byggs med `db push`, som inte
+   * kör migrationerna. Schemat kan inte uttrycka ett startvärde, så talet 1001
+   * fanns bara i databaser byggda med `migrate deploy`, och samma test föll
+   * beroende på var det kördes. Produktionen byggs alltid med migrationerna.
+   */
+  it("börjar på 1001 i produktionen", () => {
+    const root = path.resolve(__dirname, "..", "prisma", "migrations");
+    const migrations = readdirSync(root, { withFileTypes: true })
+      .filter((entry) => entry.isDirectory())
+      .map((entry) =>
+        readFileSync(path.join(root, entry.name, "migration.sql"), "utf8")
+      )
+      .join("\n");
+
+    expect(migrations).toContain(
+      'ALTER SEQUENCE "shop_orders_number_seq" RESTART WITH 1001;'
+    );
+  });
+});
+
 describe("att beställa", () => {
   it("räknar raderna, momsen och totalen ur prislistan", async () => {
     const { orderId, number, created } = await order();
     expect(created).toBe(true);
-    expect(number).toBeGreaterThanOrEqual(1001);
+    expect(number).toBeGreaterThan(0);
 
     const saved = await getShopOrder(orderId);
     expect(saved).toMatchObject({
