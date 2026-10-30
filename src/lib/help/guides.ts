@@ -433,7 +433,7 @@ export const GUIDES = [
       },
       {
         title: "Rätta sluttiden eller godkänn den beräknade",
-        body: "Skriv rätt sluttid och tryck Godkänn.",
+        body: "Skriv rätt sluttid och tryck Spara rättad tid.",
       },
     ],
     notes: [

@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   listHref,
+  presetHref,
   listPaging,
   pageGroups,
   pageRows,
@@ -101,6 +102,40 @@ describe("listPaging", () => {
       pageCount: 3,
       take: 25,
     });
+  });
+});
+
+describe("presetHref", () => {
+  it("byter datumen och behåller övriga filter", () => {
+    const href = presetHref(
+      "/admin/rapporter",
+      {
+        from: "2026-01-01",
+        to: "2026-01-31",
+        customerId: "k1",
+        visning: "person",
+      },
+      { from: "2026-10-19", to: "2026-10-25" },
+      50
+    );
+
+    const search = new URLSearchParams(href.split("?")[1]);
+    expect(search.get("from")).toBe("2026-10-19");
+    expect(search.get("to")).toBe("2026-10-25");
+    expect(search.get("customerId")).toBe("k1");
+    expect(search.get("visning")).toBe("person");
+  });
+
+  it("börjar om på första sidan och behåller radantalet", () => {
+    const href = presetHref(
+      "/admin/rapporter",
+      { sida: "4", antal: "100" },
+      { from: "2026-10-19", to: "2026-10-25" },
+      100
+    );
+
+    expect(href).not.toContain("sida=");
+    expect(href).toContain("antal=100");
   });
 });
 

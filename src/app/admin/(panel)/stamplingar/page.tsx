@@ -33,7 +33,7 @@ import { weekStep } from "@/lib/week-nav";
 import WeekStepper from "@/components/admin/WeekStepper";
 import ConfirmButton from "@/components/admin/ConfirmButton";
 import Pager, { PerPageField } from "@/components/platform/Pager";
-import { listHref, listPaging } from "@/lib/paging";
+import { listPaging, presetHref } from "@/lib/paging";
 import { deleteEntry } from "./actions";
 
 export const dynamic = "force-dynamic";
@@ -264,15 +264,12 @@ export default async function EntriesPage({
                   return (
                     <Link
                       key={preset.label}
-                      href={listHref("/admin/stamplingar", {
-                        keep: {
-                          from: preset.from,
-                          to: preset.to,
-                          employeeId: params.employeeId,
-                        },
-                        page: 1,
-                        perPage: page.take,
-                      })}
+                      href={presetHref(
+                        "/admin/stamplingar",
+                        { employeeId: params.employeeId },
+                        preset,
+                        page.take
+                      )}
                       className={`rounded-md px-2.5 py-1 text-xs font-medium transition-colors ${
                         active
                           ? "bg-neutral-900 text-white"

@@ -116,6 +116,27 @@ export function listHref(
   }`;
 }
 
+/**
+ * Adressen till ett snabbval för en period.
+ *
+ * BARA DATUMEN BYTS. Övriga filter följer med, precis som i veckostegaren. I
+ * Rapporter ledde snabbvalen till en adress med bara datum, och den som valt en
+ * kund och tryckte Denna månad fick utan besked hela företaget, och därmed ett
+ * underlag för fel urval. Sidnumret börjar om.
+ */
+export function presetHref(
+  path: string,
+  filters: Record<string, string | undefined>,
+  range: { from: string; to: string },
+  perPage: number
+): string {
+  return listHref(path, {
+    keep: { ...filters, from: range.from, to: range.to },
+    page: 1,
+    perPage,
+  });
+}
+
 /** Sidans rader ur en lista som redan är hämtad och sorterad. */
 export function pageRows<T>(rows: T[], { skip, take }: Paging): T[] {
   return rows.slice(skip, skip + take);

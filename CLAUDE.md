@@ -234,7 +234,8 @@ per anställd, order och moment.
 öppnar fem sidor för, och har inga diagram för diagrammens skull:
 
 - **Nyckeltalen.** "Registrerat idag" och veckans tid räknas av `buildWeek`,
-  samma räkning som Veckovy.
+  samma räkning som Veckovy. Rutorna är länkar till sidorna talen kommer från,
+  och Att granska är samma tal som siffran i menyn (ändrat 2026-10-30).
 - **Pågående arbete.**
 - **Att göra:** granskning, ordrar från stämplingsskärmar att komplettera,
   automatisk utstämpling som inte körs, och stämplingsskärmar som inte hört

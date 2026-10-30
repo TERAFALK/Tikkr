@@ -164,7 +164,7 @@ export async function getOnboardingState(
       title: "Lägg upp arbetstidsschemat",
       description:
         "Ger den planerade tiden som flexsaldot mäts mot. Utan schema blir all arbetad tid flex.",
-      href: "/admin/installningar/schema",
+      href: "/admin/installningar/arbetstider",
       action: "Till arbetstider",
       done: scheduleDays > 0,
     });
