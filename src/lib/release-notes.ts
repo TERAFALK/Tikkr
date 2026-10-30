@@ -23,7 +23,8 @@ import type { ModuleKey } from "./modules";
  * två gånger och en version som inte är vX.Y.Z.
  *
  * En punkt som bara rör ett tillval bär modulens nyckel och visas bara för
- * kunder som har det. En release där ingen punkt återstår visas inte alls.
+ * kunder som har det. En release där ingen punkt återstår visas inte alls. En
+ * post kan också vara bara en mening i `summary`, och visas då för alla.
  */
 
 /** En punkt. Med `module` syns den bara för kunder med det tillvalet. */
@@ -46,16 +47,9 @@ export interface Release {
 export const RELEASES: Release[] = [
   {
     version: "v1.0.0",
-    date: "2026-10-10",
+    date: "2026-10-30",
     title: "Tikkr i drift",
-    added: [
-      "Nyheter i menyn, med vad som ändrats i varje version.",
-    ],
-    improved: [
-      {
-        text: "Frånvaro tas bort i den utfällda dagen på tidrapporten.",
-        module: "PAYROLL",
-      },
-    ],
+    summary:
+      "Det här är den första versionen av Tikkr. Här står vad som ändras i varje ny version.",
   },
 ];
