@@ -42,9 +42,9 @@ jobs:
     timeout-minutes: 10
 
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-node@v5
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
 
@@ -69,7 +69,7 @@ jobs:
     steps:
       # Hela historiken. En nyckel som tagits bort i en senare commit finns
       # kvar i den gamla, och repot är publikt.
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
@@ -95,7 +95,7 @@ jobs:
       image: semgrep/semgrep:1.178.0
 
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
       # BLOCKERAR BARA VID ERROR. Reglerna för TypeScript och OWASP säger mycket
       # som är varningar eller information, och en kontroll som alltid är röd
@@ -125,7 +125,7 @@ jobs:
       TRIVY_IMAGE: aquasec/trivy:0.75.0
 
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
       - name: Bygg Docker-imagen
         run: >-
