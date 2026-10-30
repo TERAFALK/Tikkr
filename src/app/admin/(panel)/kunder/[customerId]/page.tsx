@@ -27,6 +27,8 @@ import {
 import { updateCustomer } from "../actions";
 import { closeOrders } from "../../ordrar/actions";
 
+export const metadata = { title: "Kund · Tikkr" };
+
 /**
  * KUNDSIDAN.
  *

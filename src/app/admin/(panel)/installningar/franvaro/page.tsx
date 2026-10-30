@@ -26,6 +26,8 @@ import {
   type ReasonState,
 } from "./actions";
 
+export const metadata = { title: "Frånvaroorsaker · Tikkr" };
+
 /**
  * FRÅNVAROORSAKER.
  *

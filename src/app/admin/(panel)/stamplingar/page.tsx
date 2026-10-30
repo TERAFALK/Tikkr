@@ -36,6 +36,8 @@ import Pager, { PerPageField } from "@/components/platform/Pager";
 import { listHref, listPaging } from "@/lib/paging";
 import { deleteEntry } from "./actions";
 
+export const metadata = { title: "Stämplingar · Tikkr" };
+
 export const dynamic = "force-dynamic";
 
 /**

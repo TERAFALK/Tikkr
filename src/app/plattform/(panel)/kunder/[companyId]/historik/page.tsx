@@ -6,6 +6,8 @@ import ActivityTable from "@/components/platform/ActivityTable";
 import Pager from "@/components/platform/Pager";
 import { Card, CardHeader, EmptyState, PageHeader } from "@/components/ui";
 
+export const metadata = { title: "Historik · Tikkr" };
+
 export const dynamic = "force-dynamic";
 
 /**

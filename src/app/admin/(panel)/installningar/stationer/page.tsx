@@ -26,6 +26,8 @@ import {
   toggleStationAction,
 } from "@/app/admin/(panel)/planering/actions";
 
+export const metadata = { title: "Stationer · Tikkr" };
+
 /**
  * STATIONSREGISTRET.
  *

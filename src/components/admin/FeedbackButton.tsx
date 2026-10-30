@@ -60,6 +60,7 @@ export default function FeedbackButton({
             title="Lämna feedback"
           >
             <IconMessage />
+            <span className="text-xs lg:hidden">Feedback</span>
           </button>
         )}
         title="Lämna feedback"

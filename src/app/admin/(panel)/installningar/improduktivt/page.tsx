@@ -22,6 +22,8 @@ import {
   toggleIndirectMoment,
 } from "./actions";
 
+export const metadata = { title: "Improduktiv tid · Tikkr" };
+
 export const dynamic = "force-dynamic";
 
 export default async function IndirectMomentsPage() {

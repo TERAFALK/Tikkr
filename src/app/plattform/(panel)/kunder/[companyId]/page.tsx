@@ -57,6 +57,8 @@ import {
 } from "@/lib/feedback";
 import { fullName } from "@/lib/person-name";
 
+export const metadata = { title: "Kund · Tikkr" };
+
 export const dynamic = "force-dynamic";
 
 /**

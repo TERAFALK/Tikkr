@@ -1,6 +1,8 @@
 import { redirect } from "next/navigation";
 import { requireAdminEvenIfLocked } from "@/lib/admin-session";
 
+export const metadata = { title: "Prenumeration · Tikkr" };
+
 export const dynamic = "force-dynamic";
 
 /**

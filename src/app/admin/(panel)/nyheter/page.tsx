@@ -8,6 +8,8 @@ import {
 } from "@/lib/news";
 import { Badge, EmptyState, PageHeader } from "@/components/ui";
 
+export const metadata = { title: "Nyheter · Tikkr" };
+
 /**
  * NYHETERNA: vad som ändrats i varje version, nyast överst (issue #6).
  *

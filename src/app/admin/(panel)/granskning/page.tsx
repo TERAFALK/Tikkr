@@ -19,6 +19,8 @@ import { describeEntry } from "@/lib/entry-label";
 import { wallTimeIn } from "@/lib/time-zone";
 import { reviewEntry } from "./actions";
 
+export const metadata = { title: "Granskning · Tikkr" };
+
 export const dynamic = "force-dynamic";
 
 /**

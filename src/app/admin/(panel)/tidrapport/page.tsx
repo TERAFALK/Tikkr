@@ -38,6 +38,8 @@ import {
   type BalanceState,
 } from "./actions";
 
+export const metadata = { title: "Tidrapport · Tikkr" };
+
 /**
  * TIDRAPPORT PER ANSTÄLLD — LÖNEUNDERLAGET.
  *
@@ -138,20 +140,18 @@ export default async function TimesheetPage({
         </Field>
 
         <Field label="Från">
-          <input
+          <Input
             type="date"
             name="from"
             defaultValue={toDateInput(from, timeZone)}
-            className="block w-full rounded-md border-0 bg-white px-2.5 py-1.5 text-[13px] text-neutral-900 ring-1 ring-inset ring-neutral-400 focus:outline-hidden focus:ring-2 focus:ring-inset focus:ring-blue-600"
           />
         </Field>
 
         <Field label="Till">
-          <input
+          <Input
             type="date"
             name="to"
             defaultValue={toDateInput(to, timeZone)}
-            className="block w-full rounded-md border-0 bg-white px-2.5 py-1.5 text-[13px] text-neutral-900 ring-1 ring-inset ring-neutral-400 focus:outline-hidden focus:ring-2 focus:ring-inset focus:ring-blue-600"
           />
         </Field>
 

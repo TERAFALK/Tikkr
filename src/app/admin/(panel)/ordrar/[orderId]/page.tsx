@@ -21,6 +21,8 @@ import {
 } from "@/components/ui";
 import { toggleOrder, updateOrder } from "../actions";
 
+export const metadata = { title: "Order · Tikkr" };
+
 /**
  * ORDERNS EGEN SIDA.
  *

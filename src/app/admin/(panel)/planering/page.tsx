@@ -40,6 +40,8 @@ import PlanBoard, {
   type BoardUnplaced,
 } from "@/components/admin/PlanBoard";
 
+export const metadata = { title: "Planering · Tikkr" };
+
 /**
  * TAVLAN — PLANERINGENS VECKOVY.
  *

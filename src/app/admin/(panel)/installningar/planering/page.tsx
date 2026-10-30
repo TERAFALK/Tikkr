@@ -6,6 +6,8 @@ import SaveForm from "@/components/admin/SaveForm";
 import { Card, CardHeader } from "@/components/ui";
 import { savePlanningMode } from "./actions";
 
+export const metadata = { title: "Planeringsläge · Tikkr" };
+
 /**
  * PLANERINGSLÄGET (tillagt 2026-10-14, issue #21).
  *

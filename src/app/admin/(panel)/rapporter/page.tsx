@@ -42,6 +42,8 @@ import { customerOptions } from "@/lib/customers";
 import type { ReportResult, ReportRow } from "@/lib/report";
 import type { ReportView } from "@/lib/report-pdf";
 
+export const metadata = { title: "Rapporter · Tikkr" };
+
 export const dynamic = "force-dynamic";
 
 interface SearchParams {
