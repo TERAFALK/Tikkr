@@ -64,6 +64,16 @@ function itemsFor(items: NewsItem[] | undefined, modules: ModuleKey[]): string[]
   });
 }
 
+/** En post som bara är en mening, utan punkter som kan falla bort. */
+function isTextOnly(release: Release): boolean {
+  return (
+    Boolean(release.summary) &&
+    !release.added?.length &&
+    !release.improved?.length &&
+    !release.fixed?.length
+  );
+}
+
 /**
  * Releaserna kunden ska se, nyast först.
  *
@@ -79,6 +89,14 @@ export function visibleReleases(
     : releases;
 
   return installed
+    .filter(
+      (release) =>
+        isTextOnly(release) ||
+        itemsFor(release.added, modules).length +
+          itemsFor(release.improved, modules).length +
+          itemsFor(release.fixed, modules).length >
+          0
+    )
     .map((release) => ({
       version: release.version,
       date: release.date,
@@ -87,11 +105,7 @@ export function visibleReleases(
       added: itemsFor(release.added, modules),
       improved: itemsFor(release.improved, modules),
       fixed: itemsFor(release.fixed, modules),
-    }))
-    .filter(
-      (release) =>
-        release.added.length + release.improved.length + release.fixed.length > 0
-    );
+    }));
 }
 
 /**

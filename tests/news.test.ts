@@ -72,14 +72,14 @@ describe("filen med nyheterna", () => {
     }
   });
 
-  it("varje version har en rubrik och minst en punkt", () => {
+  it("varje version har en rubrik och något att läsa", () => {
     for (const release of RELEASES) {
       expect(release.title.trim(), release.version).not.toBe("");
       const count =
         (release.added?.length ?? 0) +
         (release.improved?.length ?? 0) +
         (release.fixed?.length ?? 0);
-      expect(count, release.version).toBeGreaterThan(0);
+      expect(count + (release.summary ? 1 : 0), release.version).toBeGreaterThan(0);
     }
   });
 
@@ -145,6 +145,33 @@ describe("vad kunden ser", () => {
     const shown = visibleReleases("v1.2.0", [], SAMPLE);
     expect(shown.map((r) => r.version)).toEqual(["v1.2.0"]);
     expect(shown[0].added).toEqual(["För alla."]);
+  });
+
+  it("visar en post som bara är en mening", () => {
+    const shown = visibleReleases("v1.0.0", [], [
+      {
+        version: "v1.0.0",
+        date: "2026-10-30",
+        title: "Tikkr i drift",
+        summary: "Den första versionen.",
+      },
+    ]);
+
+    expect(shown.map((r) => r.summary)).toEqual(["Den första versionen."]);
+  });
+
+  it("en mening räddar inte en post vars punkter alla föll bort", () => {
+    const shown = visibleReleases("v1.1.0", [], [
+      {
+        version: "v1.1.0",
+        date: "2026-10-30",
+        title: "Bara för planeringen",
+        summary: "Ny tavla.",
+        added: [{ text: "Tavlan.", module: "PLANNING" }],
+      },
+    ]);
+
+    expect(shown).toEqual([]);
   });
 });
 
