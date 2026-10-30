@@ -601,7 +601,7 @@ const MENU: { title: string; items: string[] }[] = [
 
 function Sidebar({ active }: { active: string }) {
   return (
-    <div className="hidden w-32 shrink-0 border-r border-neutral-200 p-2 sm:block">
+    <div className="hidden w-36 shrink-0 border-r border-neutral-200 p-2 @2xl:block">
       <div className="mb-3 flex items-center gap-1.5 px-1">
         <span className="flex h-5 w-5 items-center justify-center rounded bg-neutral-900 text-[9px] font-semibold text-white">
           D
@@ -720,11 +720,15 @@ const IN_PROGRESS = [
 export function AdminMockup({ className = "" }: { className?: string }) {
   return (
     <Frame label="Adminpanelen" meta="översikt" className={className}>
-      <div className="flex">
+      {/* BILDEN RÄKNAR PÅ SIN EGEN BREDD, inte fönstrets (`@container`). På
+          säljsidan står den i en smal spalt på en bred skärm. Med `sm:` fick
+          den skrivbordets kolumner i en halv spalt: namnen försvann, rubrikerna
+          hamnade i varandra och tiden kapades vid kanten. */}
+      <div className="flex @container">
         <Sidebar active="Översikt" />
 
         <div className="min-w-0 flex-1 bg-neutral-50 p-3">
-          <div className="mb-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
+          <div className="mb-3 grid grid-cols-2 gap-2 @lg:grid-cols-4">
             <Stat
               label="Arbetar just nu"
               value="4"
@@ -736,8 +740,8 @@ export function AdminMockup({ className = "" }: { className?: string }) {
             <Stat label="Öppna ordrar" value="4" />
           </div>
 
-          <div className="grid gap-2 sm:grid-cols-3">
-          <div className="overflow-hidden rounded-lg border border-neutral-200 bg-white sm:col-span-2">
+          <div className="grid gap-2 @4xl:grid-cols-3">
+          <div className="min-w-0 overflow-hidden rounded-lg border border-neutral-200 bg-white @4xl:col-span-2">
             <div className="border-b border-neutral-200 px-3 py-1.5">
               <span className="text-[10px] font-semibold text-neutral-900">
                 Pågående arbete
@@ -748,10 +752,10 @@ export function AdminMockup({ className = "" }: { className?: string }) {
               <span className="min-w-0 flex-1 text-[9px] font-medium uppercase tracking-wider text-neutral-400">
                 Anställd
               </span>
-              <span className="w-16 shrink-0 text-[9px] font-medium uppercase tracking-wider text-neutral-400">
+              <span className="w-20 shrink-0 text-[9px] font-medium uppercase tracking-wider text-neutral-400">
                 Order
               </span>
-              <span className="hidden w-16 shrink-0 text-[9px] font-medium uppercase tracking-wider text-neutral-400 sm:block">
+              <span className="hidden w-24 shrink-0 text-[9px] font-medium uppercase tracking-wider text-neutral-400 @md:block">
                 Arbetsmoment
               </span>
               <span className="w-10 shrink-0 text-right text-[9px] font-medium uppercase tracking-wider text-neutral-400">
@@ -768,14 +772,14 @@ export function AdminMockup({ className = "" }: { className?: string }) {
                 <span className="min-w-0 flex-1 truncate text-[10px] font-medium text-neutral-900">
                   {row.name}
                 </span>
-                <span className="w-16 shrink-0 truncate text-[10px] text-neutral-500">
+                <span className="w-20 shrink-0 text-[10px] text-neutral-500">
                   {row.order ?? (
                     <span className="rounded bg-neutral-100 px-1 py-0.5 text-[9px] font-medium text-neutral-600">
                       Improduktiv
                     </span>
                   )}
                 </span>
-                <span className="hidden w-16 shrink-0 truncate text-[10px] text-neutral-500 sm:block">
+                <span className="hidden w-24 shrink-0 text-[10px] text-neutral-500 @md:block">
                   {row.moment}
                 </span>
                 <span className="w-10 shrink-0 text-right">
@@ -801,11 +805,11 @@ export function AdminMockup({ className = "" }: { className?: string }) {
               >
                 <span className="mt-1 size-1 shrink-0 rounded-full bg-amber-500" />
                 <span className="min-w-0 flex-1">
-                  <span className="block truncate text-[10px] font-medium text-neutral-900">
+                  <span className="block text-[10px] font-medium text-neutral-900">
                     {item.title}
                   </span>
                   {item.detail && (
-                    <span className="block truncate text-[8px] text-neutral-500">
+                    <span className="block text-[8px] text-neutral-500">
                       {item.detail}
                     </span>
                   )}
@@ -838,7 +842,7 @@ export function AdminMockup({ className = "" }: { className?: string }) {
                       {order.customer}
                     </span>
                   </span>
-                  <span className="hidden w-24 shrink-0 sm:block">
+                  <span className="hidden w-24 shrink-0 @md:block">
                     <span className="block h-1 overflow-hidden rounded-full bg-neutral-100">
                       <span
                         className={`animate-grow-x block h-full rounded-full ${
@@ -938,7 +942,7 @@ const REPORT = [
 export function ReportMockup({ className = "" }: { className?: string }) {
   return (
     <Frame label="Adminpanelen" meta="rapporter" className={className}>
-      <div className="flex">
+      <div className="flex @container">
         <Sidebar active="Rapporter" />
 
         <div className="min-w-0 flex-1 bg-neutral-50 p-3">
@@ -947,15 +951,15 @@ export function ReportMockup({ className = "" }: { className?: string }) {
               Rapporter
             </span>
             <span className="ml-auto rounded-md border border-neutral-200 bg-white px-2 py-1 text-[9px] font-semibold text-neutral-700">
-              PDF
+              Ladda ner PDF
             </span>
-            <span className="rounded-md bg-neutral-900 px-2 py-1 text-[9px] font-semibold text-white">
-              Excel
+            <span className="rounded-md border border-neutral-200 bg-white px-2 py-1 text-[9px] font-semibold text-neutral-700">
+              Ladda ner Excel
             </span>
           </div>
 
           <div className="mb-2.5 flex flex-wrap gap-1.5">
-            {["Förra veckan", "Alla ordrar", "Fakturerbar tid"].map((chip) => (
+            {["Förra veckan", "Alla ordrar", "Ordertid"].map((chip) => (
               <span
                 key={chip}
                 className="rounded-md border border-neutral-200 bg-white px-2 py-1 text-[9px] font-medium text-neutral-600"
@@ -965,7 +969,7 @@ export function ReportMockup({ className = "" }: { className?: string }) {
             ))}
           </div>
 
-          <div className="mb-2.5 grid grid-cols-2 gap-2 sm:grid-cols-4">
+          <div className="mb-2.5 grid grid-cols-2 gap-2 @lg:grid-cols-4">
             <Stat label="Total tid" value="84,5" hint="timmar" />
             <Stat label="Stämplingar" value="37" />
             <Stat label="Pågår just nu" value="4" tone="emerald" />
