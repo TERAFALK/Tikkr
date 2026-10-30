@@ -4,7 +4,9 @@ import { companyTimeZone } from "@/lib/company";
 import { toDateInput } from "@/lib/time-zone";
 import { unsafeGlobalPrisma } from "@/lib/db";
 import { findAgreement } from "@/lib/collective-agreements";
+import { listPaging } from "@/lib/paging";
 import EmployeeDialog from "@/components/admin/EmployeeDialog";
+import ListPager from "@/components/admin/ListPager";
 import SearchForm from "@/components/admin/SearchForm";
 import EmployeeAvatar from "@/components/ui/EmployeeAvatar";
 import type { ScheduleDayValue } from "@/components/admin/ScheduleDays";
@@ -51,11 +53,11 @@ export const dynamic = "force-dynamic";
 export default async function EmployeesPage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string }>;
+  searchParams: Promise<{ q?: string; sida?: string; antal?: string }>;
 }) {
   const session = await requireAdmin();
   const { db, companyId } = session;
-  const { q } = await searchParams;
+  const { q, sida, antal } = await searchParams;
   const query = q?.trim() ?? "";
 
   const payroll = await hasModule(companyId, "PAYROLL");
@@ -80,16 +82,26 @@ export default async function EmployeesPage({
       }
     : undefined;
 
+  const employeeFilter = query
+    ? {
+        OR: [
+          { name: { contains: query, mode: "insensitive" as const } },
+          { employeeNumber: { contains: query, mode: "insensitive" as const } },
+        ],
+      }
+    : undefined;
+
+  // Antalet först, så att ett sidnummer bortom slutet kan visa sista sidan.
+  const total = await db.employee.count({ where: employeeFilter });
+  const page = listPaging(total, { sida, antal });
+
   const employees = await db.employee.findMany({
-    where: query
-      ? {
-          OR: [
-            { name: { contains: query, mode: "insensitive" } },
-            { employeeNumber: { contains: query, mode: "insensitive" } },
-          ],
-        }
-      : undefined,
-    orderBy: [{ active: "desc" }, { name: "asc" }],
+    where: employeeFilter,
+    // Id:t sist: Postgres lovar ingenting om rader som är lika, och två
+    // personer med samma namn kunde då byta plats mellan två sidor i listan.
+    orderBy: [{ active: "desc" }, { name: "asc" }, { id: "asc" }],
+    skip: page.skip,
+    take: page.take,
     select: {
       id: true,
       name: true,
@@ -137,7 +149,7 @@ export default async function EmployeesPage({
         action={newEmployee}
       />
 
-      {employees.length === 0 && !query ? (
+      {total === 0 && !query ? (
         <EmptyState
           title="Inga anställda upplagda"
           action={newEmployee}
@@ -147,12 +159,8 @@ export default async function EmployeesPage({
           <CardHeader
             title={
               query
-                ? `${employees.length} ${
-                    employees.length === 1 ? "träff" : "träffar"
-                  }`
-                : `${employees.length} ${
-                    employees.length === 1 ? "person" : "personer"
-                  }`
+                ? `${total} ${total === 1 ? "träff" : "träffar"}`
+                : `${total} ${total === 1 ? "person" : "personer"}`
             }
             description={query ? `Sökning på ”${query}”` : undefined}
             action={
@@ -160,11 +168,12 @@ export default async function EmployeesPage({
                 query={query}
                 placeholder="Namn, anställningsnr…"
                 clearHref="/admin/anstallda"
+                perPage={page.take}
               />
             }
           />
 
-          {employees.length === 0 ? (
+          {total === 0 ? (
             <p className="px-5 py-6 text-[13px] text-neutral-500">
               Ingen anställd matchar ”{query}”. Sökningen tittar på namn och
               anställningsnummer.
@@ -265,6 +274,14 @@ export default async function EmployeesPage({
               </tbody>
             </Table>
           )}
+
+          <ListPager
+            paging={page}
+            total={total}
+            unit="personer"
+            path="/admin/anstallda"
+            query={query}
+          />
         </Card>
       )}
     </>

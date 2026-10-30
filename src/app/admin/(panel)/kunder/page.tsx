@@ -1,7 +1,9 @@
 import Link from "next/link";
 import { requireAdmin } from "@/lib/admin-session";
 import { searchCustomers } from "@/lib/customers";
+import { listPaging, pageRows } from "@/lib/paging";
 import CustomerDialog from "@/components/admin/CustomerDialog";
+import ListPager from "@/components/admin/ListPager";
 import SearchForm from "@/components/admin/SearchForm";
 import {
   Badge,
@@ -35,6 +37,8 @@ export const dynamic = "force-dynamic";
 
 interface SearchParams {
   q?: string;
+  sida?: string;
+  antal?: string;
 }
 
 export default async function CustomersPage({
@@ -48,7 +52,9 @@ export default async function CustomersPage({
 
   const customers = await searchCustomers(db, query);
 
+  // Rubrikens antal gäller hela urvalet. Bara raderna delas upp.
   const active = customers.filter((customer) => customer.active).length;
+  const page = listPaging(customers.length, params);
 
   return (
     <>
@@ -87,6 +93,7 @@ export default async function CustomersPage({
                 query={query}
                 placeholder="Namn, kundnr, org.nr…"
                 clearHref="/admin/kunder"
+                perPage={page.take}
               />
             }
           />
@@ -111,7 +118,7 @@ export default async function CustomersPage({
                 </tr>
               </thead>
               <tbody>
-                {customers.map((customer) => (
+                {pageRows(customers, page).map((customer) => (
                   <Tr key={customer.id} dimmed={!customer.active}>
                     <Td>
                       {/* Namnet är vägen till kundsidan. Det är den enda
@@ -172,6 +179,14 @@ export default async function CustomersPage({
               </tbody>
             </Table>
           )}
+
+          <ListPager
+            paging={page}
+            total={customers.length}
+            unit="kunder"
+            path="/admin/kunder"
+            query={query}
+          />
         </Card>
       )}
     </>

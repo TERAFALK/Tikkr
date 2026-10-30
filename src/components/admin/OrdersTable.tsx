@@ -47,6 +47,8 @@ export default function OrdersTable({
   closeAction,
   query = "",
   search,
+  total,
+  pager,
 }: {
   orders: OrderRow[];
   /** Rubrik över tabellen. Utelämnad ger antalet ordrar. */
@@ -76,7 +78,13 @@ export default function OrdersTable({
    * markerat tio ordrar ska inte tappa dem på vägen.
    */
   search?: ReactNode;
+  /** Antalet i hela urvalet, när `orders` bara är en sida av det. */
+  total?: number;
+  /** Bläddringen. Göms i markeringsläget, av samma skäl som sökrutan. */
+  pager?: ReactNode;
 }) {
+  const orderCount = total ?? orders.length;
+
   const [selecting, setSelecting] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
 
@@ -134,8 +142,8 @@ export default function OrdersTable({
         title={
           title ??
           (query
-            ? `${orders.length} ${orders.length === 1 ? "träff" : "träffar"}`
-            : `${orders.length} ${orders.length === 1 ? "order" : "ordrar"}`)
+            ? `${orderCount} ${orderCount === 1 ? "träff" : "träffar"}`
+            : `${orderCount} ${orderCount === 1 ? "order" : "ordrar"}`)
         }
         /* SÄGER ATT DET BLIR ETT ZIP-ARKIV, och vad som ligger i det.
            
@@ -338,6 +346,8 @@ export default function OrdersTable({
           </tbody>
         </Table>
       )}
+
+      {!selecting && pager}
     </Card>
   );
 }

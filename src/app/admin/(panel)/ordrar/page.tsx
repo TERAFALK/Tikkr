@@ -1,11 +1,13 @@
 import { requireAdmin } from "@/lib/admin-session";
 import { hasModule } from "@/lib/company-modules";
 import NewOrderDialog from "@/components/admin/NewOrderDialog";
+import ListPager from "@/components/admin/ListPager";
 import OrdersTable from "@/components/admin/OrdersTable";
 import SearchForm from "@/components/admin/SearchForm";
 import { Alert, EmptyState, PageHeader } from "@/components/ui";
-import { orderRows } from "@/lib/orders";
+import { orderCount, orderRows } from "@/lib/orders";
 import { customerOptions } from "@/lib/customers";
+import { listPaging } from "@/lib/paging";
 import { closeOrders, createOrder } from "./actions";
 
 export const dynamic = "force-dynamic";
@@ -17,16 +19,25 @@ export default async function OrdersPage({
    * `ny=1` öppnar Ny order direkt, genvägen på översikten. `q` är sökningen,
    * som i kundregistret: den ligger i adressen och går att spara.
    */
-  searchParams: Promise<{ ny?: string; q?: string }>;
+  searchParams: Promise<{
+    ny?: string;
+    q?: string;
+    sida?: string;
+    antal?: string;
+  }>;
 }) {
   const { db, companyId } = await requireAdmin();
-  const { ny, q } = await searchParams;
+  const { ny, q, sida, antal } = await searchParams;
   const query = q?.trim() ?? "";
 
   // Leveransdatumet i orderrutan hör till tillvalet Planering. Att det döljs
   // här är kosmetik — serveråtgärden frågar om modulen själv, se actions.ts.
   // Resten av sidan är basen och visas för varje kund.
   const planning = await hasModule(companyId, "PLANNING");
+
+  // Antalet först, så att ett sidnummer bortom slutet kan visa sista sidan.
+  const total = await orderCount(db, { query });
+  const page = listPaging(total, { sida, antal });
 
   // Hämtas parallellt: kundväljaren behöver hela registret, och en fråga till
   // kostar mindre än att sidan väntar på två i följd.
@@ -36,7 +47,7 @@ export default async function OrdersPage({
       orderBy: [{ active: "desc" }, { name: "asc" }],
       select: { id: true, name: true, active: true },
     }),
-    orderRows(db, { query }),
+    orderRows(db, { query, skip: page.skip, take: page.take }),
     // Räknas för sig och inte ur listan: en sökning ska inte ändra hur många
     // ordrar som väntar på att kompletteras.
     db.order.count({ where: { isQuickJob: true } }),
@@ -77,7 +88,7 @@ export default async function OrdersPage({
         </div>
       )}
 
-      {rows.length === 0 && !query ? (
+      {total === 0 && !query ? (
         <EmptyState
           title="Inga ordrar upplagda"
           action={newOrder(false)}
@@ -85,6 +96,7 @@ export default async function OrdersPage({
       ) : (
         <OrdersTable
           orders={rows}
+          total={total}
           closeAction={closeOrders}
           query={query}
           search={
@@ -92,6 +104,16 @@ export default async function OrdersPage({
               query={query}
               placeholder="Ordernr, kund, kundnr…"
               clearHref="/admin/ordrar"
+              perPage={page.take}
+            />
+          }
+          pager={
+            <ListPager
+              paging={page}
+              total={total}
+              unit="ordrar"
+              path="/admin/ordrar"
+              query={query}
             />
           }
         />

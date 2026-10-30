@@ -2,13 +2,15 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireAdmin } from "@/lib/admin-session";
 import { customerMoney, customerStats, getCustomer } from "@/lib/customers";
-import { orderRows } from "@/lib/orders";
+import { orderCount, orderRows } from "@/lib/orders";
+import { listPaging } from "@/lib/paging";
 import { companyTimeZone } from "@/lib/company";
 import { unsafeGlobalPrisma } from "@/lib/db";
 import { formatDuration } from "@/lib/format";
 import { formatCurrency, formatMarkup } from "@/lib/money";
 import MarginChart from "@/components/admin/MarginChart";
 import CustomerDialog from "@/components/admin/CustomerDialog";
+import ListPager from "@/components/admin/ListPager";
 import OrdersTable from "@/components/admin/OrdersTable";
 import {
   ButtonLink,
@@ -41,12 +43,15 @@ export const dynamic = "force-dynamic";
 
 export default async function CustomerPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ customerId: string }>;
+  searchParams: Promise<{ sida?: string; antal?: string }>;
 }) {
   const { db, companyId } = await requireAdmin();
 
   const { customerId } = await params;
+  const { sida, antal } = await searchParams;
 
   const customer = await getCustomer(db, customerId);
   if (!customer) notFound();
@@ -60,7 +65,7 @@ export default async function CustomerPage({
   });
   const timeZone = await companyTimeZone(companyId);
 
-  const [stats, money, orders] = await Promise.all([
+  const [stats, money, orderTotal] = await Promise.all([
     customerStats(db, customerId),
     customerMoney(
       db,
@@ -68,8 +73,15 @@ export default async function CustomerPage({
       company?.markupPercent ?? 100,
       timeZone
     ),
-    orderRows(db, { customerId }),
+    orderCount(db, { customerId }),
   ]);
+
+  const page = listPaging(orderTotal, { sida, antal });
+  const orders = await orderRows(db, {
+    customerId,
+    skip: page.skip,
+    take: page.take,
+  });
 
   const address = [
     customer.addressLine,
@@ -268,8 +280,8 @@ export default async function CustomerPage({
           </Card>
         </div>
 
-        <div className="mt-6">
-          {orders.length === 0 ? (
+        <div id="ordrar" className="mt-6 scroll-mt-6">
+          {orderTotal === 0 ? (
             <EmptyState
               title="Inga ordrar på kunden"
               action={<ButtonLink href="/admin/ordrar">Till ordrar</ButtonLink>}
@@ -281,9 +293,19 @@ export default async function CustomerPage({
                måste lämna för att göra något åt det man ser. */
             <OrdersTable
               orders={orders}
+              total={orderTotal}
               closeAction={closeOrders}
               title="Ordrar"
               hideCustomer
+              pager={
+                <ListPager
+                  paging={page}
+                  total={orderTotal}
+                  unit="ordrar"
+                  path={`/admin/kunder/${customerId}`}
+                  anchor="ordrar"
+                />
+              }
             />
           )}
         </div>
