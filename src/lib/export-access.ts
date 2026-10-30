@@ -6,10 +6,10 @@ import { evaluateAccess } from "./subscription";
 /**
  * PRENUMERATIONSLÅSET FÖR UTTAGEN.
  *
- * Panelens lås ligger i layouten, och rutterna under /api renderas aldrig
- * genom den. Rapporten och orderunderlagen gick därför att hämta med en
- * direktlänk medan panelen stod låst — samma hål som § 3.1 i CLAUDE.md
- * beskriver för modulerna, och som tidrapportsrutten redan stängt för sig.
+ * requireAdmin() skickar en låst arbetsyta till låssidan, vilket är rätt för
+ * en sida och fel för ett uttag: den som tryckt på en knapp ska få ett svar och
+ * inte en HTML-sida som nedladdning. Uttagen kallar därför
+ * requireAdminEvenIfLocked() och prövar låset här.
  *
  * Svarar med 402 när uttaget ska nekas, annars null.
  *

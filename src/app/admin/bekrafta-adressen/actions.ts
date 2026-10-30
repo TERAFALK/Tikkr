@@ -1,7 +1,7 @@
 "use server";
 
 import { redirect } from "next/navigation";
-import { assertWritable, requireAdmin } from "@/lib/admin-session";
+import { assertWritable, requireAdminEvenIfLocked } from "@/lib/admin-session";
 import {
   changeUnverifiedEmail,
   EmailVerificationError,
@@ -25,7 +25,7 @@ const PATH = "/admin/bekrafta-adressen";
 
 /** Skickar bekräftelselänken på nytt. */
 export async function resendVerification() {
-  const session = await requireAdmin();
+  const session = await requireAdminEvenIfLocked();
   await assertWritable(session);
 
   const outcome = await sendEmailVerification(session.userId);
@@ -47,7 +47,7 @@ export async function changeEmail(
   _previous: SaveState,
   formData: FormData
 ): Promise<SaveState> {
-  const session = await requireAdmin();
+  const session = await requireAdminEvenIfLocked();
   await assertWritable(session);
 
   try {

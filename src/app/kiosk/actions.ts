@@ -10,11 +10,7 @@ import {
   redeemPairingCode,
   unpairDevice,
 } from "@/lib/kiosk-auth";
-import {
-  clearFailedLogins,
-  isLockedOut,
-  noteFailedLogin,
-} from "@/lib/login-throttle";
+import { isLockedOut, noteFailedLogin } from "@/lib/login-throttle";
 
 /**
  * KOPPLING AV EN SKÄRM.
@@ -34,6 +30,12 @@ import {
  * uttryckligt: den som gissar från många adresser samtidigt får fem gissningar
  * per adress och kvart, mot de koder som råkar vara giltiga just då. En kod
  * gäller i fem minuter.
+ *
+ * EN LYCKAD KOPPLING NOLLSTÄLLER INTE RÄKNAREN (ändrat 2026-10-30,
+ * säkerhetsgranskningen). Vem som helst kan skapa en arbetsyta och få egna
+ * giltiga koder, och varje sådan kod gav fem nya gissningar mot andra kunders.
+ * Räkningen löper ut av sig själv en kvart efter senaste felet. Priset är att
+ * den som sätter upp flera skärmar och skriver fel fem gånger får vänta.
  */
 const THROTTLE_SCOPE = "kiosk-pairing";
 
@@ -70,8 +72,6 @@ export async function pairDevice(
     // kod" berättar för den som gissar att den var nära.
     return { error: "Koden gäller inte. Kontrollera siffrorna eller be om en ny." };
   }
-
-  await clearFailedLogins(THROTTLE_SCOPE, key);
 
   const jar = await cookies();
   jar.set(KIOSK_COOKIE, result.token, kioskCookieOptions());

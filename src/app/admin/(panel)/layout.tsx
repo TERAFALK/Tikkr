@@ -1,6 +1,10 @@
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
-import { isOwner, READ_ONLY_COOKIE, requireAdmin } from "@/lib/admin-session";
+import {
+  isOwner,
+  READ_ONLY_COOKIE,
+  requireAdminEvenIfLocked,
+} from "@/lib/admin-session";
 import { unsafeGlobalPrisma } from "@/lib/db";
 import { getOnboardingState } from "@/lib/onboarding";
 import { evaluateAccess } from "@/lib/subscription";
@@ -24,8 +28,9 @@ import { resendVerification } from "./konto/actions";
 /**
  * Skalet runt de inloggade adminsidorna.
  *
- * Två kontroller ligger här, alltså på ETT ställe, och ärvs av varje undersida:
- * att man är inloggad, och att prenumerationen är i ordning.
+ * Layouten ritar menyn, remsorna och låsskärmen. SKYDDET LIGGER INTE HÄR, utan
+ * i requireAdmin(), som varje sida och åtgärd kallar själv. Next kör sidan även
+ * när layouten inte ritar `children`, se admin-session.ts.
  *
  * Mappnamnet inom parentes bildar ingen del av adressen. Det finns bara för att
  * kunna lägga inloggningssidan UTANFÖR det här skalet: låg den innanför skulle
@@ -38,7 +43,7 @@ export default async function PanelLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const session = await requireAdmin();
+  const session = await requireAdminEvenIfLocked();
 
   // Flaggan som assertWritable() satte när en ändring nekades. Läses här och
   // slängs av komponenten i webbläsaren — en cookie går inte att ta bort
@@ -217,14 +222,14 @@ export default async function PanelLayout({
             </div>
           )}
 
-          {/* Vid låst prenumeration visas ingen adminsida alls. Inget kan
-              då råka nås via en direktlänk, vilket hade varit fallet om vi
-              istället gömt menyn och litat på att ingen gissar adresser. */}
-          {/* SUPPORTLÄGET SLÄPPS IGENOM PRENUMERATIONSLÅSET. En obetald faktura
-              är oftast precis varför kunden ringer, och en supportvy som visar
-              samma låsta sida som kunden ser hjälper ingen. Läget är läsning, så
-              ingenting kan ändras medan låset är på. */}
-          {access.level === "locked" && !session.support ? (
+          {/* Låsskärmen. Att sidan inte når hit är requireAdmin()s verk, se
+              toppen av filen. Grenen visar bara vad en låst arbetsyta ska se.
+
+              SUPPORTLÄGET ÄR ALDRIG LÅST. En obetald faktura är oftast precis
+              varför kunden ringer, och en supportvy som visar samma låsta sida
+              som kunden ser hjälper ingen. Läget är läsning, så ingenting kan
+              ändras. */}
+          {session.locked ? (
             <SubscriptionLocked
               state={access}
               companyName={session.companyName}

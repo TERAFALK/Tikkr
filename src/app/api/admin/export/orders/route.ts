@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { requireAdmin } from "@/lib/admin-session";
+import { requireAdminEvenIfLocked } from "@/lib/admin-session";
 import { lockedExportResponse } from "@/lib/export-access";
 import { unsafeGlobalPrisma } from "@/lib/db";
 import { getOrderExports, slugify } from "@/lib/order-export";
@@ -52,7 +52,7 @@ function disposition(inline: boolean, fileName: string): string {
 }
 
 export async function GET(request: NextRequest) {
-  const session = await requireAdmin();
+  const session = await requireAdminEvenIfLocked();
   const { db, companyId, companyName } = session;
   const params = request.nextUrl.searchParams;
 

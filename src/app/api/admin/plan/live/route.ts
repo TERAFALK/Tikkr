@@ -50,6 +50,11 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "Inte inloggad." }, { status: 401 });
   }
 
+  // currentAdmin() går förbi låset i requireAdmin(). Se admin-session.ts.
+  if (session.locked) {
+    return NextResponse.json({ error: "Panelen är låst." }, { status: 402 });
+  }
+
   const { db, companyId } = session;
 
   if (!(await hasModule(companyId, "PLANNING"))) {

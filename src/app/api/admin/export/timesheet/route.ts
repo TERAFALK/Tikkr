@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { requireAdmin } from "@/lib/admin-session";
+import { requireAdminEvenIfLocked } from "@/lib/admin-session";
 import { hasModule } from "@/lib/company-modules";
 import { evaluateAccess } from "@/lib/subscription";
 import { unsafeGlobalPrisma } from "@/lib/db";
@@ -38,7 +38,7 @@ import {
 export const runtime = "nodejs";
 
 export async function GET(request: NextRequest) {
-  const { db, companyId, companyName } = await requireAdmin();
+  const { db, companyId, companyName } = await requireAdminEvenIfLocked();
   const params = request.nextUrl.searchParams;
 
   // MODULGRINDEN LIGGER HÄR OCH INTE I EN LAYOUT. Rutterna under /api nås

@@ -6,6 +6,7 @@ import { forCompany, type CompanyDb } from "./tenant";
 import { readSupportSession } from "./support-session";
 import { isPlatformAdmin } from "./platform-access";
 import { SESSION_MAX_AGE_SECONDS } from "./session-lifetime";
+import { evaluateAccess } from "./subscription";
 
 /**
  * Grinden till adminpanelen.
@@ -61,6 +62,13 @@ export interface AdminSession {
    * admin/(panel)/layout.tsx.
    */
   mfaPending?: true;
+  /**
+   * SATT NÄR PRENUMERATIONEN ÄR LÅST. Se requireAdmin.
+   *
+   * Aldrig i supportläget: en obetald faktura är oftast varför kunden ringer,
+   * och läget kan ändå bara läsa.
+   */
+  locked?: true;
 }
 
 export interface SupportContext {
@@ -174,7 +182,14 @@ export async function currentAdmin(): Promise<AdminSession | null> {
       passwordChangedAt: true,
       sessionsRevokedAt: true,
       totpEnabledAt: true,
-      company: { select: { name: true } },
+      company: {
+        select: {
+          name: true,
+          subscriptionStatus: true,
+          trialEndsAt: true,
+          pastDueSince: true,
+        },
+      },
     },
   });
 
@@ -230,6 +245,13 @@ export async function currentAdmin(): Promise<AdminSession | null> {
     if (cutoff && authenticated < cutoff.getTime() - 1000) return null;
   }
 
+  const locked =
+    evaluateAccess({
+      status: account.company.subscriptionStatus,
+      trialEndsAt: account.company.trialEndsAt,
+      pastDueSince: account.company.pastDueSince,
+    }).level === "locked";
+
   // Allt kommer från databasen, inget från token. Ett företagsnamn som ändrats
   // under Inställningar slår därmed igenom direkt i stället för vid nästa
   // inloggning.
@@ -240,6 +262,7 @@ export async function currentAdmin(): Promise<AdminSession | null> {
     companyName: account.company.name,
     role: account.role,
     ...(mfaPending ? { mfaPending: true as const } : {}),
+    ...(locked ? { locked: true as const } : {}),
     db: forCompany(account.companyId),
   };
 }
@@ -321,7 +344,40 @@ export function isOwner(session: AdminSession): boolean {
   return session.role === "OWNER";
 }
 
+/** Sidan låsskärmen visas på. Layouten ritar den, sidan själv är tom. */
+export const LOCKED_PATH = "/admin/last";
+
+/**
+ * Den inloggade administratören, eller en omdirigering.
+ *
+ * PRENUMERATIONSLÅSET SITTER HÄR (ändrat 2026-10-30, säkerhetsgranskningen).
+ * Det låg i panelens layout, som ritade låsskärmen i stället för sidan. Det
+ * stoppade ingenting: Next kör sidan ändå och skickar den i svaret, även när
+ * layouten aldrig ritar `children`, och serveråtgärderna går inte genom en
+ * layout alls.
+ *
+ * En ny sida eller åtgärd är därmed låst utan att någon behöver komma ihåg
+ * det. Det som ska fungera ändå kallar requireAdminEvenIfLocked, och den
+ * listan bevisas av tests/subscription-lock.test.ts.
+ */
 export async function requireAdmin(): Promise<AdminSession> {
+  const admin = await requireAdminEvenIfLocked();
+
+  if (admin.locked) {
+    redirect(LOCKED_PATH);
+  }
+
+  return admin;
+}
+
+/**
+ * Som requireAdmin, men släpper in en låst arbetsyta.
+ *
+ * För det som är vägen ut ur låset och det som inte rör kunddata: betalningen,
+ * det egna kontot och panelens skal. Se listan i
+ * tests/subscription-lock.test.ts, och skriv in varför där.
+ */
+export async function requireAdminEvenIfLocked(): Promise<AdminSession> {
   const admin = await currentAdmin();
 
   if (!admin) {
