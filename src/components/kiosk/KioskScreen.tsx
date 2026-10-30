@@ -1898,7 +1898,7 @@ function EmployeeGrid({
 
       {/* Fler kolumner på en stor skärm. Fyra lät 23,6 tum rymma sexton namn,
           och resten låg under kanten. */}
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 lg:grid-cols-4 2xl:grid-cols-5 min-[1800px]:grid-cols-6">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 lg:grid-cols-4 2xl:grid-cols-5 min-[112.5rem]:grid-cols-6">
       {shown.map((employee) => {
         const jobs = active[employee.id] ?? [];
         const job = jobs[0];
