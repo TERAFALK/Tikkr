@@ -719,7 +719,10 @@ export function AdminSection() {
 
               `flex-col` med `gap` och inte `space-y`: under lg står bilderna
               under varandra, och vid lg byter behållaren till `block`, där en
-              negativ marginal fungerar som den ska. */}
+              negativ marginal fungerar som den ska.
+
+              Överlappet är inte större än bildens egen inre marginal. Var det
+              större täckte rapporten raderna i Ordrar i arbete. */}
           <div className="flex flex-col gap-6 lg:block">
             <div className="lg:w-[88%]">
               <Plate tilt="none">
@@ -727,7 +730,7 @@ export function AdminSection() {
               </Plate>
             </div>
 
-            <div className="lg:-mt-24 lg:ml-auto lg:w-[88%]">
+            <div className="lg:-mt-3 lg:ml-auto lg:w-[88%]">
               <Plate tilt="none">
                 <ReportMockup />
               </Plate>
