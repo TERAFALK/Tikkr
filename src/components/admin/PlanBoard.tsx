@@ -20,6 +20,7 @@ import {
   type StationHours,
 } from "@/lib/plan-calendar";
 import { laneTotals, type BlockProgress } from "@/lib/plan-live";
+import { filterUnplaced, unplacedMoments } from "@/lib/plan-filter";
 import { formatDuration } from "@/lib/format";
 import {
   addDaysInZone,
@@ -377,6 +378,9 @@ export default function PlanBoard({
   >({});
   const [now, setNow] = useState<number | null>(null);
   const [editing, setEditing] = useState<BoardBlock | null>(null);
+
+  /** Jobbet som placeras med tangentbordet, se PlaceDialog. */
+  const [placing, setPlacing] = useState<BoardUnplaced | null>(null);
   const [boardWidth, setBoardWidth] = useState(0);
 
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -1352,6 +1356,7 @@ export default function PlanBoard({
           armed={armed}
           readOnly={readOnly}
           onPointerDownRow={beginNew}
+          onKeyboardPlace={setPlacing}
         />
       )}
 
@@ -1635,6 +1640,7 @@ export default function PlanBoard({
                         readOnly={readOnly}
                         onBlockPointerDown={beginMove}
                         onResizeStart={beginResize}
+                        onBlockOpen={setEditing}
                       />
                       );
                     })}
@@ -1646,7 +1652,7 @@ export default function PlanBoard({
         </div>
       )}
 
-      <Legend kind={kind} armed={armed} placing={placesFromUnplaced} />
+      <Legend />
 
       {/* SPÖKET SOM FÖLJER PEKAREN under en dragning från Oplacerat.
           Utan det ser en dragning ut som att ingenting händer, vilket var en
@@ -1666,6 +1672,21 @@ export default function PlanBoard({
         >
           {drag.row.orderNumber} · {drag.row.momentName}
         </div>
+      )}
+
+      {placing && (
+        <PlaceDialog
+          row={placing}
+          lanes={lanes}
+          days={days}
+          timeZone={timeZone}
+          onClose={() => setPlacing(null)}
+          onPlace={(slot) => {
+            const row = placing;
+            setPlacing(null);
+            void place(row, slot);
+          }}
+        />
       )}
 
       {editing && (
@@ -1722,6 +1743,7 @@ function UnplacedStrip({
   armed,
   readOnly,
   onPointerDownRow,
+  onKeyboardPlace,
 }: {
   kind: LaneKind;
   rows: BoardUnplaced[];
@@ -1731,25 +1753,75 @@ function UnplacedStrip({
     event: ReactPointerEvent<HTMLElement>,
     row: BoardUnplaced
   ) => void;
+  onKeyboardPlace: (row: BoardUnplaced) => void;
 }) {
-  const plannable = rows.filter((row) => row.plannable);
-  const blocked = rows.filter((row) => !row.plannable);
+  const [query, setQuery] = useState("");
+  const [momentId, setMomentId] = useState("");
+
+  const moments = useMemo(() => unplacedMoments(rows), [rows]);
+  const shown = useMemo(
+    () => filterUnplaced(rows, query, momentId),
+    [rows, query, momentId]
+  );
+
+  const plannable = shown.filter((row) => row.plannable);
+  const blocked = shown.filter((row) => !row.plannable);
+  const target = kind === "staff" ? "en anställd" : "en station";
 
   return (
     <div className="rounded-lg border border-neutral-200 bg-white">
-      <div className="flex items-center gap-2 border-b border-neutral-200 px-4 py-2.5">
+      <div className="flex flex-wrap items-center gap-2 border-b border-neutral-200 px-4 py-2.5">
         <h2 className="text-sm font-semibold text-neutral-900">Oplacerat</h2>
 
         {rows.length > 0 && (
           <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[11px] font-semibold tabular-nums text-amber-800">
-            {rows.length}
+            {shown.length === rows.length
+              ? rows.length
+              : `${shown.length} av ${rows.length}`}
           </span>
         )}
 
-        {armed && (
-          <span className="ml-auto truncate text-[12px] font-medium text-link">
-            Tryck på {kind === "staff" ? "en anställd" : "en station"} för att
-            placera {armed.orderNumber}
+        {rows.length > 0 && (
+          <span className="flex flex-wrap items-center gap-2">
+            <span className="w-44">
+              <Input
+                type="search"
+                aria-label="Sök i Oplacerat"
+                placeholder="Order, kund…"
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+              />
+            </span>
+            {moments.length > 1 && (
+              <span className="w-44">
+                <Select
+                  aria-label="Arbetsmoment"
+                  value={momentId}
+                  onChange={(event) => setMomentId(event.target.value)}
+                >
+                  <option value="">Alla arbetsmoment</option>
+                  {moments.map((moment) => (
+                    <option key={moment.id} value={moment.id}>
+                      {moment.name}
+                    </option>
+                  ))}
+                </Select>
+              </span>
+            )}
+          </span>
+        )}
+
+        {/* Instruktionen står vid det man ska trycka på. Den låg under tavlan,
+            längst till höger i liten grå text. */}
+        {!readOnly && rows.length > 0 && (
+          <span
+            className={`ml-auto text-[13px] ${
+              armed ? "font-medium text-link" : "text-neutral-500"
+            }`}
+          >
+            {armed
+              ? `Tryck på ${target} för att placera ${armed.orderNumber}, eller Esc för att avbryta`
+              : `Tryck på ett jobb, sedan på ${target}`}
           </span>
         )}
       </div>
@@ -1758,9 +1830,11 @@ function UnplacedStrip({
           placerats, och hela tavlan under hoppade uppåt i samma ögonblick som
           man släppte. Att ytan man just arbetat i flyttar sig är det som får en
           vy att kännas opålitlig, även när allt den gjorde var rätt. */}
-      {rows.length === 0 ? (
+      {shown.length === 0 ? (
         <p className="flex h-[88px] items-center px-4 text-[13px] text-neutral-500">
-          Allt beräknat arbete ligger på tavlan.
+          {rows.length === 0
+            ? "Allt beräknat arbete ligger på tavlan."
+            : "Inget jobb matchar sökningen"}
         </p>
       ) : (
         <div className="flex h-[88px] items-stretch gap-2 overflow-x-auto px-3 py-2">
@@ -1775,6 +1849,7 @@ function UnplacedStrip({
               }
               readOnly={readOnly}
               onPointerDown={(event) => onPointerDownRow(event, row)}
+              onKeyboardPlace={() => onKeyboardPlace(row)}
             />
           ))}
 
@@ -1801,6 +1876,7 @@ function Chip({
   readOnly,
   blocked = false,
   onPointerDown,
+  onKeyboardPlace,
 }: {
   kind: LaneKind;
   row: BoardUnplaced;
@@ -1808,11 +1884,26 @@ function Chip({
   readOnly: boolean;
   blocked?: boolean;
   onPointerDown?: (event: ReactPointerEvent<HTMLElement>) => void;
+  onKeyboardPlace?: () => void;
 }) {
   const over = row.remainingMinutes < 0;
+  const canPlace = !readOnly && !blocked && Boolean(onKeyboardPlace);
 
   return (
     <div
+      role={canPlace ? "button" : undefined}
+      tabIndex={canPlace ? 0 : undefined}
+      aria-label={
+        canPlace
+          ? `Placera ${row.orderNumber}, ${row.momentName}`
+          : undefined
+      }
+      onKeyDown={(event) => {
+        if (canPlace && (event.key === "Enter" || event.key === " ")) {
+          event.preventDefault();
+          onKeyboardPlace?.();
+        }
+      }}
       onPointerDown={onPointerDown}
       title={
         blocked
@@ -1891,6 +1982,7 @@ function DayCell({
   readOnly,
   onBlockPointerDown,
   onResizeStart,
+  onBlockOpen,
 }: {
   laneName: string;
   /**
@@ -1915,6 +2007,7 @@ function DayCell({
   /** Ett valt jobb kan läggas här. Ger pekaren en annan form. */
   pickable: boolean;
   readOnly: boolean;
+  onBlockOpen: (block: BoardBlock) => void;
   onBlockPointerDown: (
     event: ReactPointerEvent<HTMLElement>,
     block: BoardBlock
@@ -1995,6 +2088,7 @@ function DayCell({
               readOnly={readOnly}
               onPointerDown={(event) => onBlockPointerDown(event, block)}
               onResizeStart={(event) => onResizeStart(event, block)}
+              onOpen={() => onBlockOpen(block)}
             />
           ))}
       </div>
@@ -2031,6 +2125,7 @@ function BlockBox({
   readOnly,
   onPointerDown,
   onResizeStart,
+  onOpen,
 }: {
   block: BoardBlock;
   hours: StationHours | null;
@@ -2043,6 +2138,8 @@ function BlockBox({
   readOnly: boolean;
   onPointerDown: (event: ReactPointerEvent<HTMLElement>) => void;
   onResizeStart: (event: ReactPointerEvent<HTMLElement>) => void;
+  /** Tangentbordets väg in i rutan. Musen går genom onPointerDown. */
+  onOpen: () => void;
 }) {
   const startsAt = new Date(block.startsAt);
   const end = blockEnd(hours, startsAt, block.minutes, timeZone);
@@ -2070,6 +2167,15 @@ function BlockBox({
 
   return (
     <div
+      role="button"
+      tabIndex={0}
+      aria-label={label.replaceAll("\n", ", ")}
+      onKeyDown={(event) => {
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          onOpen();
+        }
+      }}
       onPointerDown={onPointerDown}
       title={label}
       style={{ left, width }}
@@ -2150,18 +2256,7 @@ function Axis({
   );
 }
 
-function Legend({
-  kind,
-  armed,
-  placing,
-}: {
-  kind: LaneKind;
-  armed: BoardUnplaced | null;
-  /** Om jobb placeras från Oplacerat. Annars finns ingen instruktion att ge. */
-  placing: boolean;
-}) {
-  const target = kind === "staff" ? "en anställd" : "en station";
-
+function Legend() {
   return (
     <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-neutral-500">
       <span className="flex items-center gap-1.5">
@@ -2176,15 +2271,125 @@ function Legend({
         <span className={`h-2.5 w-4 rounded-sm ${CLOSED_CLASS}`} />
         Stängt eller rast
       </span>
-
-      {placing && (
-        <span className="ml-auto text-neutral-500">
-          {armed
-            ? `Tryck på ${target}, eller Esc för att avbryta`
-            : `Tryck på ett jobb i Oplacerat, sedan på ${target}`}
-        </span>
-      )}
     </div>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+/* Att placera med tangentbordet                                               */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * TAVLANS VÄG UTAN PEKARE.
+ *
+ * Att dra och att trycka två gånger kräver en mus eller ett finger (WCAG 2.1.1).
+ * Enter på ett jobb i Oplacerat öppnar den här rutan, med samma tre svar som
+ * trycket på tavlan ger: var, vilken dag och när. Resten går samma väg som ett
+ * tryck, se `place`.
+ */
+function PlaceDialog({
+  row,
+  lanes,
+  days,
+  timeZone,
+  onPlace,
+  onClose,
+}: {
+  row: BoardUnplaced;
+  lanes: BoardLane[];
+  days: Date[];
+  timeZone: string;
+  onPlace: (slot: Slot) => void;
+  onClose: () => void;
+}) {
+  const dialog = useRef<HTMLDialogElement>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    dialog.current?.showModal();
+  }, []);
+
+  const eligible = lanes.filter(
+    (lane) => lane.momentId === null || lane.momentId === row.momentId
+  );
+
+  return (
+    <dialog
+      ref={dialog}
+      onClose={onClose}
+      className={`w-[min(28rem,calc(100vw-2rem))] ${dialogSurface}`}
+    >
+      <div className="border-b border-neutral-200 px-5 py-4">
+        <h2 className="text-sm font-semibold text-neutral-900">
+          Placera {row.orderNumber} · {row.momentName}
+        </h2>
+      </div>
+
+      <form
+        onSubmit={(event) => {
+          event.preventDefault();
+
+          const data = new FormData(event.currentTarget);
+          const dayIndex = Number(data.get("day"));
+          const startsAt = parseClockOnDay(
+            String(data.get("start") ?? ""),
+            days[dayIndex],
+            timeZone
+          );
+
+          if (!startsAt) {
+            setError("Skriv ett klockslag, t.ex. 07:00.");
+            return;
+          }
+
+          onPlace({ laneId: String(data.get("lane")), dayIndex, startsAt });
+        }}
+      >
+        <div className="space-y-4 px-5 py-5">
+          {error && <Alert>{error}</Alert>}
+
+          <Field label="Plats">
+            <Select name="lane" autoFocus>
+              {eligible.map((lane) => (
+                <option key={lane.id} value={lane.id}>
+                  {lane.name}
+                </option>
+              ))}
+            </Select>
+          </Field>
+
+          <Field label="Dag">
+            <Select name="day">
+              {days.map((day, index) => (
+                <option key={day.toISOString()} value={index}>
+                  {new Intl.DateTimeFormat("sv-SE", {
+                    weekday: "long",
+                    day: "numeric",
+                    month: "numeric",
+                    timeZone,
+                  }).format(day)}
+                </option>
+              ))}
+            </Select>
+          </Field>
+
+          <Field label="Starttid">
+            <Input type="time" name="start" defaultValue="07:00" required />
+          </Field>
+        </div>
+
+        <div className="flex justify-end gap-2 border-t border-neutral-200 bg-neutral-50 px-5 py-3">
+          <Button
+            type="button"
+            tone="secondary"
+            onClick={() => dialog.current?.close()}
+          >
+            Avbryt
+          </Button>
+          <Button type="submit">Placera</Button>
+        </div>
+      </form>
+    </dialog>
   );
 }
 

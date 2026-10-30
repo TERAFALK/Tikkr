@@ -22,6 +22,7 @@ import OrderFields from "./OrderFields";
 import PrintButton from "./PrintButton";
 import AskDialog from "@/components/ui/AskDialog";
 import { useFieldError, useKeptSubmit } from "@/components/ui/useFieldError";
+import UnsavedGuard from "@/components/ui/UnsavedGuard";
 import type { OrderBudgetRow } from "@/lib/orders";
 import type { SearchSelectOption } from "./SearchSelect";
 
@@ -246,6 +247,7 @@ export default function OrderActions({
         </div>
 
         <form ref={editForm} onSubmit={saveEdit} className="flex min-h-0 flex-1 flex-col">
+          <UnsavedGuard form={editForm} dialog={edit} saved={editState.savedAt} />
           <div className={`${dialogBody} space-y-4 px-5 py-5`}>
             {editState.error && <Alert id={editErrorId}>{editState.error}</Alert>}
             <input type="hidden" name="id" value={order.id} />

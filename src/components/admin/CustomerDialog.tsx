@@ -2,6 +2,7 @@
 
 import { useActionState, useEffect, useRef } from "react";
 import { useFieldError, useKeptSubmit } from "@/components/ui/useFieldError";
+import UnsavedGuard from "@/components/ui/UnsavedGuard";
 import type { CustomerState } from "@/app/admin/(panel)/kunder/actions";
 import {
   Alert,
@@ -91,6 +92,7 @@ export default function CustomerDialog({
         </div>
 
         <form ref={form} onSubmit={onSubmit} className="flex min-h-0 flex-1 flex-col">
+          <UnsavedGuard form={form} dialog={dialog} saved={state.savedAt} />
           <div className={`${dialogBody} space-y-5 px-5 py-5`}>
             {state.error && <Alert id={errorId}>{state.error}</Alert>}
 

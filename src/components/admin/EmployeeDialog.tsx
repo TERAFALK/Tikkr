@@ -14,6 +14,7 @@ import {
 } from "@/components/ui";
 import EmployeeAvatar from "@/components/ui/EmployeeAvatar";
 import { useFieldError, useKeptSubmit } from "@/components/ui/useFieldError";
+import UnsavedGuard from "@/components/ui/UnsavedGuard";
 import ScheduleDays, {
   type ScheduleDayValue,
 } from "@/components/admin/ScheduleDays";
@@ -159,6 +160,7 @@ export default function EmployeeDialog({
         </div>
 
         <form ref={form} onSubmit={onSubmit} className="flex min-h-0 flex-1 flex-col">
+          <UnsavedGuard form={form} dialog={dialog} saved={state.savedAt} />
           <div className={`${dialogBody} space-y-4 px-5 py-5`}>
             {state.error && <Alert id={errorId}>{state.error}</Alert>}
 

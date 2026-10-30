@@ -190,6 +190,12 @@ UX-granskningen): den valda personen och hela personalen. Sidan visar en person,
 men tre av utskrifterna gäller alla, och frånvaro är känsliga uppgifter (§ 4
 punkt 9). Justera flexsaldo står vid saldot.
 
+**Osparade ändringar frågar innan de försvinner** (beslutat 2026-10-30,
+UX-granskningen). `UnsavedGuard` står i `SaveForm`, i Arbetstider och i rutorna
+för anställd, kund och order: en länk i panelen och webbläsarens omladdning
+frågar på en sida, och Escape frågar i en ruta. Avbryt frågar inte, eftersom det
+är ett val man gjort med flit. Korta rutor har ingen fråga.
+
 **Menyn bär det man arbetar i, Inställningar det man sätter upp** (beslutat
 2026-10-14, issue #17). Vänstermenyn har två avsnitt: **Dagligen** (Översikt,
 Granskning, Stämplingar, Veckovy, Planering, Tidrapport, Rapporter) och
