@@ -15,6 +15,8 @@ const PATH = "/admin/kunder";
  * att den stängs även andra gången.
  */
 export interface CustomerState {
+  /** Fältet felet gäller. Se useFieldError. */
+  field?: string;
   error?: string;
   savedAt?: number;
 }
@@ -26,7 +28,7 @@ export interface CustomerState {
  * innan man får lägga upp någon blir ett register ingen fyller i.
  */
 function readForm(formData: FormData):
-  | { error: string }
+  | { error: string; field?: string }
   | {
       data: {
         name: string;
@@ -44,8 +46,10 @@ function readForm(formData: FormData):
       };
     } {
   const name = clean(formData.get("name"));
-  if (!name) return { error: "Ange ett namn." };
-  if (name.length > MAX_NAME) return { error: "Namnet är för långt." };
+  if (!name) return { error: "Ange ett namn.", field: "name" };
+  if (name.length > MAX_NAME) {
+    return { error: "Namnet är för långt.", field: "name" };
+  }
 
   // Tomt betyder "företagets standardpåslag gäller". Bara ett ifyllt men
   // obegripligt värde är ett fel.

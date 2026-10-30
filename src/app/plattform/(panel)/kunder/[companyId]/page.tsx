@@ -177,7 +177,7 @@ export default async function CompanyPage({
     <>
       <Link
         href="/plattform/kunder"
-        className="text-[13px] font-medium text-tick-deep hover:underline"
+        className="text-[13px] font-medium text-link hover:underline"
       >
         ← Kunder
       </Link>
@@ -234,7 +234,7 @@ export default async function CompanyPage({
                     {owner.phone ? (
                       <a
                         href={`tel:${owner.phone}`}
-                        className="font-medium text-tick-deep hover:underline"
+                        className="font-medium text-link hover:underline"
                       >
                         {formatPhone(owner.phone)}
                       </a>
@@ -245,7 +245,7 @@ export default async function CompanyPage({
                   <Fact label="E-postadress">
                     <a
                       href={`mailto:${owner.email}`}
-                      className="font-medium text-tick-deep hover:underline"
+                      className="font-medium text-link hover:underline"
                     >
                       {owner.email}
                     </a>
@@ -302,7 +302,7 @@ export default async function CompanyPage({
                   <Fact label="Månadsintäkt">
                     <span className="flex items-baseline justify-end gap-2">
                       {listRevenue !== monthlyRevenue && (
-                        <span className="font-normal text-neutral-400 line-through">
+                        <span className="font-normal text-neutral-500 line-through">
                           {listRevenue.toLocaleString("sv-SE")} kr
                         </span>
                       )}
@@ -327,7 +327,7 @@ export default async function CompanyPage({
                   <h3 className="text-[13px] font-semibold text-neutral-900">
                     Avtalat pris
                   </h3>
-                  <span className="text-xs text-neutral-400">
+                  <span className="text-xs text-neutral-500">
                     {managedByStripe
                       ? "Styrs av artiklarna hos Stripe"
                       : "Visas för kunden med listpriset överstruket"}
@@ -380,7 +380,7 @@ export default async function CompanyPage({
                     placeholder="Kontaktperson, avtal, supportärenden"
                   />
                   {note && (
-                    <p className="text-xs text-neutral-400">
+                    <p className="text-xs text-neutral-500">
                       Senast ändrad {formatDateTime(note.updatedAt)} av{" "}
                       {note.updatedByEmail}
                     </p>
@@ -419,7 +419,7 @@ export default async function CompanyPage({
                         )}
                         <a
                           href={`mailto:${admin.email}`}
-                          className="text-tick-deep hover:underline"
+                          className="text-link hover:underline"
                         >
                           {admin.email}
                         </a>

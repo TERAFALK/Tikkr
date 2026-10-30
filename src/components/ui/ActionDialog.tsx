@@ -1,8 +1,8 @@
 "use client";
 
 import { useActionState, useEffect, useRef, type ReactNode } from "react";
-import { useFormStatus } from "react-dom";
 import { Alert, Button, dialogBody, dialogEdge, dialogSurface } from ".";
+import { useFieldError, useKeptSubmit } from "./useFieldError";
 
 /**
  * RUTA FÖR EN ÅTGÄRD SOM KAN SVARA MED ETT FEL.
@@ -23,6 +23,8 @@ import { Alert, Button, dialogBody, dialogEdge, dialogSurface } from ".";
 /** Minsta gemensamma svar. Varje åtgärd får ha fler fält än så. */
 export interface DialogState {
   error?: string;
+  /** Fältet felet gäller, med sitt `name`. Se useFieldError. */
+  field?: string;
   ok?: string;
 }
 
@@ -99,6 +101,8 @@ export default function ActionDialog<S extends DialogState>({
     action,
     initial
   );
+  const errorId = useFieldError(form, state);
+  const { pending, onSubmit } = useKeptSubmit(submit);
 
   /**
    * Stänger när åtgärden svarat att det gick.
@@ -179,13 +183,13 @@ export default function ActionDialog<S extends DialogState>({
 
         <form
           ref={form}
-          action={submit}
+          onSubmit={onSubmit}
           className="flex min-h-0 flex-1 flex-col"
         >
           <div className={`${dialogBody} space-y-4 px-5 py-5`}>
             {/* Felet står överst i rutan, där blicken är efter ett tryck som
                 inte gav något. */}
-            {state.error && <Alert>{state.error}</Alert>}
+            {state.error && <Alert id={errorId}>{state.error}</Alert>}
             {children}
           </div>
 
@@ -200,6 +204,7 @@ export default function ActionDialog<S extends DialogState>({
               label={submitLabel}
               pendingLabel={pendingLabel}
               disabled={disabled}
+              pending={pending}
             />
           </div>
         </form>
@@ -213,14 +218,14 @@ function Submit({
   label,
   pendingLabel,
   disabled,
+  pending,
 }: {
   tone: "primary" | "secondary" | "danger" | "ghost";
   label: string;
   pendingLabel: string;
   disabled: boolean;
+  pending: boolean;
 }) {
-  const { pending } = useFormStatus();
-
   return (
     <Button type="submit" tone={tone} disabled={disabled || pending}>
       {pending ? pendingLabel : label}

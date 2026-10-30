@@ -62,7 +62,7 @@ export default function TwoStepEnrollment({
       <p className="text-center">
         <a
           href={enrollment.uri}
-          className="text-[13px] font-medium text-tick-deep hover:underline"
+          className="text-[13px] font-medium text-link hover:underline"
         >
           Öppna i appen på den här telefonen
         </a>

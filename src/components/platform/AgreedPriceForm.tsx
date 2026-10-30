@@ -68,14 +68,14 @@ export default function AgreedPriceForm({
               <span className="block text-[13px] font-medium text-neutral-900">
                 {row.name}
               </span>
-              <span className="mt-0.5 block text-xs text-neutral-400">
+              <span className="mt-0.5 block text-xs text-neutral-500">
                 {row.item === "SCREEN" ? "Per licens och månad" : "Per månad"}
               </span>
             </span>
 
             <span className="flex items-baseline gap-2 text-[13px] tabular-nums">
               {row.agreed !== null && row.agreed !== row.listMonth && (
-                <span className="text-neutral-400 line-through">
+                <span className="text-neutral-500 line-through">
                   {row.listMonth} kr
                 </span>
               )}

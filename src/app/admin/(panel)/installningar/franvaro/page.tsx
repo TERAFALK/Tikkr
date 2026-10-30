@@ -191,7 +191,7 @@ export default async function AbsenceReasonsPage() {
                         finns ska svara inuti rutan. */}
                     <ActionDialog<ReasonState>
                       trigger="Ändra"
-                      triggerTone="ghost"
+                      triggerTone="secondary"
                       title={`Ändra ${reason.name}`}
                       action={renameAbsenceReason}
                       initial={{}}

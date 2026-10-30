@@ -221,7 +221,7 @@ export default function ScheduleDays({
                     placeholder="06:30"
                     aria-label={`${label} börjar`}
                   />
-                  <span className="text-neutral-400">–</span>
+                  <span className="text-neutral-500">–</span>
                   <TimeField
                     name={`end-${day.weekday}`}
                     value={day.end}
@@ -235,7 +235,7 @@ export default function ScheduleDays({
                   </span>
                 </>
               ) : (
-                <span className="text-[13px] text-neutral-400">Arbetsfri</span>
+                <span className="text-[13px] text-neutral-500">Arbetsfri</span>
               )}
             </div>
 
@@ -262,7 +262,7 @@ export default function ScheduleDays({
                       placeholder="09:00"
                       aria-label="Rasten börjar"
                     />
-                    <span className="text-neutral-400">–</span>
+                    <span className="text-neutral-500">–</span>
                     <TimeField
                       name={`break-end-${day.weekday}`}
                       value={rest.end}
@@ -276,7 +276,7 @@ export default function ScheduleDays({
                       type="button"
                       onClick={() => removeBreak(day.weekday, index)}
                       aria-label="Ta bort rasten"
-                      className="rounded-md p-1.5 text-neutral-400 hover:bg-neutral-100 hover:text-neutral-700"
+                      className="rounded-md p-1.5 text-neutral-500 hover:bg-neutral-100 hover:text-neutral-700"
                     >
                       <IconClose />
                     </button>
@@ -286,7 +286,7 @@ export default function ScheduleDays({
                 <button
                   type="button"
                   onClick={() => addBreak(day.weekday)}
-                  className="inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-[13px] font-medium text-tick-deep hover:bg-emerald-50"
+                  className="inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-[13px] font-medium text-link hover:bg-emerald-50"
                 >
                   <IconPlus />
                   Lägg till rast

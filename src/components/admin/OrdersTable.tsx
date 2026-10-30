@@ -17,6 +17,7 @@ import {
   Td,
   Th,
   Tr,
+  rowLink,
 } from "@/components/ui";
 import { formatDuration } from "@/lib/format";
 
@@ -288,7 +289,7 @@ export default function OrdersTable({
               const isOpen = order.status === "OPEN";
 
               return (
-                <Tr key={order.id} dimmed={!isOpen}>
+                <Tr key={order.id} dimmed={!isOpen} linked={!selecting}>
                   {selecting && (
                     <Td>
                       <input
@@ -307,7 +308,7 @@ export default function OrdersTable({
                     ) : (
                       <Link
                         href={`/admin/ordrar/${order.id}`}
-                        className="font-medium text-tick-deep hover:underline"
+                        className={rowLink}
                       >
                         {order.orderNumber}
                       </Link>

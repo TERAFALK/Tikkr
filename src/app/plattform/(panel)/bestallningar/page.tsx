@@ -7,7 +7,7 @@ import { formatDate } from "@/lib/format";
 import { formatCurrency } from "@/lib/money";
 import { listHref } from "@/lib/paging";
 import { addDaysInZone, parseLocalDate, startOfDayIn } from "@/lib/time-zone";
-import Pager, { PerPageField } from "@/components/platform/Pager";
+import Pager, { PerPageField } from "@/components/ui/Pager";
 import {
   Badge,
   Button,
@@ -169,7 +169,7 @@ export default async function ShopOrdersPage({
                   <Td>
                     <Link
                       href={`/plattform/bestallningar/${order.id}`}
-                      className="font-medium text-tick-deep"
+                      className="font-medium text-link"
                     >
                       {order.number}
                     </Link>
@@ -191,7 +191,7 @@ export default async function ShopOrdersPage({
                   <Td numeric>
                     {formatCurrency(order.totalOre)}
                     {order.shippingOre === null && (
-                      <span className="block text-xs text-neutral-400">exkl. frakt</span>
+                      <span className="block text-xs text-neutral-500">exkl. frakt</span>
                     )}
                   </Td>
                   <Td muted>{formatDate(order.createdAt)}</Td>

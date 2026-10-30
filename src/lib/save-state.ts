@@ -10,6 +10,8 @@
 export interface SaveState {
   /** Vad som är fel, skrivet så att det går att rätta. */
   error?: string;
+  /** Fältet felet gäller, med sitt `name`. Se useFieldError. */
+  field?: string;
   /** Tidpunkten för en lyckad sparning. */
   savedAt?: number;
   /** Besked när "Sparat" är för tunt. */

@@ -24,6 +24,8 @@ function revalidateOrders() {
 }
 
 export interface OrderFormState {
+  /** Fältet felet gäller. Se useFieldError. */
+  field?: string;
   error?: string;
   /** Sattes senast sparandet gick igenom. Stänger rutan i gränssnittet. */
   savedAt?: number;
@@ -87,9 +89,11 @@ async function readPlannedDueDate(
  */
 function readOrderFields(
   formData: FormData
-): { error: string } | { values: OrderFields } {
+): { error: string; field?: string } | { values: OrderFields } {
   const orderNumber = String(formData.get("orderNumber") ?? "").trim();
-  if (!orderNumber) return { error: "Ange ett ordernummer." };
+  if (!orderNumber) {
+    return { error: "Ange ett ordernummer.", field: "orderNumber" };
+  }
 
   // Tomt fält betyder "företagets standardpåslag gäller", vilket är det
   // normala. Bara ett ifyllt men obegripligt värde är ett fel.

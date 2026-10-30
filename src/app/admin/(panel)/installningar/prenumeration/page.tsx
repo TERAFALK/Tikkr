@@ -189,7 +189,7 @@ export default async function SubscriptionPage({
           {overview.used > overview.screens && (
             <Alert tone="warning">
               {overview.used} skärmar är upplagda men ni har {overview.screens}{" "}
-              {overview.screens === 1 ? "licens" : "licenser"}. Radera de
+              {overview.screens === 1 ? "licens" : "licenser"}. Ta bort de
               skärmar ni inte längre använder under Stämplingsskärmar, eller
               utöka antalet licenser igen. Skärmarna fortsätter fungera under
               tiden.
@@ -369,7 +369,7 @@ function AgreedRow({
       <dt className="text-neutral-500">{label}</dt>
       <dd className="flex flex-wrap items-baseline justify-end gap-2">
         {list !== agreed && (
-          <span className="tabular-nums text-neutral-400 line-through">
+          <span className="tabular-nums text-neutral-500 line-through">
             {kr(list)} kr
           </span>
         )}

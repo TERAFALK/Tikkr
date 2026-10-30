@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState, useEffect, useRef } from "react";
-import { useFormStatus } from "react-dom";
+import { useFieldError, useKeptSubmit } from "@/components/ui/useFieldError";
 import type { OrderFormState } from "@/app/admin/(panel)/ordrar/actions";
 import {
   Alert,
@@ -50,6 +50,9 @@ export default function NewOrderDialog({
   const dialog = useRef<HTMLDialogElement>(null);
 
   const [state, submit] = useActionState<OrderFormState, FormData>(action, {});
+  const form = useRef<HTMLFormElement>(null);
+  const errorId = useFieldError(form, state);
+  const { pending, onSubmit } = useKeptSubmit(submit);
 
   // En gång, vid uppkopplingen. Stängs rutan ska den stanna stängd.
   useEffect(() => {
@@ -70,6 +73,7 @@ export default function NewOrderDialog({
 
       <dialog
         ref={dialog}
+        onClose={() => form.current?.reset()}
         className={`w-[min(42rem,calc(100vw-2rem))] ${dialogSurface}`}
       >
         <div className={`${dialogEdge} border-b border-neutral-200 px-5 py-4`}>
@@ -81,9 +85,9 @@ export default function NewOrderDialog({
           </p>
         </div>
 
-        <form action={submit} className="flex min-h-0 flex-1 flex-col">
+        <form ref={form} onSubmit={onSubmit} className="flex min-h-0 flex-1 flex-col">
           <div className={`${dialogBody} space-y-4 px-5 py-5`}>
-            {state.error && <Alert>{state.error}</Alert>}
+            {state.error && <Alert id={errorId}>{state.error}</Alert>}
 
             {/* Nyckeln byts när en order lagts upp, vilket monterar om fälten
                 tomma. Nästa order ska börja på ett blankt formulär, inte på
@@ -112,7 +116,7 @@ export default function NewOrderDialog({
             >
               Avbryt
             </Button>
-            <SaveButton />
+            <SaveButton pending={pending} />
           </div>
         </form>
       </dialog>
@@ -120,9 +124,7 @@ export default function NewOrderDialog({
   );
 }
 
-function SaveButton() {
-  const { pending } = useFormStatus();
-
+function SaveButton({ pending }: { pending: boolean }) {
   return (
     <Button type="submit" disabled={pending}>
       {pending ? "Lägger till…" : "Lägg till"}

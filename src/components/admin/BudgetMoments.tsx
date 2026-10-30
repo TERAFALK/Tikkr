@@ -171,7 +171,7 @@ export default function BudgetMoments({
               <>
                 {/* Numret står framför raden. Utan det är två pilar bara två
                     pilar; med det syns att raderna har en följd. */}
-                <span className="w-5 shrink-0 text-right text-[13px] tabular-nums text-neutral-400">
+                <span className="w-5 shrink-0 text-right text-[13px] tabular-nums text-neutral-500">
                   {index + 1}
                 </span>
 
@@ -181,7 +181,7 @@ export default function BudgetMoments({
                     onClick={() => move(row.key, -1)}
                     disabled={index === 0}
                     aria-label="Flytta upp"
-                    className="px-1 text-[10px] leading-none text-neutral-400 hover:text-neutral-900 disabled:text-neutral-200"
+                    className="px-1 text-[10px] leading-none text-neutral-500 hover:text-neutral-900 disabled:text-neutral-200"
                   >
                     ▲
                   </button>
@@ -190,7 +190,7 @@ export default function BudgetMoments({
                     onClick={() => move(row.key, 1)}
                     disabled={index === rows.length - 1}
                     aria-label="Flytta ner"
-                    className="px-1 text-[10px] leading-none text-neutral-400 hover:text-neutral-900 disabled:text-neutral-200"
+                    className="px-1 text-[10px] leading-none text-neutral-500 hover:text-neutral-900 disabled:text-neutral-200"
                   >
                     ▼
                   </button>
@@ -248,7 +248,7 @@ export default function BudgetMoments({
                 data-form-type="other"
                 className="block w-full rounded-md border-0 bg-white py-1.5 pl-2.5 pr-8 text-base sm:text-[13px] text-neutral-900 ring-1 ring-inset ring-neutral-400 placeholder:text-neutral-400 focus:outline-hidden focus:ring-2 focus:ring-inset focus:ring-blue-600"
               />
-              <span className="pointer-events-none absolute inset-y-0 right-2.5 flex items-center text-xs text-neutral-400">
+              <span className="pointer-events-none absolute inset-y-0 right-2.5 flex items-center text-xs text-neutral-500">
                 tim
               </span>
             </div>
@@ -257,7 +257,7 @@ export default function BudgetMoments({
               type="button"
               onClick={() => remove(row.key)}
               aria-label="Ta bort raden"
-              className="shrink-0 rounded-md p-1.5 text-neutral-400 hover:bg-neutral-100 hover:text-neutral-700"
+              className="shrink-0 rounded-md p-1.5 text-neutral-500 hover:bg-neutral-100 hover:text-neutral-700"
             >
               <IconClose />
             </button>
@@ -270,7 +270,7 @@ export default function BudgetMoments({
           type="button"
           onClick={add}
           disabled={available.length === 0}
-          className="inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-[13px] font-medium text-tick-deep hover:bg-emerald-50 disabled:cursor-not-allowed disabled:text-neutral-400 disabled:hover:bg-transparent"
+          className="inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-[13px] font-medium text-link hover:bg-emerald-50 disabled:cursor-not-allowed disabled:text-neutral-400 disabled:hover:bg-transparent"
         >
           <IconPlus />
           Lägg till arbetsmoment

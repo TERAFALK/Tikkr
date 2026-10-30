@@ -1,7 +1,6 @@
 "use client";
 
 import { useActionState, useEffect, useRef, useState } from "react";
-import { useFormStatus } from "react-dom";
 import {
   addEntry,
   type EntryFormState,
@@ -16,6 +15,7 @@ import {
   Input,
   Select,
 } from "@/components/ui";
+import { useFieldError, useKeptSubmit } from "@/components/ui/useFieldError";
 import SearchSelect from "./SearchSelect";
 
 interface Option {
@@ -59,6 +59,9 @@ export default function NewEntryDialog({
   const [state, action] = useActionState<EntryFormState, FormData>(addEntry, {});
   const [kind, setKind] = useState<"ORDER" | "INDIRECT">("ORDER");
   const dialog = useRef<HTMLDialogElement>(null);
+  const form = useRef<HTMLFormElement>(null);
+  const errorId = useFieldError(form, state);
+  const { pending, onSubmit } = useKeptSubmit(action);
 
   // En gång, vid uppkopplingen. Stängs rutan ska den stanna stängd.
   useEffect(() => {
@@ -79,6 +82,7 @@ export default function NewEntryDialog({
 
     handled.current = state;
     dialog.current?.close();
+    form.current?.reset();
   }, [state]);
 
   return (
@@ -89,6 +93,7 @@ export default function NewEntryDialog({
 
       <dialog
         ref={dialog}
+        onClose={() => form.current?.reset()}
         className={`w-[min(40rem,calc(100vw-2rem))] ${dialogSurface}`}
       >
         <div className={`${dialogEdge} border-b border-neutral-200 px-5 py-4`}>
@@ -100,9 +105,9 @@ export default function NewEntryDialog({
           </p>
         </div>
 
-        <form action={action} className="flex min-h-0 flex-1 flex-col">
+        <form ref={form} onSubmit={onSubmit} className="flex min-h-0 flex-1 flex-col">
           <div className={`${dialogBody} space-y-4 px-5 py-5`}>
-            {state.error && <Alert>{state.error}</Alert>}
+            {state.error && <Alert id={errorId}>{state.error}</Alert>}
 
             <Field label="Anställd">
               <Select name="employeeId" required defaultValue="">
@@ -215,7 +220,7 @@ export default function NewEntryDialog({
             >
               Avbryt
             </Button>
-            <SubmitButton />
+            <SubmitButton pending={pending} />
           </div>
         </form>
       </dialog>
@@ -223,9 +228,7 @@ export default function NewEntryDialog({
   );
 }
 
-function SubmitButton() {
-  const { pending } = useFormStatus();
-
+function SubmitButton({ pending }: { pending: boolean }) {
   return (
     <Button type="submit" disabled={pending}>
       {pending ? "Lägger till…" : "Lägg till"}

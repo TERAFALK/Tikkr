@@ -4,7 +4,7 @@ import { searchCustomers } from "@/lib/customers";
 import { listPaging, pageRows } from "@/lib/paging";
 import CustomerDialog from "@/components/admin/CustomerDialog";
 import SearchForm from "@/components/admin/SearchForm";
-import Pager from "@/components/platform/Pager";
+import Pager from "@/components/ui/Pager";
 import {
   Badge,
   Button,
@@ -16,6 +16,7 @@ import {
   Td,
   Th,
   Tr,
+  rowLink,
 } from "@/components/ui";
 import { createCustomer, toggleCustomer } from "./actions";
 
@@ -122,18 +123,18 @@ export default async function CustomersPage({
               </thead>
               <tbody>
                 {pageRows(customers, page).map((customer) => (
-                  <Tr key={customer.id} dimmed={!customer.active}>
+                  <Tr key={customer.id} dimmed={!customer.active} linked>
                     <Td>
                       {/* Namnet är vägen till kundsidan. Det är den enda
                           platsen där tid, pengar och ordrar står samlade. */}
                       <Link
                         href={`/admin/kunder/${customer.id}`}
-                        className="font-medium text-tick-deep hover:underline"
+                        className={rowLink}
                       >
                         {customer.name}
                       </Link>
                       {customer.customerNumber && (
-                        <span className="ml-2 text-neutral-400">
+                        <span className="ml-2 text-neutral-500">
                           {customer.customerNumber}
                         </span>
                       )}
@@ -159,7 +160,7 @@ export default async function CustomersPage({
                       )}
                     </Td>
                     <Td>
-                      <div className="flex justify-end">
+                      <div className="relative z-10 flex justify-end">
                         <form action={toggleCustomer}>
                           <input
                             type="hidden"

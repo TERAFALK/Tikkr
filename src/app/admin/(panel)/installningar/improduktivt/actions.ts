@@ -29,12 +29,12 @@ export async function createIndirectMoment(
   const { db, companyId } = session;
 
   const name = String(formData.get("name") ?? "").trim();
-  if (!name) return { error: "Ange ett namn." };
+  if (!name) return { error: "Ange ett namn.", field: "name" };
 
   try {
     await db.indirectMoment.create({ data: { companyId, name } });
   } catch (error) {
-    if (isUniqueViolation(error)) return { error: DUPLICATE };
+    if (isUniqueViolation(error)) return { error: DUPLICATE, field: "name" };
     throw error;
   }
 
@@ -52,12 +52,12 @@ export async function renameIndirectMoment(
 
   const id = String(formData.get("id") ?? "");
   const name = String(formData.get("name") ?? "").trim();
-  if (!id || !name) return { error: "Ange ett namn." };
+  if (!id || !name) return { error: "Ange ett namn.", field: "name" };
 
   try {
     await db.indirectMoment.updateMany({ where: { id }, data: { name } });
   } catch (error) {
-    if (isUniqueViolation(error)) return { error: DUPLICATE };
+    if (isUniqueViolation(error)) return { error: DUPLICATE, field: "name" };
     throw error;
   }
 

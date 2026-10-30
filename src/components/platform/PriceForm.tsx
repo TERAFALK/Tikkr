@@ -63,7 +63,7 @@ export default function PriceForm({
       </div>
 
       {updatedByEmail && (
-        <p className="text-xs text-neutral-400">
+        <p className="text-xs text-neutral-500">
           Senast ändrat av {updatedByEmail}
         </p>
       )}

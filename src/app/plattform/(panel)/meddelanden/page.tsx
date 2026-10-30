@@ -48,7 +48,7 @@ export default async function NoticesPage({
       <>
         <Link
           href="/plattform/meddelanden"
-          className="text-[13px] font-medium text-tick-deep hover:underline"
+          className="text-[13px] font-medium text-link hover:underline"
         >
           ← Driftmeddelanden
         </Link>
@@ -204,7 +204,7 @@ function NoticeRow({ notice }: { notice: Notice }) {
           {notice.body}
         </p>
 
-        <p className="mt-2 text-xs text-neutral-400">
+        <p className="mt-2 text-xs text-neutral-500">
           {formatDateTime(notice.startsAt)}
           {notice.endsAt ? ` – ${formatDateTime(notice.endsAt)}` : " – tills vidare"}
           {" · "}

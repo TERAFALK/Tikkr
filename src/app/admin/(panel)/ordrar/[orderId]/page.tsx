@@ -14,6 +14,7 @@ import {
   Card,
   CardHeader,
   Stat,
+  SectionTitle,
   Table,
   Td,
   Th,
@@ -70,7 +71,7 @@ export default async function OrderPage({
     <>
       <Link
         href="/admin/ordrar"
-        className="text-[13px] font-medium text-tick-deep hover:underline"
+        className="text-[13px] font-medium text-link hover:underline"
       >
         ← Ordrar
       </Link>
@@ -112,16 +113,14 @@ export default async function OrderPage({
 
         <div className="mt-6 grid gap-6 lg:grid-cols-3">
           <Card className="p-5">
-            <h2 className="text-[13px] font-semibold uppercase tracking-wider text-neutral-400">
-              Uppgifter
-            </h2>
+            <SectionTitle>Uppgifter</SectionTitle>
 
             <dl className="mt-3 space-y-2 text-[13px]">
               <Detail label="Kund">
                 {order.customerId ? (
                   <Link
                     href={`/admin/kunder/${order.customerId}`}
-                    className="font-medium text-tick-deep hover:underline"
+                    className="font-medium text-link hover:underline"
                   >
                     {order.customerName}
                   </Link>
@@ -153,7 +152,7 @@ export default async function OrderPage({
               action={
                 <Link
                   href={`/admin/rapporter?orderId=${order.id}`}
-                  className="text-[13px] font-medium text-tick-deep hover:underline"
+                  className="text-[13px] font-medium text-link hover:underline"
                 >
                   Stämplingar i Rapporter
                 </Link>

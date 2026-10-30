@@ -4,7 +4,7 @@ import { hasModule } from "@/lib/company-modules";
 import { companyTimeZone } from "@/lib/company";
 import { describeAuditEvents } from "@/lib/audit-view";
 import { listPaging } from "@/lib/paging";
-import Pager from "@/components/platform/Pager";
+import Pager from "@/components/ui/Pager";
 import { Card, CardHeader, EmptyState, Table, Td, Th, Tr } from "@/components/ui";
 
 export const metadata = { title: "Ändringslogg · Tikkr" };
@@ -65,7 +65,7 @@ export default async function AuditLogPage({
           params.post ? (
             <Link
               href={base}
-              className="text-[13px] font-medium text-tick-deep hover:underline"
+              className="text-[13px] font-medium text-link hover:underline"
             >
               Visa alla
             </Link>
@@ -94,7 +94,7 @@ export default async function AuditLogPage({
                   <Td>
                     <span className="font-medium">{row.what}</span>
                     {row.subject && (
-                      <span className="mt-0.5 block text-xs text-neutral-400">
+                      <span className="mt-0.5 block text-xs text-neutral-500">
                         {row.subject}
                       </span>
                     )}

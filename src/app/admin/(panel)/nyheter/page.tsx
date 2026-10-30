@@ -133,7 +133,7 @@ function Group({ label, items }: { label: string; items: string[] }) {
 
   return (
     <section>
-      <h3 className="mb-1 text-[11px] font-semibold uppercase tracking-wider text-neutral-400">
+      <h3 className="mb-1 text-[11px] font-semibold uppercase tracking-wider text-neutral-500">
         {label}
       </h3>
       <ul className="list-disc space-y-1 pl-5 text-[13px] leading-relaxed text-neutral-700 marker:text-neutral-300">

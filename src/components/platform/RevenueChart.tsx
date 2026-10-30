@@ -43,7 +43,7 @@ export default function RevenueChart({ points }: { points: MonthPoint[] }) {
           <span
             className={`text-[13px] font-medium tabular-nums ${
               change > 0
-                ? "text-emerald-600"
+                ? "text-emerald-700"
                 : change < 0
                   ? "text-amber-700"
                   : "text-neutral-500"
@@ -64,7 +64,7 @@ export default function RevenueChart({ points }: { points: MonthPoint[] }) {
             >
               {/* Beloppet syns vid hovring. Tolv siffror utskrivna samtidigt
                   gör grafen oläslig, och formen är det som ska läsas. */}
-              <span className="mb-1 text-[10px] tabular-nums text-neutral-400 opacity-0 transition-opacity group-hover:opacity-100">
+              <span className="mb-1 text-[10px] tabular-nums text-neutral-500 opacity-0 transition-opacity group-hover:opacity-100">
                 {point.mrr.toLocaleString("sv-SE")}
               </span>
 
@@ -95,7 +95,7 @@ export default function RevenueChart({ points }: { points: MonthPoint[] }) {
                 />
               </div>
 
-              <span className="mt-1.5 truncate text-[10px] text-neutral-400">
+              <span className="mt-1.5 truncate text-[10px] text-neutral-500">
                 {point.label}
               </span>
             </div>

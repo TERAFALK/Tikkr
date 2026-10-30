@@ -43,7 +43,7 @@ export default function HelpShell({
             {title}
           </h1>
           {lead && (
-            <p className="mt-4 max-w-xl text-[15px] leading-relaxed text-neutral-400">
+            <p className="mt-4 max-w-xl text-[15px] leading-relaxed text-neutral-500">
               {lead}
             </p>
           )}
@@ -92,7 +92,7 @@ function ContactCard() {
           <dd className="mt-0.5">
             <a
               href={`mailto:${CONTACT.email}`}
-              className="font-medium text-tick-deep hover:underline"
+              className="font-medium text-link hover:underline"
             >
               {CONTACT.email}
             </a>
@@ -104,7 +104,7 @@ function ContactCard() {
             <dd className="mt-0.5">
               <a
                 href={`tel:${CONTACT.phoneHref}`}
-                className="font-medium text-tick-deep hover:underline"
+                className="font-medium text-link hover:underline"
               >
                 {CONTACT.phone}
               </a>

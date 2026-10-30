@@ -28,7 +28,7 @@ export async function createBreakType(
   const { db, companyId } = session;
 
   const name = String(formData.get("name") ?? "").trim();
-  if (!name) return { error: "Ange ett namn." };
+  if (!name) return { error: "Ange ett namn.", field: "name" };
 
   const count = await db.breakType.count();
 
@@ -38,7 +38,7 @@ export async function createBreakType(
     });
   } catch (error) {
     if (isUniqueViolation(error)) {
-      return { error: "Det finns redan en rast med det namnet." };
+      return { error: "Det finns redan en rast med det namnet.", field: "name" };
     }
     throw error;
   }

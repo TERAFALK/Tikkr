@@ -3,7 +3,7 @@ import { hasModule } from "@/lib/company-modules";
 import NewOrderDialog from "@/components/admin/NewOrderDialog";
 import OrdersTable from "@/components/admin/OrdersTable";
 import SearchForm from "@/components/admin/SearchForm";
-import Pager from "@/components/platform/Pager";
+import Pager from "@/components/ui/Pager";
 import { Alert, EmptyState, PageHeader } from "@/components/ui";
 import { orderCount, orderRows } from "@/lib/orders";
 import { customerOptions } from "@/lib/customers";

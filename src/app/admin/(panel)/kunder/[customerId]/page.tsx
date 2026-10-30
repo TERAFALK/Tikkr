@@ -11,7 +11,7 @@ import { formatCurrency, formatMarkup } from "@/lib/money";
 import MarginChart from "@/components/admin/MarginChart";
 import CustomerDialog from "@/components/admin/CustomerDialog";
 import OrdersTable from "@/components/admin/OrdersTable";
-import Pager from "@/components/platform/Pager";
+import Pager from "@/components/ui/Pager";
 import {
   ButtonLink,
   Card,
@@ -19,6 +19,7 @@ import {
   EmptyState,
   PageHeader,
   Stat,
+  SectionTitle,
   Table,
   Td,
   Th,
@@ -98,7 +99,7 @@ export default async function CustomerPage({
     <>
       <Link
         href="/admin/kunder"
-        className="text-[13px] font-medium text-tick-deep hover:underline"
+        className="text-[13px] font-medium text-link hover:underline"
       >
         ← Kundregistret
       </Link>
@@ -207,9 +208,7 @@ export default async function CustomerPage({
 
         <div className="mt-6 grid gap-6 lg:grid-cols-3">
           <Card className="p-5">
-            <h2 className="text-[13px] font-semibold uppercase tracking-wider text-neutral-400">
-              Uppgifter
-            </h2>
+            <SectionTitle>Uppgifter</SectionTitle>
 
             {address.length > 0 && (
               <div className="mt-3 text-[13px] leading-relaxed text-neutral-700">
@@ -236,7 +235,7 @@ export default async function CustomerPage({
             )}
 
             {address.length === 0 && contact.length === 0 && !customer.notes && (
-              <p className="mt-3 text-[13px] text-neutral-400">
+              <p className="mt-3 text-[13px] text-neutral-500">
                 Inga kontaktuppgifter ifyllda.
               </p>
             )}

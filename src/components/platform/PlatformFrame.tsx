@@ -196,7 +196,7 @@ function Nav({
           <span className="block leading-tight">
             <WordmarkOnly height={10} />
           </span>
-          <span className="mt-0.5 block text-[11px] leading-tight text-neutral-400">
+          <span className="mt-0.5 block text-[11px] leading-tight text-neutral-500">
             Plattform
           </span>
         </span>
@@ -205,7 +205,7 @@ function Nav({
       <div className="flex-1 space-y-6">
         {SECTIONS.map((section) => (
           <div key={section.label}>
-            <p className="mb-1 px-2 text-[11px] font-semibold uppercase tracking-wider text-neutral-400">
+            <p className="mb-1 px-2 text-[11px] font-semibold uppercase tracking-wider text-neutral-500">
               {section.label}
             </p>
             <ul className="space-y-0.5">
@@ -266,7 +266,7 @@ function Nav({
           </button>
         </form>
 
-        <p className="truncate px-2 pt-2 text-[11px] text-neutral-400">
+        <p className="truncate px-2 pt-2 text-[11px] text-neutral-500">
           {email}
         </p>
       </div>

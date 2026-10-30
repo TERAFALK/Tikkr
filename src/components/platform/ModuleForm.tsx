@@ -44,7 +44,7 @@ export default function ModuleForm({
               {MODULES[row.key].name}
             </span>
             {row.enabled && row.enabledBy && (
-              <span className="mt-0.5 block text-xs text-neutral-400">
+              <span className="mt-0.5 block text-xs text-neutral-500">
                 Påslaget av {row.enabledBy}
               </span>
             )}

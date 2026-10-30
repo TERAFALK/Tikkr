@@ -43,7 +43,7 @@ export function ExportLink({
   children: ReactNode;
 }) {
   const tone = disabled
-    ? "cursor-not-allowed text-neutral-400 ring-1 ring-inset ring-neutral-200"
+    ? "cursor-not-allowed text-neutral-500 ring-1 ring-inset ring-neutral-200"
     : primary
       ? "bg-blue-600 text-white hover:bg-blue-700"
       : "bg-white text-neutral-700 ring-1 ring-inset ring-neutral-200 hover:bg-neutral-50";

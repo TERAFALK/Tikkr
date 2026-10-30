@@ -113,10 +113,10 @@ export default function SubscriptionLocked({
           )}
         </div>
 
-        <p className="mt-6 text-xs text-neutral-400">
+        <p className="mt-6 text-xs text-neutral-500">
           {companyName}
           {" · "}
-          <Link href="/kiosk" className="text-tick-deep">
+          <Link href="/kiosk" className="text-link">
             till stämplingsskärmen
           </Link>
         </p>

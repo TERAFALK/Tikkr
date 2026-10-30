@@ -24,6 +24,8 @@ const PHOTO_TYPES = ["image/png", "image/jpeg", "image/webp"];
 const PHOTO_MAX_BYTES = 512 * 1024;
 
 export interface EmployeeState {
+  /** Fältet felet gäller. Se useFieldError. */
+  field?: string;
   error?: string;
   /**
    * Tidpunkten då sparandet lyckades.
@@ -291,7 +293,7 @@ export async function createEmployee(
   const { db, companyId } = session;
 
   const name = String(formData.get("name") ?? "").trim();
-  if (!name) return { error: "Ange ett namn." };
+  if (!name) return { error: "Ange ett namn.", field: "name" };
 
   const photo = await readPhoto(formData);
   if (photo && "error" in photo) return { error: photo.error };
@@ -300,10 +302,14 @@ export async function createEmployee(
   const workHours = await hasWorkHours(companyId);
 
   const flexCode = await flexCodeFields(formData, payroll);
-  if ("error" in flexCode) return { error: flexCode.error };
+  if ("error" in flexCode) {
+    return { error: flexCode.error, field: "flexCode" };
+  }
 
   const startDate = await startDateFields(formData, companyId, payroll);
-  if ("error" in startDate) return { error: startDate.error };
+  if ("error" in startDate) {
+    return { error: startDate.error, field: "startDate" };
+  }
 
   const atfWorkForm = await atfWorkFormFields(formData, companyId, payroll);
   if ("error" in atfWorkForm) return { error: atfWorkForm.error };
@@ -363,7 +369,7 @@ export async function updateEmployee(
   const name = String(formData.get("name") ?? "").trim();
 
   if (!id) return { error: "Okänd person." };
-  if (!name) return { error: "Ange ett namn." };
+  if (!name) return { error: "Ange ett namn.", field: "name" };
 
   const photo = await readPhoto(formData);
   if (photo && "error" in photo) return { error: photo.error };
@@ -374,10 +380,14 @@ export async function updateEmployee(
   const workHours = await hasWorkHours(companyId);
 
   const flexCode = await flexCodeFields(formData, payroll);
-  if ("error" in flexCode) return { error: flexCode.error };
+  if ("error" in flexCode) {
+    return { error: flexCode.error, field: "flexCode" };
+  }
 
   const startDate = await startDateFields(formData, companyId, payroll);
-  if ("error" in startDate) return { error: startDate.error };
+  if ("error" in startDate) {
+    return { error: startDate.error, field: "startDate" };
+  }
 
   const atfWorkForm = await atfWorkFormFields(formData, companyId, payroll);
   if ("error" in atfWorkForm) return { error: atfWorkForm.error };
