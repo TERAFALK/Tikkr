@@ -209,6 +209,17 @@ och en grupp som delas mellan två sidor behåller sin egen summa
 hela urvalet, eftersom summorna behöver det. Pågående stämplingar står
 överst på första sidan. Sidnumret följer inte med när perioden byts.
 
+**Ordrar, Kunder och Anställda bläddras också, och man väljer hur många rader
+en sida visar** (beslutat 2026-10-30, produktägarens önskan). Gäller listorna
+under Ordrar, Kunder och Anställda och ordrarna på en kundsida. Förvalet är 50,
+och 25, 100 och 200 går att välja. Rymmer listan högst 50 rader syns ingen
+bläddring alls, vad adressen än säger (`listPaging`). Är den längre står valet
+kvar även när allt ryms på en sida, så att det går att välja om. Valet ligger i
+adressen som `antal`, och inte i en kaka, av samma skäl som `helg=visa` på
+tavlan. Sökningen och valet följer med varandra; sidnumret börjar om.
+Bläddringen göms i markeringsläget, som sökrutan. Rubrikens antal gäller hela
+urvalet. Ordrar och Anställda bläddrar i databasen, Kunder i minnet.
+
 Stämplingar har EN Ändra-ruta för hela listan (ändrat 2026-10-20). Varje rad
 hade en egen, och varje ruta bar hela orderregistret, så sidan växte med rader
 gånger ordrar. Rapporten hämtar raderna med sina nycklar och namnen en gång

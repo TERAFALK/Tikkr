@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { unsafeGlobalPrisma } from "@/lib/db";
 import { forCompany } from "@/lib/tenant";
-import { orderMoments, orderRows } from "@/lib/orders";
+import { orderCount, orderMoments, orderRows } from "@/lib/orders";
 
 /**
  * ORDRARNAS TID MOT BERÄKNINGEN, FÖR ETT URVAL.
@@ -169,6 +169,29 @@ describe("sökningen i orderlistan", () => {
     const rows = await orderRows(forCompany(companyId), { query: "volvo" });
 
     expect(rows.map((row) => row.id)).toEqual([orderC]);
+  });
+});
+
+describe("en sida i taget", () => {
+  it("räknar samma urval som listan visar", async () => {
+    const db = forCompany(companyId);
+
+    expect(await orderCount(db)).toBe(3);
+    expect(await orderCount(db, { query: "700" })).toBe(2);
+    expect(await orderCount(db, { query: "finns inte" })).toBe(0);
+  });
+
+  it("räknar aldrig ett annat företags ordrar", async () => {
+    expect(await orderCount(forCompany(otherCompanyId))).toBe(1);
+  });
+
+  it("delar listan utan att tappa eller dubblera en order", async () => {
+    const db = forCompany(companyId);
+    const all = await orderRows(db);
+    const first = await orderRows(db, { skip: 0, take: 2 });
+    const second = await orderRows(db, { skip: 2, take: 2 });
+
+    expect([...first, ...second]).toEqual(all);
   });
 });
 

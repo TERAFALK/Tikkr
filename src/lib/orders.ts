@@ -65,6 +65,57 @@ export interface OrderMomentRow {
   budgetMinutes: number | null;
 }
 
+/** Vilka ordrar en lista gäller. `orderRows` och `orderCount` delar urvalet. */
+interface OrderSelection {
+  customerId?: string;
+  onlyQuickJobs?: boolean;
+  /**
+   * Bara de här ordrarna. Översikten visar en handfull ordrar i arbete, och
+   * ska räkna deras tid exakt som orderlistan gör — men inte hämta varje
+   * stämpling på varje order för att visa åtta av dem.
+   */
+  ids?: string[];
+  query?: string;
+}
+
+function orderFilter(options: OrderSelection) {
+  const needle = options.query?.trim();
+
+  return {
+    ...(options.customerId ? { customerId: options.customerId } : {}),
+    ...(options.onlyQuickJobs ? { isQuickJob: true } : {}),
+    ...(options.ids ? { id: { in: options.ids } } : {}),
+    ...(needle
+      ? {
+          OR: [
+            { orderNumber: { contains: needle, mode: "insensitive" as const } },
+            {
+              customer: {
+                name: { contains: needle, mode: "insensitive" as const },
+              },
+            },
+            {
+              customer: {
+                customerNumber: {
+                  contains: needle,
+                  mode: "insensitive" as const,
+                },
+              },
+            },
+          ],
+        }
+      : {}),
+  };
+}
+
+/** Antalet ordrar i ett urval, för en lista som bara hämtar en sida. */
+export function orderCount(
+  db: CompanyDb,
+  options: OrderSelection = {}
+): Promise<number> {
+  return db.order.count({ where: orderFilter(options) });
+}
+
 /**
  * Ordrarna med upparbetad tid, beräkning och utfall per arbetsmoment.
  *
@@ -75,50 +126,19 @@ export interface OrderMomentRow {
  * `query` söker i ordernummer, kundens namn och kundnummer, skiftlägesokänsligt
  * som kundregistret. Den som har ordernumret på en följesedel ska hitta ordern,
  * och den som bara minns kunden likaså. Tom sökning ger alla.
+ *
+ * `skip` och `take` hämtar en sida. Varje rad drar med sig orderns alla
+ * stämplingar, så att bläddra i databasen är det som håller listan snabb.
  */
 export async function orderRows(
   db: CompanyDb,
-  options: {
-    customerId?: string;
-    onlyQuickJobs?: boolean;
-    /**
-     * Bara de här ordrarna. Översikten visar en handfull ordrar i arbete, och
-     * ska räkna deras tid exakt som orderlistan gör — men inte hämta varje
-     * stämpling på varje order för att visa åtta av dem.
-     */
-    ids?: string[];
-    query?: string;
-  } = {}
+  options: OrderSelection & { skip?: number; take?: number } = {}
 ): Promise<OrderRow[]> {
-  const needle = options.query?.trim();
-
   const orders = await db.order.findMany({
-    where: {
-      ...(options.customerId ? { customerId: options.customerId } : {}),
-      ...(options.onlyQuickJobs ? { isQuickJob: true } : {}),
-      ...(options.ids ? { id: { in: options.ids } } : {}),
-      ...(needle
-        ? {
-            OR: [
-              { orderNumber: { contains: needle, mode: "insensitive" as const } },
-              {
-                customer: {
-                  name: { contains: needle, mode: "insensitive" as const },
-                },
-              },
-              {
-                customer: {
-                  customerNumber: {
-                    contains: needle,
-                    mode: "insensitive" as const,
-                  },
-                },
-              },
-            ],
-          }
-        : {}),
-    },
+    where: orderFilter(options),
     orderBy: [{ status: "asc" }, { orderNumber: "asc" }],
+    skip: options.skip,
+    take: options.take,
     select: {
       id: true,
       orderNumber: true,

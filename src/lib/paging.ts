@@ -11,11 +11,19 @@
  * `pageGroups` finns för att grupperna ska behålla sina egna summor även när
  * en grupp delas mellan två sidor.
  *
+ * REGISTREN (Ordrar, Kunder, Anställda) väljer dessutom hur många rader en sida
+ * bär, med `?antal=` i adressen, se `listPaging`. Valet ligger i adressen av
+ * samma skäl som `helg=visa` på tavlan: ett visningsval hör inte hemma i en
+ * kaka.
+ *
  * Filen har inga importer. Den läses av fakturasidans rapportvy och skulle
  * kunna läsas av lönesidan, och ska därför inte dra in något från någondera.
  */
 
 export const PER_PAGE = 50;
+
+/** Valen under listan i registren. `PER_PAGE` är förvalet. */
+export const PER_PAGE_CHOICES = [25, 50, 100, 200];
 
 export interface Paging {
   /** Sidan som visas, från 1. */
@@ -46,6 +54,51 @@ export function paging(
   );
 
   return { page, pageCount, skip: (page - 1) * perPage, take: perPage };
+}
+
+/**
+ * Vilken sida ett register visar, ur `?sida=` och `?antal=`.
+ *
+ * Får allt plats i förvalet gäller förvalet, vad adressen än säger: då visas
+ * ingen bläddring, och ett gammalt `antal=25` på en lista med fyrtio rader hade
+ * annars gömt de sista femton utan någon väg dit.
+ */
+export function listPaging(
+  total: number,
+  { sida, antal }: { sida?: string; antal?: string }
+): Paging {
+  const wanted = Number(antal);
+  const perPage =
+    total > PER_PAGE && PER_PAGE_CHOICES.includes(wanted) ? wanted : PER_PAGE;
+
+  return paging(total, sida, perPage);
+}
+
+/**
+ * Adressen till en sida i ett register. Sidan ett och förvalet står inte i
+ * adressen, så att den orörda listan har samma adress som förut.
+ *
+ * `anchor` är för en lista långt ner på en sida. Utan den hamnar man högst upp
+ * vid varje bläddring och får skrolla ner igen.
+ */
+export function listHref(
+  path: string,
+  {
+    query,
+    page,
+    perPage,
+    anchor,
+  }: { query?: string; page: number; perPage: number; anchor?: string }
+): string {
+  const search = new URLSearchParams();
+  if (query) search.set("q", query);
+  if (page > 1) search.set("sida", String(page));
+  if (perPage !== PER_PAGE) search.set("antal", String(perPage));
+
+  const queryString = search.toString();
+  return `${path}${queryString ? `?${queryString}` : ""}${
+    anchor ? `#${anchor}` : ""
+  }`;
 }
 
 /** Sidans rader ur en lista som redan är hämtad och sorterad. */

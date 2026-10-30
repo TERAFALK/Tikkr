@@ -1,5 +1,13 @@
 import { describe, it, expect } from "vitest";
-import { pageGroups, pageRows, paging } from "@/lib/paging";
+import {
+  listHref,
+  listPaging,
+  pageGroups,
+  pageRows,
+  paging,
+  PER_PAGE,
+  PER_PAGE_CHOICES,
+} from "@/lib/paging";
 import { weekStep } from "@/lib/week-nav";
 
 /**
@@ -47,6 +55,79 @@ describe("paging", () => {
       skip: 0,
       take: 50,
     });
+  });
+});
+
+describe("listPaging", () => {
+  it("har 50 rader som förval, och förvalet går att välja", () => {
+    expect(PER_PAGE).toBe(50);
+    expect(PER_PAGE_CHOICES).toContain(PER_PAGE);
+    expect(listPaging(120, {})).toMatchObject({ pageCount: 3, take: 50 });
+  });
+
+  it("läser radantalet ur adressen", () => {
+    expect(listPaging(120, { antal: "100" })).toMatchObject({
+      pageCount: 2,
+      take: 100,
+    });
+    expect(listPaging(120, { antal: "25", sida: "3" })).toMatchObject({
+      page: 3,
+      skip: 50,
+      take: 25,
+    });
+  });
+
+  it("tar bara radantalen som går att välja", () => {
+    // Ett påhittat antal=100000 i adressen ska inte rita hela registret.
+    for (const junk of ["7", "100000", "0", "-50", "abc", ""]) {
+      expect(listPaging(120, { antal: junk }).take).toBe(50);
+    }
+  });
+
+  it("gömmer inga rader när allt ryms i förvalet", () => {
+    // Ingen bläddring visas då, och ett gammalt antal=25 hade annars lämnat
+    // de sista femton raderna utan någon väg dit.
+    expect(listPaging(40, { antal: "25" })).toEqual({
+      page: 1,
+      pageCount: 1,
+      skip: 0,
+      take: 50,
+    });
+    expect(listPaging(50, { antal: "25" })).toMatchObject({ take: 50 });
+  });
+
+  it("gäller valet från och med rad 51", () => {
+    expect(listPaging(51, { antal: "25" })).toMatchObject({
+      pageCount: 3,
+      take: 25,
+    });
+  });
+});
+
+describe("listHref", () => {
+  it("lämnar förvalet utanför adressen", () => {
+    expect(listHref("/admin/ordrar", { page: 1, perPage: 50 })).toBe(
+      "/admin/ordrar"
+    );
+  });
+
+  it("tar med sökning, sida och radantal", () => {
+    const href = listHref("/admin/ordrar", {
+      query: "volvo ab",
+      page: 2,
+      perPage: 100,
+    });
+    const search = new URL(href, "https://tikkr.test").searchParams;
+
+    expect(search.get("q")).toBe("volvo ab");
+    expect(search.get("sida")).toBe("2");
+    expect(search.get("antal")).toBe("100");
+  });
+
+  it("sätter ankaret sist", () => {
+    expect(
+      listHref("/admin/kunder/k1", { page: 2, perPage: 50, anchor: "ordrar" })
+    ).toBe("/admin/kunder/k1?sida=2#ordrar");
   });
 });
 
