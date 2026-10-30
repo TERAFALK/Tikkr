@@ -50,6 +50,12 @@ const CONTENT_WIDTH = A4_WIDTH - MARGIN * 2;
 /** Höjden underskriftsraden behöver: texten plus linjen under den. */
 const SIGNATURE_HEIGHT = 34;
 
+/** Raden Totalt för perioden, med luften runt den. */
+const SUMMARY_TOTAL_HEIGHT = 38;
+
+/** Luften under sammanställningen och den finstilta raden, två rader hög. */
+const SUMMARY_NOTE_HEIGHT = 30;
+
 export interface TimesheetCompany {
   name: string;
   timezone: string;
@@ -66,6 +72,8 @@ export interface TimesheetOptions {
    * ATF-underlaget per anställd, nyckel = personens id. Saknas personen här
    * visas ingen ATF, vilket är fallet när företaget inte valt något avtal
    * eller perioden inte är en hel kalendermånad. Se atf.ts.
+   *
+   * Bara Löneunderlaget visar det. Se summaryRows.
    */
   atf?: Record<string, AtfBasis | null>;
 }
@@ -309,7 +317,18 @@ function renderPeriod(
 
   /* --- Periodsumma -------------------------------------------------------- */
 
-  if (y > 640) {
+  const rows = summaryRows(period, absenceOnly, atf);
+  const lists = summaryLists(period, absenceOnly);
+
+  // SUMMORNA HÅLLER IHOP PÅ EN SIDA. Löneunderlaget har fler rader och en lista
+  // till, och den fasta gränsen som stod här lät dem rinna ut över foten.
+  const blockHeight =
+    SUMMARY_TOTAL_HEIGHT +
+    summaryHeight(rows) +
+    SUMMARY_NOTE_HEIGHT +
+    lists.reduce((sum, list) => sum + listHeight(list), 0);
+
+  if (y + blockHeight > FOOTER_Y - 16) {
     doc.addPage();
     y = MARGIN;
   }
@@ -329,20 +348,20 @@ function renderPeriod(
 
   /* --- Sammanställningen -------------------------------------------------- */
 
-  y = drawSummary(doc, y, period, absenceOnly, atf);
+  y = drawSummary(doc, y, period, rows, absenceOnly, atf);
 
-  /* --- Improduktiv tid per typ -------------------------------------------- */
+  /* --- Frånvaro per orsak och improduktiv tid per typ --------------------- */
 
-  if (period.indirectByMoment.length > 0) {
+  for (const list of lists) {
     y += 10;
     doc.font("Helvetica-Bold").fontSize(9).fillColor(DOC.heading);
-    doc.text("Improduktiv tid", MARGIN, y);
+    doc.text(list.title, MARGIN, y);
     y += 14;
 
-    for (const row of period.indirectByMoment) {
+    for (const [name, value] of list.rows) {
       doc.font("Helvetica").fontSize(9).fillColor(DOC.body);
-      doc.text(row.name, MARGIN + 8, y, { width: 300, lineBreak: false });
-      doc.text(formatDuration(row.minutes), A4_WIDTH - MARGIN - 68, y, {
+      doc.text(name, MARGIN + 8, y, { width: 300, lineBreak: false });
+      doc.text(value, A4_WIDTH - MARGIN - 68, y, {
         width: 60,
         align: "right",
         lineBreak: false,
@@ -450,17 +469,20 @@ function drawDayRule(doc: PDFKit.PDFDocument, y: number): number {
 }
 
 /**
- * Sammanställningen längst ner — kundens fyra efterfrågade rader plus flex.
+ * Raderna i sammanställningen längst ner — kundens fyra efterfrågade rader plus
+ * flex. Två kolumner, som i deras gamla rapport. Ordningen är deras.
  *
- * Två kolumner i tre rader, som i deras gamla rapport. Ordningen är deras.
+ * ATF STÅR BARA PÅ LÖNEUNDERLAGET (ändrat 2026-10-30, kundens begäran).
+ * Tidrapporten delas ut till var och en, och ATF är ett underlag till lönen.
+ * Flexen från föregående månad får en egen rad, eftersom den höjer eller sänker
+ * underlaget och annars bara syntes i den finstilta raden. En timanställd har
+ * ingen flex i underlaget, se atf.ts.
  */
-function drawSummary(
-  doc: PDFKit.PDFDocument,
-  y: number,
+export function summaryRows(
   period: PayrollPeriod,
   absenceOnly: boolean,
   atf: AtfBasis | null
-): number {
+): [string, string][][] {
   const rows: [string, string][][] = [
     [
       ["Planerad tid", formatDuration(period.totals.planned)],
@@ -481,14 +503,83 @@ function drawSummary(
   ];
 
   // ATF är ett underlag till lönen, inget saldo. Se atf.ts.
-  if (atf) {
+  if (absenceOnly && atf) {
+    if (!period.employee.hourly) {
+      rows.push([
+        ["Flex föregående månad", pdfSigned(atf.previousMonthFlexMinutes)],
+        ["", ""],
+      ]);
+    }
+
     rows.push([
       ["Underlag ATF", formatDuration(atf.basisMinutes)],
-      ["Intjänad ATF", formatDuration(atf.earnedMinutes)],
+      ["Intjänad ATF Period", formatDuration(atf.earnedMinutes)],
     ]);
   }
 
-  const height = rows.length * 16 + 14;
+  return rows;
+}
+
+export interface SummaryList {
+  title: string;
+  rows: [string, string][];
+}
+
+/**
+ * Listorna under sammanställningen.
+ *
+ * FRÅNVARO PER ORSAK står bara på Löneunderlaget (tillagt 2026-10-30, kundens
+ * begäran), där en orsak som kunden döpt till ATF-uttag ger det totala uttaget
+ * för perioden. Listan vet inte vad orsakerna heter, och Tikkr håller inget
+ * ATF-saldo. Se atf.ts.
+ */
+export function summaryLists(
+  period: PayrollPeriod,
+  absenceOnly: boolean
+): SummaryList[] {
+  const lists: SummaryList[] = [];
+
+  if (absenceOnly && period.absenceByReason.length > 0) {
+    lists.push({
+      title: "Frånvaro per orsak",
+      rows: period.absenceByReason.map((row) => [
+        row.reason,
+        formatDuration(row.minutes),
+      ]),
+    });
+  }
+
+  if (period.indirectByMoment.length > 0) {
+    lists.push({
+      title: "Improduktiv tid",
+      rows: period.indirectByMoment.map((row) => [
+        row.name,
+        formatDuration(row.minutes),
+      ]),
+    });
+  }
+
+  return lists;
+}
+
+function summaryHeight(rows: [string, string][][]): number {
+  return rows.length * 16 + 14;
+}
+
+/** Luft, rubrik och rader, som listorna ritas i renderPeriod. */
+function listHeight(list: SummaryList): number {
+  return 10 + 14 + list.rows.length * 14;
+}
+
+function drawSummary(
+  doc: PDFKit.PDFDocument,
+  y: number,
+  period: PayrollPeriod,
+  rows: [string, string][][],
+  absenceOnly: boolean,
+  atf: AtfBasis | null
+): number {
+  const height = summaryHeight(rows);
   doc.rect(MARGIN, y, CONTENT_WIDTH, height).fill(DOC.tint);
 
   let cursor = y + 8;
@@ -518,7 +609,7 @@ function drawSummary(
 
   // Hur underlaget räknats, så att lönekontoret kan stämma av det. Samma
   // tre tal som formeln i atf.ts, i samma ordning.
-  if (atf) {
+  if (absenceOnly && atf) {
     doc.font("Helvetica").fontSize(7).fillColor(DOC.faint);
     doc.text(
       period.employee.hourly

@@ -106,6 +106,8 @@ export async function GET(request: NextRequest) {
     );
   }
 
+  const absenceOnly = params.get("rader") === "franvaro";
+
   const periods: PayrollPeriod[] = [];
   const atf: Record<string, AtfBasis | null> = {};
 
@@ -127,14 +129,11 @@ export async function GET(request: NextRequest) {
 
     periods.push(period);
 
-    // Bara för en hel kalendermånad och bara med ett valt avtal; annars null,
-    // och PDF:en visar ingen ATF. Se atf.ts.
-    atf[period.employee.id] = await buildAtf(
-      db,
-      timeZone,
-      period,
-      company?.atfAgreement ?? null
-    );
+    // Bara på Löneunderlaget, bara för en hel kalendermånad och bara med ett
+    // valt avtal; annars null, och PDF:en visar ingen ATF. Se atf.ts.
+    atf[period.employee.id] = absenceOnly
+      ? await buildAtf(db, timeZone, period, company?.atfAgreement ?? null)
+      : null;
   }
 
   if (periods.length === 0) {
@@ -148,8 +147,6 @@ export async function GET(request: NextRequest) {
           mimeType: company.logoWideMimeType,
         }
       : null;
-
-  const absenceOnly = params.get("rader") === "franvaro";
 
   const pdf = await buildTimesheetPdf(
     { name: companyName, timezone: timeZone, logo },
