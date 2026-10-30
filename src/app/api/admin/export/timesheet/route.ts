@@ -3,7 +3,11 @@ import { requireAdmin } from "@/lib/admin-session";
 import { hasModule } from "@/lib/company-modules";
 import { evaluateAccess } from "@/lib/subscription";
 import { unsafeGlobalPrisma } from "@/lib/db";
-import { buildPayrollPeriod, type PayrollPeriod } from "@/lib/payroll";
+import {
+  buildPayrollPeriod,
+  employeesForTimesheet,
+  type PayrollPeriod,
+} from "@/lib/payroll";
 import { buildTimesheetPdf } from "@/lib/timesheet-pdf";
 import { buildAtf, type AtfBasis } from "@/lib/atf";
 import { slugify } from "@/lib/order-export";
@@ -22,11 +26,12 @@ import {
  * kundens kund, tidrapporten till lönekontoret — och en tidrapport som råkar
  * bifogas en faktura lämnar ut vad en namngiven person gjort varje timme.
  *
- * Utan angiven anställd tas hela personalen med, en person per sida. Det är så
- * en lönekörning går till: alla på en gång, i en fil.
+ * Utan angiven anställd tas hela personalen med, en person per sida, och den
+ * som slutat men har tid i perioden. Det är så en lönekörning går till: alla på
+ * en gång, i en fil. Se employeesForTimesheet.
  *
- * `rader=franvaro` ger samma dokument med bara frånvaron i raderna, utan
- * stämplingar och raster. Summeringen är densamma. Se `rows` i
+ * `rader=franvaro` ger Löneunderlaget: samma dokument med bara frånvaron i
+ * raderna, utan stämplingar och raster. Summeringen är densamma. Se `rows` i
  * timesheet-pdf.ts.
  */
 
@@ -92,13 +97,7 @@ export async function GET(request: NextRequest) {
   const employeeIds =
     requested.length > 0
       ? requested
-      : (
-          await db.employee.findMany({
-            where: { active: true },
-            orderBy: { name: "asc" },
-            select: { id: true },
-          })
-        ).map((employee) => employee.id);
+      : await employeesForTimesheet(db, timeZone, from, to);
 
   if (employeeIds.length === 0) {
     return NextResponse.json(
@@ -160,11 +159,11 @@ export async function GET(request: NextRequest) {
 
   // Filnamnet säger vad filen är. En tidrapport ska inte kunna förväxlas med
   // ett orderunderlag i samma nedladdningsmapp.
-  const kind = absenceOnly ? "franvaro" : "tidrapport";
+  const kind = absenceOnly ? "loneunderlag" : "tidrapport";
   const base =
     periods.length === 1
       ? `${kind}-${slugify(periods[0].employee.name)}-${toDateInput(from, timeZone)}`
-      : `${absenceOnly ? "franvaro" : "tidrapporter"}-${slugify(companyName)}-${toDateInput(from, timeZone)}`;
+      : `${absenceOnly ? "loneunderlag" : "tidrapporter"}-${slugify(companyName)}-${toDateInput(from, timeZone)}`;
 
   // VISNING ELLER NEDLADDNING.
   //

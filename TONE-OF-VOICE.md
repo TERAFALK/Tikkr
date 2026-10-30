@@ -117,7 +117,8 @@ Det här är den ordlista som gäller. Byt inte synonym för variationens skull.
 | **underlag** | rapport, faktureringsunderlag | Dokumentet som går till kunden, per order. |
 | **efterkalkyl** | kalkyl, lönsamhetsrapport | Internt. Självkostnad, påslag, pris. |
 | **rapport** | tidrapport | Uttaget under Rapporter. **Får inte heta tidrapport.** |
-| **tidrapport** | lönerapport, tidsrapport | Löneunderlaget per anställd. Bara detta dokument heter så. |
+| **tidrapport** | lönerapport, tidsrapport | Sidan i panelen och veckans papper per anställd, med stämplingarna. Bara detta dokument heter så. |
+| **löneunderlag** | lönespec, lönespecifikation, lönerapport | Månadens papper per anställd till lönen, med frånvaron och summeringen. Timmar, aldrig belopp. Med stor bokstav och bestämd form, *Löneunderlaget*, är det också tillvalets namn. |
 | **beräknad tid** | budget, budgeterad tid, estimat | Per arbetsmoment på ordern. |
 | **planerad tid** | schemalagd tid, bokad tid | Planeringsmodulens rutor. Varken arbetad eller fakturerbar. |
 | **tillval** | modul (mot kunden), add-on, paket | *Modul* är kodens ord. Kunden ser *tillval*. |

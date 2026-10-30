@@ -641,7 +641,7 @@ shop_prices       — död, ersatt av shop_products.price_ore (se § 3.4)
 
    **Tikkr håller inget ATF-saldo.** Tidbanken, uttagen och det som vid
    årsskiftet blir pensionspremie hör till lönesystemet. Underlaget står på
-   tidrapporten och på utskriften Förra månaden per anställd, med en rad som
+   tidrapporten och på Löneunderlaget, se § 3.2, med en rad som
    visar talen det räknats på. Allt räknas i `src/lib/atf.ts`, och
    `tests/atf.test.ts` fäller det.
 
@@ -1307,8 +1307,8 @@ handling nästan alltid att stänga ordern. Frågan går genom samma åtgärd so
 knappen längre ner i menyn och därmed genom samma mellansteg: står någon
 instämplad ändras ingenting förrän administratören sett vilka.
 
-**Förra veckan per anställd: en person per sida.** Utskriften delas ut till var
-och en, och flöt personerna ihop gick den inte att dela ut utan att någon fick
+**Tidrapport föregående vecka: en person per sida.** Knappen hette Förra veckan
+per anställd till 2026-10-30. Utskriften delas ut till var och en, och flöt personerna ihop gick den inte att dela ut utan att någon fick
 läsa någon annans rader. Därför finns heller ingen slutsumma sist — den skulle
 hamna på den sista personens papper och påstå att raden ovanför gäller hen.
 Periodens totaler står på förstasidan.
@@ -1327,8 +1327,9 @@ Konsekvensen är att knappen hör till lönemodulen. Den sitter på Tidrapport,
 som redan är grindad, och inte på Rapporter. En kund utan löneunderlaget har
 ingen summering att skriva ut.
 
-**Förra månaden per anställd: samma papper med bara frånvaron** (tillagt
-2026-10-13, kundens begäran). Knappen bredvid veckans går till lönen. Raderna
+**Löneunderlag föregående månad: samma papper med bara frånvaron** (tillagt
+2026-10-13, kundens begäran, hette Förra månaden per anställd till
+2026-10-30). Knappen bredvid veckans går till lönen. Raderna
 visar frånvaron dag för dag, utan stämplingar och raster, och summan under
 dem är frånvarons. Summeringen längst ner är densamma som i veckans. En månad
 av stämplingar per person är flera sidor som lönen inte läser, och det lönen
@@ -1337,6 +1338,28 @@ behöver ur raderna är just frånvaron.
 Det är samma rutt och samma PDF med `rader=franvaro`, inte ett eget
 dokument. Två utskrifter av samma tidrapport som byggs var för sig hinner
 alltid börja räkna olika.
+
+**Pappret heter Löneunderlag** (ändrat 2026-10-30, kundens begäran): rubriken,
+dokumenttiteln, foten och filnamnet. Veckans papper heter fortfarande
+Tidrapport, och sidan och menyn likaså. Underskriftsraden står orörd, med
+Tidrapport ok, eftersom den är kundens egen blankett.
+
+**Löneunderlag vald period** (tillagt 2026-10-30, kundens fråga) tar perioden
+ur Från och Till på sidan. Månadsknappen når bara föregående månad, och en
+äldre månad gick inte att ta ut. Hela personalen kommer med även om en person
+är vald, som på månadsknappen. ATF står med när perioden är en hel
+kalendermånad.
+
+**Hela personalen är de aktiva OCH den som har tid i perioden** (ändrat
+2026-10-30). Det gäller båda utskrifterna, se `employeesForTimesheet` i
+`payroll.ts`. Med en vald period saknades annars den som slutat i april på
+underlaget för mars, utan att något på pappret sa det. En anonymiserad person
+får en sida under sitt anonyma namn.
+
+**En äldre månad räknas om, den är ingen kopia av det som skrevs ut då.**
+Arbetstiderna har ingen historik, och en justering av flexsaldot ligger på det
+ingående saldot. Planerad tid, flex och ATF följer alltså dagens värden. Det
+står i hjälpen.
 
 **Underlaget och efterkalkylen finns BARA som PDF** (ändrat 2026-10-01). Båda
 fanns också som Excel-ark, och kunden använde dem inte: det ena bifogas en
