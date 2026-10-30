@@ -23,6 +23,8 @@ import {
   Tr,
 } from "@/components/ui";
 
+export const metadata = { title: "Veckovy · Tikkr" };
+
 export const dynamic = "force-dynamic";
 
 const DAYS = ["Mån", "Tis", "Ons", "Tors", "Fre", "Lör", "Sön"];

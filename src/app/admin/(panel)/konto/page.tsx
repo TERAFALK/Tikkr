@@ -27,6 +27,8 @@ import {
   saveOwnProfile,
 } from "./actions";
 
+export const metadata = { title: "Ditt konto · Tikkr" };
+
 /**
  * DET EGNA KONTOT: namn, telefon, e-postadress och lösenord.
  *

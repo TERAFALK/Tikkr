@@ -10,6 +10,8 @@ import { customerOptions } from "@/lib/customers";
 import { listPaging } from "@/lib/paging";
 import { closeOrders, createOrder } from "./actions";
 
+export const metadata = { title: "Ordrar · Tikkr" };
+
 export const dynamic = "force-dynamic";
 
 export default async function OrdersPage({
@@ -102,6 +104,7 @@ export default async function OrdersPage({
           search={
             <SearchForm
               query={query}
+              label="Sök ordrar"
               placeholder="Ordernr, kund, kundnr…"
               clearHref="/admin/ordrar"
               perPage={page.take}

@@ -16,6 +16,8 @@ import {
 import { formatCurrency } from "@/lib/money";
 import { createMoment, renameMoment, toggleMoment } from "./actions";
 
+export const metadata = { title: "Arbetsmoment · Tikkr" };
+
 /** Hjälptexten är densamma i båda rutorna, så den står på ett ställe. */
 /** Samma text i båda rutorna, därför på ett ställe. */
 const COST_HINT = "Kronor per timme. Gäller tid som registreras framöver";

@@ -67,7 +67,7 @@ export function Section({
             <p className="mt-1 text-[13px] text-neutral-500">{description}</p>
           )}
         </div>
-        {action && <div className="shrink-0">{action}</div>}
+        {action && <div className="min-w-0 max-w-full">{action}</div>}
       </div>
       {children}
     </section>

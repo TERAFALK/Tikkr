@@ -15,6 +15,8 @@ import {
 } from "@/components/ui";
 import { createBreakType, toggleBreakType } from "./actions";
 
+export const metadata = { title: "Raster · Tikkr" };
+
 /**
  * RASTERNA, alltså rasttyperna på stämplingsskärmen. Löneunderlagets.
  *

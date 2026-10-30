@@ -29,6 +29,8 @@ import {
 } from "@/components/ui";
 import { createEmployee, toggleEmployee, updateEmployee } from "./actions";
 
+export const metadata = { title: "Anställda · Tikkr" };
+
 export const dynamic = "force-dynamic";
 
 /**
@@ -166,6 +168,7 @@ export default async function EmployeesPage({
             action={
               <SearchForm
                 query={query}
+                label="Sök anställda"
                 placeholder="Namn, anställningsnr…"
                 clearHref="/admin/anstallda"
                 perPage={page.take}

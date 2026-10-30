@@ -102,7 +102,9 @@ export function PageHeader({
           </p>
         )}
       </div>
-      {action && <div className="shrink-0">{action}</div>}
+      {/* Får brytas och aldrig bli bredare än sidan. Med `shrink-0` stod
+          knapparna på en rad och sköt hela sidan i sidled på en telefon. */}
+      {action && <div className="min-w-0 max-w-full">{action}</div>}
     </div>
   );
 }
@@ -208,7 +210,7 @@ export function CardHeader({
           <p className="mt-0.5 text-[13px] text-neutral-500">{description}</p>
         )}
       </div>
-      {action && <div className="shrink-0">{action}</div>}
+      {action && <div className="min-w-0 max-w-full">{action}</div>}
     </div>
   );
 }
@@ -390,7 +392,9 @@ export function TimeField({
 
 export function Table({ children }: { children: ReactNode }) {
   return (
-    <div className="overflow-x-auto">
+    // `relative` håller kvar dolda rubriker (`sr-only`), som annars är absolut
+    // positionerade utanför rullningsrutan och gör hela sidan bredare.
+    <div className="relative overflow-x-auto">
       <table className="min-w-full text-[13px]">{children}</table>
     </div>
   );

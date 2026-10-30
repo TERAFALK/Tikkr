@@ -11,6 +11,8 @@ import { formatDate } from "@/lib/format";
 import { discountFrom } from "@/lib/company-prices";
 import { openBillingPortal, startCheckout } from "./actions";
 
+export const metadata = { title: "Prenumeration · Tikkr" };
+
 /**
  * Belopp med tusentalsavgränsare. Ligger på modulnivå och inte i
  * sidkomponenten, eftersom raderna under också skriver belopp.

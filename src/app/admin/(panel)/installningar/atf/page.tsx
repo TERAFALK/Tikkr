@@ -15,6 +15,8 @@ import {
 import { COLLECTIVE_AGREEMENTS, findAgreement } from "@/lib/collective-agreements";
 import { saveAtfAgreement } from "./actions";
 
+export const metadata = { title: "Arbetstidsförkortning · Tikkr" };
+
 /**
  * ARBETSTIDSFÖRKORTNING (tillagt 2026-10-13).
  *

@@ -9,6 +9,8 @@ import ProfileFields from "@/components/admin/ProfileFields";
 import { profileToValues } from "@/lib/shop/profile";
 import { saveCompany, saveCompanyProfile, saveMarkup } from "./actions";
 
+export const metadata = { title: "Inställningar · Tikkr" };
+
 export const dynamic = "force-dynamic";
 
 export default async function CompanySettingsPage() {

@@ -40,6 +40,8 @@ import { planToday, type PlanStatus } from "@/lib/plan-today";
 import { planningModeOf } from "@/lib/planning";
 import type { CompanyDb } from "@/lib/tenant";
 
+export const metadata = { title: "Översikt · Tikkr" };
+
 export const dynamic = "force-dynamic";
 
 /**
