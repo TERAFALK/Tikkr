@@ -512,6 +512,65 @@ dialog {
 }
 
 /*
+  TABELLER SOM KORT PÅ TELEFON (2026-10-30).
+
+  Samma celler som på skrivbordet, ritade om med stilmallen. Två uppsättningar
+  markup hade kunnat visa olika saker. Rubrikraden hålls kvar för skärmläsare,
+  och kolumnens namn står i varje cell via `data-label`, se `Table` i
+  src/components/ui/index.tsx.
+*/
+@media (max-width: 39.99rem) {
+  .data-list,
+  .data-list tbody,
+  .data-list tr {
+    display: block;
+    width: 100%;
+  }
+
+  .data-list thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+  }
+
+  .data-list tr {
+    padding: 0.75rem 1rem;
+  }
+
+  .data-list td {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 0.125rem 0;
+    text-align: right;
+  }
+
+  .data-list td > * {
+    min-width: 0;
+  }
+
+  .data-list td:not([data-label]) {
+    justify-content: flex-start;
+    text-align: left;
+  }
+
+  .data-list td:empty {
+    display: none;
+  }
+
+  .data-list td[data-label]::before {
+    content: attr(data-label);
+    flex-shrink: 0;
+    color: var(--color-skiffer);
+    font-size: 0.75rem;
+    text-align: left;
+  }
+}
+
+/*
   KOMPAKT LÄGE PÅ LÅGA SKÄRMAR.
 
   Stämplingsskärmen får aldrig behöva skrollas — det som ligger under kanten
