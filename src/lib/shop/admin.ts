@@ -1,5 +1,6 @@
 import type { Prisma, ShopOrderStatus, ShopPaymentStatus } from "@prisma/client";
 import { unsafeGlobalPrisma } from "../db";
+import { listPaging, type PageRequest } from "../paging";
 import { orderTotals } from "./pricing";
 import {
   allowedPaymentNext,
@@ -35,9 +36,7 @@ export class ShopActionError extends Error {
 
 const STALE = "Beställningen har ändrats sedan sidan laddades. Ladda om och försök igen.";
 
-export const SHOP_ORDERS_PER_PAGE = 50;
-
-export interface ShopOrderFilters {
+export interface ShopOrderFilters extends PageRequest {
   q?: string;
   status?: ShopOrderStatus;
   payment?: ShopPaymentStatus;
@@ -45,7 +44,6 @@ export interface ShopOrderFilters {
   attention?: boolean;
   from?: Date;
   to?: Date;
-  page?: number;
 }
 
 /** Samma urval som needsAttention i status.ts, som en databasfråga. */
@@ -82,31 +80,31 @@ function whereFor(filters: ShopOrderFilters): Prisma.ShopOrderWhereInput {
 
 export async function listShopOrders(filters: ShopOrderFilters) {
   const where = whereFor(filters);
-  const page = Math.max(1, Math.floor(filters.page ?? 1));
 
-  const [rows, total] = await Promise.all([
-    unsafeGlobalPrisma.shopOrder.findMany({
-      where,
-      orderBy: { createdAt: "desc" },
-      skip: (page - 1) * SHOP_ORDERS_PER_PAGE,
-      take: SHOP_ORDERS_PER_PAGE,
-      select: {
-        id: true,
-        number: true,
-        companyId: true,
-        companyName: true,
-        status: true,
-        paymentStatus: true,
-        totalOre: true,
-        shippingOre: true,
-        createdAt: true,
-        lines: { select: { name: true, quantity: true }, orderBy: { sortOrder: "asc" } },
-      },
-    }),
-    unsafeGlobalPrisma.shopOrder.count({ where }),
-  ]);
+  // Antalet först, så att ett sidnummer bortom slutet kan visa sista sidan.
+  const total = await unsafeGlobalPrisma.shopOrder.count({ where });
+  const paging = listPaging(total, filters);
 
-  return { rows, total, page, pages: Math.max(1, Math.ceil(total / SHOP_ORDERS_PER_PAGE)) };
+  const rows = await unsafeGlobalPrisma.shopOrder.findMany({
+    where,
+    orderBy: { createdAt: "desc" },
+    skip: paging.skip,
+    take: paging.take,
+    select: {
+      id: true,
+      number: true,
+      companyId: true,
+      companyName: true,
+      status: true,
+      paymentStatus: true,
+      totalOre: true,
+      shippingOre: true,
+      createdAt: true,
+      lines: { select: { name: true, quantity: true }, orderBy: { sortOrder: "asc" } },
+    },
+  });
+
+  return { rows, total, paging };
 }
 
 /** Siffran vid Beställningar i menyn. */

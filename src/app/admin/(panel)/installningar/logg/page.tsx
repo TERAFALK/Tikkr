@@ -3,12 +3,11 @@ import { requireAdmin } from "@/lib/admin-session";
 import { hasModule } from "@/lib/company-modules";
 import { companyTimeZone } from "@/lib/company";
 import { describeAuditEvents } from "@/lib/audit-view";
+import { listPaging } from "@/lib/paging";
 import Pager from "@/components/platform/Pager";
 import { Card, CardHeader, EmptyState, Table, Td, Th, Tr } from "@/components/ui";
 
 export const dynamic = "force-dynamic";
-
-const PER_PAGE = 50;
 
 /**
  * ÄNDRINGSLOGGEN.
@@ -24,7 +23,7 @@ const PER_PAGE = 50;
 export default async function AuditLogPage({
   searchParams,
 }: {
-  searchParams: Promise<{ post?: string; sida?: string }>;
+  searchParams: Promise<{ post?: string; sida?: string; antal?: string }>;
 }) {
   const { db, companyId } = await requireAdmin();
   const params = await searchParams;
@@ -39,14 +38,13 @@ export default async function AuditLogPage({
   };
 
   const total = await db.auditEvent.count({ where });
-  const pageCount = Math.max(1, Math.ceil(total / PER_PAGE));
-  const page = Math.min(Math.max(1, Number(params.sida) || 1), pageCount);
+  const page = listPaging(total, params);
 
   const events = await db.auditEvent.findMany({
     where,
     orderBy: { createdAt: "desc" },
-    skip: (page - 1) * PER_PAGE,
-    take: PER_PAGE,
+    skip: page.skip,
+    take: page.take,
   });
 
   const rows = await describeAuditEvents(
@@ -56,13 +54,6 @@ export default async function AuditLogPage({
   );
 
   const base = "/admin/installningar/logg";
-  const hrefFor = (target: number) => {
-    const search = new URLSearchParams();
-    if (params.post) search.set("post", params.post);
-    if (target > 1) search.set("sida", String(target));
-    const query = search.toString();
-    return query ? `${base}?${query}` : base;
-  };
 
   return (
     <Card>
@@ -126,11 +117,11 @@ export default async function AuditLogPage({
           </Table>
 
           <Pager
-            page={page}
-            pageCount={pageCount}
+            paging={page}
             total={total}
             unit="ändringar"
-            hrefFor={hrefFor}
+            path={base}
+            keep={{ post: params.post }}
           />
         </>
       )}

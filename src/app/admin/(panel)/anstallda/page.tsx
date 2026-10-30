@@ -6,8 +6,8 @@ import { unsafeGlobalPrisma } from "@/lib/db";
 import { findAgreement } from "@/lib/collective-agreements";
 import { listPaging } from "@/lib/paging";
 import EmployeeDialog from "@/components/admin/EmployeeDialog";
-import ListPager from "@/components/admin/ListPager";
 import SearchForm from "@/components/admin/SearchForm";
+import Pager from "@/components/platform/Pager";
 import EmployeeAvatar from "@/components/ui/EmployeeAvatar";
 import type { ScheduleDayValue } from "@/components/admin/ScheduleDays";
 import {
@@ -275,12 +275,12 @@ export default async function EmployeesPage({
             </Table>
           )}
 
-          <ListPager
+          <Pager
             paging={page}
             total={total}
             unit="personer"
             path="/admin/anstallda"
-            query={query}
+            keep={{ q: query }}
           />
         </Card>
       )}

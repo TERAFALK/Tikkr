@@ -10,8 +10,8 @@ import { formatDuration } from "@/lib/format";
 import { formatCurrency, formatMarkup } from "@/lib/money";
 import MarginChart from "@/components/admin/MarginChart";
 import CustomerDialog from "@/components/admin/CustomerDialog";
-import ListPager from "@/components/admin/ListPager";
 import OrdersTable from "@/components/admin/OrdersTable";
+import Pager from "@/components/platform/Pager";
 import {
   ButtonLink,
   Card,
@@ -298,7 +298,7 @@ export default async function CustomerPage({
               title="Ordrar"
               hideCustomer
               pager={
-                <ListPager
+                <Pager
                   paging={page}
                   total={orderTotal}
                   unit="ordrar"

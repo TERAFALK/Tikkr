@@ -1,43 +1,54 @@
 import Link from "next/link";
+import {
+  listHref,
+  PER_PAGE,
+  PER_PAGE_CHOICES,
+  type Paging,
+} from "@/lib/paging";
 
 /**
- * SIDBLÄDDRING.
+ * SIDBLÄDDRINGEN, SAMMA PÅ VARJE LISTA.
  *
- * Föregående, nästa, och var man befinner sig. Inga numrerade sidknappar:
- * med tio sidor är de överflödiga och med tusen ryms de inte, och den som
- * verkligen letar efter något gammalt är hjälpt av sökning, inte av att kunna
- * hoppa till sida 47.
+ * Föregående, nästa, var man befinner sig och hur många rader en sida bär. Inga
+ * numrerade sidknappar: med tio sidor är de överflödiga och med tusen ryms de
+ * inte, och den som verkligen letar efter något gammalt är hjälpt av sökning,
+ * inte av att kunna hoppa till sida 47.
  *
  * Länkar och inte knappar. Ett sidnummer i adressen går att spara, skicka
  * vidare och backa ur, vilket ingen JavaScript-lösning ger gratis.
  *
- * Visas inte alls när allt får plats på en sida, utom med `sizes`: den som valt
- * 100 rader och fått plats med allt måste kunna välja om. Se ListPager.
+ * Syns inte alls när hela listan ryms i förvalet (`PER_PAGE`). Det avgörs på
+ * antalet rader och inte på antalet sidor: den som valt 100 på en lista med 80
+ * rader har en sida, men ska fortfarande kunna välja om.
+ *
+ * Ett nytt radantal börjar om på sidan ett. Sida 7 med 25 rader säger ingenting
+ * om var man hamnar med 100.
  */
 export default function Pager({
-  page,
-  pageCount,
+  paging,
   total,
   unit,
-  hrefFor,
-  sizes,
+  path,
+  keep,
+  anchor,
 }: {
-  page: number;
-  pageCount: number;
+  paging: Paging;
   total: number;
   /** Vad raderna är, i plural: "händelser", "företag". */
   unit: string;
-  hrefFor: (page: number) => string;
-  /** Valet av rader per sida. Utelämnat ger bara bläddringen. */
-  sizes?: {
-    current: number;
-    choices: number[];
-    hrefFor: (perPage: number) => string;
-  };
+  path: string;
+  /** Filtren som följer med mellan sidorna. Tomma värden utelämnas. */
+  keep?: Record<string, string | undefined>;
+  /** Listans id, när den ligger långt ner på sidan. Se `listHref`. */
+  anchor?: string;
 }) {
-  if (pageCount <= 1 && !sizes) return null;
+  if (total <= PER_PAGE) return null;
 
+  const { page, pageCount, take } = paging;
   const paged = pageCount > 1;
+
+  const hrefFor = (target: number, perPage: number = take) =>
+    listHref(path, { keep, page: target, perPage, anchor });
 
   return (
     <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-t border-neutral-100 px-5 py-3">
@@ -47,33 +58,31 @@ export default function Pager({
       </p>
 
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-        {sizes && (
-          <div
-            role="group"
-            aria-label="Rader per sida"
-            className="flex items-center gap-1"
-          >
-            <span className="mr-1 text-[13px] text-neutral-500">Visa</span>
-            {sizes.choices.map((choice) => {
-              const active = choice === sizes.current;
+        <div
+          role="group"
+          aria-label="Rader per sida"
+          className="flex items-center gap-1"
+        >
+          <span className="mr-1 text-[13px] text-neutral-500">Visa</span>
+          {PER_PAGE_CHOICES.map((choice) => {
+            const active = choice === take;
 
-              return (
-                <Link
-                  key={choice}
-                  href={sizes.hrefFor(choice)}
-                  aria-current={active ? "true" : undefined}
-                  className={`rounded-md px-2.5 py-1 text-xs font-medium transition-colors ${
-                    active
-                      ? "bg-neutral-900 text-white"
-                      : "bg-neutral-100 text-neutral-600 hover:bg-neutral-200"
-                  }`}
-                >
-                  {choice}
-                </Link>
-              );
-            })}
-          </div>
-        )}
+            return (
+              <Link
+                key={choice}
+                href={hrefFor(1, choice)}
+                aria-current={active ? "true" : undefined}
+                className={`rounded-md px-2.5 py-1 text-xs font-medium transition-colors ${
+                  active
+                    ? "bg-neutral-900 text-white"
+                    : "bg-neutral-100 text-neutral-600 hover:bg-neutral-200"
+                }`}
+              >
+                {choice}
+              </Link>
+            );
+          })}
+        </div>
 
         {paged && (
           <div className="flex gap-2">
@@ -88,6 +97,19 @@ export default function Pager({
       </div>
     </div>
   );
+}
+
+/**
+ * Radvalet i ett sök- eller filterformulär.
+ *
+ * Ett GET-formulär skickar bara sina egna fält, och utan det här hade varje
+ * sökning gått tillbaka till 50 rader. Sidnumret följer inte med: ett nytt
+ * urval är en ny lista.
+ */
+export function PerPageField({ perPage }: { perPage: number }) {
+  if (perPage === PER_PAGE) return null;
+
+  return <input type="hidden" name="antal" value={perPage} />;
 }
 
 function Step({

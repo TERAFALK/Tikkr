@@ -21,6 +21,7 @@ import {
 } from "./company-prices";
 import { SCREEN_ITEM, type PriceItem } from "./price-book";
 import { resetAdminMfa } from "./admin-mfa";
+import { listPaging, type PageRequest, type Paging } from "./paging";
 
 /**
  * PLATTFORMSADMINISTRATION.
@@ -752,12 +753,8 @@ export interface AuditPage {
     createdAt: Date;
   }[];
   total: number;
-  page: number;
-  pageCount: number;
+  paging: Paging;
 }
-
-/** Hur många rader ur loggen som visas per sida. */
-export const AUDIT_PER_PAGE = 50;
 
 /**
  * Åtgärdsloggen, sidvis.
@@ -769,26 +766,24 @@ export const AUDIT_PER_PAGE = 50;
  * Sidnumret räknas om till ett giltigt intervall i stället för att avvisas. En
  * adress som pekar förbi slutet ska visa sista sidan, inte ett felmeddelande.
  */
-export async function auditLog(params: {
-  companyId?: string;
-  page?: number;
-}): Promise<AuditPage> {
+export async function auditLog(
+  params: { companyId?: string } & PageRequest
+): Promise<AuditPage> {
   const where = params.companyId
     ? { targetCompanyId: params.companyId }
     : undefined;
 
   const total = await unsafeGlobalPrisma.platformAuditLog.count({ where });
-  const pageCount = Math.max(1, Math.ceil(total / AUDIT_PER_PAGE));
-  const page = Math.min(Math.max(1, params.page ?? 1), pageCount);
+  const paging = listPaging(total, params);
 
   const rows = await unsafeGlobalPrisma.platformAuditLog.findMany({
     where,
     orderBy: { createdAt: "desc" },
-    skip: (page - 1) * AUDIT_PER_PAGE,
-    take: AUDIT_PER_PAGE,
+    skip: paging.skip,
+    take: paging.take,
   });
 
-  return { rows, total, page, pageCount };
+  return { rows, total, paging };
 }
 
 /**

@@ -113,7 +113,7 @@ describe("listHref", () => {
 
   it("tar med sökning, sida och radantal", () => {
     const href = listHref("/admin/ordrar", {
-      query: "volvo ab",
+      keep: { q: "volvo ab" },
       page: 2,
       perPage: 100,
     });
@@ -122,6 +122,27 @@ describe("listHref", () => {
     expect(search.get("q")).toBe("volvo ab");
     expect(search.get("sida")).toBe("2");
     expect(search.get("antal")).toBe("100");
+  });
+
+  it("utelämnar tomma filter", () => {
+    expect(
+      listHref("/admin/ordrar", {
+        keep: { q: "", kund: undefined },
+        page: 1,
+        perPage: 50,
+      })
+    ).toBe("/admin/ordrar");
+  });
+
+  it("låter en hel adress skickas in utan att gamla sida och antal följer med", () => {
+    // Rapporter och Beställningar skickar in alla sina adressparametrar.
+    const href = listHref("/admin/rapporter", {
+      keep: { from: "2026-10-01", sida: "4", antal: "25" },
+      page: 1,
+      perPage: 100,
+    });
+
+    expect(href).toBe("/admin/rapporter?from=2026-10-01&antal=100");
   });
 
   it("sätter ankaret sist", () => {
@@ -195,5 +216,16 @@ describe("weekStep och sidnumret", () => {
       expect(search.get("sida")).toBeNull();
       expect(search.get("employeeId")).toBe("e1");
     }
+  });
+
+  it("behåller radantalet när perioden flyttas", () => {
+    const { forwardHref } = weekStep(
+      "/admin/stamplingar",
+      { from: "2026-10-05", to: "2026-10-11", antal: "100", sida: "4" },
+      "Europe/Stockholm"
+    );
+
+    const search = new URL(forwardHref, "https://tikkr.test").searchParams;
+    expect(search.get("antal")).toBe("100");
   });
 });

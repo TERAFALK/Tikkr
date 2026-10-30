@@ -209,16 +209,20 @@ och en grupp som delas mellan två sidor behåller sin egen summa
 hela urvalet, eftersom summorna behöver det. Pågående stämplingar står
 överst på första sidan. Sidnumret följer inte med när perioden byts.
 
-**Ordrar, Kunder och Anställda bläddras också, och man väljer hur många rader
-en sida visar** (beslutat 2026-10-30, produktägarens önskan). Gäller listorna
-under Ordrar, Kunder och Anställda och ordrarna på en kundsida. Förvalet är 50,
+**Varje lista bläddras likadant, och man väljer hur många rader en sida
+visar** (beslutat 2026-10-30, produktägarens önskan). Gäller Ordrar, Kunder,
+Anställda, ordrarna på en kundsida, Stämplingar, Rapporter och Ändringsloggen,
+och plattformens Kunder, Historik, Händelser, Inkorg och Beställningar. Det
+finns EN komponent, `Pager`, och den går inte att använda utan radvalet.
+Förvalet är 50 överallt, också i plattformens kundlista och inkorg som hade 25,
 och 25, 100 och 200 går att välja. Rymmer listan högst 50 rader syns ingen
 bläddring alls, vad adressen än säger (`listPaging`). Är den längre står valet
 kvar även när allt ryms på en sida, så att det går att välja om. Valet ligger i
 adressen som `antal`, och inte i en kaka, av samma skäl som `helg=visa` på
-tavlan. Sökningen och valet följer med varandra; sidnumret börjar om.
-Bläddringen göms i markeringsläget, som sökrutan. Rubrikens antal gäller hela
-urvalet. Ordrar och Anställda bläddrar i databasen, Kunder i minnet.
+tavlan. Filter och sökning behåller valet; sidnumret börjar om. Uttaget i
+Rapporter påverkas inte av något av dem. Bläddringen göms i markeringsläget,
+som sökrutan. Rubrikens antal gäller hela urvalet. Ordrar och Anställda
+bläddrar i databasen, registren som redan hämtas hela i minnet.
 
 Stämplingar har EN Ändra-ruta för hela listan (ändrat 2026-10-20). Varje rad
 hade en egen, och varje ruta bar hela orderregistret, så sidan växte med rader

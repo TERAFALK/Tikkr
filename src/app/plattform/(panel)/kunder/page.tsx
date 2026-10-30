@@ -13,11 +13,9 @@ import {
   Tr,
 } from "@/components/ui";
 import { formatDate, formatDateTime } from "@/lib/format";
-import Pager from "@/components/platform/Pager";
+import { listPaging, pageRows } from "@/lib/paging";
+import Pager, { PerPageField } from "@/components/platform/Pager";
 import { SubscriptionBadge } from "@/components/platform/Pieces";
-
-/** Antal företag per sida i listan. */
-const PER_PAGE = 25;
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Kunder · Tikkr" };
@@ -37,7 +35,7 @@ export const metadata = { title: "Kunder · Tikkr" };
 export default async function CompaniesPage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string; sida?: string }>;
+  searchParams: Promise<{ q?: string; sida?: string; antal?: string }>;
 }) {
   await requirePlatformAdmin();
 
@@ -52,17 +50,8 @@ export default async function CompaniesPage({
       )
     : companies;
 
-  const pageCount = Math.max(1, Math.ceil(matches.length / PER_PAGE));
-  const page = Math.min(Math.max(1, Number(search.sida) || 1), pageCount);
-  const shown = matches.slice((page - 1) * PER_PAGE, page * PER_PAGE);
-
-  /** Bevarar sökningen när man bläddrar. */
-  const listHref = (next: number) => {
-    const params = new URLSearchParams();
-    if (query) params.set("q", query);
-    params.set("sida", String(next));
-    return `/plattform/kunder?${params}`;
-  };
+  const page = listPaging(matches.length, search);
+  const shown = pageRows(matches, page);
 
   const kr = (value: number) => `${value.toLocaleString("sv-SE")} kr`;
 
@@ -84,6 +73,7 @@ export default async function CompaniesPage({
               /* Formulär utan JavaScript. Sökningen hamnar i adressen, så att
                  en träfflista går att spara och skicka vidare. */
               <form className="flex gap-2">
+                <PerPageField perPage={page.take} />
                 {/* Fältet är inte <Input>: den är block w-full och skulle ta
                     hela kortrubriken. Klasserna är designsystemets, med en
                     egen bredd. */}
@@ -172,11 +162,11 @@ export default async function CompaniesPage({
           )}
 
           <Pager
-            page={page}
-            pageCount={pageCount}
+            paging={page}
             total={matches.length}
             unit={query ? "träffar" : "företag"}
-            hrefFor={listHref}
+            path="/plattform/kunder"
+            keep={{ q: query }}
           />
         </Card>
       )}

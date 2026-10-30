@@ -19,11 +19,11 @@ export default async function CompanyHistoryPage({
   searchParams,
 }: {
   params: Promise<{ companyId: string }>;
-  searchParams: Promise<{ sida?: string }>;
+  searchParams: Promise<{ sida?: string; antal?: string }>;
 }) {
   await requirePlatformAdmin();
   const { companyId } = await params;
-  const page = Number((await searchParams).sida) || 1;
+  const { sida, antal } = await searchParams;
 
   const company = await unsafeGlobalPrisma.company.findUnique({
     where: { id: companyId },
@@ -32,7 +32,7 @@ export default async function CompanyHistoryPage({
 
   if (!company) notFound();
 
-  const log = await auditLog({ companyId, page });
+  const log = await auditLog({ companyId, sida, antal });
 
   return (
     <>
@@ -60,13 +60,10 @@ export default async function CompanyHistoryPage({
             />
             <ActivityTable rows={log.rows} />
             <Pager
-              page={log.page}
-              pageCount={log.pageCount}
+              paging={log.paging}
               total={log.total}
               unit="händelser"
-              hrefFor={(next) =>
-                `/plattform/kunder/${companyId}/historik?sida=${next}`
-              }
+              path={`/plattform/kunder/${companyId}/historik`}
             />
           </Card>
         )}
