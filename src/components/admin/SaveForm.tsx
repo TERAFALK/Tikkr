@@ -5,6 +5,7 @@ import { useFormStatus } from "react-dom";
 import { Alert, Button } from "@/components/ui";
 import type { SaveState } from "@/lib/save-state";
 import { useFieldError, useKeptSubmit } from "@/components/ui/useFieldError";
+import UnsavedGuard from "@/components/ui/UnsavedGuard";
 
 /**
  * ETT FORMULÄR SOM SÄGER ATT DET SPARADE.
@@ -45,6 +46,7 @@ export default function SaveForm({
 
   return (
     <form ref={form} onSubmit={onSubmit} className={className}>
+      <UnsavedGuard form={form} saved={state.savedAt} />
       {state.error && <Alert id={errorId}>{state.error}</Alert>}
 
       {children}
