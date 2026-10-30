@@ -38,6 +38,7 @@ import { buildWeek, isoWeekNumber } from "@/lib/week";
 import { orderRows } from "@/lib/orders";
 import { planToday, type PlanStatus } from "@/lib/plan-today";
 import { planningModeOf } from "@/lib/planning";
+import { personHref } from "@/lib/person-link";
 import type { CompanyDb } from "@/lib/tenant";
 
 export const metadata = { title: "Översikt · Tikkr" };
@@ -66,6 +67,7 @@ export default async function OverviewPage() {
   // kör UTC, så ett dygn räknat där börjar 02:00 på verkstadsgolvet på
   // sommaren — och ett kvällspass hamnar på fel dag.
   const timeZone = await companyTimeZone(companyId);
+  const payroll = await hasModule(companyId, "PAYROLL");
   const now = new Date();
   const silentBefore = new Date(
     now.getTime() - SILENT_DEVICE_HOURS * 60 * 60 * 1000
@@ -94,6 +96,7 @@ export default async function OverviewPage() {
       select: {
         id: true,
         employeeId: true,
+        orderId: true,
         clockInAt: true,
         employee: { select: { name: true } },
         kind: true,
@@ -289,10 +292,22 @@ export default async function OverviewPage() {
                 {working.map((entry) => (
                   <Tr key={entry.id}>
                     <Td>
-                      <span className="font-medium">{entry.employee.name}</span>
+                      <Link
+                        href={personHref(entry.employeeId, payroll)}
+                        className="font-medium hover:underline"
+                      >
+                        {entry.employee.name}
+                      </Link>
                     </Td>
                     <Td>
-                      {entry.order?.orderNumber ?? (
+                      {entry.orderId ? (
+                        <Link
+                          href={`/admin/ordrar/${entry.orderId}`}
+                          className="text-link hover:underline"
+                        >
+                          {entry.order?.orderNumber}
+                        </Link>
+                      ) : (
                         <Badge tone="muted">Improduktiv</Badge>
                       )}
                       {entry.order?.customer && (

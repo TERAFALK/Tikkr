@@ -79,7 +79,7 @@ const sections: SettingsSection[] = [
         // nytta med löneunderlaget eller planeringen. Se work-hours.ts.
         href: "/admin/installningar/arbetstider",
         label: "Arbetstider",
-        description: "Schema och raster",
+        description: "Veckoschema",
         icon: IconTimeline,
         anyModule: WORK_HOURS_MODULES,
       },
@@ -141,8 +141,8 @@ const sections: SettingsSection[] = [
     pages: [
       {
         href: "/admin/installningar/schema",
-        label: "Raster",
-        description: "Rasttyper på skärmen",
+        label: "Rasttyper",
+        description: "Knappar på stämplingsskärmen",
         icon: IconTimeline,
       },
       {

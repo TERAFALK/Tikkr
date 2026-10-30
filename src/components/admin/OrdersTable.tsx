@@ -264,8 +264,9 @@ export default function OrdersTable({
 
       {orders.length === 0 ? (
         <p className="px-5 py-6 text-[13px] text-neutral-500">
-          Ingen order matchar ”{query}”. Sökningen tittar på ordernummer, kund
-          och kundnummer.
+          {query
+            ? `Ingen order matchar ”${query}”. Sökningen tittar på ordernummer, kund och kundnummer.`
+            : "Inga ordrar med den statusen"}
         </p>
       ) : (
         <Table>
@@ -280,7 +281,7 @@ export default function OrdersTable({
               {!hideCustomer && <Th>Kund</Th>}
               <Th>Status</Th>
               <Th numeric>Stämplingar</Th>
-              <Th numeric>Upparbetad tid (timmar)</Th>
+              <Th numeric>Registrerad tid (timmar)</Th>
               <Th>Mot beräknad tid</Th>
             </tr>
           </thead>

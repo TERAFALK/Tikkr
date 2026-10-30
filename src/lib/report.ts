@@ -56,6 +56,7 @@ export interface ReportRow {
    */
   label: string;
   /** Ordernumret. null på improduktiv tid — den hör inte till någon order. */
+  orderId: string | null;
   orderNumber: string | null;
   customerName: string | null;
   /** Arbetsmomentet, eller det improduktiva momentet. */
@@ -207,6 +208,7 @@ export async function buildReport(
       employeeName: entry.employee.name,
       employeeNumber: entry.employee.employeeNumber,
       label: label.text,
+      orderId: entry.orderId,
       orderNumber: entry.order?.orderNumber ?? null,
       customerName: label.customerName,
       momentName: entry.moment?.name ?? entry.indirectMoment?.name ?? "",

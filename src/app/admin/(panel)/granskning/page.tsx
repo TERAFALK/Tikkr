@@ -103,7 +103,7 @@ export default async function ReviewPage() {
           <Table>
             <thead>
               <tr>
-                <Th>Anställd och jobb</Th>
+                <Th>Anställd och order</Th>
                 <Th>Instämplad</Th>
                 <Th numeric>Tid (timmar)</Th>
                 <Th>Sluttid</Th>

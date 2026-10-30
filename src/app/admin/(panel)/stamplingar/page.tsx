@@ -3,11 +3,12 @@ import { requireAdmin } from "@/lib/admin-session";
 import { companyTimeZone } from "@/lib/company";
 import NewEntryDialog from "@/components/admin/NewEntryDialog";
 import { EditEntryButton, EntryEditor } from "@/components/admin/EntryEditor";
-import FilterForm from "@/components/admin/FilterForm";
+import FilterBar from "@/components/admin/FilterBar";
+import SearchSelect from "@/components/admin/SearchSelect";
+import { hasModule } from "@/lib/company-modules";
+import { personHref } from "@/lib/person-link";
 import {
   Badge,
-  Button,
-  ButtonLink,
   Card,
   CardHeader,
   EmptyState,
@@ -53,6 +54,7 @@ export const dynamic = "force-dynamic";
 
 interface SearchParams {
   employeeId?: string;
+  orderId?: string;
   from?: string;
   to?: string;
   sida?: string;
@@ -70,6 +72,7 @@ export default async function EntriesPage({
   const params = await searchParams;
 
   const timeZone = await companyTimeZone(companyId);
+  const payroll = await hasModule(companyId, "PAYROLL");
 
   // INGET FÖRVALT FRÅNDATUM (ändrat 2026-09-29). Listan började tidigare två
   // veckor tillbaka, med skälet att en obegränsad lista blir oanvändbar. Det
@@ -105,6 +108,7 @@ export default async function EntriesPage({
    */
   const entryFilter = {
     employeeId: params.employeeId || undefined,
+    orderId: params.orderId || undefined,
     // Utelämnas helt när inget datum valts. Ett tomt villkorsobjekt hade gett
     // samma svar, men den här formen säger rakt ut att ingen gräns finns.
     ...(fromDayStart || toDayEnd
@@ -248,74 +252,53 @@ export default async function EntriesPage({
         }
       />
 
-      <Card className="mb-6">
-        <CardHeader
-          title="Filter"
-          action={
-            // Samma snabbval som i rapportvyn, av samma skäl: två datumfält per
-            // gång blir många knapptryck för det man gör oftast.
-            <div className="flex flex-wrap items-center gap-2">
-              {/* Veckostegaren bredvid snabbvalen, som i rapportvyn. */}
-              <WeekStepper {...week} />
+      <FilterBar
+        week={week}
+        presets={presets}
+        current={params}
+        presetHref={(preset) =>
+          presetHref(
+            "/admin/stamplingar",
+            { employeeId: params.employeeId, orderId: params.orderId },
+            preset,
+            page.take
+          )
+        }
+        resetHref="/admin/stamplingar"
+      >
+        <PerPageField perPage={page.take} />
 
-              <div className="flex flex-wrap gap-1">
-                {presets.map((preset) => {
-                  const active =
-                    params.from === preset.from && params.to === preset.to;
+        <Field label="Från och med">
+          <Input type="date" name="from" defaultValue={params.from ?? ""} />
+        </Field>
 
-                  return (
-                    <Link
-                      key={preset.label}
-                      href={presetHref(
-                        "/admin/stamplingar",
-                        { employeeId: params.employeeId },
-                        preset,
-                        page.take
-                      )}
-                      className={`rounded-md px-2.5 py-1 text-xs font-medium transition-colors ${
-                        active
-                          ? "bg-neutral-900 text-white"
-                          : "bg-neutral-100 text-neutral-600 hover:bg-neutral-200"
-                      }`}
-                    >
-                      {preset.label}
-                    </Link>
-                  );
-                })}
-              </div>
-            </div>
-          }
-        />
-        <FilterForm className="grid gap-4 p-5 sm:grid-cols-2 lg:grid-cols-4">
-          <PerPageField perPage={page.take} />
+        <Field label="Till och med">
+          <Input type="date" name="to" defaultValue={params.to ?? ""} />
+        </Field>
 
-          <Field label="Från och med">
-            <Input type="date" name="from" defaultValue={params.from ?? ""} />
-          </Field>
+        <Field label="Anställd">
+          <Select name="employeeId" defaultValue={params.employeeId ?? ""}>
+            <option value="">Alla</option>
+            {employees.map((employee) => (
+              <option key={employee.id} value={employee.id}>
+                {employee.name}
+              </option>
+            ))}
+          </Select>
+        </Field>
 
-          <Field label="Till och med">
-            <Input type="date" name="to" defaultValue={params.to ?? ""} />
-          </Field>
-
-          <Field label="Anställd">
-            <Select name="employeeId" defaultValue={params.employeeId ?? ""}>
-              <option value="">Alla</option>
-              {employees.map((employee) => (
-                <option key={employee.id} value={employee.id}>
-                  {employee.name}
-                </option>
-              ))}
-            </Select>
-          </Field>
-
-          <div className="flex items-end gap-2">
-            <Button type="submit">Visa</Button>
-            <ButtonLink href="/admin/stamplingar" tone="secondary">
-              Rensa
-            </ButtonLink>
-          </div>
-        </FilterForm>
-      </Card>
+        {/* Ordersidan leder hit, så att en felaktig stämpling går att rätta
+            utan att man först måste veta vem som stämplade och när. */}
+        <Field label="Order">
+          <SearchSelect
+            name="orderId"
+            options={orderOptions}
+            defaultValue={params.orderId}
+            placeholder="Sök order…"
+            emptyLabel="Alla ordrar"
+          />
+        </Field>
+      </FilterBar>
 
       {total === 0 ? (
         <EmptyState
@@ -329,7 +312,7 @@ export default async function EntriesPage({
         >
         <Card>
           <CardHeader
-            title={`${total.toLocaleString("sv-SE")} ${total === 1 ? "post" : "poster"}`}
+            title={`${total.toLocaleString("sv-SE")} ${total === 1 ? "stämpling" : "stämplingar"}`}
           />
           <Table>
             <thead>
@@ -351,7 +334,12 @@ export default async function EntriesPage({
                 return (
                   <Tr key={entry.id}>
                     <Td>
-                      <span className="font-medium">{entry.employee.name}</span>
+                      <Link
+                        href={personHref(entry.employeeId, payroll)}
+                        className="font-medium hover:underline"
+                      >
+                        {entry.employee.name}
+                      </Link>
                       {entry.source === "ADMIN_MANUAL" && (
                         <span className="ml-2">
                           <Badge>Manuell</Badge>
@@ -365,7 +353,19 @@ export default async function EntriesPage({
                     </Td>
 
                     <Td muted>
-                      {describeEntry(entry).text}
+                      {entry.orderId && entry.order ? (
+                        <>
+                          <Link
+                            href={`/admin/ordrar/${entry.orderId}`}
+                            className="text-link hover:underline"
+                          >
+                            {entry.order.orderNumber}
+                          </Link>
+                          {entry.moment && ` · ${entry.moment.name}`}
+                        </>
+                      ) : (
+                        describeEntry(entry).text
+                      )}
                       {entry.order?.customer && (
                         <span className="mt-0.5 block text-xs text-neutral-500">
                           {entry.order.customer.name}
@@ -393,11 +393,7 @@ export default async function EntriesPage({
                       {/* Pågående poster ändras inte här. Att skriva in en
                           sluttid på ett jobb som fortfarande pågår skulle
                           stänga det bakom ryggen på den som står vid skärmen. */}
-                      {ongoing ? (
-                        <span className="block text-right text-xs text-neutral-500">
-                          Ändras när den avslutats
-                        </span>
-                      ) : (
+                      {ongoing ? null : (
                         // ÄNDRA OCH TA BORT. Borttagningen fanns inte mellan
                         // 2026-09-29 och 2026-10-13; den lämnar numera hela
                         // posten i ändringsloggen. Se deleteEntryManually.
@@ -464,6 +460,7 @@ export default async function EntriesPage({
               from: params.from,
               to: params.to,
               employeeId: params.employeeId,
+              orderId: params.orderId,
             }}
           />
         </Card>

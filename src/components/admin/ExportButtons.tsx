@@ -1,3 +1,5 @@
+"use client";
+
 import type { ReactNode } from "react";
 
 /**
@@ -16,7 +18,7 @@ export function ExportGroup({
   return (
     <div>
       <p className="mb-1 text-xs font-medium text-neutral-500">{label}</p>
-      <div className="flex items-center gap-2">{children}</div>
+      <div className="flex flex-wrap items-center gap-2">{children}</div>
     </div>
   );
 }

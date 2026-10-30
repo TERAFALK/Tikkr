@@ -267,7 +267,7 @@ export const GUIDES = [
       },
     ],
     notes: [
-      "Rasttyperna läggs upp under Inställningar, Raster, med Ny rast.",
+      "Rasttyperna läggs upp under Inställningar, Rasttyper, med Ny rast.",
       "Rasten räknas inte som arbetad tid och kan inte faktureras.",
     ],
     related: ["arbetstider", "tidrapport"],
@@ -541,7 +541,7 @@ export const GUIDES = [
         body: "Sorts tid väljer ordertid, improduktiv tid eller båda. Tryck Visa.",
       },
       {
-        title: "Tryck Excel för att räkna vidare",
+        title: "Tryck Ladda ner Excel för att räkna vidare",
         body: "Arket har tiden som ett tal, så att den går att summera.",
       },
     ],
@@ -571,7 +571,7 @@ export const GUIDES = [
         body: "Planerad tid räknas netto efter schemats raster.",
       },
       {
-        title: "Lägg upp rasttyperna under Inställningar, Raster",
+        title: "Lägg upp rasttyperna under Inställningar, Rasttyper",
         body: "Tryck Ny rast. De visas som val när någon trycker Rast på stämplingsskärmen.",
       },
       {

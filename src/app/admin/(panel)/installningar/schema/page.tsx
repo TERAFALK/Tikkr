@@ -15,7 +15,7 @@ import {
 } from "@/components/ui";
 import { createBreakType, toggleBreakType } from "./actions";
 
-export const metadata = { title: "Raster · Tikkr" };
+export const metadata = { title: "Rasttyper · Tikkr" };
 
 /**
  * RASTERNA, alltså rasttyperna på stämplingsskärmen. Löneunderlagets.
@@ -47,7 +47,7 @@ export default async function SchedulePage() {
     <div className="space-y-6">
       <Card>
         <CardHeader
-          title="Raster"
+          title="Rasttyper"
           help="arbetstider"
           action={
             <ActionDialog

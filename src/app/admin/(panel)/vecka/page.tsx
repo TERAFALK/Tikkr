@@ -3,6 +3,8 @@ import { requireAdmin } from "@/lib/admin-session";
 import { buildWeek, isoWeekNumber } from "@/lib/week";
 import WeekStepper from "@/components/admin/WeekStepper";
 import { companyTimeZone } from "@/lib/company";
+import { hasModule } from "@/lib/company-modules";
+import { personHref } from "@/lib/person-link";
 import {
   addDaysInZone,
   parseLocalDate,
@@ -51,6 +53,7 @@ export default async function WeekPage({
   // Veckan räknas i FÖRETAGETS tidszon, inte serverns. Containern kör UTC, och
   // gjorde vyn det också skulle en söndagskväll hamna i veckan efter.
   const timeZone = await companyTimeZone(companyId);
+  const payroll = await hasModule(companyId, "PAYROLL");
 
   // Länkarna bär ett kalenderdatum ("2026-09-22"), som tolkas i samma tidszon
   // som det skrevs i. Ett ogiltigt värde i adressfältet ger denna vecka i
@@ -80,7 +83,7 @@ export default async function WeekPage({
     <>
       <PageHeader
         title="Veckovy"
-        description="Huvudstämplingen per person och dag."
+        description="Arbetad tid per person och dag."
         action={
           // Samma reglage som på tidrapporten. Se WeekStepper.
           <div className="flex items-center gap-2">
@@ -137,9 +140,12 @@ export default async function WeekPage({
                         size={28}
                       />
                       <span className="min-w-0">
-                        <span className="block font-medium">
+                        <Link
+                          href={personHref(row.employeeId, payroll)}
+                          className="block font-medium hover:underline"
+                        >
                           {row.employeeName}
-                        </span>
+                        </Link>
                         {row.employeeNumber && (
                           <span className="block text-xs text-neutral-500">
                             {row.employeeNumber}
@@ -154,20 +160,18 @@ export default async function WeekPage({
                       {day.minutes === 0 ? (
                         <span className="text-neutral-300">—</span>
                       ) : (
-                        <span
-                          className={
-                            day.needsReview
-                              ? "font-medium text-amber-700"
-                              : "tabular-nums"
-                          }
-                          title={
-                            day.needsReview
-                              ? "Innehåller en post med beräknad sluttid"
-                              : undefined
-                          }
-                        >
-                          {formatDuration(day.minutes)}
-                        </span>
+                        day.needsReview ? (
+                          <Link
+                            href="/admin/granskning"
+                            className="font-medium text-amber-700 underline"
+                          >
+                            {formatDuration(day.minutes)}
+                          </Link>
+                        ) : (
+                          <span className="tabular-nums">
+                            {formatDuration(day.minutes)}
+                          </span>
+                        )
                       )}
                     </Td>
                   ))}
@@ -199,6 +203,14 @@ export default async function WeekPage({
               </Tr>
             </tbody>
           </Table>
+
+          {/* Färgen ensam säger ingenting, och ett `title` syns inte på en
+              pekskärm. */}
+          {week.rows.some((row) => row.days.some((day) => day.needsReview)) && (
+            <p className="border-t border-neutral-200 px-5 py-3 text-xs text-neutral-500">
+              Understruken gul tid innehåller en stämpling att granska.
+            </p>
+          )}
         </Card>
       )}
 
