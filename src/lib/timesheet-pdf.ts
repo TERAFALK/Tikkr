@@ -27,6 +27,7 @@ import { DOC } from "./brand";
  * MÅNADSUTSKRIFTEN HAR BARA FRÅNVARON I RADERNA (tillagt 2026-10-13). Samma
  * dokument, men utan stämplingar och raster: lönen behöver frånvaron dag för
  * dag och summeringen längst ner, inte en månad av stämplingar. Se `rows`.
+ * Den heter LÖNEUNDERLAG på pappret (ändrat 2026-10-30, kundens begäran).
  *
  * TID SKRIVS SOM DECIMALTIMMAR (33,75), som i hela resten av applikationen.
  * Se `format.ts`. Det är kundens format: lönen räknar vidare på
@@ -75,15 +76,14 @@ export function buildTimesheetPdf(
   options: TimesheetOptions = {}
 ): Promise<Buffer> {
   const absenceOnly = options.rows === "absence";
+  const title = documentTitle(absenceOnly);
 
   const doc = new PDFDocument({
     size: "A4",
     margin: MARGIN,
     info: {
       Title:
-        periods.length === 1
-          ? `Tidrapport ${periods[0].employee.name}`
-          : "Tidrapport",
+        periods.length === 1 ? `${title} ${periods[0].employee.name}` : title,
       Author: company.name,
     },
   });
@@ -111,6 +111,10 @@ export function buildTimesheetPdf(
   return finished;
 }
 
+function documentTitle(absenceOnly: boolean): string {
+  return absenceOnly ? "Löneunderlag" : "Tidrapport";
+}
+
 function renderPeriod(
   doc: PDFKit.PDFDocument,
   company: TimesheetCompany,
@@ -134,7 +138,7 @@ function renderPeriod(
   }
 
   doc.font("Helvetica-Bold").fontSize(20).fillColor(DOC.heading);
-  doc.text("Tidrapport", MARGIN, y);
+  doc.text(documentTitle(absenceOnly), MARGIN, y);
 
   // Anställningsnumret till höger, som i kundens rapport. Det är så två
   // personer med samma namn hålls isär i lönekörningen.
@@ -385,7 +389,11 @@ function renderPeriod(
       .stroke();
   });
 
-  drawFooter(doc, "Tidrapport från Tikkr. Internt löneunderlag.", {
+  const footer = absenceOnly
+    ? "Löneunderlag från Tikkr. Internt dokument."
+    : "Tidrapport från Tikkr. Internt löneunderlag.";
+
+  drawFooter(doc, footer, {
     marginLeft: MARGIN,
     contentWidth: CONTENT_WIDTH,
     y: FOOTER_Y,

@@ -257,6 +257,16 @@ export default async function TimesheetPage({
     `/api/admin/export/timesheet?from=${lastMonth.from}&to=${lastMonth.to}` +
     `&rader=franvaro`;
 
+  /*
+   * SAMMA LÖNEUNDERLAG FÖR PERIODEN I RUTORNA (tillagt 2026-10-30, kundens
+   * fråga). Månadsknappen når bara föregående månad, och den som behöver en
+   * äldre hade ingen väg dit. Hela personalen, som månadsknappen, även om en
+   * person är vald ovanför: det är den utskriften lönen tar emot.
+   */
+  const selectedPeriodHref =
+    `/api/admin/export/timesheet?from=${toDateInput(from, timeZone)}` +
+    `&to=${toDateInput(to, timeZone)}&rader=franvaro`;
+
   return (
     <>
       <PageHeader
@@ -303,12 +313,18 @@ export default async function TimesheetPage({
                 "Spara som PDF" i skrivardialogen. */}
             <PrintButton
               href={lastWeekHref}
-              label="Förra veckan per anställd"
+              label="Tidrapport föregående vecka"
             />
 
             <PrintButton
               href={lastMonthHref}
-              label="Förra månaden per anställd"
+              label="Löneunderlag föregående månad"
+            />
+
+            <PrintButton
+              href={selectedPeriodHref}
+              label="Löneunderlag vald period"
+              disabled={to < from}
             />
 
             <ButtonLink href={exportHref} tone="secondary">

@@ -595,7 +595,7 @@ export const GUIDES = [
     summary:
       "Planerad tid, närvarotid, flex och frånvaro per anställd och period.",
     module: "PAYROLL",
-    keywords: ["lön", "löneunderlag", "flex", "flextid", "flexsaldo", "närvaro", "saldo", "justera", "startdatum", "atf", "arbetstidsförkortning"],
+    keywords: ["lön", "löneunderlag", "lönespec", "flex", "flextid", "flexsaldo", "närvaro", "saldo", "justera", "startdatum", "atf", "arbetstidsförkortning"],
     steps: [
       {
         title: "Öppna Tidrapport och välj anställd och period",
@@ -609,18 +609,23 @@ export const GUIDES = [
         body: "Tryck Justera flexsaldo och skriv vad saldot ska vara idag.",
       },
       {
-        title: "Skriv ut Förra veckan per anställd",
+        title: "Skriv ut Tidrapport föregående vecka",
         body: "En person per sida, för att dela ut.",
       },
       {
-        title: "Skriv ut Förra månaden per anställd till lönen",
+        title: "Skriv ut Löneunderlag föregående månad till lönen",
         body: "Samma sida per person, med bara frånvaron dag för dag.",
+      },
+      {
+        title: "Skriv ut en äldre månad med Löneunderlag vald period",
+        body: "Välj Från och Till. Hela personalen kommer med, även om en anställd är vald.",
       },
     ],
     notes: [
       "Tid utöver schemat är flex.",
       "Flexen räknas från startdatumet, som sätts under Anställda. Utan startdatum räknas den från första stämplingen.",
       "Intjänad ATF visas för en hel kalendermånad när ett kollektivavtal är valt under Inställningar, Arbetstidsförkortning. Tikkr håller inget ATF-saldo.",
+      "En äldre månad räknas om med dagens arbetstider och saldojusteringar. Talen kan därför skilja sig från utskriften när månaden var ny.",
       "Tikkr räknar timmar. Lönearter, OB och övertidsersättning hanteras i lönesystemet.",
       "Tidrapporten är ett internt dokument och ska inte skickas till en kund.",
       "Den anställde ser sitt saldo på stämplingsskärmen med en kod som sätts under Anställda.",

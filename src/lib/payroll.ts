@@ -178,6 +178,51 @@ export interface PayrollPeriod {
   flex: Balance;
 }
 
+/** Periodens gränser som hela dygn. Se kommentaren i buildPayrollPeriod. */
+function periodBounds(
+  from: Date,
+  to: Date,
+  timeZone: string
+): { periodStart: Date; periodEnd: Date } {
+  return {
+    periodStart: startOfDayIn(from, timeZone),
+    // Sluttiden är dygnets SLUT, alltså början på dagen efter. En stämpling
+    // 15:30 sista dagen ska med.
+    periodEnd: startOfDayIn(addDaysInZone(to, 1, timeZone), timeZone),
+  };
+}
+
+/**
+ * VILKA SOM KOMMER MED NÄR HELA PERSONALEN SKRIVS UT (ändrat 2026-10-30).
+ *
+ * De aktiva, och dessutom den som har stämplingar eller frånvaro i perioden.
+ * Bara de aktiva räckte så länge perioden var förra veckan eller förra månaden.
+ * Med en vald period saknades den som slutat i april på underlaget för mars,
+ * utan att något på pappret sa det.
+ */
+export async function employeesForTimesheet(
+  db: CompanyDb,
+  timeZone: string,
+  from: Date,
+  to: Date
+): Promise<string[]> {
+  const { periodStart, periodEnd } = periodBounds(from, to, timeZone);
+
+  const employees = await db.employee.findMany({
+    where: {
+      OR: [
+        { active: true },
+        { timeEntries: { some: { clockInAt: { gte: periodStart, lt: periodEnd } } } },
+        { absences: { some: { date: { gte: periodStart, lt: periodEnd } } } },
+      ],
+    },
+    orderBy: { name: "asc" },
+    select: { id: true },
+  });
+
+  return employees.map((employee) => employee.id);
+}
+
 /**
  * Bygger tidrapporten för en anställd och en period.
  *
@@ -224,11 +269,7 @@ export async function buildPayrollPeriod(
   // Normaliseringen ligger HÄR och inte hos anroparna. Sidan, PDF:en och
   // flexsaldot kallar alla hit, och en regel som varje anropare måste komma
   // ihåg är ingen regel.
-  const periodStart = startOfDayIn(from, timeZone);
-
-  // Sluttiden är dygnets SLUT, alltså början på dagen efter. En stämpling
-  // 15:30 sista dagen ska med.
-  const periodEnd = startOfDayIn(addDaysInZone(to, 1, timeZone), timeZone);
+  const { periodStart, periodEnd } = periodBounds(from, to, timeZone);
 
   // Startdagen behövs både för dagarna och för det ingående saldot, och det
   // ingående saldot räknas samtidigt med resten i stället för efteråt.

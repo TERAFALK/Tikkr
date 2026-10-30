@@ -28,14 +28,14 @@ export interface DatePresets {
    * Förra veckan, måndag till söndag — hela veckan som är klar.
    *
    * Finns BÅDE som snabbval och här för sig. Snabbvalet filtrerar det man ser;
-   * det här används av utskriftsknappen "Förra veckan per anställd", som
+   * det här används av utskriftsknappen "Tidrapport föregående vecka", som
    * laddar ner en PDF i stället. Samma intervall räknat en gång, så att
    * knappen och filtret aldrig kan mena olika veckor.
    */
   lastWeek: DateRange;
   /**
    * Förra månaden, första till sista dagen. Samma skäl som `lastWeek`: den
-   * används av utskriften "Förra månaden per anställd" på Tidrapport.
+   * används av utskriften "Löneunderlag föregående månad" på Tidrapport.
    */
   lastMonth: DateRange;
 }
