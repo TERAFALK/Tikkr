@@ -1205,9 +1205,9 @@ princip som att stämplingen aldrig slutar fungera: en obetald faktura får
 inte kosta någon registrerad tid, för den tiden går inte att rekonstruera.
 
 **Grinden ligger i koden, inte i menyn**, och det är den enda punkten som
-verkligen är säkerhet. Prenumerationslåset lärde oss varför: det ligger som
-en gren i panelens layout, och rutterna under `/api` renderas aldrig genom
-den. Därför gäller regeln att **varje sida, server action och rutt som rör en
+verkligen är säkerhet. Prenumerationslåset lärde oss varför: det låg som en
+gren i panelens layout, och rutterna under `/api` renderas aldrig genom den.
+Därför gäller regeln att **varje sida, server action och rutt som rör en
 modul ska kalla `requireModule()` respektive `hasModule()`**. Menyn döljer
 bara — sidan bakom svarar 404 oavsett vad menyn visar.
 
@@ -1625,6 +1625,13 @@ kundens arbetsorder, det allt annat i Tikkr hänger på. I koden heter det
    mot `/kiosk`. Koden är kvar på sex siffror och gäller i fem minuter, och
    priset är uttryckligt: den som gissar från många adresser får fem försök
    per adress.
+
+   **En lyckad koppling nollställer inte räknaren** (ändrat 2026-10-30,
+   säkerhetsgranskningen). Vem som helst kan skapa en arbetsyta och få egna
+   giltiga koder, och varje sådan kod gav fem nya gissningar mot andra kunders.
+   Räkningen löper ut en kvart efter senaste felet. Priset är att den som
+   sätter upp flera skärmar och skriver fel fem gånger får vänta, och felfria
+   kopplingar räknas inte alls.
 
    **Bromsarna ligger i databasen** (ändrat 2026-10-18), i `login_throttles`,
    och inte i minnet. En räknare i minnet nollades vid varje driftsättning.
@@ -2372,6 +2379,21 @@ stämplingsskärmarna. Utebliven betalning ger tio dagars respit innan låsning.
 Skälet: stämplar ingen går arbetstid förlorad och går inte att rekonstruera.
 Den tiden är kundens fakturaunderlag mot sin kund, alltså pengar som försvinner
 för någon som inte rår över att fakturan till oss är obetald.
+
+**Låset sitter i `requireAdmin()`, inte i layouten** (ändrat 2026-10-30,
+säkerhetsgranskningen). Det låg som en gren i panelens layout, som ritade
+låsskärmen i stället för sidan. Det stoppade ingenting: Next kör sidan ändå och
+skickar den i svaret, även när layouten aldrig ritar `children`, och
+serveråtgärderna går inte genom en layout alls.
+
+Nu skickar `requireAdmin()` en låst arbetsyta till `/admin/last`, en tom sida
+där layouten ritar låsskärmen. En ny sida eller åtgärd är därmed låst utan att
+någon behöver komma ihåg det. Undantagen kallar `requireAdminEvenIfLocked()` och
+står med skäl i `tests/subscription-lock.test.ts`: betalningen, det egna kontot,
+feedback, adressbekräftelsen, registerutdraget och anonymiseringen. De två
+sista är de registrerades rättigheter, som inte kan hänga på en betald faktura.
+Uttagen svarar 402 och prövar låset själva (`export-access.ts`). Supportläget är
+aldrig låst, se § 4 punkt 5.
 
 ### Betalning vs bokföring
 

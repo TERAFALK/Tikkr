@@ -14,7 +14,7 @@ import { normalizePhone } from "@/lib/phone";
 import { verifyAdminCode } from "@/lib/admin-mfa";
 import { nameProblem, storedName } from "@/lib/person-name";
 import { saved, type SaveState } from "@/lib/save-state";
-import { assertWritable, requireAdmin } from "@/lib/admin-session";
+import { assertWritable, requireAdminEvenIfLocked } from "@/lib/admin-session";
 
 /**
  * DET EGNA KONTOT: namn, telefon, e-postadress och lösenord.
@@ -48,7 +48,7 @@ export async function saveOwnProfile(
   _previous: SaveState,
   formData: FormData
 ): Promise<SaveState> {
-  const session = await requireAdmin();
+  const session = await requireAdminEvenIfLocked();
   await assertWritable(session);
 
   const name = storedName({
@@ -88,7 +88,7 @@ export async function changePassword(
   _previous: SaveState,
   formData: FormData
 ): Promise<SaveState> {
-  const session = await requireAdmin();
+  const session = await requireAdminEvenIfLocked();
   await assertWritable(session);
 
   const current = String(formData.get("current") ?? "");
@@ -117,7 +117,7 @@ export async function changePassword(
  * misstänker att någon annan är inne.
  */
 export async function logoutEverywhere() {
-  const session = await requireAdmin();
+  const session = await requireAdminEvenIfLocked();
   await assertWritable(session);
 
   await revokeOwnSessions(session.userId);
@@ -126,7 +126,7 @@ export async function logoutEverywhere() {
 
 /** Skickar bekräftelselänken på nytt, från remsan i panelen. */
 export async function resendVerification() {
-  const session = await requireAdmin();
+  const session = await requireAdminEvenIfLocked();
   await assertWritable(session);
 
   const outcome = await sendEmailVerification(session.userId);
@@ -146,7 +146,7 @@ export async function changeEmail(
   _previous: SaveState,
   formData: FormData
 ): Promise<SaveState> {
-  const session = await requireAdmin();
+  const session = await requireAdminEvenIfLocked();
   await assertWritable(session);
 
   try {
@@ -184,7 +184,7 @@ export async function enableTwoStep(
   _previous: SaveState,
   formData: FormData
 ): Promise<SaveState> {
-  const session = await requireAdmin();
+  const session = await requireAdminEvenIfLocked();
   await assertWritable(session);
 
   const code = String(formData.get("code") ?? "").replace(/\s/g, "");

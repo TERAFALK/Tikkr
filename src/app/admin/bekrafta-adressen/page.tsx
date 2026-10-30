@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { requireAdmin } from "@/lib/admin-session";
+import { requireAdminEvenIfLocked } from "@/lib/admin-session";
 import { unsafeGlobalPrisma } from "@/lib/db";
 import ActionDialog from "@/components/ui/ActionDialog";
 import AuthShell from "@/components/ui/AuthShell";
@@ -48,7 +48,7 @@ export default async function ConfirmAddressPage({
 }: {
   searchParams: Promise<{ utskick?: string }>;
 }) {
-  const session = await requireAdmin();
+  const session = await requireAdminEvenIfLocked();
 
   // Supportläget har inget eget konto och ska aldrig hamna här. Det skriver
   // dessutom ingenting, så sidans båda åtgärder vore ändå avvisade.

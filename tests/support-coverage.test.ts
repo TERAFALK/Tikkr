@@ -66,6 +66,14 @@ const files = actionFiles(PANEL_ROOT).map((file) => ({
 const count = (source: string, pattern: RegExp) =>
   (source.match(pattern) ?? []).length;
 
+/**
+ * Grinden, i båda formerna. Undantaget från prenumerationslåset släpper in en
+ * låst arbetsyta, inte en supportsession som ska skriva, så skrivspärren krävs
+ * lika mycket där. Se requireAdmin i admin-session.ts.
+ */
+const ADMIN_GATE = /await requireAdmin(EvenIfLocked)?\(\)/;
+const ADMIN_GATE_ALL = new RegExp(ADMIN_GATE.source, "g");
+
 describe("supportläget kan inte skriva", () => {
   it("hittar åtgärdsfiler att granska alls", () => {
     // Flyttas katalogerna ska testet säga det, inte tystna och se grönt ut
@@ -77,7 +85,7 @@ describe("supportläget kan inte skriva", () => {
     const wrong = files
       .map(({ file, source }) => ({
         file,
-        calls: count(source, /await requireAdmin\(\)/g),
+        calls: count(source, ADMIN_GATE_ALL),
         guards: count(source, /await assertWritable\(session\)/g),
       }))
       .filter(({ calls, guards }) => calls !== guards);
@@ -103,7 +111,7 @@ describe("supportläget kan inte skriva", () => {
       for (const block of blocks) {
         const name = block.slice(0, block.indexOf("(")).trim();
         if (READ_ONLY_ACTIONS.includes(name)) continue;
-        if (!/await requireAdmin\(\)/.test(block)) continue;
+        if (!ADMIN_GATE.test(block)) continue;
         if (/await assertWritable\(session\)/.test(block)) continue;
 
         unguarded.push(`${file}: ${name}`);

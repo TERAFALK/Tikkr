@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import ExcelJS from "exceljs";
-import { requireAdmin } from "@/lib/admin-session";
+import { requireAdminEvenIfLocked } from "@/lib/admin-session";
 import { lockedExportResponse } from "@/lib/export-access";
 import { buildReport, type ReportGroup } from "@/lib/report";
 import { formatDate, toDecimalHours } from "@/lib/format";
@@ -40,7 +40,7 @@ async function timeZoneOf(companyId: string): Promise<string> {
 }
 
 export async function GET(request: NextRequest) {
-  const session = await requireAdmin();
+  const session = await requireAdminEvenIfLocked();
   const { db, companyId, companyName } = session;
   const params = request.nextUrl.searchParams;
 

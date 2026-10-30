@@ -1,7 +1,12 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { assertWritable, isOwner, requireAdmin } from "@/lib/admin-session";
+import {
+  assertWritable,
+  isOwner,
+  requireAdmin,
+  requireAdminEvenIfLocked,
+} from "@/lib/admin-session";
 import { unsafeGlobalPrisma } from "@/lib/db";
 import { recordAudit } from "@/lib/audit";
 import { parseMarkupPercent } from "@/lib/money";
@@ -302,12 +307,15 @@ export async function saveTimeSettings(
  * beteckning. Tiden finns kvar och går att fakturera, men går inte längre att
  * koppla till en namngiven person. Det är den tolkning som uppfyller båda
  * lagarna samtidigt.
+ *
+ * Fungerar även när prenumerationen är låst. Rätten att bli glömd kan inte
+ * hänga på att en faktura till oss är betald, samma skäl som registerutdraget.
  */
 export async function anonymizeEmployee(
   _previous: SaveState,
   formData: FormData
 ): Promise<SaveState> {
-  const session = await requireAdmin();
+  const session = await requireAdminEvenIfLocked();
   await assertWritable(session);
   // Går inte att ångra, och bara ägaren gör det. Se isOwner.
   if (!isOwner(session)) {

@@ -2,7 +2,7 @@
 
 import { redirect } from "next/navigation";
 import { appUrl } from "@/lib/app-url";
-import { assertWritable, isOwner, requireAdmin } from "@/lib/admin-session";
+import { assertWritable, isOwner, requireAdminEvenIfLocked } from "@/lib/admin-session";
 import { revalidatePath } from "next/cache";
 import {
   applyLicenseChange,
@@ -46,7 +46,7 @@ const MANAGED_NOTICE =
   "support@tikkr.se för att ändra licenser eller tillval.";
 
 export async function startCheckout(formData: FormData) {
-  const session = await requireAdmin();
+  const session = await requireAdminEvenIfLocked();
   await assertWritable(session);
   if (!isOwner(session)) redirect(PAGE);
 
@@ -100,7 +100,7 @@ export async function changeLicenses(
   _previous: LicenseFormState,
   formData: FormData
 ): Promise<LicenseFormState> {
-  const session = await requireAdmin();
+  const session = await requireAdminEvenIfLocked();
   await assertWritable(session);
   if (!isOwner(session)) return { error: OWNER_ONLY };
 
@@ -162,7 +162,7 @@ export async function changeLicenses(
 }
 
 export async function openBillingPortal() {
-  const session = await requireAdmin();
+  const session = await requireAdminEvenIfLocked();
   await assertWritable(session);
   if (!isOwner(session)) redirect(PAGE);
 
@@ -212,7 +212,7 @@ export async function changeModule(
   _previous: ModuleFormState,
   formData: FormData
 ): Promise<ModuleFormState> {
-  const session = await requireAdmin();
+  const session = await requireAdminEvenIfLocked();
   await assertWritable(session);
   if (!isOwner(session)) return { error: OWNER_ONLY };
 

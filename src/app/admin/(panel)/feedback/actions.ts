@@ -1,6 +1,6 @@
 "use server";
 
-import { assertWritable, requireAdmin } from "@/lib/admin-session";
+import { assertWritable, requireAdminEvenIfLocked } from "@/lib/admin-session";
 import { FeedbackError, sendFeedback } from "@/lib/feedback";
 import { fullName } from "@/lib/person-name";
 
@@ -21,7 +21,7 @@ export async function sendFeedbackAction(
   _previous: FeedbackFormState,
   formData: FormData
 ): Promise<FeedbackFormState> {
-  const session = await requireAdmin();
+  const session = await requireAdminEvenIfLocked();
   await assertWritable(session);
 
   const me = await session.db.adminUser.findFirst({
