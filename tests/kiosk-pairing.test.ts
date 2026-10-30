@@ -376,10 +376,16 @@ describe("tak på antalet gissningar", () => {
     expect((await pairDevice({}, form)).pairedAs).toBe("Lackeringen");
   });
 
-  it("en lyckad koppling nollställer räknaren", async () => {
-    const first = await createKioskDevice(companyId, "Skärm ett");
+  /**
+   * EN LYCKAD KOPPLING NOLLSTÄLLER INTE RÄKNAREN (ändrat 2026-10-30).
+   *
+   * Vem som helst kan skapa en arbetsyta och få egna giltiga koder. Nollställde
+   * varje sådan kod räknaren fick angriparen fyra nya gissningar mot andra
+   * kunders koder för varje egen, utan slut.
+   */
+  it("en egen giltig kod ger inga nya gissningar", async () => {
+    const own = await createKioskDevice(companyId, "Egen skärm");
 
-    // Fyra felslag — en person som läser fel i motljus, inte ett skript.
     for (let attempt = 0; attempt < 4; attempt += 1) {
       const guess = new FormData();
       guess.set("code", String(300000 + attempt));
@@ -387,20 +393,31 @@ describe("tak på antalet gissningar", () => {
     }
 
     const form = new FormData();
-    form.set("code", first.pairing.code);
-    expect((await pairDevice({}, form)).pairedAs).toBe("Skärm ett");
+    form.set("code", own.pairing.code);
+    expect((await pairDevice({}, form)).pairedAs).toBe("Egen skärm");
 
-    // Nästa skärm sätts upp från samma enhet direkt efteråt. Hade räknaren
-    // stått kvar hade ett enda felslag räckt för att låsa ute installatören
-    // mitt i arbetet.
-    const second = await createKioskDevice(companyId, "Skärm två");
+    // Felslag nummer fem låser, trots kopplingen emellan.
+    const fifth = new FormData();
+    fifth.set("code", "300004");
+    expect((await pairDevice({}, fifth)).error).not.toContain("För många försök");
 
-    const stray = new FormData();
-    stray.set("code", "400000");
-    expect((await pairDevice({}, stray)).error).toBeTruthy();
+    const next = await createKioskDevice(companyId, "Nästa skärm");
 
-    const next = new FormData();
-    next.set("code", second.pairing.code);
-    expect((await pairDevice({}, next)).pairedAs).toBe("Skärm två");
+    const form2 = new FormData();
+    form2.set("code", next.pairing.code);
+
+    const result = await pairDevice({}, form2);
+    expect(result.pairedAs).toBeUndefined();
+    expect(result.error).toContain("För många försök");
+  });
+
+  it("den som kopplar flera skärmar utan felslag låses aldrig", async () => {
+    for (const name of ["Ett", "Två", "Tre", "Fyra", "Fem", "Sex", "Sju"]) {
+      const { pairing } = await createKioskDevice(companyId, name);
+
+      const form = new FormData();
+      form.set("code", pairing.code);
+      expect((await pairDevice({}, form)).pairedAs).toBe(name);
+    }
   });
 });
