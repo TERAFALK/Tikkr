@@ -112,7 +112,18 @@ export default function PrintButton({
   return (
     <Button type="button" tone={tone} onClick={start} disabled={disabled || busy}>
       <IconPrinter />
-      {busy ? "Förbereder…" : label}
+      {/* BÅDA TEXTERNA LIGGER I SAMMA RUTA, och den ena är osynlig. Knappen
+          behåller då sin bredd när texten byts. Annars krympte den, och på
+          Tidrapport fick hela knappraden plötsligt plats bredvid rubriken och
+          hoppade upp dit under utskriften. */}
+      <span className="inline-grid text-center">
+        <span className={`col-start-1 row-start-1 ${busy ? "invisible" : ""}`}>
+          {label}
+        </span>
+        <span className={`col-start-1 row-start-1 ${busy ? "" : "invisible"}`}>
+          Förbereder…
+        </span>
+      </span>
     </Button>
   );
 }
