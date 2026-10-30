@@ -183,7 +183,7 @@ export default function KioskSettings({
               </p>
               <button
                 type="submit"
-                className="kiosk-press w-full rounded-xl bg-amber-500 px-6 py-4 text-lg font-semibold text-white active:bg-amber-600"
+                className="kiosk-press w-full rounded-xl bg-amber-500 px-6 py-4 text-lg font-semibold text-fjord active:bg-amber-600"
               >
                 Ja, koppla loss
               </button>

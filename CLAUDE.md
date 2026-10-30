@@ -140,6 +140,16 @@ läggs det till bredvid, och båda löper parallellt.
 omedelbart (optimistisk UI-uppdatering). Den enda koden på skärmen är den som
 visar en anställds eget flexsaldo, och den rör inte stämplingen — se regel 7.
 
+**Tillbaka går ett steg, Avbryt går hem** (beslutat 2026-10-30, UX-granskningen).
+Tillbaka står i sidhuvudet på varje delsteg, och Avbryt betyder alltid tillbaka
+till namnen. Valdes fel order fanns tidigare bara vägen hem, och i kundvalet stod
+två Avbryt med olika betydelse. Ett byte av jobb står kvar när man går bakåt inom
+valet, och avbryts först vid personens egen vy.
+
+**Namnrutnätet får fler kolumner på en stor skärm** (beslutat 2026-10-30,
+UX-granskningen), och en bokstavsrad över 24 anställda, samma som kundvalet har.
+Bokstaven släpper av sig själv efter samma tid som ett halvfärdigt val.
+
 **Ordervalet börjar på knappsatsen** (ändrat 2026-10-01). Den som ska börja
 eller byta jobb har ordernumret på ritningen framför sig; rutnätet med öppna
 ordrar ligger ett tryck bort, på "Visa öppna ordrar".
@@ -2102,6 +2112,10 @@ Länkar ligger nu på `emerald-700` (5,09:1) och läsbar sekundär text på Skif
 Tick Deep och `neutral-400` står kvar på ikoner, ytor och linjer. Det är ett
 litet avsteg från guiden, som anger Tick Deep för länkar. Bevisas av
 `tests/contrast.test.ts`.
+
+**Text på en gul yta är Fjord** (beslutat 2026-10-30, produktägarens val,
+UX-granskningen). Vitt på gult ger 2,1:1 och Fjord 8,2:1. Gäller felrutan och
+varningen på stämplingsskärmen, kort med improduktiv tid och Skapa order.
 
 Fjord och Snö bär de flesta ytorna. **Grönt är accent och aldrig huvudfärg** —
 det är den enda regeln i guiden som står utskriven som ett förbud, och skälet

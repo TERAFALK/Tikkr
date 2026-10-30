@@ -215,6 +215,10 @@ export function KioskCard({
   const filled = working || Boolean(person.onBreak);
   const big = size === "stor";
 
+  // Gult kort har mörk text, som på skärmen. Se JOB_TONE i KioskScreen.
+  const onAmber = working && Boolean(person.indirect);
+  const ink = onAmber ? "text-fjord" : "text-white";
+
   const fill = working
     ? person.indirect
       ? "border-amber-500 bg-amber-500"
@@ -255,9 +259,11 @@ export function KioskCard({
           className={`flex shrink-0 items-center justify-center rounded-full font-semibold ${
             big ? "h-7 w-7 text-[10px]" : "h-6 w-6 text-[9px]"
           } ${
-            filled
-              ? "bg-white/20 text-white ring-1 ring-white/40"
-              : `${toneFor(person.name)} ring-1 ring-neutral-200`
+            onAmber
+              ? "bg-fjord/10 text-fjord ring-1 ring-fjord/30"
+              : filled
+                ? "bg-white/20 text-white ring-1 ring-white/40"
+                : `${toneFor(person.name)} ring-1 ring-neutral-200`
           }`}
         >
           {initialsOf(person.name)}
@@ -265,7 +271,7 @@ export function KioskCard({
         <span
           className={`min-w-0 truncate font-semibold leading-tight ${
             big ? "text-[12px]" : "text-[11px]"
-          } ${filled ? "text-white" : "text-neutral-900"}`}
+          } ${filled ? ink : "text-neutral-900"}`}
         >
           {person.name}
         </span>
@@ -276,15 +282,25 @@ export function KioskCard({
           {/* Antalet först när flera jobb pågår. Ett dolt jobb är värre än ett
               förkortat namn, och brickan är produktens egen. */}
           {jobs.length > 1 && (
-            <span className="mb-1 inline-flex items-center gap-1.5 rounded bg-white/15 px-1.5 py-0.5 text-[9px] font-semibold text-white ring-1 ring-inset ring-white/25">
-              <span className="h-1 w-1 rounded-full bg-white" />
+            <span
+              className={`mb-1 inline-flex items-center gap-1.5 rounded px-1.5 py-0.5 text-[9px] font-semibold ring-1 ring-inset ${
+                onAmber
+                  ? "bg-fjord/10 text-fjord ring-fjord/25"
+                  : "bg-white/15 text-white ring-white/25"
+              }`}
+            >
+              <span
+                className={`h-1 w-1 rounded-full ${
+                  onAmber ? "bg-fjord" : "bg-white"
+                }`}
+              />
               {jobs.length} jobb igång
             </span>
           )}
           {jobs.map((job) => (
             <span
               key={job}
-              className={`block truncate font-semibold leading-snug text-white ${
+              className={`block truncate font-semibold leading-snug ${ink} ${
                 big ? "text-[12px]" : "text-[11px]"
               }`}
             >

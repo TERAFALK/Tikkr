@@ -164,6 +164,10 @@ function jobKey(choice: KioskJobChoice): string {
  * Skillnaden ska gå att läsa tvärs över en verkstad, precis som skillnaden
  * mellan instämplad och utstämplad. Den som ser ett gult kort vet att personen
  * är på plats men inte på ett jobb som betalas.
+ *
+ * TEXTEN PÅ GULT ÄR FJORD (beslutat 2026-10-30, produktägarens val). Vitt på
+ * gult ger 2,1:1 och Fjord 8,2:1, och det är just felmeddelandet som ska gå att
+ * läsa på avstånd.
  */
 const JOB_TONE = {
   order: "border-emerald-600 bg-emerald-600 active:bg-emerald-700",
@@ -323,9 +327,15 @@ type View =
       employee: Employee;
       orderNumber: string;
       customer: KioskCustomer | null;
+      from: "order" | "orderNumber";
     }
-  | { name: "moment"; employee: Employee; order: Order }
-  | { name: "indirect"; employee: Employee }
+  | {
+      name: "moment";
+      employee: Employee;
+      order: Order;
+      from: "order" | "orderNumber";
+    }
+  | { name: "indirect"; employee: Employee; from: "order" | "orderNumber" }
   | { name: "flex"; employee: Employee };
 
 /** Hur många siffror ett ordernummer får vara innan knappsatsen slutar ta emot. */
@@ -551,6 +561,53 @@ export default function KioskScreen({
     backToGrid();
     router.refresh();
   }, [backToGrid, router]);
+
+  /**
+   * TILLBAKA ETT STEG (tillagt 2026-10-30, UX-granskningen).
+   *
+   * Avbryt går alltid hem till namnen. Valdes fel order fanns ingen annan väg,
+   * och felet kostade tre tryck: namnet, numret och ordern igen. I kundvalet
+   * stod dessutom två Avbryt med olika betydelse.
+   *
+   * Null betyder att det inte finns något steg före det här, utom namnen.
+   */
+  const previousView = useCallback(
+    (current: View): View | null => {
+      if (current.name === "employees" || current.name === "action") return null;
+
+      const { employee } = current;
+      const hasAction = Boolean(
+        active[employee.id]?.length ||
+          autoClosed[employee.id]?.length ||
+          recent[employee.id] ||
+          breaks[employee.id]
+      );
+      const start: View | null = hasAction ? { name: "action", employee } : null;
+
+      switch (current.name) {
+        case "orderNumber":
+          return start;
+        case "order":
+          return { name: "orderNumber", employee };
+        case "moment":
+        case "indirect":
+        case "quickCustomer":
+          return { name: current.from, employee };
+        case "quickMoment":
+          return {
+            name: "quickCustomer",
+            employee,
+            orderNumber: current.orderNumber,
+            from: current.from,
+          };
+        case "break":
+          return { name: "action", employee };
+        case "flex":
+          return start ?? { name: "orderNumber", employee };
+      }
+    },
+    [active, autoClosed, breaks, recent]
+  );
 
   // Skärmen återgår själv om någon lämnar den mitt i ett val.
   useEffect(() => {
@@ -1221,6 +1278,18 @@ export default function KioskScreen({
         hasLogo={hasLogo}
         lastSyncedAt={lastSyncedAt}
         onBack={goHome}
+        onStepBack={
+          previousView(view)
+            ? () => {
+                const target = previousView(view);
+                if (!target) return;
+
+                // Tillbaka vid sitt jobb: bytet är avbrutet, som i Avbryt.
+                if (target.name === "action") setReplacing(null);
+                setView(target);
+              }
+            : null
+        }
         onFlex={
           // Bara när en namngiven person är vald OCH hen har en kod. På
           // startsidan finns ingen person, och saldoknappen hör till den som
@@ -1238,7 +1307,7 @@ export default function KioskScreen({
           nämner den för chefen — meningen är inte att störa den som stämplar,
           därför tar den ingen plats från knapparna. */}
       {subscriptionWarning && (
-        <div className="flex items-center gap-3 bg-amber-500 px-6 py-3 text-white">
+        <div className="flex items-center gap-3 bg-amber-500 px-6 py-3 text-fjord">
           <span className="text-lg font-semibold">{subscriptionWarning}</span>
           <span className="text-sm opacity-90">
             Stämplingen fungerar som vanligt. Informera närmaste chef.
@@ -1394,7 +1463,11 @@ export default function KioskScreen({
                 {indirectMoments.length > 0 && (
                   <button
                     onClick={() =>
-                      setView({ name: "indirect", employee: view.employee })
+                      setView({
+                        name: "indirect",
+                        employee: view.employee,
+                        from: "order",
+                      })
                     }
                     className="kiosk-press rounded-xl border border-neutral-200 bg-white px-5 py-4 text-base font-semibold text-neutral-600 active:bg-neutral-50 sm:text-lg"
                   >
@@ -1408,7 +1481,12 @@ export default function KioskScreen({
               primary: order.orderNumber,
               secondary: order.customerName ?? undefined,
               onPick: () =>
-                setView({ name: "moment", employee: view.employee, order }),
+                setView({
+                  name: "moment",
+                  employee: view.employee,
+                  order,
+                  from: "order",
+                }),
             }))}
           />
         )}
@@ -1419,7 +1497,12 @@ export default function KioskScreen({
             orders={orders}
             switchingFrom={replacing?.label ?? null}
             onPick={(order) =>
-              setView({ name: "moment", employee: view.employee, order })
+              setView({
+                name: "moment",
+                employee: view.employee,
+                order,
+                from: "orderNumber",
+              })
             }
             onBrowse={() =>
               setView({ name: "order", employee: view.employee })
@@ -1445,7 +1528,11 @@ export default function KioskScreen({
             // som ska registrera improduktiv tid hamnar här först. Vägen dit
             // måste därför finnas både här och i åtgärdsvyn.
             onIndirect={() =>
-              setView({ name: "indirect", employee: view.employee })
+              setView({
+                name: "indirect",
+                employee: view.employee,
+                from: "orderNumber",
+              })
             }
             hasIndirect={indirectMoments.length > 0}
           />
@@ -1467,17 +1554,8 @@ export default function KioskScreen({
                 employee: view.employee,
                 orderNumber: view.orderNumber,
                 customer,
+                from: view.from,
               })
-            }
-            onBack={() =>
-              // Grenarna skrivs ut. TypeScript kan inte smalna av en union ur
-              // en variabel, och att tvinga fram det med en typkonvertering
-              // vore att stänga av den kontroll som gör ändringen trygg.
-              setView(
-                view.from === "order"
-                  ? { name: "order", employee: view.employee }
-                  : { name: "orderNumber", employee: view.employee }
-              )
             }
           />
         )}
@@ -1585,6 +1663,7 @@ function Header({
   hasLogo,
   lastSyncedAt,
   onBack,
+  onStepBack,
   onFlex,
 }: {
   companyName: string;
@@ -1596,6 +1675,8 @@ function Header({
   hasLogo: boolean;
   lastSyncedAt: Date | null;
   onBack: () => void;
+  /** Ett steg bakåt. Null när steget före är namnen. */
+  onStepBack: (() => void) | null;
   /** Null när saldot inte går att visa. Se KioskScreen. */
   onFlex: (() => void) | null;
 }) {
@@ -1670,6 +1751,15 @@ function Header({
               <path d="M12 11v5" />
               <path d="M12 7.75h.01" />
             </svg>
+          </button>
+        )}
+
+        {onStepBack && (
+          <button
+            onClick={onStepBack}
+            className="kiosk-press shrink-0 rounded-xl border border-neutral-200 bg-white px-6 py-4 text-lg font-semibold text-neutral-900 active:bg-neutral-50"
+          >
+            Tillbaka
           </button>
         )}
 
@@ -1748,7 +1838,7 @@ function Toast({
   onDismiss?: () => void;
 }) {
   const styles =
-    tone === "ok" ? "bg-emerald-600 text-white" : "bg-amber-500 text-white";
+    tone === "ok" ? "bg-emerald-600 text-white" : "bg-amber-500 text-fjord";
 
   return (
     <div
@@ -1782,13 +1872,38 @@ function EmployeeGrid({
   breaks: Record<string, KioskBreak>;
   onPick: (employee: Employee) => void;
 }) {
+  const [letter, setLetter] = useState<string | null>(null);
+
+  // Nästa person ska mötas av alla namn, inte av en bokstav någon lämnat kvar.
+  useEffect(() => {
+    if (!letter) return;
+    const timer = setTimeout(() => setLetter(null), IDLE_MS);
+    return () => clearTimeout(timer);
+  }, [letter]);
+
+  const showLetters = employees.length > EMPLOYEE_LETTERS_FROM;
+  const letters = useMemo(
+    () => firstLetters(employees.map((employee) => employee.name)),
+    [employees]
+  );
+  const shown = letter
+    ? employees.filter((employee) => firstLetter(employee.name) === letter)
+    : employees;
+
   if (employees.length === 0) {
     return <Empty>Inga anställda upplagda. Kontakta kontoret.</Empty>;
   }
 
   return (
-    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 lg:grid-cols-4">
-      {employees.map((employee) => {
+    <>
+      {showLetters && (
+        <LetterBar letters={letters} letter={letter} onPick={setLetter} />
+      )}
+
+      {/* Fler kolumner på en stor skärm. Fyra lät 23,6 tum rymma sexton namn,
+          och resten låg under kanten. */}
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 lg:grid-cols-4 2xl:grid-cols-5 min-[112.5rem]:grid-cols-6">
+      {shown.map((employee) => {
         const jobs = active[employee.id] ?? [];
         const job = jobs[0];
         const last = recent[employee.id];
@@ -1797,6 +1912,10 @@ function EmployeeGrid({
         // Fylld knapp betyder "du är här": arbetar eller på rast. Vit betyder
         // utstämplad.
         const filled = Boolean(job) || Boolean(onBreak);
+
+        // Gult kort har mörk text. Se JOB_TONE.
+        const onAmber = Boolean(job) && onlyIndirect(jobs);
+        const ink = onAmber ? "text-fjord" : "text-white";
 
         return (
           <button
@@ -1829,11 +1948,11 @@ function EmployeeGrid({
                 name={employee.name}
                 hasPhoto={employee.hasPhoto}
                 size={52}
-                onDark={filled}
+                onDark={filled && !onAmber}
               />
               <span
                 className={`min-w-0 text-xl font-semibold leading-tight sm:text-2xl ${
-                  filled ? "text-white" : "text-neutral-900"
+                  filled ? ink : "text-neutral-900"
                 }`}
               >
                 {employee.name}
@@ -1854,21 +1973,35 @@ function EmployeeGrid({
                  först, eftersom ett dolt jobb är värre än ett förkortat namn. */
               <span className="mt-3 block">
                 {jobs.length > 1 && (
-                  <span className="mb-1.5 inline-flex items-center gap-2 rounded-md bg-white/15 px-2.5 py-1 text-sm font-semibold text-white ring-1 ring-inset ring-white/25">
-                    <span className="h-2 w-2 rounded-full bg-white" />
+                  <span
+                    className={`mb-1.5 inline-flex items-center gap-2 rounded-md px-2.5 py-1 text-sm font-semibold ring-1 ring-inset ${
+                      onAmber
+                        ? "bg-fjord/10 text-fjord ring-fjord/25"
+                        : "bg-white/15 text-white ring-white/25"
+                    }`}
+                  >
+                    <span
+                      className={`h-2 w-2 rounded-full ${
+                        onAmber ? "bg-fjord" : "bg-white"
+                      }`}
+                    />
                     {jobs.length} jobb igång
                   </span>
                 )}
                 {jobs.slice(0, 2).map((entry) => (
                   <span
                     key={jobKey(entry.choice)}
-                    className="block truncate text-lg font-semibold leading-snug text-white sm:text-xl"
+                    className={`block truncate text-lg font-semibold leading-snug sm:text-xl ${ink}`}
                   >
                     {entry.label}
                   </span>
                 ))}
                 {jobs.length > 2 && (
-                  <span className="mt-1 block text-base text-white/70">
+                  <span
+                    className={`mt-1 block text-base ${
+                      onAmber ? "text-fjord/80" : "text-white/70"
+                    }`}
+                  >
                     och {jobs.length - 2} till
                   </span>
                 )}
@@ -1901,6 +2034,65 @@ function EmployeeGrid({
           </button>
         );
       })}
+      </div>
+    </>
+  );
+}
+
+/** Över så här många anställda ryms inte namnen, och bokstavsraden dyker upp. */
+const EMPLOYEE_LETTERS_FROM = 24;
+
+function firstLetter(name: string): string {
+  return name.trim().charAt(0).toUpperCase();
+}
+
+/** Bokstäverna som faktiskt börjar ett namn, i svensk ordning. */
+function firstLetters(names: string[]): string[] {
+  return [...new Set(names.map(firstLetter))].sort((a, b) =>
+    a.localeCompare(b, "sv")
+  );
+}
+
+/**
+ * Bokstavsraden över namn- och kundvalet.
+ *
+ * Bara bokstäver som faktiskt börjar ett namn visas. En rad med hela alfabetet
+ * där mer än hälften inte går att trycka på är mest i vägen.
+ */
+function LetterBar({
+  letters,
+  letter,
+  onPick,
+}: {
+  letters: string[];
+  letter: string | null;
+  onPick: (letter: string | null) => void;
+}) {
+  const on = "bg-neutral-900 text-white";
+  const off =
+    "border border-neutral-200 bg-white text-neutral-900 active:bg-neutral-50";
+
+  return (
+    <div className="mb-3 flex flex-wrap gap-2">
+      <button
+        onClick={() => onPick(null)}
+        className={`kiosk-press min-h-14 min-w-14 rounded-lg px-4 text-lg font-semibold ${
+          letter === null ? on : off
+        }`}
+      >
+        Alla
+      </button>
+      {letters.map((option) => (
+        <button
+          key={option}
+          onClick={() => onPick(option)}
+          className={`kiosk-press min-h-14 min-w-14 rounded-lg text-lg font-semibold ${
+            letter === option ? on : off
+          }`}
+        >
+          {option}
+        </button>
+      ))}
     </div>
   );
 }
@@ -1990,13 +2182,17 @@ function ActionChoice({
               {single.label}
             </span>
             <span
-              className={`mt-2 inline-flex items-center gap-2 rounded-md px-3 py-1.5 text-[15px] font-semibold text-white ${
+              className={`mt-2 inline-flex items-center gap-2 rounded-md px-3 py-1.5 text-[15px] font-semibold ${
                 single.choice.kind === "INDIRECT"
-                  ? "bg-amber-500"
-                  : "bg-emerald-600"
+                  ? "bg-amber-500 text-fjord"
+                  : "bg-emerald-600 text-white"
               }`}
             >
-              <span className="h-2 w-2 rounded-full bg-white" />
+              <span
+                className={`h-2 w-2 rounded-full ${
+                  single.choice.kind === "INDIRECT" ? "bg-fjord" : "bg-white"
+                }`}
+              />
               Pågår
             </span>
           </div>
@@ -2047,10 +2243,22 @@ function ActionChoice({
               }`}
             >
               <span className="min-w-0 flex-1">
-                <span className="block truncate text-2xl font-semibold leading-snug text-white">
+                <span
+                  className={`block truncate text-2xl font-semibold leading-snug ${
+                    job.choice.kind === "INDIRECT" ? "text-fjord" : "text-white"
+                  }`}
+                >
                   {job.label}
                 </span>
-                <span className="mt-1 block text-sm text-white/80">Pågår</span>
+                <span
+                  className={`mt-1 block text-sm ${
+                    job.choice.kind === "INDIRECT"
+                      ? "text-fjord/80"
+                      : "text-white/80"
+                  }`}
+                >
+                  Pågår
+                </span>
               </span>
               <button
                 onClick={() => onClockOut(job)}
@@ -2236,27 +2444,21 @@ function CustomerPicker({
   orderNumber,
   customers,
   onPick,
-  onBack,
 }: {
   orderNumber: string;
   customers: KioskCustomer[];
   onPick: (customer: KioskCustomer | null) => void;
-  onBack: () => void;
 }) {
   const [letter, setLetter] = useState<string | null>(null);
 
-  const letters = useMemo(() => {
-    const found = new Set(
-      customers.map((customer) => customer.name.trim().charAt(0).toUpperCase())
-    );
-    return [...found].sort((a, b) => a.localeCompare(b, "sv"));
-  }, [customers]);
+  const letters = useMemo(
+    () => firstLetters(customers.map((customer) => customer.name)),
+    [customers]
+  );
 
   const shown = useMemo(() => {
     if (!letter) return customers;
-    return customers.filter(
-      (customer) => customer.name.trim().charAt(0).toUpperCase() === letter
-    );
+    return customers.filter((customer) => firstLetter(customer.name) === letter);
   }, [customers, letter]);
 
   const useAlphabet = customers.length > ALPHABET_THRESHOLD;
@@ -2273,31 +2475,7 @@ function CustomerPicker({
       </p>
 
       {useAlphabet && (
-        <div className="mb-3 flex flex-wrap gap-2">
-          <button
-            onClick={() => setLetter(null)}
-            className={`kiosk-press min-h-14 min-w-14 rounded-lg px-4 text-lg font-semibold ${
-              letter === null
-                ? "bg-neutral-900 text-white"
-                : "border border-neutral-200 bg-white text-neutral-900 active:bg-neutral-50"
-            }`}
-          >
-            Alla
-          </button>
-          {letters.map((option) => (
-            <button
-              key={option}
-              onClick={() => setLetter(option)}
-              className={`kiosk-press min-h-14 min-w-14 rounded-lg text-lg font-semibold ${
-                letter === option
-                  ? "bg-neutral-900 text-white"
-                  : "border border-neutral-200 bg-white text-neutral-900 active:bg-neutral-50"
-              }`}
-            >
-              {option}
-            </button>
-          ))}
-        </div>
+        <LetterBar letters={letters} letter={letter} onPick={setLetter} />
       )}
 
       {shown.length > 0 ? (
@@ -2323,21 +2501,15 @@ function CustomerPicker({
         </p>
       )}
 
-      <div className="mt-3 grid gap-3 sm:grid-cols-2">
+      <div className="mt-3">
         {/* Att hoppa över är tillåtet. Ordern flaggas ändå för kontoret,
             och att stå fast vid skärmen för att man inte vet vilken kund det
             är vore att förlora timmen man försökte rädda. */}
         <button
           onClick={() => onPick(null)}
-          className="kiosk-press min-h-20 rounded-xl border border-neutral-200 bg-white p-5 text-lg font-semibold text-neutral-500 active:bg-neutral-50"
+          className="kiosk-press min-h-20 w-full rounded-xl border border-neutral-200 bg-white p-5 text-lg font-semibold text-neutral-500 active:bg-neutral-50"
         >
           Vet inte
-        </button>
-        <button
-          onClick={onBack}
-          className="kiosk-press min-h-20 rounded-xl border border-neutral-200 bg-white p-5 text-lg font-semibold text-neutral-900 active:bg-neutral-50"
-        >
-          Avbryt
         </button>
       </div>
     </div>
@@ -2530,7 +2702,7 @@ function OrderNumberPad({
         className={`kiosk-frame-cta kiosk-press mt-2 lg:col-start-2 lg:row-start-5 h-[5.5rem] w-full shrink-0 rounded-xl px-4 py-3.5 text-2xl font-semibold disabled:bg-neutral-200 disabled:text-neutral-400 ${
           match
             ? "bg-blue-600 text-white active:bg-blue-700"
-            : "bg-amber-500 text-white active:bg-amber-600"
+            : "bg-amber-500 text-fjord active:bg-amber-600"
         }`}
       >
         {!match && !typed ? (
@@ -2538,7 +2710,7 @@ function OrderNumberPad({
         ) : !match ? (
           <>
             Skapa order {typed}
-            <span className="mt-1 block text-base font-normal text-white/80">
+            <span className="mt-1 block text-base font-normal text-fjord/80">
               märks för kontoret
             </span>
           </>
