@@ -219,6 +219,7 @@ export function Stat({
   hint,
   tone = "neutral",
   icon,
+  href,
 }: {
   label: string;
   /** Ett tal, eller `LiveValue` runt talet där det uppdateras medan man tittar. */
@@ -226,6 +227,8 @@ export function Stat({
   hint?: string;
   tone?: "neutral" | "active" | "warning";
   icon?: ReactNode;
+  /** Sidan talet kommer från. Hela rutan blir en länk dit. */
+  href?: string;
 }) {
   const valueTone = {
     neutral: "text-neutral-900",
@@ -233,8 +236,12 @@ export function Stat({
     warning: "text-amber-600",
   }[tone];
 
-  return (
-    <Card className="px-5 py-4">
+  const card = (
+    <Card
+      className={`px-5 py-4 ${
+        href ? "h-full transition-colors group-hover:border-neutral-400" : ""
+      }`}
+    >
       <div className="flex items-center gap-2 text-neutral-400">
         {icon}
         <p className="text-[13px] font-medium text-neutral-500">{label}</p>
@@ -246,6 +253,14 @@ export function Stat({
       </p>
       {hint && <p className="mt-0.5 text-xs text-neutral-400">{hint}</p>}
     </Card>
+  );
+
+  return href ? (
+    <Link href={href} className="group block rounded-lg">
+      {card}
+    </Link>
+  ) : (
+    card
   );
 }
 

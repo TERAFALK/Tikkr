@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 import { useFormStatus } from "react-dom";
 import type { ReviewState } from "@/app/admin/(panel)/granskning/actions";
 import { Button, Input } from "@/components/ui";
@@ -17,6 +17,10 @@ import { Button, Input } from "@/components/ui";
  * starttiden gjorde servern ingenting alls och svarade ingenting alls: posten
  * stod kvar i listan, och den som skrivit 07:00 i stället för 17:00 trodde att
  * knappen var trasig. Nu står svaret under fältet.
+ *
+ * KNAPPEN SÄGER VAD SOM HÄNDER. Godkänn så länge tiden är orörd, Spara rättad
+ * tid när den ändrats. Servern avgör fortfarande utfallet, men den som rättat en
+ * tid ska inte behöva trycka på ett ord som betyder att den stämde.
  *
  * Åtgärden skickas in som en prop, som i rutorna. Sidan äger kopplingen till
  * servern; komponenten äger bara hur svaret visas.
@@ -35,6 +39,7 @@ export default function ReviewForm({
   ) => Promise<ReviewState>;
 }) {
   const [state, submit] = useActionState<ReviewState, FormData>(action, {});
+  const [value, setValue] = useState(defaultValue);
 
   return (
     <form action={submit}>
@@ -43,11 +48,12 @@ export default function ReviewForm({
         <Input
           type="datetime-local"
           name="clockOutAt"
-          defaultValue={defaultValue}
+          value={value}
+          onChange={(event) => setValue(event.target.value)}
           aria-label="Sluttid"
           className="w-52"
         />
-        <SubmitButton />
+        <SubmitButton changed={value !== defaultValue} />
       </div>
 
       {state.error && (
@@ -57,12 +63,12 @@ export default function ReviewForm({
   );
 }
 
-function SubmitButton() {
+function SubmitButton({ changed }: { changed: boolean }) {
   const { pending } = useFormStatus();
 
   return (
     <Button type="submit" disabled={pending}>
-      {pending ? "Sparar…" : "Godkänn"}
+      {pending ? "Sparar…" : changed ? "Spara rättad tid" : "Godkänn"}
     </Button>
   );
 }

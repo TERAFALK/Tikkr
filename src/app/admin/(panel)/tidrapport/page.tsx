@@ -339,7 +339,7 @@ export default async function TimesheetPage({
           <Alert tone="warning">
             {period.employee.name} har inget arbetstidsschema.{" "}
             <Link
-              href="/admin/installningar/schema"
+              href="/admin/installningar/arbetstider"
               className="font-medium underline"
             >
               Lägg upp ett schema

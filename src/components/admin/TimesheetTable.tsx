@@ -270,7 +270,7 @@ function DetailRow({
 /** Flexvärde med tecken. Plus är grönt, minus gult — aldrig rött. */
 function Flex({ minutes }: { minutes: number }) {
   if (Math.round(minutes) === 0) {
-    return <span className="text-neutral-400">0:00</span>;
+    return <span className="text-neutral-400">0</span>;
   }
 
   const positive = minutes > 0;

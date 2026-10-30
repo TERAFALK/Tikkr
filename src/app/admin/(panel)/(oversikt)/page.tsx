@@ -234,6 +234,7 @@ export default async function OverviewPage() {
                 : "personer instämplade"
           }
           icon={<IconPeople />}
+          href="/admin/stamplingar"
         />
         <Stat
           label="Registrerat idag"
@@ -246,17 +247,23 @@ export default async function OverviewPage() {
             week.totalMinutes
           )}`}
           icon={<IconClock />}
+          href="/admin/vecka"
         />
+        {/* Samma tal som i menyn: stämplingarna OCH snabbjobben. Rutan visade
+            bara stämplingarna, och två tal för samma sak får folk att tvivla på
+            båda. Uppdelningen står under Att göra. */}
         <Stat
           label="Att granska"
-          value={<LiveValue value={needsReview} />}
-          tone={needsReview > 0 ? "warning" : "neutral"}
+          value={<LiveValue value={needsReview + quickJobs} />}
+          tone={needsReview + quickJobs > 0 ? "warning" : "neutral"}
           icon={<IconReview />}
+          href="/admin/granskning"
         />
         <Stat
           label="Öppna ordrar"
           value={<LiveValue value={openOrders} />}
           icon={<IconOrder />}
+          href="/admin/ordrar"
         />
       </div>
 

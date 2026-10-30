@@ -32,10 +32,10 @@ import { weekStep } from "@/lib/week-nav";
 import WeekStepper from "@/components/admin/WeekStepper";
 import Pager, { PerPageField } from "@/components/platform/Pager";
 import {
-  listHref,
   listPaging,
   pageGroups,
   pageRows,
+  presetHref,
   PER_PAGE,
 } from "@/lib/paging";
 import { customerOptions } from "@/lib/customers";
@@ -207,11 +207,12 @@ export default async function ReportsPage({
                   return (
                     <Link
                       key={preset.label}
-                      href={listHref("/admin/rapporter", {
-                        keep: { from: preset.from, to: preset.to },
-                        page: 1,
-                        perPage: page.take,
-                      })}
+                      href={presetHref(
+                        "/admin/rapporter",
+                        { ...params },
+                        preset,
+                        page.take
+                      )}
                       className={`rounded-md px-2.5 py-1 text-xs font-medium transition-colors ${
                         active
                           ? "bg-neutral-900 text-white"

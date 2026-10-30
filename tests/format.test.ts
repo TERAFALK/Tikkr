@@ -179,6 +179,16 @@ describe("ingen yta visar tim:min", () => {
    * en som står kvar är värre än ingen rubrik alls: den påstår ett format som
    * talet under den inte har.
    */
+  it("ingen yta skriver noll som tim:min", () => {
+    // Fångades av en granskning och inte av kontrollerna ovan: en utskriven
+    // nolla går aldrig genom formatDuration.
+    const offenders = sourceFiles().filter((file) =>
+      />\s*0:00\s*</.test(readFileSync(file, "utf8"))
+    );
+
+    expect(offenders.map(relative)).toEqual([]);
+  });
+
   it("ingen kolumnrubrik lovar tim:min", () => {
     // Bara rubriken, alltså "(tim:min)" med parenteser. Ordet får stå i en
     // kommentar: filernas historik förklarar varför formatet är som det är,
