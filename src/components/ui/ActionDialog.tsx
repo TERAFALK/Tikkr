@@ -7,16 +7,10 @@ import { Alert, Button, dialogBody, dialogEdge, dialogSurface } from ".";
 /**
  * RUTA FÖR EN ÅTGÄRD SOM KAN SVARA MED ETT FEL.
  *
- * Systerkomponent till FormDialog, och skälet att den behövs är en rad:
- *
- *   onSubmit={() => dialog.current?.close()}
- *
- * FormDialog tar en vanlig serveråtgärd och stänger rutan i samma stund som
- * formuläret skickas. Det duger när åtgärden inte kan misslyckas på ett sätt
- * användaren kan rätta — men plattformspanelens åtgärder gör precis det:
- * "Ange en anledning till ändringen", "Antalet styrs av prenumerationen hos
- * Stripe". I FormDialog hade rutan redan varit stängd när det svaret kom, och
- * ändringen hade sett ut att gå igenom.
+ * Den enda rutan för ett formulär som skickas till en serveråtgärd. Det fanns
+ * en till, FormDialog, som stängde sig i samma stund som formuläret skickades.
+ * Den gick inte att svara i: ett namn som redan fanns byttes mot en hel felsida.
+ * Den togs bort 2026-10-30.
  *
  * Den här rutan äger därför sin egen useActionState, visar felet INUTI sig
  * och stänger först när åtgärden svarat att det gick.
@@ -168,7 +162,7 @@ export default function ActionDialog<S extends DialogState>({
       {/* Webbläsarens egen dialog. Den sköter bakgrundsdämpning,
           tangentbordsfokus, Escape och att resten av sidan inte går att nå
           medan rutan är öppen — allt sådant som blir många rader egen kod med
-          subtila fel. Samma val som i FormDialog. */}
+          subtila fel. */}
       <dialog
         ref={dialog}
         onClose={() => form.current?.reset()}

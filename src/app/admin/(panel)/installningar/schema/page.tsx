@@ -1,7 +1,7 @@
 import { requireAdmin } from "@/lib/admin-session";
 import { requireModule } from "@/lib/company-modules";
 import ConfirmButton from "@/components/admin/ConfirmButton";
-import FormDialog from "@/components/admin/FormDialog";
+import ActionDialog from "@/components/ui/ActionDialog";
 import {
   Badge,
   Card,
@@ -48,16 +48,18 @@ export default async function SchedulePage() {
           title="Raster"
           help="arbetstider"
           action={
-            <FormDialog
+            <ActionDialog
               trigger="Ny rast"
+              triggerTone="primary"
               title="Lägg till rast"
               action={createBreakType}
+              initial={{}}
               submitLabel="Lägg till"
             >
               <Field label="Namn">
                 <Input name="name" placeholder="Frukost" required autoFocus />
               </Field>
-            </FormDialog>
+            </ActionDialog>
           }
         />
 

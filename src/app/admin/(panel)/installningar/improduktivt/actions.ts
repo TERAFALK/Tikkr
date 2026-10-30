@@ -2,8 +2,12 @@
 
 import { revalidatePath } from "next/cache";
 import { assertWritable, requireAdmin } from "@/lib/admin-session";
+import { isUniqueViolation } from "@/lib/save-state";
+import type { DialogState } from "@/components/ui/ActionDialog";
 
 const PATH = "/admin/installningar/improduktivt";
+
+const DUPLICATE = "Det finns redan ett improduktivt moment med det namnet.";
 
 /**
  * Improduktiv tid: städning, möten, underhåll.
@@ -16,29 +20,49 @@ const PATH = "/admin/installningar/improduktivt";
  * Ingen timkostnad här. Improduktiv tid kalkyleras inte — den redovisas.
  */
 
-export async function createIndirectMoment(formData: FormData) {
+export async function createIndirectMoment(
+  _previous: DialogState,
+  formData: FormData
+): Promise<DialogState> {
   const session = await requireAdmin();
   await assertWritable(session);
   const { db, companyId } = session;
 
   const name = String(formData.get("name") ?? "").trim();
-  if (!name) return;
+  if (!name) return { error: "Ange ett namn." };
 
-  await db.indirectMoment.create({ data: { companyId, name } });
+  try {
+    await db.indirectMoment.create({ data: { companyId, name } });
+  } catch (error) {
+    if (isUniqueViolation(error)) return { error: DUPLICATE };
+    throw error;
+  }
+
   revalidatePath(PATH);
+  return { ok: "Momentet är tillagt." };
 }
 
-export async function renameIndirectMoment(formData: FormData) {
+export async function renameIndirectMoment(
+  _previous: DialogState,
+  formData: FormData
+): Promise<DialogState> {
   const session = await requireAdmin();
   await assertWritable(session);
   const { db } = session;
 
   const id = String(formData.get("id") ?? "");
   const name = String(formData.get("name") ?? "").trim();
-  if (!id || !name) return;
+  if (!id || !name) return { error: "Ange ett namn." };
 
-  await db.indirectMoment.updateMany({ where: { id }, data: { name } });
+  try {
+    await db.indirectMoment.updateMany({ where: { id }, data: { name } });
+  } catch (error) {
+    if (isUniqueViolation(error)) return { error: DUPLICATE };
+    throw error;
+  }
+
   revalidatePath(PATH);
+  return { ok: "Momentet är ändrat." };
 }
 
 export async function toggleIndirectMoment(formData: FormData) {

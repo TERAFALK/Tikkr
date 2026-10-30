@@ -16,6 +16,16 @@ export interface SaveState {
   ok?: string;
 }
 
+/**
+ * True när databasen vägrat ett värde som måste vara unikt (Prismas P2002).
+ *
+ * Läser bara koden, så att filen inte drar in Prisma i en typ som också
+ * webbläsaren läser.
+ */
+export function isUniqueViolation(error: unknown): boolean {
+  return (error as { code?: string } | null)?.code === "P2002";
+}
+
 export function saved(ok?: string): SaveState {
   return { savedAt: Date.now(), ok };
 }
