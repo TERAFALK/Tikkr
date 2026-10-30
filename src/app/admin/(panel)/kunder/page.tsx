@@ -108,7 +108,7 @@ export default async function CustomersPage({
               kundnummer och organisationsnummer.
             </p>
           ) : (
-            <Table>
+            <Table cards>
               <thead>
                 <tr>
                   <Th>Kund</Th>
@@ -139,20 +139,20 @@ export default async function CustomersPage({
                         </span>
                       )}
                     </Td>
-                    <Td muted>
+                    <Td label="Org.nr" muted>
                       {customer.orgNumber ?? (
                         <span className="text-neutral-300">—</span>
                       )}
                     </Td>
-                    <Td muted>
+                    <Td label="Ort" muted>
                       {customer.city ?? (
                         <span className="text-neutral-300">—</span>
                       )}
                     </Td>
-                    <Td numeric muted>
+                    <Td label="Ordrar" numeric muted>
                       {customer.orders}
                     </Td>
-                    <Td>
+                    <Td label="Status">
                       {customer.active ? (
                         <Badge tone="active">Aktiv</Badge>
                       ) : (

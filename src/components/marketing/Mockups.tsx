@@ -752,7 +752,7 @@ export function AdminMockup({ className = "" }: { className?: string }) {
                 Order
               </span>
               <span className="hidden w-16 shrink-0 text-[9px] font-medium uppercase tracking-wider text-neutral-400 sm:block">
-                Moment
+                Arbetsmoment
               </span>
               <span className="w-10 shrink-0 text-right text-[9px] font-medium uppercase tracking-wider text-neutral-400">
                 Tid
@@ -1026,17 +1026,17 @@ export function ReviewMockup({ className = "" }: { className?: string }) {
         <div className="mb-2.5 flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2">
           <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-amber-500" />
           <span className="text-[10px] font-medium text-amber-900">
-            1 post behöver granskas
+            1 stämpling att granska
           </span>
         </div>
 
         <div className="overflow-hidden rounded-lg border border-neutral-200 bg-white">
           <div className="border-b border-neutral-200 px-3 py-2">
             <p className="text-[10px] font-semibold text-neutral-900">
-              1 post att gå igenom
+              1 stämpling att granska
             </p>
             <p className="text-[9px] text-neutral-500">
-              Rätta sluttiden, eller godkänn den beräknade.
+              Rätta sluttiden eller godkänn den.
             </p>
           </div>
 
@@ -1048,6 +1048,9 @@ export function ReviewMockup({ className = "" }: { className?: string }) {
                 </span>
                 <span className="block truncate text-[9px] text-neutral-500">
                   2601 · Lackering · Volvo Lastvagnar
+                </span>
+                <span className="mt-0.5 block text-[9px] text-amber-800">
+                  Stämplades inte ut. Stängdes automatiskt 18:00.
                 </span>
               </span>
               <span className="shrink-0 text-right">
@@ -1065,8 +1068,7 @@ export function ReviewMockup({ className = "" }: { className?: string }) {
             </p>
 
             {/* Fältet bär den beräknade sluttiden, som i produkten. Knappen
-                heter Godkänn oavsett om tiden ändrats: servern jämför och
-                avgör själv vad som hände. */}
+                heter Godkänn tills tiden ändrats. */}
             <div className="mt-2 flex items-center gap-1.5">
               <span className="min-w-0 flex-1 truncate rounded-md border border-neutral-400 bg-white px-2 py-1 text-[10px] tabular-nums text-neutral-900">
                 2026-04-16 18:00

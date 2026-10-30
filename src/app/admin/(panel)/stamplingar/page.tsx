@@ -314,7 +314,7 @@ export default async function EntriesPage({
           <CardHeader
             title={`${total.toLocaleString("sv-SE")} ${total === 1 ? "stämpling" : "stämplingar"}`}
           />
-          <Table>
+          <Table cards>
             <thead>
               <tr>
                 <Th>Anställd</Th>
@@ -352,30 +352,33 @@ export default async function EntriesPage({
                       )}
                     </Td>
 
-                    <Td muted>
-                      {entry.orderId && entry.order ? (
-                        <>
-                          <Link
-                            href={`/admin/ordrar/${entry.orderId}`}
-                            className="text-link hover:underline"
-                          >
-                            {entry.order.orderNumber}
-                          </Link>
-                          {entry.moment && ` · ${entry.moment.name}`}
-                        </>
-                      ) : (
-                        describeEntry(entry).text
-                      )}
-                      {entry.order?.customer && (
-                        <span className="mt-0.5 block text-xs text-neutral-500">
-                          {entry.order.customer.name}
-                        </span>
-                      )}
+                    <Td label="Order" muted>
+                      {/* En omslutning, så att allt står som ett värde i kortet på telefon. */}
+                      <span>
+                        {entry.orderId && entry.order ? (
+                          <>
+                            <Link
+                              href={`/admin/ordrar/${entry.orderId}`}
+                              className="text-link hover:underline"
+                            >
+                              {entry.order.orderNumber}
+                            </Link>
+                            {entry.moment && ` · ${entry.moment.name}`}
+                          </>
+                        ) : (
+                          describeEntry(entry).text
+                        )}
+                        {entry.order?.customer && (
+                          <span className="mt-0.5 block text-xs text-neutral-500">
+                            {entry.order.customer.name}
+                          </span>
+                        )}
+                      </span>
                     </Td>
 
-                    <Td muted>{formatDateTime(entry.clockInAt, timeZone)}</Td>
+                    <Td label="Instämplad" muted>{formatDateTime(entry.clockInAt, timeZone)}</Td>
 
-                    <Td muted>
+                    <Td label="Utstämplad" muted>
                       {ongoing ? (
                         <Badge tone="active">Pågår</Badge>
                       ) : (
@@ -383,7 +386,7 @@ export default async function EntriesPage({
                       )}
                     </Td>
 
-                    <Td numeric>
+                    <Td label="Timmar" numeric>
                       {formatDuration(
                         minutesBetween(entry.clockInAt, entry.clockOutAt)
                       )}

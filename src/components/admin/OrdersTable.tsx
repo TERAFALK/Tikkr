@@ -269,7 +269,7 @@ export default function OrdersTable({
             : "Inga ordrar med den statusen"}
         </p>
       ) : (
-        <Table>
+        <Table cards>
           <thead>
             <tr>
               {selecting && (
@@ -324,19 +324,19 @@ export default function OrdersTable({
                     )}
                   </Td>
 
-                  {!hideCustomer && <Td muted>{order.customerName ?? "—"}</Td>}
-                  <Td>
+                  {!hideCustomer && <Td label="Kund" muted>{order.customerName ?? "—"}</Td>}
+                  <Td label="Status">
                     {isOpen ? (
                       <Badge tone="active">Öppen</Badge>
                     ) : (
                       <Badge tone="muted">Stängd</Badge>
                     )}
                   </Td>
-                  <Td numeric muted>
+                  <Td label="Stämplingar" numeric muted>
                     {order.entries}
                   </Td>
-                  <Td numeric>{formatDuration(order.minutes)}</Td>
-                  <Td>
+                  <Td label="Registrerad tid" numeric>{formatDuration(order.minutes)}</Td>
+                  <Td label="Mot beräknad tid">
                     <BudgetBar
                       budgetMinutes={order.budgetMinutes}
                       usedMinutes={order.minutes}

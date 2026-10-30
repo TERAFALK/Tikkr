@@ -190,6 +190,11 @@ UX-granskningen): den valda personen och hela personalen. Sidan visar en person,
 men tre av utskrifterna gäller alla, och frånvaro är känsliga uppgifter (§ 4
 punkt 9). Justera flexsaldo står vid saldot.
 
+**Listorna är kort på telefon** (beslutat 2026-10-30, produktägarens val). Ordrar,
+Stämplingar, Anställda och Kunder visar varje rad som ett kort under `sm`, med
+`Table cards` och en `label` på cellerna. Det är samma celler som på skrivbordet,
+ritade om i `globals.css`, så att telefonen aldrig kan visa något annat.
+
 **Osparade ändringar frågar innan de försvinner** (beslutat 2026-10-30,
 UX-granskningen). `UnsavedGuard` står i `SaveForm`, i Arbetstider och i rutorna
 för anställd, kund och order: en länk i panelen och webbläsarens omladdning

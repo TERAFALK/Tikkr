@@ -185,7 +185,7 @@ export default async function EmployeesPage({
               anställningsnummer.
             </p>
           ) : (
-            <Table>
+            <Table cards>
               <thead>
                 <tr>
                   <Th>Namn</Th>
@@ -216,12 +216,12 @@ export default async function EmployeesPage({
                         </Link>
                       </span>
                     </Td>
-                    <Td muted>
+                    <Td label="Anställningsnummer" muted>
                       {employee.employeeNumber ?? (
                         <span className="text-neutral-300">—</span>
                       )}
                     </Td>
-                    <Td>
+                    <Td label="Status">
                       <span className="flex flex-wrap items-center gap-1.5">
                         {employee.active ? (
                           <Badge tone="active">Aktiv</Badge>
@@ -237,7 +237,7 @@ export default async function EmployeesPage({
                         )}
                       </span>
                     </Td>
-                    <Td numeric muted>
+                    <Td label="Stämplingar" numeric muted>
                       {employee._count.timeEntries}
                     </Td>
                     <Td>

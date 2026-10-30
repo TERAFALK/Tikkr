@@ -397,12 +397,26 @@ export function TimeField({
 /* Tabell                                                                      */
 /* -------------------------------------------------------------------------- */
 
-export function Table({ children }: { children: ReactNode }) {
+/**
+ * `cards` visar raderna som kort på en telefon. Tabellen rullade annars i sidled,
+ * och status, tid och åtgärder hamnade utanför skärmen. Cellerna behöver då
+ * `label`, se `.data-list` i globals.css. En cell utan `label` står som radens
+ * rubrik eller åtgärder. Samma data och samma celler på alla bredder.
+ */
+export function Table({
+  children,
+  cards = false,
+}: {
+  children: ReactNode;
+  cards?: boolean;
+}) {
   return (
     // `relative` håller kvar dolda rubriker (`sr-only`), som annars är absolut
     // positionerade utanför rullningsrutan och gör hela sidan bredare.
     <div className="relative overflow-x-auto">
-      <table className="min-w-full text-[13px]">{children}</table>
+      <table className={`min-w-full text-[13px] ${cards ? "data-list" : ""}`}>
+        {children}
+      </table>
     </div>
   );
 }
@@ -431,15 +445,19 @@ export function Td({
   numeric,
   muted,
   colSpan,
+  label,
 }: {
   children?: ReactNode;
   numeric?: boolean;
   muted?: boolean;
   colSpan?: number;
+  /** Kolumnens namn, när raden visas som ett kort. Se `Table`. */
+  label?: string;
 }) {
   return (
     <td
       colSpan={colSpan}
+      data-label={label}
       className={`px-4 py-2.5 align-middle ${
         numeric ? "text-right tabular-nums" : "text-left"
       } ${muted ? "text-neutral-500" : "text-neutral-900"}`}
