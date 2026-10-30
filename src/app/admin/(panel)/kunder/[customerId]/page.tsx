@@ -1,13 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireAdmin } from "@/lib/admin-session";
-import { hasModule } from "@/lib/company-modules";
-import {
-  customerMoney,
-  customerOptions,
-  customerStats,
-  getCustomer,
-} from "@/lib/customers";
+import { customerMoney, customerStats, getCustomer } from "@/lib/customers";
 import { orderRows } from "@/lib/orders";
 import { companyTimeZone } from "@/lib/company";
 import { unsafeGlobalPrisma } from "@/lib/db";
@@ -29,7 +23,7 @@ import {
   Tr,
 } from "@/components/ui";
 import { updateCustomer } from "../actions";
-import { closeOrders, toggleOrder, updateOrder } from "../../ordrar/actions";
+import { closeOrders } from "../../ordrar/actions";
 
 /**
  * KUNDSIDAN.
@@ -51,11 +45,6 @@ export default async function CustomerPage({
   params: Promise<{ customerId: string }>;
 }) {
   const { db, companyId } = await requireAdmin();
-  // Leveransdatumet i orderrutan hör till tillvalet Planering. Samma flagga
-  // som under Ordrar: att dölja fältet är kosmetik, serveråtgärden frågar
-  // själv. Den skickas ändå med hit, så att samma order går att ändra likadant
-  // oavsett vilken sida man står på.
-  const planning = await hasModule(companyId, "PLANNING");
 
   const { customerId } = await params;
 
@@ -71,7 +60,7 @@ export default async function CustomerPage({
   });
   const timeZone = await companyTimeZone(companyId);
 
-  const [stats, money, orders, customerList, moments] = await Promise.all([
+  const [stats, money, orders] = await Promise.all([
     customerStats(db, customerId),
     customerMoney(
       db,
@@ -80,13 +69,6 @@ export default async function CustomerPage({
       timeZone
     ),
     orderRows(db, { customerId }),
-    // Ordermenyn kan ändra en orders kund, och då behövs hela registret att
-    // välja ur — inte bara kunden vars sida man står på.
-    customerOptions(db),
-    db.workMoment.findMany({
-      orderBy: [{ active: "desc" }, { name: "asc" }],
-      select: { id: true, name: true, active: true },
-    }),
   ]);
 
   const address = [
@@ -294,17 +276,12 @@ export default async function CustomerPage({
             />
           ) : (
             /* Samma tabell som under Ordrar, med kundkolumnen borttagen.
-               Ordernumret öppnar samma meny, och markeringsläget exporterar
+               Ordernumret öppnar ordern, och markeringsläget exporterar
                flera på en gång — annars vore kundens sida en lista man ändå
                måste lämna för att göra något åt det man ser. */
             <OrdersTable
               orders={orders}
-              customers={customerList}
-              moments={moments}
-              updateAction={updateOrder}
-              toggleAction={toggleOrder}
               closeAction={closeOrders}
-              planning={planning}
               title="Ordrar"
               hideCustomer
             />

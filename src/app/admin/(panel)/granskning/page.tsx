@@ -1,11 +1,8 @@
 import { requireAdmin } from "@/lib/admin-session";
-import { hasModule } from "@/lib/company-modules";
 import { unsafeGlobalPrisma } from "@/lib/db";
 import OrdersTable from "@/components/admin/OrdersTable";
 import ReviewForm from "@/components/admin/ReviewForm";
 import { orderRows } from "@/lib/orders";
-import { customerOptions } from "@/lib/customers";
-import { toggleOrder, updateOrder } from "../ordrar/actions";
 import {
   Badge,
   Card,
@@ -40,18 +37,12 @@ export const dynamic = "force-dynamic";
  * Snabbjobben står först. En order utan nummer går inte att fakturera alls;
  * en beräknad sluttid är en siffra som behöver bekräftas.
  *
- * Rutan för att rätta ett snabbjobb är orderlistans egen, med flit: den kan
- * redan allt som behövs och visar sina fel inuti sig. En egen liten
- * kompletteringsruta hade blivit ett andra ställe som ändrar samma order.
+ * Ett snabbjobb rättas på orderns egen sida, med flit: den kan redan allt som
+ * behövs och visar sina fel inuti sig. En egen liten kompletteringsruta hade
+ * blivit ett andra ställe som ändrar samma order.
  */
 export default async function ReviewPage() {
   const { db, companyId } = await requireAdmin();
-  // Leveransdatumet i orderrutan hör till tillvalet Planering. Samma flagga
-  // som under Ordrar: att dölja fältet är kosmetik, serveråtgärden frågar
-  // själv. Den skickas ändå med hit, så att samma order går att ändra likadant
-  // oavsett vilken sida man står på.
-  const planning = await hasModule(companyId, "PLANNING");
-
 
   const company = await unsafeGlobalPrisma.company.findUnique({
     where: { id: companyId },
@@ -59,7 +50,7 @@ export default async function ReviewPage() {
   });
   const timeZone = company?.timezone ?? "Europe/Stockholm";
 
-  const [entries, quickJobs, customers, moments] = await Promise.all([
+  const [entries, quickJobs] = await Promise.all([
     db.timeEntry.findMany({
       where: { needsReview: true },
       orderBy: { clockInAt: "desc" },
@@ -78,11 +69,6 @@ export default async function ReviewPage() {
       },
     }),
     orderRows(db, { onlyQuickJobs: true }),
-    customerOptions(db),
-    db.workMoment.findMany({
-      orderBy: [{ active: "desc" }, { name: "asc" }],
-      select: { id: true, name: true, active: true },
-    }),
   ]);
 
   return (
@@ -97,11 +83,6 @@ export default async function ReviewPage() {
         <div className="mb-6">
           <OrdersTable
             orders={quickJobs}
-            customers={customers}
-            moments={moments}
-            updateAction={updateOrder}
-            toggleAction={toggleOrder}
-            planning={planning}
             selectable={false}
             title={`${quickJobs.length} snabbjobb att komplettera`}
           />

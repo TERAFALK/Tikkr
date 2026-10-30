@@ -175,15 +175,16 @@ const MODULE_SURFACES: Record<string, ModuleSurface> = {
       "app/api/admin/plan/live/route.ts",
     ],
 
-    // ordrar/page.tsx och ordrar/actions.ts: orderlistan, kunden, påslaget och
-    // den beräknade tiden är basen. Bara leveransdatumet hör till planeringen,
-    // och bara det ligger bakom `hasModule`. Samma avvägning som anstallda/*
-    // gör för löneunderlaget.
+    // ordrar/page.tsx, ordrar/[orderId]/page.tsx och ordrar/actions.ts:
+    // orderlistan, ordern, kunden, påslaget och den beräknade tiden är basen.
+    // Bara leveransdatumet hör till planeringen, och bara det ligger bakom
+    // `hasModule`. Samma avvägning som anstallda/* gör för löneunderlaget.
     //
     // (oversikt)/page.tsx: översikten är basen. Bara kortet Planerat idag hör
     // till planeringen, och det hämtas och ritas bara när `hasModule` säger ja.
     partial: [
       "app/admin/(panel)/ordrar/page.tsx",
+      "app/admin/(panel)/ordrar/[orderId]/page.tsx",
       "app/admin/(panel)/ordrar/actions.ts",
       "app/admin/(panel)/(oversikt)/page.tsx",
     ],

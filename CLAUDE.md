@@ -172,6 +172,22 @@ skickas vidare i `next.config.ts`, så att bokmärken fortsätter fungera.
 Frågan för en ny sida är alltså hur ofta den öppnas: varje dag eller vecka
 hör den till menyn, en gång och sedan sällan hör den till Inställningar.
 
+**En order öppnas som en kund** (beslutat 2026-10-30, produktägarens val).
+Ordernumret i listorna och i Ordrar i arbete på översikten leder till
+`/admin/ordrar/<id>`. Det öppnade en meny förut, och från översikten rapporten.
+Sidan har efterkalkyl och underlag med samma knappar som markeringsläget, Ändra
+och Stäng ordern, tiden per arbetsmoment mot beräkningen, och en länk till
+stämplingarna i Rapporter. Menyn är borttagen, också på kundsidan och under
+Granskning, där ett snabbjobb nu rättas på orderns sida. Att markera flera och
+ta ut eller avsluta dem i ett svep fungerar som förut, och valet Visa belopp
+och rabatt finns bara på en enskild order, som förut.
+
+**Ordrar och Anställda går att söka i, som Kunder** (beslutat 2026-10-30).
+Sökningen är ett vanligt formulär som hamnar i adressen som `q`
+(`SearchForm`). Ordrar söks på ordernummer, kund och kundnummer, anställda på
+namn och anställningsnummer. Sökrutan göms i markeringsläget, eftersom en
+sökning laddar om sidan och tappar det man markerat.
+
 **Bara ägaren ändrar fakturan och anonymiserar** (beslutat 2026-10-18,
 produktägarens val, säkerhetsgranskningen). Ägaren bjuder in, tar bort och
 nollställer administratörer som förut, och nu också licenser, tillval,

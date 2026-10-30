@@ -9,26 +9,31 @@ import type {
 import {
   Alert,
   Button,
+  Card,
+  PageHeader,
   dialogBody,
   dialogEdge,
   dialogSurface,
 } from "@/components/ui";
 import { formatDuration, minutesBetween } from "@/lib/format";
-import BudgetBar from "./BudgetBar";
 import type { BudgetMomentOption } from "./BudgetMoments";
+import { ExportGroup, ExportLink } from "./ExportButtons";
 import OrderFields from "./OrderFields";
 import PrintButton from "./PrintButton";
 import AskDialog from "@/components/ui/AskDialog";
 import type { OrderBudgetRow } from "@/lib/orders";
 import type { SearchSelectOption } from "./SearchSelect";
-import { IconOrder } from "@/components/ui/icons";
 
 /**
- * Menyn som öppnas när man klickar på en order.
+ * RUBRIKEN OCH ÅTGÄRDERNA PÅ ORDERNS EGEN SIDA.
  *
- * Alternativet vore fyra knappar per rad, vilket i en lista med femtio ordrar
- * blir tvåhundra knappar. Här ligger de bakom ordernumret, som är det man
- * ändå tittar på när man letar.
+ * Var en meny som öppnades av ordernumret i listan (ändrat 2026-10-30). Nu
+ * öppnas ordern som en kund, och samma val står på sidan: efterkalkyl och
+ * underlag med samma knappar som markeringsläget, Ändra och Stäng ordern.
+ *
+ * Rubriken ligger här och inte på sidan eftersom knapparna i den och knapparna
+ * i dokumentkortet delar tillstånd: en uttagen efterkalkyl frågar om ordern
+ * ska avslutas, och svaret går samma väg som Stäng ordern.
  */
 export default function OrderActions({
   order,
@@ -50,9 +55,6 @@ export default function OrderActions({
     customerId: string | null;
     customerName: string | null;
     status: string;
-    entries: number;
-    minutes: number;
-    budgetMinutes: number | null;
     budgets: OrderBudgetRow[];
     markupPercent: number | null;
     fixedPriceOre: number | null;
@@ -67,9 +69,8 @@ export default function OrderActions({
     formData: FormData
   ) => Promise<OrderToggleState>;
 }) {
-  // Kryssrutan för belopp på kundens underlag. Nollställs inte mellan
-  // öppningar med flit: den som tar ut tre ordrar i rad vill oftast ha samma
-  // sorts underlag på alla tre.
+  // Kryssrutan för belopp på kundens underlag. Belopp är ett val vid uttaget,
+  // inte ett läge på kunden. Självkostnad och marginal kommer aldrig med.
   const [withPrice, setWithPrice] = useState(false);
   const priceParam = withPrice ? "&belopp=1" : "";
 
@@ -81,7 +82,6 @@ export default function OrderActions({
   // svaret.
   const [asking, setAsking] = useState(false);
 
-  const menu = useRef<HTMLDialogElement>(null);
   const edit = useRef<HTMLDialogElement>(null);
   // Inte "confirm": det namnet är webbläsarens egen dialogfunktion, och att
   // skugga den i en fil full av rutor är att be om förvirring.
@@ -130,9 +130,9 @@ export default function OrderActions({
   /**
    * Avslutar ordern.
    *
-   * Går genom samma åtgärd som knappen längre ner i menyn, och därmed genom
-   * samma mellansteg: står någon instämplad ändras ingenting, utan rutan med
-   * de instämplade öppnas.
+   * Går genom samma åtgärd som knappen i rubriken, och därmed genom samma
+   * mellansteg: står någon instämplad ändras ingenting, utan rutan med de
+   * instämplade öppnas.
    */
   function closeOrder() {
     setAsking(false);
@@ -145,187 +145,75 @@ export default function OrderActions({
 
   return (
     <>
-      <button
-        type="button"
-        onClick={() => menu.current?.showModal()}
-        className="rounded font-medium text-neutral-900 underline-offset-4 hover:underline"
-      >
-        {order.orderNumber}
-      </button>
+      <PageHeader
+        title={`Order ${order.orderNumber}`}
+        description={`${order.customerName ?? "Ingen kund angiven"} · ${
+          isOpen ? "Öppen" : "Stängd"
+        }`}
+        help="ordrar"
+        action={
+          <div className="flex flex-wrap gap-2">
+            <Button
+              type="button"
+              tone="secondary"
+              onClick={() => edit.current?.showModal()}
+            >
+              Ändra
+            </Button>
+            <form action={submitToggle}>
+              <input type="hidden" name="id" value={order.id} />
+              <input type="hidden" name="status" value={order.status} />
+              <ToggleOrderButton isOpen={isOpen} />
+            </form>
+          </div>
+        }
+      />
 
-      {/* Meny */}
-      <dialog
-        ref={menu}
-        className={`w-[min(38rem,calc(100vw-2rem))] ${dialogSurface}`}
-      >
-        <div className={`${dialogEdge} border-b border-neutral-200 px-5 py-4`}>
-          <h2 className="text-sm font-semibold text-neutral-900">
-            Order {order.orderNumber}
-          </h2>
-          <p className="mt-0.5 text-[13px] text-neutral-500">
-            {order.customerName ?? "Ingen kund angiven"} · {order.entries}{" "}
-            {order.entries === 1 ? "stämpling" : "stämplingar"}
-          </p>
-
-          {order.budgetMinutes && (
-            <div className="mt-3">
-              <BudgetBar
-                budgetMinutes={order.budgetMinutes}
-                usedMinutes={order.minutes}
-              />
-
-              {/* Uppdelningen under totalen, inte istället för den. Totalen
-                  svarar på om ordern håller; raderna på vilket moment som
-                  drar över — och det är den frågan nästa beräkning behöver
-                  svar på. */}
-              <ul className="mt-3 space-y-1.5">
-                {order.budgets.map((budget) => (
-                  <li
-                    key={budget.momentId}
-                    className="flex items-baseline justify-between gap-3"
-                  >
-                    <span className="truncate text-[13px] text-neutral-600">
-                      {budget.momentName}
-                    </span>
-                    <span className="shrink-0 text-xs tabular-nums text-neutral-500">
-                      {formatDuration(budget.usedMinutes)} av{" "}
-                      {formatDuration(budget.minutes)}
-                      {budget.usedMinutes > budget.minutes && (
-                        <span className="ml-1.5 font-medium text-amber-700">
-                          {formatDuration(budget.usedMinutes - budget.minutes)}{" "}
-                          över
-                        </span>
-                      )}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
+      {/* Felet står här och inte bara i rutan med de instämplade, som inte
+          öppnas när det inte finns några. */}
+      {toggleState.error && blockers.length === 0 && (
+        <div className="mb-4">
+          <Alert>{toggleState.error}</Alert>
         </div>
+      )}
 
-        <div className={`${dialogBody} p-2`}>
-          <p className="px-3 pb-1 pt-2 text-[11px] font-semibold uppercase tracking-wider text-neutral-400">
-            Underlag
-          </p>
+      <Card className="p-5">
+        <div className="flex flex-wrap items-end gap-x-4 gap-y-4">
+          {/* Efterkalkylen är INTERN och underlaget är kundens. Därför
+              skiljelinjen, som i orderlistans markeringsläge. */}
+          <ExportGroup label="Efterkalkyl">
+            <PrintButton
+              href={`${exportBase}&format=kalkyl`}
+              label="Skriv ut"
+              onPrint={askToClose}
+            />
+            <ExportLink href={`${exportBase}&format=kalkyl`} onPick={askToClose}>
+              Ladda ner
+            </ExportLink>
+          </ExportGroup>
 
-          {/* Kryssrutan styr BARA det här uttaget. Belopp på kundens underlag
-              är ett val man gör per gång, inte ett läge man ställer in på en kund
-              och sedan glömmer. Självkostnad och marginal kommer aldrig med —
-              det är en annan sorts dokument, längre ner i menyn. */}
-          <label className="flex cursor-pointer items-start gap-2 rounded-md px-3 py-2 text-[13px] hover:bg-neutral-50">
+          <span aria-hidden="true" className="h-8 w-px bg-neutral-200" />
+
+          <ExportGroup label="Underlag">
+            <PrintButton href={`${exportBase}&format=pdf${priceParam}`} label="Skriv ut" />
+            <ExportLink href={`${exportBase}&format=pdf${priceParam}`} primary>
+              Ladda ner
+            </ExportLink>
+          </ExportGroup>
+
+          <label className="flex cursor-pointer items-start gap-2 pb-1 text-[13px]">
             <input
               type="checkbox"
               checked={withPrice}
               onChange={(event) => setWithPrice(event.target.checked)}
               className="mt-0.5 h-3.5 w-3.5 rounded border-neutral-300 text-blue-600 focus:ring-blue-600"
             />
-            <span>
-              <span className="block font-medium text-neutral-900">
-                Visa belopp och rabatt
-              </span>
-              <span className="block text-neutral-500">
-                Utan kryss visas bara tid
-              </span>
+            <span className="font-medium text-neutral-900">
+              Visa belopp och rabatt
             </span>
           </label>
-
-          <MenuLink
-            href={`${exportBase}&format=pdf${priceParam}`}
-            icon={<IconOrder />}
-            title="Ladda ner PDF"
-            description="Bilaga till faktura"
-            onPick={() => menu.current?.close()}
-          />
-          <p className="px-3 pb-1 pt-3 text-[11px] font-semibold uppercase tracking-wider text-neutral-400">
-            Internt
-          </p>
-
-          {/* Egen rubrik och egen knapp, inte ett kryss i rutan ovanför.
-              Kalkylen innehåller självkostnad och marginal och får aldrig
-              förväxlas med underlaget som skickas till kunden. */}
-          <PrintButton
-            href={`${exportBase}&format=kalkyl`}
-            variant="menu"
-            label="Skriv ut efterkalkyl"
-            description="Går direkt till skrivaren"
-            onPrint={() => {
-              menu.current?.close();
-              askToClose();
-            }}
-          />
-          <MenuLink
-            href={`${exportBase}&format=kalkyl`}
-            icon={<IconOrder />}
-            title="Efterkalkyl som PDF"
-            description="Kostnad och marginal. Internt"
-            onPick={() => {
-              menu.current?.close();
-              askToClose();
-            }}
-          />
-
-          <p className="px-3 pb-1 pt-3 text-[11px] font-semibold uppercase tracking-wider text-neutral-400">
-            Ordern
-          </p>
-
-          <button
-            type="button"
-            onClick={() => {
-              menu.current?.close();
-              edit.current?.showModal();
-            }}
-            className="flex w-full items-start gap-3 rounded-lg px-3 py-2.5 text-left hover:bg-neutral-50"
-          >
-            <span className="mt-0.5 text-neutral-400">
-              <IconOrder />
-            </span>
-            <span>
-              <span className="block text-[13px] font-medium text-neutral-900">
-                Ändra uppgifter
-              </span>
-              <span className="block text-xs text-neutral-500">
-                Ordernummer och kund
-              </span>
-            </span>
-          </button>
-
-          <form action={submitToggle} onSubmit={() => menu.current?.close()}>
-            <input type="hidden" name="id" value={order.id} />
-            <input type="hidden" name="status" value={order.status} />
-            <button
-              type="submit"
-              className="flex w-full items-start gap-3 rounded-lg px-3 py-2.5 text-left hover:bg-neutral-50"
-            >
-              <span className="mt-0.5 text-neutral-400">
-                <IconOrder />
-              </span>
-              <span>
-                <span className="block text-[13px] font-medium text-neutral-900">
-                  {isOpen ? "Stäng ordern" : "Öppna ordern igen"}
-                </span>
-                <span className="block text-xs text-neutral-500">
-                  {isOpen
-                    ? "Döljs på stämplingsskärmen, tiden finns kvar"
-                    : "Går att stämpla på igen"}
-                </span>
-              </span>
-            </button>
-          </form>
         </div>
-
-        <div
-          className={`${dialogEdge} flex justify-end border-t border-neutral-200 bg-neutral-50 px-5 py-3`}
-        >
-          <Button
-            type="button"
-            tone="secondary"
-            onClick={() => menu.current?.close()}
-          >
-            Stäng
-          </Button>
-        </div>
-      </dialog>
+      </Card>
 
       {/* Frågan som ersatte kryssrutan. Ställs först när kalkylen är
           uttagen, eftersom det är då man vet om jobbet är färdigt. */}
@@ -466,6 +354,16 @@ export default function OrderActions({
   );
 }
 
+function ToggleOrderButton({ isOpen }: { isOpen: boolean }) {
+  const { pending } = useFormStatus();
+
+  return (
+    <Button type="submit" tone="secondary" disabled={pending}>
+      {isOpen ? "Stäng ordern" : "Öppna ordern igen"}
+    </Button>
+  );
+}
+
 function SaveOrderButton() {
   const { pending } = useFormStatus();
 
@@ -483,36 +381,6 @@ function ConfirmCloseButton() {
     <Button type="submit" disabled={pending}>
       {pending ? "Avslutar…" : "Stämpla ut alla och avsluta"}
     </Button>
-  );
-}
-
-function MenuLink({
-  href,
-  icon,
-  title,
-  description,
-  onPick,
-}: {
-  href: string;
-  icon: React.ReactNode;
-  title: string;
-  description: string;
-  onPick: () => void;
-}) {
-  return (
-    <a
-      href={href}
-      onClick={onPick}
-      className="flex items-start gap-3 rounded-lg px-3 py-2.5 hover:bg-neutral-50"
-    >
-      <span className="mt-0.5 text-neutral-400">{icon}</span>
-      <span>
-        <span className="block text-[13px] font-medium text-neutral-900">
-          {title}
-        </span>
-        <span className="block text-xs text-neutral-500">{description}</span>
-      </span>
-    </a>
   );
 }
 
