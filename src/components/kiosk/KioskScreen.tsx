@@ -164,6 +164,10 @@ function jobKey(choice: KioskJobChoice): string {
  * Skillnaden ska gå att läsa tvärs över en verkstad, precis som skillnaden
  * mellan instämplad och utstämplad. Den som ser ett gult kort vet att personen
  * är på plats men inte på ett jobb som betalas.
+ *
+ * TEXTEN PÅ GULT ÄR FJORD (beslutat 2026-10-30, produktägarens val). Vitt på
+ * gult ger 2,1:1 och Fjord 8,2:1, och det är just felmeddelandet som ska gå att
+ * läsa på avstånd.
  */
 const JOB_TONE = {
   order: "border-emerald-600 bg-emerald-600 active:bg-emerald-700",
@@ -1303,7 +1307,7 @@ export default function KioskScreen({
           nämner den för chefen — meningen är inte att störa den som stämplar,
           därför tar den ingen plats från knapparna. */}
       {subscriptionWarning && (
-        <div className="flex items-center gap-3 bg-amber-500 px-6 py-3 text-white">
+        <div className="flex items-center gap-3 bg-amber-500 px-6 py-3 text-fjord">
           <span className="text-lg font-semibold">{subscriptionWarning}</span>
           <span className="text-sm opacity-90">
             Stämplingen fungerar som vanligt. Informera närmaste chef.
@@ -1834,7 +1838,7 @@ function Toast({
   onDismiss?: () => void;
 }) {
   const styles =
-    tone === "ok" ? "bg-emerald-600 text-white" : "bg-amber-500 text-white";
+    tone === "ok" ? "bg-emerald-600 text-white" : "bg-amber-500 text-fjord";
 
   return (
     <div
@@ -1909,6 +1913,10 @@ function EmployeeGrid({
         // utstämplad.
         const filled = Boolean(job) || Boolean(onBreak);
 
+        // Gult kort har mörk text. Se JOB_TONE.
+        const onAmber = Boolean(job) && onlyIndirect(jobs);
+        const ink = onAmber ? "text-fjord" : "text-white";
+
         return (
           <button
             key={employee.id}
@@ -1940,11 +1948,11 @@ function EmployeeGrid({
                 name={employee.name}
                 hasPhoto={employee.hasPhoto}
                 size={52}
-                onDark={filled}
+                onDark={filled && !onAmber}
               />
               <span
                 className={`min-w-0 text-xl font-semibold leading-tight sm:text-2xl ${
-                  filled ? "text-white" : "text-neutral-900"
+                  filled ? ink : "text-neutral-900"
                 }`}
               >
                 {employee.name}
@@ -1965,21 +1973,35 @@ function EmployeeGrid({
                  först, eftersom ett dolt jobb är värre än ett förkortat namn. */
               <span className="mt-3 block">
                 {jobs.length > 1 && (
-                  <span className="mb-1.5 inline-flex items-center gap-2 rounded-md bg-white/15 px-2.5 py-1 text-sm font-semibold text-white ring-1 ring-inset ring-white/25">
-                    <span className="h-2 w-2 rounded-full bg-white" />
+                  <span
+                    className={`mb-1.5 inline-flex items-center gap-2 rounded-md px-2.5 py-1 text-sm font-semibold ring-1 ring-inset ${
+                      onAmber
+                        ? "bg-fjord/10 text-fjord ring-fjord/25"
+                        : "bg-white/15 text-white ring-white/25"
+                    }`}
+                  >
+                    <span
+                      className={`h-2 w-2 rounded-full ${
+                        onAmber ? "bg-fjord" : "bg-white"
+                      }`}
+                    />
                     {jobs.length} jobb igång
                   </span>
                 )}
                 {jobs.slice(0, 2).map((entry) => (
                   <span
                     key={jobKey(entry.choice)}
-                    className="block truncate text-lg font-semibold leading-snug text-white sm:text-xl"
+                    className={`block truncate text-lg font-semibold leading-snug sm:text-xl ${ink}`}
                   >
                     {entry.label}
                   </span>
                 ))}
                 {jobs.length > 2 && (
-                  <span className="mt-1 block text-base text-white/70">
+                  <span
+                    className={`mt-1 block text-base ${
+                      onAmber ? "text-fjord/80" : "text-white/70"
+                    }`}
+                  >
                     och {jobs.length - 2} till
                   </span>
                 )}
@@ -2160,13 +2182,17 @@ function ActionChoice({
               {single.label}
             </span>
             <span
-              className={`mt-2 inline-flex items-center gap-2 rounded-md px-3 py-1.5 text-[15px] font-semibold text-white ${
+              className={`mt-2 inline-flex items-center gap-2 rounded-md px-3 py-1.5 text-[15px] font-semibold ${
                 single.choice.kind === "INDIRECT"
-                  ? "bg-amber-500"
-                  : "bg-emerald-600"
+                  ? "bg-amber-500 text-fjord"
+                  : "bg-emerald-600 text-white"
               }`}
             >
-              <span className="h-2 w-2 rounded-full bg-white" />
+              <span
+                className={`h-2 w-2 rounded-full ${
+                  single.choice.kind === "INDIRECT" ? "bg-fjord" : "bg-white"
+                }`}
+              />
               Pågår
             </span>
           </div>
@@ -2217,10 +2243,22 @@ function ActionChoice({
               }`}
             >
               <span className="min-w-0 flex-1">
-                <span className="block truncate text-2xl font-semibold leading-snug text-white">
+                <span
+                  className={`block truncate text-2xl font-semibold leading-snug ${
+                    job.choice.kind === "INDIRECT" ? "text-fjord" : "text-white"
+                  }`}
+                >
                   {job.label}
                 </span>
-                <span className="mt-1 block text-sm text-white/80">Pågår</span>
+                <span
+                  className={`mt-1 block text-sm ${
+                    job.choice.kind === "INDIRECT"
+                      ? "text-fjord/80"
+                      : "text-white/80"
+                  }`}
+                >
+                  Pågår
+                </span>
               </span>
               <button
                 onClick={() => onClockOut(job)}
@@ -2664,7 +2702,7 @@ function OrderNumberPad({
         className={`kiosk-frame-cta kiosk-press mt-2 lg:col-start-2 lg:row-start-5 h-[5.5rem] w-full shrink-0 rounded-xl px-4 py-3.5 text-2xl font-semibold disabled:bg-neutral-200 disabled:text-neutral-400 ${
           match
             ? "bg-blue-600 text-white active:bg-blue-700"
-            : "bg-amber-500 text-white active:bg-amber-600"
+            : "bg-amber-500 text-fjord active:bg-amber-600"
         }`}
       >
         {!match && !typed ? (
@@ -2672,7 +2710,7 @@ function OrderNumberPad({
         ) : !match ? (
           <>
             Skapa order {typed}
-            <span className="mt-1 block text-base font-normal text-white/80">
+            <span className="mt-1 block text-base font-normal text-fjord/80">
               märks för kontoret
             </span>
           </>

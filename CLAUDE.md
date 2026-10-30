@@ -2113,6 +2113,10 @@ Tick Deep och `neutral-400` står kvar på ikoner, ytor och linjer. Det är ett
 litet avsteg från guiden, som anger Tick Deep för länkar. Bevisas av
 `tests/contrast.test.ts`.
 
+**Text på en gul yta är Fjord** (beslutat 2026-10-30, produktägarens val,
+UX-granskningen). Vitt på gult ger 2,1:1 och Fjord 8,2:1. Gäller felrutan och
+varningen på stämplingsskärmen, kort med improduktiv tid och Skapa order.
+
 Fjord och Snö bär de flesta ytorna. **Grönt är accent och aldrig huvudfärg** —
 det är den enda regeln i guiden som står utskriven som ett förbud, och skälet
 att Fjord och inte grönt bär knapparna.

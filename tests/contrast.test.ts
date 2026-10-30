@@ -73,6 +73,17 @@ describe("läsbar text i panelerna", () => {
     expect(contrast(link!, BRAND.sno)).toBeGreaterThanOrEqual(4.5);
   });
 
+  it("text på en gul yta är Fjord", () => {
+    // Vitt på gult ger 2,1:1. Felrutan på stämplingsskärmen hade den färgen.
+    const offenders = panel.filter((file) =>
+      readFileSync(file, "utf8")
+        .split("\n")
+        .some((line) => /bg-amber-500[^"`]*text-white/.test(line))
+    );
+
+    expect(offenders.map((file) => path.relative(SRC, file))).toEqual([]);
+  });
+
   it("gul text är tillräckligt mörk", () => {
     const offenders = panel.filter((file) =>
       /(?<![:\w-])text-amber-[3-6]00/.test(readFileSync(file, "utf8"))
