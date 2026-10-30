@@ -3,102 +3,48 @@
 import { revalidatePath } from "next/cache";
 import { assertWritable, requireAdmin } from "@/lib/admin-session";
 import { requireModule } from "@/lib/company-modules";
-import { readScheduleDays } from "@/lib/schedule";
+import { isUniqueViolation } from "@/lib/save-state";
+import type { DialogState } from "@/components/ui/ActionDialog";
 
 /**
- * Arbetstidsschemat.
+ * RASTTYPERNA för stämplingsskärmen, som Frukost och Lunch. Löneunderlagets.
  *
- * Hela veckan sparas i ett svep. Alternativet — en knapp per dag — skulle
- * göra det möjligt att lämna halva veckan osparad utan att det syns, och ett
- * halvt schema ger en planerad tid som ser rimlig ut men är fel.
- *
- * Fälten läses av `readScheduleDays` i lib/schedule.ts, som också läser rutan
- * med egna tider under Anställda. Samma formulärfält på två ställen ska tolkas
- * av samma kod.
+ * Företagets arbetstider låg på samma sida till 2026-10-17, och ligger nu
+ * under Inställningar, Arbetsytan, Arbetstider. De är arbetsytans och inte
+ * löneunderlagets: planeringen läser dem också. Se lib/work-hours.ts.
  */
 
 const PATH = "/admin/installningar/schema";
 
-export interface ScheduleFormState {
-  error?: string;
-  savedAt?: number;
-}
-
-export async function saveSchedule(
-  _previous: ScheduleFormState,
-  formData: FormData
-): Promise<ScheduleFormState> {
-  const session = await requireAdmin();
-  await assertWritable(session);
-  await requireModule(session, "PAYROLL");
-  const { db, companyId } = session;
-
-  const read = readScheduleDays(formData);
-  if ("error" in read) return read;
-  const days = read.days;
-
-  const existing = await db.workSchedule.findFirst({
-    where: { isDefault: true },
-    select: { id: true },
-  });
-
-  // Dagarna skrivs om från grunden i stället för att jämföras rad för rad.
-  // Ett schema är litet, och en omskrivning kan inte lämna kvar en dag som
-  // tagits bort i gränssnittet.
-  await db.$transaction(async (tx) => {
-    const scheduleId =
-      existing?.id ??
-      (
-        await tx.workSchedule.create({
-          data: { companyId, name: "Normalarbetstid", isDefault: true },
-        })
-      ).id;
-
-    await tx.scheduleDay.deleteMany({ where: { scheduleId } });
-
-    for (const day of days) {
-      await tx.scheduleDay.create({
-        data: {
-          companyId,
-          scheduleId,
-          weekday: day.weekday,
-          startMinute: day.startMinute,
-          endMinute: day.endMinute,
-          breaks: {
-            create: day.breaks.map((rest) => ({
-              companyId,
-              startMinute: rest.startMinute,
-              endMinute: rest.endMinute,
-            })),
-          },
-        },
-      });
-    }
-  });
-
-  revalidatePath(PATH);
-  revalidatePath("/admin/tidrapport");
-  return { savedAt: Date.now() };
-}
-
 /* --- Rasttyper ----------------------------------------------------------- */
 
-export async function createBreakType(formData: FormData) {
+export async function createBreakType(
+  _previous: DialogState,
+  formData: FormData
+): Promise<DialogState> {
   const session = await requireAdmin();
   await assertWritable(session);
   await requireModule(session, "PAYROLL");
   const { db, companyId } = session;
 
   const name = String(formData.get("name") ?? "").trim();
-  if (!name) return;
+  if (!name) return { error: "Ange ett namn.", field: "name" };
 
   const count = await db.breakType.count();
 
-  await db.breakType.create({
-    data: { companyId, name, sortOrder: count },
-  });
+  try {
+    await db.breakType.create({
+      data: { companyId, name, sortOrder: count },
+    });
+  } catch (error) {
+    if (isUniqueViolation(error)) {
+      return { error: "Det finns redan en rast med det namnet.", field: "name" };
+    }
+    throw error;
+  }
 
   revalidatePath(PATH);
+  return { ok: "Rasten är tillagd." };
 }
 
 export async function toggleBreakType(formData: FormData) {

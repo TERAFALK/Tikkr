@@ -5,15 +5,15 @@
 
 ## 0. Arbetsflödet — gäller varje session (beslutat 2026-10-10)
 
-Kod går gren → PR → CI → `main` → labbet → tagg → produktionen. Rutinen står
-i `docs/release.md`, skälen i § 5.
+Kod går gren → PR → CI → `dev` → labbet → `prod` → tagg → produktionen.
+Rutinen står i `docs/release.md`, skälen i § 5.
 
 ### Före arbetet
 1. Kör `git status` och `git branch --show-current`. Finns ändringar jag inte
    gjort: fråga innan något rörs.
-2. Arbeta aldrig på `main`. Skapa en gren från senaste `origin/main`:
-   `feat/<namn>`, `fix/<namn>` eller `chore/<namn>`. En gren är en avgränsad
-   ändring.
+2. Arbeta aldrig på `dev` eller `prod`. Skapa en gren från senaste
+   `origin/dev`: `feat/<namn>`, `fix/<namn>` eller `chore/<namn>`. En gren
+   är en avgränsad ändring.
 3. Läs koden, testerna och avsnittet i denna fil som rör ändringen innan något
    ändras. Är nuvarande beteende oklart: fråga, anta inte.
 
@@ -38,13 +38,15 @@ i `docs/release.md`, skälen i § 5.
    bygget. Testerna med databas körs av CI på PR:en — läs resultatet innan
    något kallas klart. Skriv vad som är verifierat och vad som inte är det.
 10. Läs hela diffen. Inga hemligheter, felsökningsrader eller orelaterade filer.
-11. Commit och push till grenen. Öppna PR mot `main` med `gh pr create`: vad,
+11. Commit och push till grenen. Öppna PR mot `dev` med `gh pr create`: vad,
     hur det testats, migrationer, driftändringar. **Aldrig push eller
-    force-push till `main`**, aldrig `--no-verify`.
+    force-push till `dev` eller `prod`**, aldrig `--no-verify`. En akut
+    rättelse i produktionen grenas från `origin/prod` och går mot `prod`, se
+    `docs/release.md` steg 7.
 
 ### Det som bara användaren beslutar
-12. Sammanslagning till `main`, en tagg `v*`, en GitHub Release och varje
-    driftsättning kräver användarens uttryckliga ja i samma session.
+12. Sammanslagning till `dev` eller `prod`, en tagg `v*`, en GitHub Release
+    och varje driftsättning kräver användarens uttryckliga ja i samma session.
 13. Claude har ingen åtkomst till servrarna och ska inte ha det. Claude ger
     kommandon, ett i taget; användaren kör dem.
 14. Ett kommando som raderar eller skriver över data (`restore.sh`,
@@ -80,7 +82,7 @@ för, se § 3.1. Den gränsen är kommersiell och ligger utanpå den tekniska �
 den gör inget av det som står här mindre sant.
 
 **Gränsen går vid pengar till lön, inte vid tid.** Tikkr räknar timmar:
-planerad tid, närvarotid, flex, komp och frånvaro. Vad timmarna är värda i lön
+planerad tid, närvarotid, flex och frånvaro. Vad timmarna är värda i lön
 avgörs av kollektivavtalet, i lönesystemet. Lägg därför ALDRIG till lönearter,
 OB-tillägg, övertidsersättning, karensavdrag eller semesterlön — de reglerna
 ändras med varje avtalsrörelse, och ett system som har dem fel betalar fel lön
@@ -138,6 +140,16 @@ läggs det till bredvid, och båda löper parallellt.
 omedelbart (optimistisk UI-uppdatering). Den enda koden på skärmen är den som
 visar en anställds eget flexsaldo, och den rör inte stämplingen — se regel 7.
 
+**Tillbaka går ett steg, Avbryt går hem** (beslutat 2026-10-30, UX-granskningen).
+Tillbaka står i sidhuvudet på varje delsteg, och Avbryt betyder alltid tillbaka
+till namnen. Valdes fel order fanns tidigare bara vägen hem, och i kundvalet stod
+två Avbryt med olika betydelse. Ett byte av jobb står kvar när man går bakåt inom
+valet, och avbryts först vid personens egen vy.
+
+**Namnrutnätet får fler kolumner på en stor skärm** (beslutat 2026-10-30,
+UX-granskningen), och en bokstavsrad över 24 anställda, samma som kundvalet har.
+Bokstaven släpper av sig själv efter samma tid som ett halvfärdigt val.
+
 **Ordervalet börjar på knappsatsen** (ändrat 2026-10-01). Den som ska börja
 eller byta jobb har ordernumret på ritningen framför sig; rutnätet med öppna
 ordrar ligger ett tryck bort, på "Visa öppna ordrar".
@@ -157,6 +169,157 @@ den som inte HAR ett nummer såg ingen väg alls, och knappsatsen är första vy
 Administratör loggar in separat i en adminpanel, hanterar anställda/ordrar/
 moment och tar ut rapporter (tid per order, person, moment) med export till
 Excel/PDF.
+
+**Filtren i Rapporter och Stämplingar är en rad, och de gäller direkt** (beslutat
+2026-10-30, UX-granskningen). `FilterBar` har perioden överst, de vanligaste
+fälten under, och resten bakom Fler filter, som står öppet så länge något i det
+är valt. Ett snabbval byter bara datumen. Summeringarna i Rapporter ligger bakom
+ett tryck, så att listan börjar på första skärmen.
+
+**Ett namn och ett ordernummer leder vidare** (beslutat 2026-10-30, produktägarens
+val). Ordernumret öppnar ordern på varje sida. Namnet leder till personens
+tidrapport med löneunderlaget, och annars till personens stämplingar
+(`person-link.ts`). En anställd har ingen egen sida.
+
+**Stämplingar går att filtrera på order, och Ordrar på status** (beslutat
+2026-10-30, produktägarens val). Ordersidan länkar till orderns stämplingar, där
+de går att rätta.
+
+**Tidrapportens utskrifter står i två grupper** (beslutat 2026-10-30,
+UX-granskningen): den valda personen och hela personalen. Sidan visar en person,
+men tre av utskrifterna gäller alla, och frånvaro är känsliga uppgifter (§ 4
+punkt 9). Justera flexsaldo står vid saldot.
+
+**Listorna är kort på telefon** (beslutat 2026-10-30, produktägarens val). Ordrar,
+Stämplingar, Anställda och Kunder visar varje rad som ett kort under `sm`, med
+`Table cards` och en `label` på cellerna. Det är samma celler som på skrivbordet,
+ritade om i `globals.css`, så att telefonen aldrig kan visa något annat.
+
+**Osparade ändringar frågar innan de försvinner** (beslutat 2026-10-30,
+UX-granskningen). `UnsavedGuard` står i `SaveForm`, i Arbetstider och i rutorna
+för anställd, kund och order: en länk i panelen och webbläsarens omladdning
+frågar på en sida, och Escape frågar i en ruta. Avbryt frågar inte, eftersom det
+är ett val man gjort med flit. Korta rutor har ingen fråga.
+
+**Menyn bär det man arbetar i, Inställningar det man sätter upp** (beslutat
+2026-10-14, issue #17). Vänstermenyn har två avsnitt: **Dagligen** (Översikt,
+Granskning, Stämplingar, Veckovy, Planering, Tidrapport, Rapporter) och
+**Register** (Ordrar, Kunder, Anställda). Arbetsmoment, Improduktiv tid,
+Stämplingsskärmar och Stationer låg också under Register, och menyn hade
+fjorton punkter. De sätts upp en gång och står sedan, och ligger nu under
+Inställningar, i avsnitten Stämpling och Planering. De gamla adresserna
+skickas vidare i `next.config.ts`, så att bokmärken fortsätter fungera.
+
+Frågan för en ny sida är alltså hur ofta den öppnas: varje dag eller vecka
+hör den till menyn, en gång och sedan sällan hör den till Inställningar.
+
+**En order öppnas som en kund** (beslutat 2026-10-30, produktägarens val).
+Ordernumret i listorna och i Ordrar i arbete på översikten leder till
+`/admin/ordrar/<id>`. Det öppnade en meny förut, och från översikten rapporten.
+Sidan har efterkalkyl och underlag med samma knappar som markeringsläget, Ändra
+och Stäng ordern, tiden per arbetsmoment mot beräkningen, och en länk till
+stämplingarna i Rapporter. Menyn är borttagen, också på kundsidan och under
+Granskning, där ett snabbjobb nu rättas på orderns sida. Att markera flera och
+ta ut eller avsluta dem i ett svep fungerar som förut, och valet Visa belopp
+och rabatt finns bara på en enskild order, som förut.
+
+**Ordrar och Anställda går att söka i, som Kunder** (beslutat 2026-10-30).
+Sökningen är ett vanligt formulär som hamnar i adressen som `q`
+(`SearchForm`). Ordrar söks på ordernummer, kund och kundnummer, anställda på
+namn och anställningsnummer. Sökrutan göms i markeringsläget, eftersom en
+sökning laddar om sidan och tappar det man markerat.
+
+**Bara ägaren ändrar fakturan och anonymiserar** (beslutat 2026-10-18,
+produktägarens val, säkerhetsgranskningen). Ägaren bjuder in, tar bort och
+nollställer administratörer som förut, och nu också licenser, tillval,
+kassan, betalningsportalen och GDPR-anonymiseringen. Allt annat gör en
+administratör. Skälet är att de två första ändrar vad kunden betalar, och
+den sista går inte att ångra. En administratör ser prenumerationssidan men
+inga knappar, och den låsta panelen säger att ägaren aktiverar
+prenumerationen. Prövningen ligger i varje serveråtgärd (`isOwner` i
+`admin-session.ts`) och bevisas av `tests/owner-coverage.test.ts`, som
+härleder prenumerationens åtgärder ur filen.
+
+**Stämplingar och Rapporter visar 50 rader i taget** (beslutat 2026-10-17,
+issue #24), med Föregående och Nästa. Båda ritade varje rad i urvalet, och en
+rapport utan datum var då varje stämpling arbetsytan gjort: sidan blev
+långsammare för varje vecka kunden använde systemet. **Bara listan delas
+upp.** Rapportens total, grupper och uttag räknas på hela urvalet som förut,
+och en grupp som delas mellan två sidor behåller sin egen summa
+(`src/lib/paging.ts`). Stämplingar bläddrar i databasen; Rapporter hämtar
+hela urvalet, eftersom summorna behöver det. Pågående stämplingar står
+överst på första sidan. Sidnumret följer inte med när perioden byts.
+
+**Varje lista bläddras likadant, och man väljer hur många rader en sida
+visar** (beslutat 2026-10-30, produktägarens önskan). Gäller Ordrar, Kunder,
+Anställda, ordrarna på en kundsida, Stämplingar, Rapporter och Ändringsloggen,
+och plattformens Kunder, Historik, Händelser, Inkorg och Beställningar. Det
+finns EN komponent, `Pager`, och den går inte att använda utan radvalet.
+Förvalet är 50 överallt, också i plattformens kundlista och inkorg som hade 25,
+och 25, 100 och 200 går att välja. Rymmer listan högst 50 rader syns ingen
+bläddring alls, vad adressen än säger (`listPaging`). Är den längre står valet
+kvar även när allt ryms på en sida, så att det går att välja om. Valet ligger i
+adressen som `antal`, och inte i en kaka, av samma skäl som `helg=visa` på
+tavlan. Filter och sökning behåller valet; sidnumret börjar om. Uttaget i
+Rapporter påverkas inte av något av dem. Bläddringen göms i markeringsläget,
+som sökrutan. Rubrikens antal gäller hela urvalet. Ordrar och Anställda
+bläddrar i databasen, registren som redan hämtas hela i minnet.
+
+Stämplingar har EN Ändra-ruta för hela listan (ändrat 2026-10-20). Varje rad
+hade en egen, och varje ruta bar hela orderregistret, så sidan växte med rader
+gånger ordrar. Rapporten hämtar raderna med sina nycklar och namnen en gång
+per anställd, order och moment.
+
+**Översikten svarar på vad som händer nu och vad som väntar** (beslutat
+2026-10-20, produktägarens godkända förslag). Den samlar det man annars
+öppnar fem sidor för, och har inga diagram för diagrammens skull:
+
+- **Nyckeltalen.** "Registrerat idag" och veckans tid räknas av `buildWeek`,
+  samma räkning som Veckovy. Rutorna är länkar till sidorna talen kommer från,
+  och Att granska är samma tal som siffran i menyn (ändrat 2026-10-30).
+- **Pågående arbete.**
+- **Att göra:** granskning, ordrar från stämplingsskärmar att komplettera,
+  automatisk utstämpling som inte körs, och stämplingsskärmar som inte hört
+  av sig på ett dygn, samma gräns som plattformens lista.
+- **Ordrar i arbete:** de senaste sju dagarna, tid mot beräknad tid, räknat
+  av `orderRows` som orderlistan.
+- **Planerat idag**, bara med Planering, räknat i `plan-today.ts` med
+  tavlans egna delar.
+
+Sidan hämtas om varje minut medan fliken syns. Frånvarande idag valdes bort:
+frånvaro är känslig och hör till löneunderlaget (§ 4 punkt 9). Säljsidans
+bild av översikten (`AdminMockup`) ändras i samma PR som översikten.
+
+**Stämplingsskärmar vi säljer fjärrstyrs från panelen, aldrig från skärmen**
+(beslutat 2026-10-19). En skärm som kör i Fully Kiosk rapporterar sin
+version, sitt nät och sitt serienummer, och får då knappen Fjärrstyrning
+under Stämplingsskärmar: ljusstyrka och omstart. En kunds egen dator eller
+surfplatta rapporterar ingenting och får ingen knapp. Det är en förmåga
+skärmen intygar och inte en bock, så den kan inte vara fel. Ljusstyrkan syns
+inte på stämplingsskärmen, som saknar inloggning: ett reglage där hade låtit
+vem som helst släcka stämpelklockan. `src/lib/fully.ts` är enda filen som
+känner appen, och hårdvaran står i `docs/kioskskarm.md`.
+
+**Omstarten finns också på skärmen** (ändrat 2026-10-30, produktägarens val).
+En ikon överst i rutan under kugghjulet, bara på skärmar som kör appen, och
+bakom en fråga. Den som står vid en skärm som krånglar ska inte behöva ringa
+någon med panelen. Vem som helst kan alltså starta om, men inte med tryck i
+kön, och skärmen är tillbaka efter en minut. **Stänga av finns inte:**
+`fully.shutdown()` kräver en rotad enhet, och våra skärmar är inte rotade.
+
+**Starta om startar om hela skärmen** (ändrat 2026-10-26), med
+`fully.reboot()`, och appen om enheten inte går att starta om. Skärmen är
+borta i ungefär en minut, och startar som förut aldrig om med tryck i kön.
+
+**Skärmarnas inställningar ställs in i ProDVX portal, inte i Tikkr**
+(beslutat 2026-10-26, produktägarens val). Samma dag byggdes först tre
+inställningar som Tikkr skickade till skärmarna, och sedan hela
+konfigurationsfiler med versioner och krypterade hemligheter, som skärmarna
+läste in med appens `importSettingsFile`. Det blev för rörigt, och allt togs
+bort igen. Konfigurationen sätts vid provisioneringen och ändras med en
+USB-sticka, se `docs/kioskskarm.md` § 6. Det som finns kvar är Fjärrstyrning:
+ljusstyrka och omstart av hela skärmen. Tabellerna från försöket ligger kvar,
+döda, och tas bort i en senare release.
 
 ### Multi-tenant
 
@@ -201,9 +364,11 @@ admin-UI m.m.). Kraftfullt, men det motsäger målet om *ett* enkelt paket.
 ## 3. Datamodell
 
 ```
-companies      — id, name, subscription_status, created_at
+companies      — id, name, subscription_status, created_at, atf_agreement?,
+                 planning_mode, kiosk_config_id? (död)
 employees      — id, company_id, name, active, cost_rate_ore,
-                 schedule_id?, flex_opening_minutes, flex_code_hash?, hourly
+                 schedule_id?, flex_opening_minutes, flex_code_hash?, hourly,
+                 balance_opening_date?, atf_work_form?
 customers      — id, company_id, name, customer_number, org_number,
                  contact_name, email, phone,
                  address_line, postal_code, city,
@@ -218,31 +383,40 @@ time_entries   — id, company_id, employee_id, kind,
                  clock_in_at, clock_out_at, source,
                  moment_cost_rate_ore, employee_cost_rate_ore,
                  needs_review, review_note, kiosk_device_id, source_ip
-admin_users    — id, company_id, email, name?, phone?, password_hash, role,
+admin_users    — id, company_id, email, first_name?, last_name?, phone?,
+                 password_hash, role,
                  password_changed_at?, sessions_revoked_at?, email_verified_at?,
-                 news_seen_version?, support_seen_at?
+                 news_seen_version?, name? (död, se § 4 punkt 3)
 email_verifications — id, user_id, token_hash, email, expires_at, used_at
 audit_events   — id, company_id, actor_email, entity, entity_id, action,
                  before, after, subject_employee_id
-kiosk_devices  — id, company_id, name, device_token, active, last_seen_at
+kiosk_devices  — id, company_id, name, token_hash?, pairing_code_hash?,
+                 pairing_expires_at?, last_seen_at?,
+                 fully_version?, webview_version?, brightness?,
+                 restart_requested_at?, serial_number?, network_type?,
+                 wifi_ssid?, wifi_signal?, reported_at?,
+                 kiosk_config_id?, applied_config_version_id?,
+                 config_applied_at? (de tre sista döda)
 support_visits — id, company_id, email, started_at, last_seen_at
 feedback_messages — id, company_id, author_user_id?, author_email, author_name?,
-                 kind, area?, page?, body, status, status_changed_at?,
-                 status_changed_by_email?, customer_updated_at?
-feedback_replies — id, company_id, message_id, body, author_email
+                 kind, area?, page?, body, done_at?, done_note?, done_by_email?
 
-  — löneunderlaget, se regel 7 —
+  — arbetstiderna, arbetsytans sedan 2026-10-17, se regel 8 —
 work_schedules   — id, company_id, name, is_default
 schedule_days    — id, company_id, schedule_id, weekday, start_minute, end_minute
 schedule_breaks  — id, company_id, schedule_day_id, start_minute, end_minute
+
+  — löneunderlaget, se regel 7 —
 break_types      — id, company_id, name, active, sort_order
 break_entries    — id, company_id, employee_id, break_type_id,
                    started_at, ended_at, source, needs_review
-absence_reasons  — id, company_id, name, active, sort_order, counts_as_comp
+absence_reasons  — id, company_id, name, active, sort_order, counts_as_comp,
+                   gives_atf
 absences         — id, company_id, employee_id, date, reason_id, minutes,
                    note, created_by_email
 comp_adjustments — id, company_id, employee_id, date, minutes,
                    note, created_by_email, absence_id
+holidays         — id, company_id, date, name, created_by_email
 
   — planeringen, se regel 8 —
 stations         — id, company_id, name, moment_id, active, sort_order
@@ -251,15 +425,47 @@ station_days     — id, company_id, station_id, weekday, start_minute,
 station_breaks   — id, company_id, station_day_id, start_minute, end_minute
 planned_blocks   — id, company_id, station_id, order_id, moment_id,
                    starts_at, minutes, note, created_by_email
+staff_blocks     — id, company_id, employee_id, order_id, moment_id,
+                   planned_block_id?, starts_at, minutes, note,
+                   created_by_email
 
   — tillvalen, se § 3.1 —
 company_modules  — id, company_id, module, source, stripe_item_id,
                    enabled_by, enabled_at
 
 company_prices   — id, company_id, item, monthly_ore, updated_by_email
+company_kiosk_settings — död sedan 2026-10-26
 
   — plattformens egna tabeller, aldrig kundens —
 stripe_prices    — item, month_price_id, year_price_id, updated_by_email
+kiosk_setting_defaults, kiosk_configs, kiosk_config_versions,
+kiosk_config_downloads — döda sedan 2026-10-26
+login_throttles  — scope, key_hash, count, until
+
+  — tillbehören, se § 3.4 —
+company_profiles  — id, company_id, org_number, contact_name, order_email,
+                    phone, address_line, postal_code, city,
+                    delivery_reference, billing_address_line,
+                    billing_postal_code, billing_city, invoice_email
+shop_orders       — id, company_id, number, status, payment_status,
+                    idempotency_key, placed_by_email, ögonblicksbild av
+                    köparen och adresserna, goods_ore, shipping_ore?,
+                    vat_ore, total_ore, carrier?, tracking_url?,
+                    invoice_number?, invoiced_at?, paid_at?
+shop_order_lines  — id, company_id, order_id, product_key, name,
+                    unit_price_ore, vat_rate_percent, quantity,
+                    subtotal_ore, vat_ore, sort_order
+shop_order_events — id, company_id, order_id, kind, from_status, to_status,
+                    detail, customer_message, actor_email, email_state
+shop_order_notes  — id, order_id, target_company_id, body, author_email
+                    (plattformens, ingen relation)
+shop_products     — id, key, slug, kind, name, summary, description,
+                    price_ore, vat_rate_percent, max_quantity, delivery,
+                    warranty, benefits, included, requirements, specs,
+                    in_shop, on_site, sort_order (plattformens)
+shop_product_images — id, product_id, data?, mime_type?, static_path?, alt,
+                    illustration, sort_order
+shop_prices       — död, ersatt av shop_products.price_ore (se § 3.4)
 ```
 
 ### Beslutade regler för stämpling (bestämt 2026-08-10)
@@ -316,7 +522,7 @@ stripe_prices    — item, month_price_id, year_price_id, updated_by_email
    **Helgstämpling flaggas också** (tillagt 2026-10-01). En stämpling som görs
    på en lördag eller söndag går igenom precis som vanligt, men hamnar i
    granskningen. Helgtid är nästan alltid något som ska beslutas om innan den
-   faktureras eller blir komp, och en post som ingen tittat på hinner annars
+   faktureras eller blir flex, och en post som ingen tittat på hinner annars
    bli både faktura och lön. Veckodagen räknas i företagets tidszon, och både
    in- och utstämplingen prövas: ett pass som börjar fredag kväll och slutar på
    lördagen flaggas.
@@ -394,7 +600,7 @@ stripe_prices    — item, month_price_id, year_price_id, updated_by_email
 
    Systemet stoppar aldrig stämpling för att en beräkning överskrids.
 
-7. **Löneunderlaget: schema, raster, flex, komp och frånvaro**
+7. **Löneunderlaget: schema, raster, flex och frånvaro**
    (tillagt 2026-09-26).
 
    **Schemat ger PLANERAD tid**, netto efter schemats raster. Kundens vardag
@@ -420,8 +626,19 @@ stripe_prices    — item, month_price_id, year_price_id, updated_by_email
    Ett eget schema utan dagar finns inte. Kryssas rutan ur raderas schemat och
    kopplingen, samma princip som att raden ÄR tillståndet i § 3.1.
 
+   **RÖDA DAGAR ÄR KUNDENS EGEN LISTA** (tillagt 2026-10-13), under
+   Inställningar, Röda dagar, i `holidays`. En röd dag har ingen planerad tid
+   för någon i arbetsytan: den som är ledig tappar ingenting i flex, den som
+   arbetar får tiden som plus, och frånvaro utan timmar täcker noll, som en
+   lördag. En uträknad kalender med Sveriges helgdagar valdes bort av
+   produktägaren: vilka aftnar och klämdagar som är lediga skiljer sig mellan
+   verkstäder, och en lista kunden skrivit säger exakt det som gäller hos dem.
+   Priset är att listan måste fyllas i varje år. Ändringar loggas, eftersom
+   en röd dag flyttar flexen för alla på en gång. ATF-underlaget minskar inte
+   av en röd dag, se ATF nedan.
+
    **TIMANSTÄLLD MÄTS INTE MOT NÅGOT SCHEMA** (tillagt 2026-10-07).
-   `employees.hourly` stänger av planerad tid, flexsaldo och komptid för den
+   `employees.hourly` stänger av planerad tid och flexsaldo för den
    personen. Arbetad tid, raster och frånvaro registreras som för alla andra.
 
    Utan fältet föll en timanställd tillbaka på företagets standardschema, se
@@ -436,13 +653,60 @@ stripe_prices    — item, month_price_id, year_price_id, updated_by_email
    Krysset sitter i rutan under Anställda, före arbetstiderna, och gömmer dem
    — ett schemaformulär under krysset hade sett ut som att tiderna ändå
    gäller. Ett eget schema raderas när krysset sätts. Rutan som justerar
-   saldot och åtgärden för godkänd komptid avvisar personen på servern, inte
-   bara i menyn.
+   saldot avvisar personen på servern, inte bara i menyn.
 
-   **ATF är inte byggt** (2026-10-07). Hur många timmar någon tjänar in står i
-   kollektivavtalet, och det räknar Tikkr aldrig. Blir det aktuellt är formen
-   given av komptiden: ett saldo kontoret fyller på, och uttag genom en
-   frånvaroorsak som drar på det.
+   **ATF RÄKNAS SOM UNDERLAG, ALDRIG SOM SALDO** (beslutat 2026-10-13, ersätter
+   "ATF är inte byggt" från 2026-10-07). Pilotkunden behövde intjänad
+   arbetstidsförkortning på löneunderlaget, och lämnade sin egen formel:
+
+   ```
+   ATF = (planerad tid + flex föregående månad − ogiltig frånvaro) × faktor
+   ```
+
+   Faktorn är avtalets minuter per heltidsvecka delat med veckans minuter.
+   Teknikavtalet IF Metall ger 82 minuter på 40 timmar för dagtid, alltså
+   0,03417, det kunden räknat som 0,0342, och 202 minuter för tvåskift.
+
+   - **Avtalet väljs per företag** under Inställningar, Arbetstidsförkortning,
+     och **arbetstidsformen per anställd**. Värdena står i
+     `src/lib/collective-agreements.ts` med källa och avtalsperiod. Ändras
+     avtalet ändras raden där, i en egen PR, så att ändringen syns i en
+     granskning. Det är skälet att de inte skrivs in i en ruta i panelen.
+   - **Flexen är FÖREGÅENDE månads**, kundens val: deras lönekörning räknar
+     ATF innan månaden är slut. Det är månadens flex och aldrig saldot, som
+     hade räknat samma timmar en gång till för varje månad de stod kvar.
+   - **Ogiltig frånvaro** är frånvaro på en orsak utan kryss i **Ger ATF**, ett
+     val kunden gör per orsak, eftersom avtalen säger olika. En orsak som drar
+     på flexen dras aldrig: den ledigheten syns redan som minus i flexen.
+   - **Timanställda** räknas på arbetad tid och frånvaro som ger ATF. Formeln
+     hade gett dem noll, och avtalet ger den som arbetar kortare tid ATF i
+     proportion.
+   - **Röda dagar minskar inte underlaget.** De har ingen planerad tid, men
+     avtalet räknar en vecka med en helgdag som fullgjord, så schemats tid de
+     dagarna läggs tillbaka och står för sig på utskriften.
+   - **Bara för en hel kalendermånad.** Formeln blandar två månader, och för en
+     vecka finns ingen föregående månad. Då visas ingen ATF alls hellre än en
+     som är fel.
+
+   **Tikkr håller inget ATF-saldo.** Tidbanken, uttagen och det som vid
+   årsskiftet blir pensionspremie hör till lönesystemet. Allt räknas i
+   `src/lib/atf.ts`, och `tests/atf.test.ts` fäller det.
+
+   **Underlaget står bara på Löneunderlaget, inte på tidrapportens papper**
+   (ändrat 2026-10-30, kundens begäran), se § 3.2. Raden heter Intjänad ATF
+   Period. Flexen från föregående månad står på en egen rad, eftersom den
+   annars bara syntes i den finstilta raden med talen. Rutan Intjänad ATF står
+   kvar på sidan Tidrapport (produktägarens val), så att en persons ATF går att
+   kontrollera utan att skriva ut hela personalen.
+
+   **Ett ATF-uttag är frånvaro på kundens egen orsak** (beslutat 2026-10-30,
+   produktägarens val). Löneunderlaget summerar frånvaron per orsak, och där
+   syns uttaget för perioden. Listan vet inte vad orsakerna heter, så det
+   krävdes ingen ny kolumn, och något saldo uppstår inte.
+
+   Det är inte ett avsteg från avgränsningen överst: ATF är timmar, inte
+   kronor. Det avtalet styr är hur många timmar, och därför står avtalets tal
+   för sig, med källa, och inte utspridda i räkningen.
 
    **Rasterna STÄMPLAS** (kundens val), och ett rasttryck stänger ALLA
    pågående jobb. Därmed faller rasten bort ur närvarotiden av sig själv, och
@@ -456,19 +720,19 @@ stripe_prices    — item, month_price_id, year_price_id, updated_by_email
    **Flexformeln, som bara räknas i `src/lib/payroll.ts`:**
 
    ```
-   flex(dag) = arbetad tid + frånvarotid − planerad tid − intjänad komp
+   flex(dag) = arbetad tid + frånvarotid − planerad tid − uttagen flex
    ```
 
-   | Fall | Arbetad | Frånvaro | Planerad | Komp | Flex |
+   | Fall | Arbetad | Frånvaro | Planerad | Uttagen flex | Flex |
    |---|---|---|---|---|---|
    | Normal dag | 8,5 | 0 | 8,5 | 0 | 0 |
    | Sjuk hel dag | 0 | 8,5 | 8,5 | 0 | 0 |
-   | Övertid, 2 h godkänd komp | 10,5 | 0 | 8,5 | 2 | 0 |
-   | Tar ut komp hel dag | 0 | 8,5 | 8,5 | 0 | 0 |
+   | Övertid två timmar | 10,5 | 0 | 8,5 | 0 | +2 |
+   | Flexledig hel dag | 0 | 8,5 | 8,5 | 8,5 | −8,5 |
 
    Frånvaron TÄCKER den planerade tiden — annars gav en sjukvecka minus
-   fyrtio timmar. Intjänad komp dras bort, annars räknades samma övertid två
-   gånger.
+   fyrtio timmar. Frånvaro på en orsak som drar på flexen dras sedan bort
+   igen: den som är flexledig tar ut timmar hen arbetat in.
 
    **Arbetad tid är HUVUDSTÄMPLINGEN** (`mainMinutes` i `spans.ts`), aldrig
    råsumman. Det är här de två underlagen skiljer sig, se avgränsningen överst.
@@ -483,8 +747,8 @@ stripe_prices    — item, month_price_id, year_price_id, updated_by_email
    Skickades de råa in i frågan föll halva första dagen bort. Samma vecka för
    samma person visade 6:51 när man kom in på sidan och 3:23 när man växlat
    vecka fram och tillbaka, eftersom förmiddagens stämplingar låg före gränsen
-   andra gången. Frånvaro och komprader, som dateras vid dygnets början,
-   försvann helt från första dagen.
+   andra gången. Frånvaro, som dateras vid dygnets början, försvann helt från
+   första dagen.
 
    Normaliseringen ligger i `buildPayrollPeriod` och inte hos anroparna: sidan,
    PDF:en och flexsaldot kallar alla dit, och en regel som varje anropare måste
@@ -521,24 +785,25 @@ stripe_prices    — item, month_price_id, year_price_id, updated_by_email
    vet inte att `spans.ts` finns. Ett belopp som redan fakturerats ska inte
    ändras av att löneunderlaget räknar jämna minuter.
 
-   **Intjänad komp uppstår aldrig av sig själv.** Tid utöver schemat är flex
-   till dess att en människa beslutat att den är övertid. Uttagen komp är en
-   frånvaroorsak som också drar på komptidssaldot.
+   **KOMPTID FINNS INTE, BARA FLEX** (beslutat 2026-10-13, kundens begäran).
+   Komptiden var ett eget saldo: övertid flyttades dit med en knapp Komptid
+   på varje dag i tidrapporten, och "Uttagen komp" drog på det. Kunden
+   skiljer inte på dem, och två saldon för samma timmar var ett tal för
+   mycket. Nu är tid utöver schemat flex, och ledighet på inarbetad tid är
+   frånvaro på en orsak som drar på flexen. Standardorsaken heter
+   **Flexledig**. Knappen och rutan är borttagna, och ordet komp står
+   ingenstans kunden ser.
 
-   **Beslutet fattas på tidrapporten, per dag** (tillagt 2026-10-10). Varje
-   dag har en knapp Komptid bredvid Frånvaro, och raden dateras på dagen
-   övertiden gjordes, eftersom det är den dagens flex som ska minska.
-   Åtgärderna fanns från 2026-09-26 men hade ingen knapp, och saldot kunde
-   därför aldrig öka. Frånvaro och komptid tas bort i den utfällda dagen. Ett
-   uttag som en frånvaro skrivit har ingen egen knapp: det tas bort med
-   frånvaron, annars stod ledigheten kvar utan att komptiden minskat.
+   `comp_adjustments` och `employees.comp_opening_minutes` läses inte längre
+   men ligger kvar (§ 0 punkt 7). Registerutdraget lämnar ut dem så länge de
+   har innehåll, och anonymiseringen raderar dem. De tas bort i en senare
+   release. En arbetsyta som redan har orsaken "Uttagen komp" behåller
+   namnet, men orsaken drar nu på flexen; den byter namn under Inställningar.
 
-   **Ingående komptid och startdatumet för saldot sätts inte i panelen**
-   (beslutat 2026-10-10). `saveOpeningBalances` skrev alla tre ingående
-   värdena rakt av och hade aldrig en knapp; den togs bort. Ingående flex
-   sätts med Justera flexsaldo, och ett tomt startdatum betyder första
-   stämplingen, vilket är rätt för den som flyttar in. Fälten finns kvar i
-   databasen.
+   **Startdatumet sätts under Anställda** (ändrat 2026-10-13, var borttaget
+   ur panelen 2026-10-10). Det ligger i `balance_opening_date`, och flexen
+   räknas från och med den dagen. Ingående flex sätts fortfarande med
+   Justera flexsaldo. Ingående komptid sätts inte, se ovan.
 
    **Frånvaroorsakerna är kundens egna rader** (ändrat 2026-10-01), i
    `absence_reasons`, och läggs upp under Inställningar. Var en enum i koden,
@@ -546,12 +811,12 @@ stripe_prices    — item, month_price_id, year_price_id, updated_by_email
    driftsättning. Orsakerna följer deras verksamhet och deras kollektivavtal,
    inte vår kod.
 
-   Den enda av dem som betyder något för räkningen är `counts_as_comp`: står
-   den ikryssad skriver frånvaron samtidigt ett uttag i komptidsboken. Utan
-   den kopplingen räknades en uttagen komptimme två gånger, en gång som
-   frånvaro och en gång som ett saldo som aldrig minskade. Alla övriga orsaker
-   är etiketter, och `payroll.ts` summerar dem per namn utan att veta vad de
-   heter.
+   Den enda av dem som betyder något för räkningen är `counts_as_comp`, som i
+   panelen heter **Drar på flexsaldot**: frånvaro på en sådan orsak täcker
+   inte den planerade tiden, utan minskar flexen. Kolumnen behåller sitt namn
+   från komptiden, eftersom ett namnbyte kräver en migration i två steg och
+   ingenting kunden ser ändras. Alla övriga orsaker är etiketter, och
+   `payroll.ts` summerar dem per namn utan att veta vad de heter.
 
    En orsak RADERAS aldrig, den avaktiveras. En post från i mars ska gå att
    läsa i oktober, och databasen vägrar dessutom (`onDelete: Restrict`). Samma
@@ -571,8 +836,17 @@ stripe_prices    — item, month_price_id, year_price_id, updated_by_email
    skickas aldrig in från rutan — ett tal webbläsaren räknat på hinner bli
    gammalt medan rutan står öppen.
 
-   **Saldot räknas från `balance_opening_date`, och är den tom från personens
-   FÖRSTA STÄMPLING** (tillagt 2026-10-01). Dagen avgörs på ett ställe,
+   **Saldot idag och en periods flex räknas utan tidrapporten runt omkring**
+   (ändrat 2026-10-20). `currentFlexMinutes` byggde en hel tidrapport från
+   startdatumet till idag, och ATF-underlaget en för förra månaden, för att få
+   fram ett tal var. Tidrapport blev långsammare för varje vecka personen
+   arbetat. Nu räknar `flexBetween` i `payroll.ts` dem, samma väg som det
+   ingående saldot: samma formel dag för dag, men bara med tiderna och
+   frånvaron. `tests/flex-time.test.ts` fäller en räkning som börjar säga
+   något annat än tidrapporten.
+
+   **Saldot räknas från STARTDATUMET (`balance_opening_date`), och är det tomt
+   från personens FÖRSTA STÄMPLING** (tillagt 2026-10-01). Dagen avgörs på ett ställe,
    `balanceStart` i `payroll.ts`, eftersom två vägar in i samma saldo hann
    säga olika saker: tidrapporten utelämnade all historik före perioden, så
    saldot blev periodens egen flex, medan stämplingsskärmen räknade ett år
@@ -582,6 +856,16 @@ stripe_prices    — item, month_price_id, year_price_id, updated_by_email
 
    Den som aldrig stämplat har inget härlett saldo. Då står det ingående
    ensamt, vilket är noll för alla utom den som flyttat in med timmar.
+
+   **Dagar före startdatumet har varken planerad tid eller flex** (tillagt
+   2026-10-13), även i tidrapporten för en period som börjar tidigare. Till
+   dess räknade tidrapporten varje schemalagd dag i perioden, medan
+   stämplingsskärmen började vid startdagen, och en vecka där någon börjat på
+   onsdagen gav minus för måndag och tisdag på det ena stället men inte på det
+   andra. Stämplingar och frånvaro före startdatumet visas som vanligt, och en
+   heldagsfrånvaro där står med schemats timmar: löneunderlaget behöver dem
+   även när flexen inte räknas. Utan startdatum och utan stämplingar räknas
+   ingen dag alls.
 
    **Den anställde ser sitt eget saldo på stämplingsskärmen** (tillagt
    2026-10-01), efter att ha angett en personlig kod som administratören satt
@@ -751,16 +1035,179 @@ stripe_prices    — item, month_price_id, year_price_id, updated_by_email
    som brådskar, och Oplacerat har ingen annan ordning än ordernummer.
 
    **Planerade rutor är inte personuppgifter.** En ruta bär station, order,
-   arbetsmoment och tid — ingen person. Vem som körde jobbet framgår bara av
+   arbetsmoment och tid — ingen person. Personalpassen gör det, se
+   planeringsläget nedan. Vem som körde jobbet framgår bara av
    stämplingarna, som redan har sin GDPR-väg. Anonymiseringen i § 4 punkt 8
    behöver därför inte röras, till skillnad från löneunderlagets poster.
 
    Kiosken är **orörd**. Ett tryck ska räcka.
 
+   **PLANERINGSLÄGET: PRODUKTION ELLER TJÄNST** (beslutat 2026-10-14,
+   issue #21, produktägarens val). Planeringen passade bara verkstäder, och en
+   elfirma som planerar människor på jobb hade inga stationer att lägga något
+   på. Läget väljs per företag under Inställningar, Planeringsläge, och ligger
+   i `companies.planning_mode`. Det är ETT tillval och inte två: det kunden
+   betalar för är detsamma, att lägga ordrarnas beräknade tid ut i veckan.
+
+   | Läge | Vyer på tavlan | Räknar av beräkningen |
+   |---|---|---|
+   | Produktion (förval) | Stationer | stationernas rutor |
+   | Tjänst | Personal | personalens pass |
+
+   **Exakt EN resurs räknar av orderns beräknade tid.** Räknade både stationen
+   och personen av samma timme vore den planerad två gånger, och regeln att
+   ingen tid får falla bort vore bruten. I Produktion är personalen därför
+   bemanning på stationens rutor, och dess pass räknas inte mot beräkningen:
+   maskinens körtid och operatörens arbetstid skiljer sig, som när en CNC kör
+   sex timmar obemannad på en timmes ställtid.
+
+   **Förvalet är Produktion**, så att varje befintlig kund har kvar det
+   planeringen alltid varit. Att byta läge rör ingen planerad tid: stationerna
+   och rutorna står kvar och syns igen om läget byts tillbaka.
+
+   Lägena står i `src/lib/planning-modes.ts`, som inte har några importer. En
+   ny verksamhetstyp är ett värde i enumen `PlanningMode` och en rad där.
+   `tests/planning-modes.test.ts` fäller ett register och ett schema som
+   glidit isär.
+
+   **ARBETSTIDERNA ÄR ARBETSYTANS, INTE ETT TILLVALS** (beslutat 2026-10-17,
+   produktägarens val, ersätter "personalens arbetstider blir planeringens
+   egna" från 2026-10-14). Löneunderlaget mäter flexen mot dem och planeringen
+   gråmarkerar och varnar efter dem, och båda läser SAMMA tider. Planeringen
+   fick under en dag en egen uppsättning, och samma människors tider på två
+   ställen blev rörigt.
+
+   - **Företagets tider** står under Inställningar, Arbetsytan, **Arbetstider**,
+     och **egna tider** under Anställda, i personens ruta. Båda syns med
+     löneunderlaget eller planeringen, eller båda (`WORK_HOURS_MODULES` i
+     `modules.ts`, `requireWorkHours` i `company-modules.ts`). Rasttyperna för
+     stämplingsskärmen är löneunderlagets och står kvar där, under **Rasttyper**.
+   - **En enda läsare**, `src/lib/work-hours.ts`, som är neutral som
+     `weekly-hours.ts`. `schedule.ts` och `staff-hours.ts` läser båda därifrån,
+     och `tests/planning-boundary.test.ts` fäller ett annat bibliotek som
+     läser tabellerna direkt. Gränsen mellan tillvalen står kvar: planeringen
+     importerar ingenting från löneunderlaget.
+   - **Bara regeln om den timanställda skiljer.** I löneunderlaget har hen
+     inget schema. I planeringen får hen företagets tider, så att tavlan visar
+     när verkstaden är öppen.
+   - **Frånvaro syns inte i planeringen.** Den är känslig och löneunderlagets.
+   - Tabellerna `staff_days` och `staff_breaks` från fas 3 togs bort i samma
+     PR, innan de nått `dev`: migrationen som skapade dem står kvar och nästa
+     tar bort dem, så att labbets historik stämmer.
+   - **Stationernas öppettider är kvar i egna tabeller.** En maskin är ingen
+     anställd.
+
+   Byggs i faser: läget och vyerna (fas 1), personalpassen (fas 2),
+   personalens arbetstider och tillgänglighet (fas 3) och passen mot
+   stämplingen (fas 4). Alla fyra är gjorda.
+
+   **PERSONALPASSEN** (tillagt 2026-10-14, fas 2). Ett pass är en anställd på
+   en order och ett arbetsmoment, med start och längd, i `staff_blocks`. Enda
+   vägen in är `src/lib/staff-planning.ts`. Tavlan är densamma som för
+   stationerna, med en rad per aktiv anställd: `PlanBoard` ritar "resurser",
+   där en station kör ett moment och en anställd tar vilket som helst.
+
+   - **I Tjänst** placeras passen från Oplacerat, med samma två tryck som
+     stationernas rutor, och räknar av orderns beräknade tid.
+   - **PRODUKTION HAR INGEN PERSONALFLIK** (ändrat 2026-10-17, produktägarens
+     beslut). Fliken visade bemanningen per person, men det gick inte att
+     planera något där, bara att se och flytta. Den togs bort, och tavlan i
+     Produktion är bara stationerna. Ett bokmärke till `?vy=personal` leder
+     till stationerna. Bemanningen finns kvar i stationsrutan, nedan.
+   - **I Produktion** är passen bemanning. De läggs från stationsrutans dialog
+     med knappen **Bemanna**, bär rutans id (`planned_block_id`), och start
+     och längd föreslås ur rutan men går att ändra. De räknas inte mot
+     beräkningen.
+   - **Flyttas stationsrutan följer bemanningen med**, lika långt, i samma
+     transaktion (`moveBlock`). Bemanningen hör till körningen.
+   - **Tas stationsrutan bort ligger passet kvar** utan koppling
+     (`onDelete: SetNull`). En persons planerade dag ska inte försvinna för att
+     maskinplanen ändrades.
+   - **Två pass samtidigt för samma person varnas i gult**, och avvisas inte.
+     En operatör kör ibland två maskiner (regel 2). I Tjänst syns det på
+     personalvyn, i Produktion i Bemanna, se arbetstiderna nedan.
+
+   **PERSONALENS TILLGÄNGLIGHET** (tillagt 2026-10-17, fas 3). Vems tider som
+   gäller och vad som ligger utanför dem räknas i `src/lib/staff-hours.ts`,
+   med tiderna ur `work-hours.ts`, se arbetstiderna ovan.
+
+   - **Egna tider går före företagets**, hela veckan. Saknas båda finns inga
+     tider, och då gäller väggklockan och dagen ritas vit. Tavlan säger då
+     "Personalen har inga arbetstider", med en länk till Arbetstider. "Inga
+     tider" och "ledig den dagen" är olika svar.
+   - **Ett pass räknas i arbetsminuter**, som en stationsruta: personens
+     raster hoppas över, och passet kapas vid midnatt med dem inräknade.
+   - **I Tjänst ritar tavlan personens tider**: stängd tid och raster i Lav
+     (`CLOSED_CLASS` i `PlanBoard`, samma som förklaringen), och gult "över"
+     när mer är planerat än dagen rymmer.
+   - **I Produktion varnar Bemanna** för pass utanför arbetstid och för pass
+     som ligger i ett annat av personens pass, även på en annan station
+     (`passWarnings`). Varningar, aldrig hinder.
+
+   **PLANERAT MOT STÄMPLAT PER PERSON** (tillagt 2026-10-17, fas 4).
+   `plan-live.ts` räknar utfallet för ett pass med `employeeId`: bara
+   personens egna stämplingar på passets order och moment, inom passet. Det är
+   exakt, till skillnad från en stationsruta, där tavlan inte vet vid vilken
+   maskin någon stod.
+
+   - **Passet** blir grönkantat när personen står instämplad, och visar
+     stämplat mot planerat, som stationsrutorna.
+   - **Raden för varje anställd** i Tjänst visar veckans "Planerat · Stämplat",
+     summan av passen och av det som stämplats inom dem (`laneTotals`).
+     Stämplat utanför ett pass räknas inte där; det syns i rapporterna.
+   - **Bemanna** visar det stämplade per bemannat pass.
+   - **En vecka som varit hämtar utfallet en gång**, utan pollning. Till
+     2026-10-17 visades utfallet bara för den pågående veckan, och planerat mot
+     stämplat gick inte att se i efterhand.
+   - Fortfarande råa minuter per jobb, aldrig `mainMinutes`. Vad personen
+     arbetat räknar tidrapporten, och planeringen delar ingen kod med den.
+
+   **TIDSLINJEN** (ändrat 2026-10-17). Var dagarna ligger, vad ett tryck
+   träffar och var klockslagen står räknas på ETT ställe,
+   `src/lib/plan-geometry.ts`, för rubriken, rutnätet och träffytan. De räknade
+   var för sig förut: klockslagen stod bredvid sina linjer, och slutet av varje
+   dag kapades eftersom skiljelinjen räknades utanför dagen men ritades
+   innanför. `tests/plan-geometry.test.ts` fäller det.
+
+   - **Axeln visar alltid minst 06–18** och en timme kring resursernas tider
+     (`dayWindow`). Den slutade där stationen stängde, och då gick det inte att
+     trycka in ett jobb 17:00, fast överbokning är tillåten.
+   - **Helgen är dold som standard och visas med knappen Visa helg**
+     (beslutat 2026-10-17, produktägarens val). Valet står i adressfältet som
+     `helg=visa`, följer med mellan veckor och dagar, och är borta nästa gång
+     tavlan öppnas. Inte i en kaka: integritetspolicyn räknar upp systemets
+     kakor, och ett visningsval hör inte dit. Är något planerat i en dold helg
+     står antalet i gult på knappen. Dagvyns pilar hoppar över en dold helg.
+   - **En helg som visas är hela dagar**, med tidslinje. En tom helgdag stod en
+     kort tid som en smal kolumn, och den såg avkapad ut bredvid en hel dag.
+   - **Vecka och Dag ersätter zoomknapparna.** Dag lägger en dag i full bredd
+     och står i adressfältet som `dag`. Ett tryck på en dag i rubriken öppnar
+     den, och pilarna går över veckans kant.
+   - **Linjen för nu går på webbläsarens klocka**, och syns därför i båda
+     vyerna och för personalen.
+   - **Veckan ryms i skärmens bredd.** Golvet för skalan är lågt
+     (`WEEK_SCALE_FLOOR`, 0,12 pixlar per minut), dagarnas bredder avrundas
+     nedåt och det som blir över delas ut en pixel per dag. Med 0,25 behövde
+     sju dagar med axeln 06–18 1 400 pixlar, och söndagen hamnade utanför
+     kanten. Den som behöver läsa timmarna byter till Dag.
+
+   **ETT PERSONALPASS ÄR EN PERSONUPPGIFT**, till skillnad från en
+   stationsruta: det säger var en namngiven person ska vara och när.
+   Anonymiseringen raderar passen och registerutdraget lämnar ut dem, även när
+   planeringen är avstängd, av samma skäl som frånvaron (§ 3.1).
+
 
 Multi-tenant-isolering byggs i appens kod: **varje databasfråga går via ett
 gemensamt lager** i Prisma som alltid filtrerar på inloggad användares
 `company_id`. Ett enda ställe i koden, inte utspritt — och testat automatiskt.
+
+**Lagret prövar också det som skrivs** (tillagt 2026-10-18,
+säkerhetsgranskningen). En ändring får inte sätta ett annat `companyId`, och
+nästlade skrivningar på kunddata är begränsade till nya rader som själva bär
+rätt `companyId`, som schemats och stationernas raster. Kopplingar
+(`connect`) och nästlade ändringar vägras: en koppling sätts som ett id-fält,
+efter att raden slagits upp genom `forCompany()`. Bevisas av
+`tests/tenant-writes.test.ts`.
 
 ### 3.1 Tillval — moduler kunden betalar extra för (beslutat 2026-09-27)
 
@@ -800,9 +1247,9 @@ princip som att stämplingen aldrig slutar fungera: en obetald faktura får
 inte kosta någon registrerad tid, för den tiden går inte att rekonstruera.
 
 **Grinden ligger i koden, inte i menyn**, och det är den enda punkten som
-verkligen är säkerhet. Prenumerationslåset lärde oss varför: det ligger som
-en gren i panelens layout, och rutterna under `/api` renderas aldrig genom
-den. Därför gäller regeln att **varje sida, server action och rutt som rör en
+verkligen är säkerhet. Prenumerationslåset lärde oss varför: det låg som en
+gren i panelens layout, och rutterna under `/api` renderas aldrig genom den.
+Därför gäller regeln att **varje sida, server action och rutt som rör en
 modul ska kalla `requireModule()` respektive `hasModule()`**. Menyn döljer
 bara — sidan bakom svarar 404 oavsett vad menyn visar.
 
@@ -919,16 +1366,15 @@ handling nästan alltid att stänga ordern. Frågan går genom samma åtgärd so
 knappen längre ner i menyn och därmed genom samma mellansteg: står någon
 instämplad ändras ingenting förrän administratören sett vilka.
 
-**Förra veckan per anställd: en person per sida.** Utskriften delas ut till var
-och en, och flöt personerna ihop gick den inte att dela ut utan att någon fick
+**Tidrapport föregående vecka: en person per sida.** Knappen hette Förra veckan
+per anställd till 2026-10-30. Utskriften delas ut till var och en, och flöt personerna ihop gick den inte att dela ut utan att någon fick
 läsa någon annans rader. Därför finns heller ingen slutsumma sist — den skulle
 hamna på den sista personens papper och påstå att raden ovanför gäller hen.
 Periodens totaler står på förstasidan.
 
 **Knappen är tillbaka, och hämtar nu TIDRAPPORTEN** (ändrat 2026-10-08).
 Den togs bort dagen innan på kundens begäran, och kunden ändrade sig: utskriften
-behövdes, men med summeringen per person — planerad tid, närvarotid, flex och
-komp.
+behövdes, men med summeringen per person — planerad tid, närvarotid och flex.
 
 Den summeringen är löneunderlagets, och `report-pdf.ts` får aldrig läsa
 löneunderlaget. Utskriften kan alltså inte vara stämplingslistan med en
@@ -939,6 +1385,40 @@ pekas ut, en per sida, så bytet var en adress och inte en ny PDF.
 Konsekvensen är att knappen hör till lönemodulen. Den sitter på Tidrapport,
 som redan är grindad, och inte på Rapporter. En kund utan löneunderlaget har
 ingen summering att skriva ut.
+
+**Löneunderlag föregående månad: samma papper med bara frånvaron** (tillagt
+2026-10-13, kundens begäran, hette Förra månaden per anställd till
+2026-10-30). Knappen bredvid veckans går till lönen. Raderna
+visar frånvaron dag för dag, utan stämplingar och raster, och summan under
+dem är frånvarons. Summeringen längst ner är densamma som i veckans. En månad
+av stämplingar per person är flera sidor som lönen inte läser, och det lönen
+behöver ur raderna är just frånvaron.
+
+Det är samma rutt och samma PDF med `rader=franvaro`, inte ett eget
+dokument. Två utskrifter av samma tidrapport som byggs var för sig hinner
+alltid börja räkna olika.
+
+**Pappret heter Löneunderlag** (ändrat 2026-10-30, kundens begäran): rubriken,
+dokumenttiteln, foten och filnamnet. Veckans papper heter fortfarande
+Tidrapport, och sidan och menyn likaså. Underskriftsraden står orörd, med
+Tidrapport ok, eftersom den är kundens egen blankett.
+
+**Löneunderlag vald period** (tillagt 2026-10-30, kundens fråga) tar perioden
+ur Från och Till på sidan. Månadsknappen når bara föregående månad, och en
+äldre månad gick inte att ta ut. Hela personalen kommer med även om en person
+är vald, som på månadsknappen. ATF står med när perioden är en hel
+kalendermånad.
+
+**Hela personalen är de aktiva OCH den som har tid i perioden** (ändrat
+2026-10-30). Det gäller båda utskrifterna, se `employeesForTimesheet` i
+`payroll.ts`. Med en vald period saknades annars den som slutat i april på
+underlaget för mars, utan att något på pappret sa det. En anonymiserad person
+får en sida under sitt anonyma namn.
+
+**En äldre månad räknas om, den är ingen kopia av det som skrevs ut då.**
+Arbetstiderna har ingen historik, och en justering av flexsaldot ligger på det
+ingående saldot. Planerad tid, flex och ATF följer alltså dagens värden. Det
+står i hjälpen.
 
 **Underlaget och efterkalkylen finns BARA som PDF** (ändrat 2026-10-01). Båda
 fanns också som Excel-ark, och kunden använde dem inte: det ena bifogas en
@@ -969,18 +1449,26 @@ visar VILKA som står instämplade innan de stämplas ut; den listan går inte a
 visa för tio ordrar på ett begripligt sätt, och att stämpla ut folk tyst i bulk
 vore att göra precis det mellansteget finns för att förhindra.
 
-**Stämplingar går inte att radera** (ändrat 2026-09-29). Knappen fanns för
-felregistreringar. En felaktig stämpling rättas i stället genom att skrivas om:
-tiden är både faktura- och löneunderlag, en ändrad post bär spår av vem som
-ändrade den, och en raderad post lämnar bara ett hål ingen kan förklara i
-efterhand. Ska en persons tid bort helt finns GDPR-raderingen i
-inställningarna.
+**Stämplingar går att ta bort igen** (ändrat 2026-10-13, kundens begäran;
+var borttaget 2026-09-29). Skälet att ta bort knappen var att en raderad post
+lämnade ett hål ingen kunde förklara. Det föll med ändringsloggen
+(2026-10-05): `deleteEntryManually` i `clock.ts` skriver hela posten som den
+såg ut och vem som tog bort den, i samma transaktion som borttagningen. Bara
+avslutade poster, av samma skäl som de är de enda som går att ändra: en
+pågående stämpling tillhör någon som står vid en skärm. Ska en persons tid
+bort helt finns fortfarande GDPR-raderingen i inställningarna.
+
+**Improduktiv tid går att lägga in för hand** (ändrat 2026-10-13). Ny
+stämpling lade bara in ordertid, med skälet att glömd improduktiv tid hellre
+stämplas på skärmen. Med löneunderlaget är den saknade städtimmen någons
+arbetstid, och utan vägen bokades den på en order, vilket gör ordern dyrare
+än den var (§ 1).
 
 ### 3.3 Hjälpcentret (beslutat 2026-10-11, issue #8)
 
 Ett publikt hjälpcenter på `tikkr.se/support`, med säljsidans meny, fot och
 mörka band. Steg-för-steg-guider per område, sökning, vanliga frågor och
-vägen till support. Nås från **Hjälp** i panelens meny och från en
+vägen till support. Nås från **frågetecknet i menyns fot** och från en
 **Hjälp**-länk vid rubriken på sidorna den gäller. Båda öppnar en ny flik.
 
 **Guiderna ligger i koden**, i `src/lib/help/guides.ts`, och inte i
@@ -1018,35 +1506,150 @@ och en miljövariabel för något som säljsidan redan bär.
 Inga öppettider för support står utskrivna. Inga är bestämda.
 
 **Fel, förslag och synpunkter skickas från panelen** (tillagt 2026-10-11,
-steg 2 av issue #8). Sidan **Support** (`/admin/support`) står under Hjälp i
-menyn: typ (Fel, Förslag, Synpunkt), område och meddelande. Bara inloggade,
-och företaget och avsändaren tas ur sessionen, aldrig ur formuläret. Menyn
-skickar med sidan man stod på, som förväljer området ur `areaForPath` i
-`help/areas.ts` och sparas med meddelandet.
+steg 2 av issue #8, förenklat samma dag). En **pratbubbla i menyns fot**
+öppnar en liten ruta, **Lämna feedback**: typ (Fel, Förslag, Synpunkt),
+område och meddelande. Underrubriken säger att rutan är för förslag och
+mindre fel, att inget svar skickas, och länkar till hjälpcentret för den som
+behöver hjälp.
+Bara inloggade, och företaget och avsändaren tas ur sessionen, aldrig ur
+formuläret. Sidan man stod på följer med, förväljer området ur `areaForPath`
+i `help/areas.ts` och sparas med meddelandet.
 
-Under formuläret står ARBETSYTANS skickade meddelanden, med status och våra
-svar. Hela arbetsytans och inte bara de egna, så att två administratörer som
-hittar samma fel ser att det redan är anmält.
+**Kunden får ingen återkoppling** (ändrat 2026-10-11, produktägarens val).
+Första versionen var en egen sida, Support, med arbetsytans skickade
+meddelanden, våra svar, status och en prick i menyn. Den blev ett
+supportärende i stället för en brevlåda, och togs bort samma dag. Ingen
+mejlavisering åt något håll.
 
-**Vi svarar i plattformens Inkorg** (`/plattform/inkorg`), med en siffra för
-antalet nya i menyn. Status är Ny, Pågår eller Klar, och Klar är arkivet:
-inkorgen visar det som inte är klart om inget annat väljs. Svaren går bara åt
-ett håll. Kunden svarar genom att skicka ett nytt meddelande, eftersom en
-tråd åt båda hållen är ett ärendesystem, och issuen bad uttryckligen om att
-slippa ett. Ett svar på ett nytt meddelande gör det till Pågår; Klar sätts
-alltid för hand. Statusbyten och svar skrivs i plattformens händelselogg.
+**Nyheter, Butik, Hjälp och pratbubblan är ikoner i menyns fot**, bredvid
+Tikkr-märket, och inte rader i menyn. De handlar om Tikkr och inte om
+arbetsytan, och den nedre delen av menyn ska bara bära kontot, Inställningar
+och Logga ut. Versionen står inte i foten, utan på sidan Nyheter.
 
-**Ingen mejlavisering, åt något håll** (produktägarens val). I stället får
-kunden en **prick vid Support** när ett av hens EGNA meddelanden fått svar
-eller ny status sedan sidan senast öppnades (`admin_users.support_seen_at`
-mot `feedback_messages.customer_updated_at`). Utan pricken hade ett svar
-aldrig blivit läst.
+**Vi hanterar dem i plattformens Inkorg** (`/plattform/inkorg`), med en
+siffra för det som inte är klarmarkerat. Att klarmarkera kräver en
+anteckning om vad som gjordes, och meddelandet ligger sedan i Arkiv.
+`done_at` ÄR tillståndet, utan en statuskolumn bredvid, samma skäl som
+`company_modules` i § 3.1. Klarmarkeringen skrivs i plattformens
+händelselogg.
 
-Tabellerna är kundens data och står i `TENANT_SCOPED_MODELS`. Kunden skriver
-genom sin egen klient; inkorgen läser och svarar via `unsafeGlobalPrisma`,
+Tabellen är kundens data och står i `TENANT_SCOPED_MODELS`. Kunden skriver
+genom sin egen klient; inkorgen läser och arkiverar via `unsafeGlobalPrisma`,
 som för `CompanyPrice`. Supportläget kan inte skicka, se § 4 punkt 5. Tas en
 användare bort står meddelandet kvar med den kopierade adressen. All logik
 ligger i `src/lib/feedback.ts`, och `tests/feedback.test.ts` fäller den.
+
+### 3.4 Butiken (beslutat 2026-10-20, flyttad 2026-10-21)
+
+Vi säljer hårdvara till kunderna, med **stämplingsskärmen** som första
+produkt: pekskärm 23,6 tum i pulverlackerat stativ, uppsatt och provad före
+leverans. Hårdvaran och dess öppna punkter står i `docs/kioskskarm.md`.
+
+**Butiken är en egen sida, `/admin/butik`, och nås från en ikon i menyns
+fot** bredvid Nyheter och Hjälp (ändrat 2026-10-21, produktägarens val). Den
+låg en dag under Inställningar, Tillbehör, och formuläret var det första man
+såg. Ett köp är inte en inställning, och en utbildning är inte ett tillbehör.
+Foten bär det som handlar om Tikkr och inte om arbetsytan (§ 3.3), och en
+butik är just det. En egen rad i vänstermenyn valdes bort: menyn bär det man
+öppnar varje dag eller vecka. Den gamla adressen skickas vidare till
+Beställningar i `next.config.ts`, eftersom de första mejlen länkade dit.
+
+- **Butik, varukorg, kassa.** Produkterna visas som kort, grupperade som
+  varor och tjänster, med Lägg till. Varukorgen står i adressen
+  (`?stamplingsskarm=2`, se `src/lib/shop/cart.ts`) och behöver ingen
+  lagring. Kassan är en egen sida med sammanställningen och uppgifterna.
+  Beställningarna är en egen flik.
+- **Ingångar där behovet uppstår:** en länk på Stämplingsskärmar och i Kom
+  igång, båda till kassan med en skärm i korgen. Säljsidans Beställ leder
+  dit genom inloggningen.
+- **Vara eller tjänst** (`kind` på produkten). Kassan frågar efter
+  leveransadress bara när något ska skickas. Med bara tjänster är adressen
+  fakturaadressen, och märkning och frakt finns inte. Ingen tjänst säljs än;
+  tjänsternas egna lägen (bokad, genomförd) byggs när den första finns.
+
+**I allt kunden ser heter det BESTÄLLNING, aldrig order.** En order är
+kundens arbetsorder, det allt annat i Tikkr hänger på. I koden heter det
+`Shop…`.
+
+- **Produkterna läggs upp under Produkter i plattformspanelen** (ändrat
+  2026-10-21, produktägarens val; låg som en katalog i koden till dess).
+  De ligger i `shop_products` och `shop_product_images`: namn, texter,
+  typ, pris, moms, högsta antal, leveranstext, garanti, fördelar, vad som
+  ingår, vad kunden behöver, specifikationer och bilder. En ny produkt är
+  dold tills den kryssas i för **butiken** och/eller **säljsidan**.
+  Skälet är att butiken ska kunna bära utbildningar och annat utan att varje
+  produkt kräver en driftsättning. Priset är att texterna inte längre
+  granskas i en PR innan de syns, och att ingen test längre stoppar
+  tillverkarens namn; det valde produktägaren bort.
+- **Allt läser produkterna genom `products.ts`**: säljsidan, butiken,
+  kassan, servern som räknar beställningen och mejlen. Säljsidan och kassan
+  kan därför aldrig visa olika pris. Priserna är exklusive moms, och momsen
+  räknas bara i `pricing.ts`, per rad som fakturan i Fortnox. Säljsidans
+  priser står annars bara i prisavsnittet; skärmens engångspris står på
+  produktsidan, inte på startsidan, och startsidans avsnitt om skärmen
+  visas bara när produkten `stamplingsskarm` syns på säljsidan.
+- **Nyckeln sätts en gång.** Den bildas ur adressen när produkten skapas
+  (`stamplingsskarm` → `STAMPLINGSSKARM`) och ändras aldrig, eftersom
+  beställningsraderna pekar på den. Adressen får ändras.
+- **En beställd produkt raderas aldrig, den döljs.** En som aldrig
+  beställts går att ta bort, samma avvägning som för improduktiva moment.
+- **Bilderna laddas upp i plattformen** och ligger i databasen, som
+  kundernas logotyper, så att de följer med i backupen. Uppladdningen går
+  genom en egen rutt, `/api/plattform/produkter/bild`, eftersom
+  serveråtgärder tar emot högst 1 MB; gränsen där är 5 MB, och typen prövas
+  på filens innehåll. `/api/butik/bild/<id>` lämnar ut bilderna, och bara
+  för produkter som syns. Stämplingsskärmens illustrationer ligger kvar som
+  filer under `public/` och pekas ut med `static_path`.
+- `shop_prices` läses inte längre men ligger kvar (§ 0 punkt 7), och tas
+  bort i en senare release. Migrationen tog priset därifrån.
+- **Bara ägaren beställer**, av samma skäl som prenumerationen (§ 1,
+  Adminflöde): en beställning ändrar vad kunden betalar. Alla
+  administratörer ser butiken och beställningarna. Leverans- och
+  fakturauppgifterna står under Inställningar, Företag, och får ändras av
+  varje administratör. **E-post för faktura står alltid i formuläret**,
+  valfri och skild från den separata fakturaadressen (ändrat 2026-10-21):
+  många kunder har en egen adress för fakturor men ingen för post. Systemet
+  skickar ingenting dit; den står på beställningen för fakturan i Fortnox.
+- **Säljsidans Beställ går genom inloggningen** med `?till=/admin/...`
+  (`safeAdminNext` i `login-ticket.ts`) till kassan, och den som redan är
+  inloggad går rakt igenom.
+- **En beställning är en ögonblicksbild**: köparens uppgifter, adresserna och
+  varje rads pris kopieras dit. En ändring i företagets uppgifter eller i
+  priset rör aldrig en lagd beställning. Beloppen lagras, till skillnad från
+  orderns beräknade tid, eftersom de är vad fakturan skrivs på; de räknas
+  bara ur raderna och frakten.
+- **Samma formulär två gånger ger en beställning.** Formuläret bär en nyckel
+  som är unik per företag i databasen.
+- **Betalningen sker utanför systemet** (produktägarens val). Fakturan
+  skrivs i Fortnox **vid leverans**, och betalstatusen sätts för hand i
+  plattformen: Ej fakturerad, Fakturerad, Betald, Krediterad. Fakturerad
+  kräver fakturanummer och datum, så att systemet aldrig påstår att en
+  faktura finns. Stripe används inte för tillbehör.
+- **Frakten tillkommer** och varierar. Den står som "Tillkommer" tills vi
+  satt den på beställningen, och totalen räknas då om. Den går inte att
+  ändra efter fakturering.
+- **Orderstatus och betalstatus är skilda.** Mottagen, Bekräftad, Under
+  tillverkning, Klar för leverans, Skickad, Levererad, Avbruten och Kräver
+  åtgärd. Framåt, aldrig bakåt; ett fel går via Kräver åtgärd. En skickad
+  beställning avbryts inte. Systemet sätter aldrig Skickad eller Levererad
+  självt. Varje byte prövas mot läget det utgår från. Reglerna i
+  `status.ts`.
+- **Kunden får mejl** vid Mottagen, Bekräftad, Under tillverkning, Skickad,
+  Avbruten och Kräver åtgärd, varje besked en gång per beställning utom
+  Kräver åtgärd. Mejlet skickas efter att ändringen sparats; går det inte
+  iväg står felet i historiken och kan skickas igen. Se `notify.ts`.
+- **Interna anteckningar** ligger i `shop_order_notes`, utan relation till
+  kunddata, av samma skäl som `PlatformNote`. Historiken kunden ser bär
+  aldrig vem hos oss som ändrade något.
+- **Garantin är tre år på skärm och stativ**, från leveransen (produktägarens
+  val). Tillverkarens garanti räknas från deras faktura till oss, så glappet
+  bär vi; köp därför in när kunden beställt.
+- **Bilderna är illustrationer** tills det finns foton, och märks så. Byt
+  filerna i `public/tillbehor/<produkt>/` och sätt `illustration: false`.
+- **Bara leverans inom Sverige**, moms 25 %. En kund i ett annat EU-land
+  kräver omvänd skattskyldighet och är inte byggt.
+- Ett företag med en beställning som inte är levererad eller avbruten går
+  inte att radera.
 
 ## 4. Kritiska säkerhetskrav
 
@@ -1056,6 +1659,27 @@ ligger i `src/lib/feedback.ts`, och `tests/feedback.test.ts` fäller den.
 2. **Kiosk-token, inte PIN** — varje fysisk skärm får en lång, slumpad,
    återkallningsbar, company-scopad token vid uppsättning. Utan giltig token
    accepteras ingen stämpling.
+
+   **Kopplingskoden bromsas bara per IP-adress** (beslutat 2026-10-18,
+   produktägarens val, säkerhetsgranskningen). Fem fel per adress och kvart.
+   En gemensam spärr på hundra fel för hela installationen togs bort, eftersom
+   vem som helst kunde stänga skärmkopplingen för alla kunder med ett skript
+   mot `/kiosk`. Koden är kvar på sex siffror och gäller i fem minuter, och
+   priset är uttryckligt: den som gissar från många adresser får fem försök
+   per adress.
+
+   **En lyckad koppling nollställer inte räknaren** (ändrat 2026-10-30,
+   säkerhetsgranskningen). Vem som helst kan skapa en arbetsyta och få egna
+   giltiga koder, och varje sådan kod gav fem nya gissningar mot andra kunders.
+   Räkningen löper ut en kvart efter senaste felet. Priset är att den som
+   sätter upp flera skärmar och skriver fel fem gånger får vänta, och felfria
+   kopplingar räknas inte alls.
+
+   **Bromsarna ligger i databasen** (ändrat 2026-10-18), i `login_throttles`,
+   och inte i minnet. En räknare i minnet nollades vid varje driftsättning.
+   Nyckeln, alltså e-postadressen eller IP-adressen, sparas som SHA-256, och
+   rader som löpt ut raderas löpande. Koden i steg två räknas nu också per IP,
+   både i adminpanelen och i plattformspanelen. Se `login-throttle.ts`.
 3. **Fullständig audit-logg** — varje stämpling sparar tidsstämpel, kiosk-ID och
    IP, så admin i efterhand kan se och manuellt korrigera en felaktig stämpling.
 
@@ -1076,7 +1700,17 @@ ligger i `src/lib/feedback.ts`, och `tests/feedback.test.ts` fäller den.
 
    **Sessionen gäller sju dagar** (ändrat 2026-10-06, var trettio dagar). Ett
    lösenordsbyte eller "Logga ut på alla enheter" under Ditt konto gör äldre
-   sessioner ogiltiga. **E-postadressen bekräftas** med en länk vid
+   sessioner ogiltiga.
+
+   **De sju dagarna räknas från INLOGGNINGEN, och återkallelsen prövas mot
+   samma tid** (ändrat 2026-10-18, säkerhetsgranskningen). Prövningen låg mot
+   `iat`, som Auth.js sätter om varje gång `/api/auth/session` signerar om
+   sessionen. Den som hade en stulen cookie behövde därför bara göra ett anrop
+   efter utloggningen för att vara inne igen, och en session som användes
+   minst en gång i veckan gick aldrig ut. Nu bär token `authTime`, som sätts
+   bara vid inloggningen, och `currentAdmin()` nekar en session utan den. Se
+   `auth-callbacks.ts`. Konsekvensen är att alla loggar in en gång till efter
+   versionen, och därefter var sjunde dag oavsett hur ofta panelen används. **E-postadressen bekräftas** med en länk vid
    registreringen; det spärrar ingenting, men panelen visar en remsa tills
    det är gjort, och en obekräftad adress går att rätta själv. Registreringen
    tar högst fem nya arbetsytor per kvart och IP-adress. Se `account.ts` och
@@ -1095,6 +1729,51 @@ ligger i `src/lib/feedback.ts`, och `tests/feedback.test.ts` fäller den.
    aldrig ur formuläret, så ingen administratör kan ändra någon annans
    uppgifter den vägen. Nollställning av tvåsteg står kvar under Användare,
    eftersom den gäller någon annan.
+
+   **FÖRNAMN OCH EFTERNAMN I VARSITT FÄLT** (ändrat 2026-10-11, issue #16).
+   Var ett enda `name`, och kunderna skrev då förnamnet och ingenting mer. En
+   arbetsyta med två administratörer som båda heter Anna går inte att skilja
+   åt, varken på kundkortet i plattformspanelen eller av den som ringer
+   supporten.
+
+   Båda krävs av den som registrerar en arbetsyta, båda är frivilliga för den
+   som bjuds in. Visningsnamnet slås ihop av `fullName()` i
+   `src/lib/person-name.ts` och **lagras aldrig** — ett sammanslaget fält
+   bredvid de två hinner alltid sluta säga samma sak, samma skäl som att
+   orderns beräknade tid aldrig lagras (§ 3 regel 6).
+
+   `name` ligger kvar i databasen som en **död kolumn**, oläst och oskriven.
+   Migrationen delade de befintliga namnen vid sista mellanslaget och lämnade
+   `name` orörd, så att den föregående versionen av appen fungerar mot den nya
+   databasen (§ 0 punkt 7). Kolumnen tas bort i en senare release, som fälten
+   för ingående komptid.
+
+   **REGISTRERINGEN GÅR I TRE STEG** (ändrat 2026-10-11, issue #16): personen,
+   lösenordet, arbetsytan, med en stegmätare överst. Sju fält under varandra
+   betydde att den som skapade en arbetsyta på en telefon mötte ett formulär
+   som fortsatte nedanför skärmkanten.
+
+   **Ordningen är vald och inte given.** Lösenordet låg först på samma steg som
+   företagets namn, och "Företagets namn" följt av "Lösenord" lästes som ett
+   lösenord FÖR FÖRETAGET. Allt som är personen står därför före arbetsytan.
+   Att företagsnamnet blev ett eget steg med ett enda fält är inte en förlust:
+   det är sista steget, knappen står direkt under, och "vad heter företaget" är
+   en fråga man svarar på utan att läsa.
+
+   **Det är ETT formulär**, och alla stegens fält ligger kvar i DOM:en hela
+   tiden. Tre formulär efter varandra hade krävt att de tidigare stegen
+   lagrades någonstans mellan dem, och det någonstans är antingen en server som
+   får halva uppgifter eller en lagring i webbläsaren med personuppgifter i.
+
+   Ett fel vet vilket steg det hör till och skickar formuläret dit, eftersom
+   servern vet vilket fält som brast och webbläsaren inte gör det. Fälten får
+   sina värden tillbaka, utom lösenorden: React nollställer ett formulär som
+   skickats med `action`, och utan ekot vore ett felstavat telefonnummer
+   detsamma som att skriva om allting.
+
+   Utan JavaScript finns inga steg, och ingenting går förlorat: en stil i
+   `noscript` visar alla stegen och gömmer mätaren. Kvar står formuläret som
+   fanns före ändringen.
 
 4. **Anomali-varningar** (senare fas, ej MVP-kritiskt) — flagga t.ex. ett jobb
    som pågått orimligt länge, eller en person med fler parallella jobb än hen
@@ -1116,6 +1795,9 @@ ligger i `src/lib/feedback.ts`, och `tests/feedback.test.ts` fäller den.
      `tests/support-coverage.test.ts`.
    - **Varje besök skrivs ner** i `support_visits` innan cookien sätts, och
      visas på kundens sida i plattformspanelen.
+   - **Behörigheten prövas vid varje anrop** (tillagt 2026-10-18). En adress
+     som tagits bort ur `PLATFORM_ADMIN_EMAILS` förlorar supportläget direkt,
+     inte när cookien går ut.
 
    Supportläget släpps igenom prenumerationslåset — en obetald faktura är
    oftast precis varför kunden ringer.
@@ -1125,9 +1807,47 @@ ligger i `src/lib/feedback.ts`, och `tests/feedback.test.ts` fäller den.
    flöde. Steg ett är lösenordet, som bara lämnar en signerad lapp i tio
    minuter (`login-ticket.ts`). Steg två visar en QR-kod första gången och
    frågar sedan efter koden (TOTP, `totp.ts`, `two-step.ts`). Sessionen
-   skapas först när koden godkänts, och registrering, inbjudan och
-   återställning går samma väg. `currentAdmin()` släpper inte in ett konto
-   utan bekräftad app. Nycklarna lagras krypterade med `AUTH_SECRET`.
+   skapas först när koden godkänts, och inbjudan och återställning går samma
+   väg. `currentAdmin()` släpper inte in ett konto utan bekräftad app.
+   Nycklarna lagras krypterade med `AUTH_SECRET`.
+
+   **REGISTRERINGEN ÄR UNDANTAGET, PÅ EN ENDA SESSION** (ändrat 2026-10-11,
+   produktägarens beslut). Den som skapar en arbetsyta mötte en QR-kod innan
+   hen sett en enda sida av produkten, och ett krav man inte förstår skälet
+   till är ett krav man avbryter på.
+
+   Nu skapas sessionen av registreringen själv. Beviset är lappen: signerad,
+   tio minuter, satt i samma webbläsare i samma begäran, och märkt `fresh`.
+   `auth.ts` tar emot den under sättet `signup` och märker sessionen
+   `mfaDeferred`; `currentAdmin()` släpper in ett konto utan app **bara** när
+   det märket finns. Märket går inte att be om och följer inte med vidare:
+   nästa inloggning utfärdar en ny session, och den går genom inloggningssidan,
+   som möter ett konto utan app med QR-koden. Tvånget vid nästa inloggning
+   krävde därför ingen ny kod.
+
+   **I stället spärrar E-POSTADRESSEN.** Den nyregistrerade kommer inte in i
+   panelen förrän länken i välkomstmejlet använts, och skickas så länge till
+   `/admin/bekrafta-adressen`. Med tvåsteget flyttat är adressen det enda som
+   binder arbetsytan till en människa vi kan nå, och ett stavfel där upptäcks
+   annars den dag lösenordet ska återställas. Sidan ligger utanför `(panel)`,
+   eftersom en spärrsida inuti den layout som skickar dit hade skickat vidare
+   till sig själv, och den bär en väg att **rätta adressen** — utan den vore en
+   felskriven adress detsamma som en arbetsyta ingen kommer in i.
+
+   Spärren är ett flödessteg och inte en säkerhetsgräns: arbetsytan är
+   personens egen. Därför räcker kontrollen i layouten, till skillnad från
+   modulgrinden i § 3.1, som måste ligga i varje rutt.
+
+   **Panelen tjatar till dess appen är kopplad.** En remsa högst upp, av samma
+   slag som den om e-postadressen, med en knapp som leder till Ditt konto med
+   rutan öppen. Uppsättningen bor i `TwoStepEnrollment`, som inloggningen och
+   panelen delar: instruktionen är det som gör uppsättningen möjlig för den som
+   aldrig gjort den förut, och två texter som glider isär hade låst ute folk.
+
+   Priset är uttryckligt: ett stulet lösenord räcker aldrig för att komma in,
+   men den FÖRSTA webbläsarens cookie räcker i upp till sju dagar för ett konto
+   som inte hunnit koppla appen. **Inbjudna administratörer omfattas inte** —
+   de tvingas direkt, som förut.
 
    **Två lättnader för kunderna, ingen för plattformen** (beslutat
    2026-10-07, eftersom pilotkunden tyckte koden var jobbig). Appen sätts
@@ -1160,6 +1880,16 @@ ligger i `src/lib/feedback.ts`, och `tests/feedback.test.ts` fäller den.
    om detta mot kunden.
 7. **HTTPS + kort request-timeout** — stämpling ska kännas omedelbar men gå
    krypterat.
+
+   **Content-Security-Policy på grundnivå** (beslutat 2026-10-18,
+   produktägarens val, säkerhetsgranskningen), i `next.config.ts`. Allt från
+   egen adress, inga plugins, `base-uri` och `frame-ancestors` låsta, och
+   formulär bara hit och till Stripes kassa och kundportal. Inline-skript
+   tillåts, eftersom en nonce kräver att varje sida renderas vid varje anrop,
+   även säljsidan. Policyn sätts inte på `/api`, där ett PDF-svar annars kan
+   sluta visas i webbläsarens egen PDF-visare. Bevisas av
+   `tests/security-headers.test.ts`. Versionen i `/api/health` står kvar, se
+   § 5.
 8. **GDPR** — adminpanelen ska stödja export och radering av en anställds data
    (rätt att bli glömd). PUB-avtal hanteras utanför koden, men bygg
    funktionaliteten.
@@ -1179,15 +1909,36 @@ Alla kunder delar samma server, och en trasig driftsättning slår mot alla på
 en gång. Därför (beslutat 2026-10-10):
 
 ```
-gren → PR → CI → main → labbet (release.sh main) → tagg vX.Y.Z → produktionen (release.sh vX.Y.Z)
+gren → PR → CI → dev → labbet (release.sh dev) → PR dev → prod → tagg vX.Y.Z → produktionen (release.sh vX.Y.Z)
 ```
+
+**`dev` och `prod`** (beslutat 2026-10-11, `prod` hette `main` till dess).
+`dev` är det labbet kör, och dit går varje PR. `prod` är det som släpps, och
+får nya funktioner bara genom att `dev` slås ihop i den — det är det som gör
+en version. Skälet är att `main` blandade två saker: det som provades och det
+som var redo att släppas.
+
+`dev` går till `prod` med en vanlig sammanslagning, aldrig squash, och `prod`
+får inga egna commits utom en akut rättelse, som sedan slås ihop tillbaka i
+`dev`. Då har `prod` exakt det innehåll labbet provat, och taggen sätts utan
+en ny omgång i labbet.
 
 - **CI** (`.github/workflows/ci.yml`) kör typkontroll, alla tester mot en egen
   Postgres, ett bygge av Docker-imagen och en kontroll av compose-filerna på
-  varje PR och push till `main`. Den driftsätter ingenting.
+  varje PR och push till `dev` och `prod`. Den driftsätter ingenting.
+- **Säkerhetskontrollerna** (`.github/workflows/security.yml`, infört
+  2026-10-18) körs på samma händelser och dessutom varje måndag:
+  `npm audit` (produktionens beroenden fäller vid hög, alla vid kritisk),
+  gitleaks över hela historiken (repot är publikt), semgrep (fäller vid
+  ERROR) och trivy mot imagen (fäller vid kritisk med rättelse). Verktygen
+  är låsta på versioner som är minst två veckor gamla. Dependabot föreslår
+  uppdateringar som PR:er mot `dev` (`.github/dependabot.yml`). Inget slås
+  ihop av sig självt.
+- **ZAP mot labbet** (`zap-baseline.yml`) startas bara för hand, efter en
+  driftsättning i labbet, och vägrar en annan adress än `test.tikkr.se`.
 - **Labbet är staging.** Ingen tredje miljö, se § 9.
-- **Produktionen kör bara taggar**, och taggen sätts när labbet kört samma
-  commit. Driftsättningen är ett kommando som användaren själv kör på
+- **Produktionen kör bara taggar**, och taggen sätts på `prod` när labbet kört
+  samma innehåll på `dev`. Driftsättningen är ett kommando som användaren själv kör på
   servern; det är godkännandet. Ingen automatisk driftsättning, och inga
   SSH-nycklar hos GitHub.
 - **Imagen bär versionen** (`tikkr-app:v1.2.0`), som visas i `/api/health`.
@@ -1204,13 +1955,14 @@ Nyheter i panelen står vad som ändrats i varje version, och texten ligger i
 `src/lib/release-notes.ts`, inte i databasen. Den granskas därmed som koden,
 och syns när versionen installeras utan att någon trycker på något.
 `news.ts` gömmer dessutom poster för versioner som är nyare än den som kör,
-eftersom en rättelse kan taggas på en `main` där nästa versions text redan
+eftersom en rättelse kan taggas på en `prod` där nästa versions text redan
 ligger. Punkter som bara rör ett tillval visas bara för kunder som har det.
 
-Pricken vid Nyheter är per administratör: `admin_users.news_seen_version`
-håller den senaste versionen personen sett, och sidan skriver den när den
-öppnas. Den skrivs bara framåt, så att en backad version inte tänder pricken
-igen. Versionen som kör står i menyn, bredvid Tikkr-märket.
+Pricken vid Nyheter, i hörnet på ikonen i menyns fot, är per
+administratör: `admin_users.news_seen_version` håller den senaste versionen
+personen sett, och sidan skriver den när den öppnas. Den skrivs bara framåt, så att en backad version inte tänder pricken
+igen. Versionen som kör står på sidan Nyheter, och inte i menyn (ändrat
+2026-10-11).
 
 Produktionsservern kör Caddy framför appen (`deploy/Caddyfile`,
 `docker-compose.prod.yml`), och dess `.env` sätter `COMPOSE_FILE` så att
@@ -1299,32 +2051,45 @@ HÄR först, och filen följer efter.
    Knappar är verb i imperativ: "Lägg till", "Spara", "Koppla om".
 
 6. **Fälthjälp bara vid format eller konsekvens**, i en kort mening utan
-   punkt om den är ofullständig: "Tim:min, t.ex. 7:30", "Minst 10 tecken",
+   punkt om den är ofullständig: "Timmar, t.ex. 7,5", "Minst 10 tecken",
    "Kan inte ångras". Inte varför fältet finns.
 
 7. **Felmeddelanden säger vad som är fel och vad som rättar det.** Ett led,
    inte tre.
 
-8. **TID SKRIVS ALLTID SOM TIM:MIN** (bestämt 2026-10-01). "8:30", aldrig
-   "8,50". Gäller varje yta kunden ser: panelen, kioskskärmen och varenda
-   PDF. Saldon får sitt tecken utskrivet: "+2:15", "−0:45", "0:00".
+8. **TID SKRIVS ALLTID SOM DECIMALTIMMAR** (ändrat 2026-10-14, ersätter
+   "tid skrivs alltid som tim:min" från 2026-10-01). "8,5", aldrig "8:30".
+   Nollor i slutet faller bort, så "8" är åtta timmar och 33,75 sticker ut
+   bland en spalt runda tal. Saldon får sitt tecken utskrivet: "+2,25",
+   "−0,75", "0".
 
-   Decimaltimmar finns kvar, men BARA i Excel-arket. En kolumn som ska
-   summeras eller multipliceras med en timpeng kan inte stå i tim:min, och
-   arket finns just för att räkna vidare i. Där står båda formaten bredvid
-   varandra, tim:min först.
+   Gäller varje yta kunden ser: panelen, kioskskärmen, varenda PDF,
+   Excel-arket och säljsidans produktbilder.
 
-   Skälet är en bugg: tidrapporten stod i decimaltimmar medan tabellen under
-   den stod i tim:min, på samma sida om samma dag, och "1,99" lästes som 1:59
-   — fyra minuter fel. Flexsaldot gick dessutom inte att justera, eftersom
-   rutan visade ett format och räknade i ett annat.
+   Kunden bad om det, och skälet är deras eget: lönekörningen och de
+   efterkalkyler de räknat på i tio år står i decimaltimmar. Den som läste ett
+   tal i panelen för att skriva in det någon annanstans räknade om varje gång,
+   och en omräkning i huvudet är en felkälla systemet lagt dit själv.
 
-   Fälten där tid skrivs in tar BÅDA formen, så att ingen behöver räkna om
-   det hen just läst: "7:30" och "7,5" ger samma sak. Bara kolon skiljer
-   timmar från minuter — "7.30" är sju timmar och arton minuter.
+   **DET ÄR NU ETT FORMAT OCH INTE TVÅ, och det är hela vinsten.** Buggen som
+   gav tim:min sin regel var inte att decimaltimmar är svårlästa, utan att två
+   format stod på samma sida om samma dag: tidrapporten i decimaltimmar,
+   tabellen under den i tim:min, och "1,99" lästes som 1:59 — fyra minuter
+   fel. Med ett enda format finns ingenting att läsa fel, och Excel-arkets
+   dubbla tidkolumn kunde tas bort: en text att jämföra med skärmen och ett
+   tal att summera är samma tal nu, och talet är det som står kvar.
 
-   `src/lib/format.ts` äger båda formaten, och
-   `tests/format.test.ts` fäller en ny sida som visar decimaltimmar.
+   **ETT KLOCKSLAG ÄR INTE EN LÄNGD.** En in- och utstämpling, en rast
+   11:30–12:15, schemats dag och en beräknad sluttid är klockslag och skrivs
+   med kolon. Bara tid som RÄKNAS är decimal. Den som blandar ihop det gör
+   tabellen obegriplig åt andra hållet.
+
+   Fälten där tid skrivs in tar BÅDA formen, så att "7:30" på ett gammalt
+   papper går att skriva av: "7,5" och "7:30" ger samma sak. Bara kolon
+   skiljer timmar från minuter — "7.30" är sju timmar och arton minuter.
+
+   `src/lib/format.ts` äger formatet, och `tests/format.test.ts` fäller en ny
+   sida som visar tim:min.
 
 Där något verkligen är svårt — GDPR-radering, fast pris kontra påslag — får
 en mening stå kvar. Den ska då vara skriven för en verkstadschef, inte för en
@@ -1346,10 +2111,22 @@ kopiorna i `public/` kopieras om.
 |---|---|---|
 | Fjord | `#0E1A2B` | Primär. Text, logotyp, mörka ytor, knappar |
 | Tick | `#2ED196` | Accent på mörkt |
-| Tick Deep | `#0F9E68` | Accent på ljust: länkar, markerat läge |
+| Tick Deep | `#0F9E68` | Accent på ljust: ikoner, markerat läge |
 | Snö | `#F5F6F2` | Ljus bakgrund |
 | Skiffer | `#5B6573` | Sekundär text |
 | Lav | `#D9DDD6` | Linjer, ramar, tysta ytor |
+
+**Länkad text är `text-link`, ett steg mörkare än Tick Deep** (beslutat
+2026-10-30, produktägarens val, UX-granskningen). Tick Deep ger 3,44:1 mot vitt
+och `neutral-400` 3,37:1, och båda stod på text som ska läsas. WCAG begär 4,5:1.
+Länkar ligger nu på `emerald-700` (5,09:1) och läsbar sekundär text på Skiffer.
+Tick Deep och `neutral-400` står kvar på ikoner, ytor och linjer. Det är ett
+litet avsteg från guiden, som anger Tick Deep för länkar. Bevisas av
+`tests/contrast.test.ts`.
+
+**Text på en gul yta är Fjord** (beslutat 2026-10-30, produktägarens val,
+UX-granskningen). Vitt på gult ger 2,1:1 och Fjord 8,2:1. Gäller felrutan och
+varningen på stämplingsskärmen, kort med improduktiv tid och Skapa order.
 
 Fjord och Snö bär de flesta ytorna. **Grönt är accent och aldrig huvudfärg** —
 det är den enda regeln i guiden som står utskriven som ett förbud, och skälet
@@ -1398,6 +2175,27 @@ en gång utan niohundra ändringar som inte går att bygga på den här maskinen
 Ny kod använder hellre `text-fjord`, `bg-tick-deep` och de andra
 varumärkesnamnen.
 
+**RÖRELSE OCH LADDNING** (beslutat 2026-10-20, produktägarens godkännande).
+Gäller adminpanelen och plattformspanelen. Kort, liten och bara när något
+kommer in, aldrig medan man arbetar i en vy:
+
+- **Sidbyte:** nytt innehåll tonas in fyra pixlar (`.panel-content > *`).
+  Menyn står still, och den klickade punkten markeras direkt med en prick
+  medan sidan hämtas (`NavFeedback.tsx`).
+- **Skelett** i sidans egen form (`Skeleton.tsx`, `loading.tsx`), först
+  efter 150 ms, så att en snabb sida inte blinkar förbi ett. När samma sida
+  hämtas om står det gamla kvar tills det nya kommit.
+- **Staplar växer fram** när de ritas, med `scale` så att ingenting runt
+  dem flyttar sig (`.animate-grow-*`). Produktägarens önskan.
+- **Ett tal som ändras medan sidan står öppen lyser upp** (`LiveValue`).
+- **Ingen rörlig bakgrund i panelerna.** Säljsidans ljus passar inloggningen
+  men konkurrerar med siffrorna i en arbetsyta.
+- **`prefers-reduced-motion` stänger av allt**, och skelettet står då stilla.
+
+Stämplingsskärmen behåller sitt korta vybyte och sin tryckkvittens, på samma
+tidsvariabel (`--motion-fast`). Den får inga skelett: ett tryck ska kännas
+omedelbart, och den laddar ingenting som motiverar ett.
+
 **Typsnittet är Geist**, och ingenting annat. Laddas av `next/font` i
 `src/app/layout.tsx`, som packar filerna med bygget — en kioskskärm utan nät
 ska inte tappa typsnittet, och säljsidans besökare ska inte lämna spår hos
@@ -1426,6 +2224,23 @@ ordmärke 86 % av symbolens höjd med 34 % mellanrum. En handplockad siffra ger
 en logotyp som nästan stämmer, vilket är svårare att upptäcka än en som är
 uppenbart fel.
 
+**INLOGGNING OCH REGISTRERING LIGGER PÅ SÄLJSIDANS YTA** (ändrat 2026-10-11,
+issue #16). De sju sidorna som delar `AuthShell` låg på en platt ljusgrå yta,
+och den som kom från säljsidans hero rakt in i registreringen bytte produkt
+mitt i ett steg. Nu bär Fjord sidan: ljuset som driver, ritningsrutnätet,
+symbolen och två produktbilder som svävar i kanterna. Se `AuthBackdrop`.
+
+Lagren är säljsidans egna, ur `marketing/`, och det är hela skälet att filen
+är kort. En andra uppsättning gradienter som är "ungefär likadana" är precis
+vad `Atmosphere.tsx` finns för att slippa — mappen heter `marketing` efter var
+de först användes, inte efter vem som får använda dem.
+
+Rutan man skriver i är kvar vit. Ett fält på en mörk yta med ett ljus bakom är
+ett fält man inte ser kanten på, och guiden säger att Fjord och Snö bär
+ytorna. Produktbilderna syns först från `xl`, eftersom avståndet mellan rutan
+och fönsterkanten under den bredden är mindre än en produktbild; en telefon
+får ljuset och rutnätet, som bär ytan ändå.
+
 Bevisas av **`tests/brand.test.ts`**: den fäller en färg utanför paletten, ett
 token som glidit från guidens hexkod, och ett ordmärke som satts som text.
 Samma sorts skyddsnät som `format.test.ts` och `ui-text.test.ts`, och av samma
@@ -1438,6 +2253,7 @@ och `bg-sky-600` ser lika rimlig ut i en kodgranskning som `bg-blue-600`.
 
 **399 kr per aktiv stämplingsskärm och månad, exkl. moms.** Ingen grundavgift,
 inget tak på anställda, ordrar eller stämplingar. **Ingen bindningstid.**
+När appen finns räknas den som en skärm, se Appen är en stämplingsplats nedan.
 
 **Årsbetalning: 3 990 kr per skärm och år** — tio månaders pris för tolv
 månader. Frivilligt alternativ, inte bindning: kunden väljer själv och får
@@ -1500,6 +2316,71 @@ Numret kontrolleras mot Stripe när det sparas: att artikeln finns, att den är
 månadsfältet ger en faktura tolv gånger för dyr, och det ska inte gå att
 spara.
 
+### Appen är en stämplingsplats (beslutat 2026-10-17, issue #19)
+
+Appen är inte byggd. Beslutet tas före den, så att säljsidan och villkoren
+inte lovar något som blir fel den dag den kommer, och så att ingen kund får
+ett högre pris i efterhand.
+
+**399 kr per STÄMPLINGSPLATS och månad, och en plats är en skärm eller
+appen.** Appen kostar som en skärm, en gång per företag, för hela personalen.
+Årsbetalning 3 990 kr, som skärmen. Tillvalen är oförändrade, 499 och 699 kr.
+
+| Kund | Per månad |
+|---|---|
+| 1 skärm | 399 |
+| Bara appen | 399 |
+| 2 skärmar och appen | 1 197 |
+| Appen och planeringen | 1 098 |
+
+Skälet är kunden som inte har någon skärm. En elfirma i planeringsläget
+Tjänst (§ 3 regel 8) står inte vid en skärm i en verkstad, och med ett pris
+per skärm gick den kunden inte att ta betalt av alls. Att appen kostar som en
+skärm gör att det fortfarande är ett pris att förklara.
+
+**Prenumerationen kräver minst en plats: en skärm eller appen.** Det är
+prenumerationens status som släpper in kunden (`subscription.ts`), inte
+skärmen. Men betalningskoden förutsätter i dag minst en skärm, och fyra
+ställen ändras i samma gren som appen:
+
+- Kassan i `billing.ts` tar bara med skärmraden när kunden valt skärmar.
+- `assertLicenseCount` tillåter noll skärmar när appen är på, och den första
+  skärmen på en prenumeration utan skärm blir en ny rad hos Stripe.
+- `screenItemOf` i `stripe.ts` tar aldrig en modulrad. Den faller i dag
+  tillbaka på första raden, för prenumerationer från tiden före modulerna, och
+  hade då skrivit appens antal som en skärmlicens. `tests/stripe-items.test.ts`
+  får fallet "bara appen".
+- Webhooken skriver noll skärmar när raden saknas.
+
+**Stämplingen i appen slutar aldrig fungera**, lika lite som på skärmen. En
+obetald faktura låser panelen och ger en varning i appen, men tiden
+registreras (se Provperiod nedan).
+
+Övervägt och bortvalt samma dag:
+
+- **Storleksnivåer efter antal aktiva anställda**, med skärmar och app
+  inkluderade. Det är pris per anställd i trappsteg, och skälet mot det står
+  under Pris ovan.
+- **Paket** (Start, Pro, Komplett, som bygger på varandra). Tillvalen är
+  fristående i koden, och planeringen hade inte längre gått att köpa utan
+  löneunderlaget.
+- **Ett lägre pris på planeringen.** Ingen kund har köpt den än, och ett pris
+  som är för högt syns på att kunderna provar och väljer bort den. Då går det
+  att sänka, men ett höjt pris går inte att ta tillbaka. Följ hur många som
+  slår på den under provperioden och behåller den efteråt.
+
+Väntar tills en kund frågar: rabatt för båda tillvalen och ett lägre pris
+från den femte skärmen. Båda går att lägga till utan att någon får ett högre
+pris.
+
+### Pris på stämplingsskärmen (beslutat 2026-10-20, tillfälligt)
+
+**24 900 kr exklusive moms**, frakt tillkommer. Inköpet är ungefär 13 600 kr
+för skärmen och 1 500 kr för stativet, och med förberedelse, emballage och en
+reserv för garantiärenden landar självkostnaden kring 16 900 kr. Priset sätts
+på produkten under Produkter i plattformspanelen och kan ändras innan lansering. Lagda
+beställningar behåller sitt pris.
+
 ### Avtalat pris per kund (tillagt 2026-10-08)
 
 Listpriset ovan gäller alla. `company_prices` säger vad vi kommit överens om
@@ -1553,6 +2434,21 @@ Skälet: stämplar ingen går arbetstid förlorad och går inte att rekonstruera
 Den tiden är kundens fakturaunderlag mot sin kund, alltså pengar som försvinner
 för någon som inte rår över att fakturan till oss är obetald.
 
+**Låset sitter i `requireAdmin()`, inte i layouten** (ändrat 2026-10-30,
+säkerhetsgranskningen). Det låg som en gren i panelens layout, som ritade
+låsskärmen i stället för sidan. Det stoppade ingenting: Next kör sidan ändå och
+skickar den i svaret, även när layouten aldrig ritar `children`, och
+serveråtgärderna går inte genom en layout alls.
+
+Nu skickar `requireAdmin()` en låst arbetsyta till `/admin/last`, en tom sida
+där layouten ritar låsskärmen. En ny sida eller åtgärd är därmed låst utan att
+någon behöver komma ihåg det. Undantagen kallar `requireAdminEvenIfLocked()` och
+står med skäl i `tests/subscription-lock.test.ts`: betalningen, det egna kontot,
+feedback, adressbekräftelsen, registerutdraget och anonymiseringen. De två
+sista är de registrerades rättigheter, som inte kan hänga på en betald faktura.
+Uttagen svarar 402 och prövar låset själva (`export-access.ts`). Supportläget är
+aldrig låst, se § 4 punkt 5.
+
 ### Betalning vs bokföring
 
 Stripe sköter prenumerationen och styr åtkomst automatiskt. Fortnox används
@@ -1567,7 +2463,7 @@ servern — Claude har **ingen** SSH-åtkomst och ska alltid leverera kommandon 
 färdiga kodblock, ett i taget, med förklaring av vad de gör.
 
 ```
-Laptop (gren, commit)  →  GitHub (PR, CI, main, tagg)  →  Server: ./scripts/release.sh <version>
+Laptop (gren, commit)  →  GitHub (PR, CI, dev, prod, tagg)  →  Server: ./scripts/release.sh <version>
 ```
 
 ### Utvecklingsdator
@@ -1612,7 +2508,7 @@ separat server som sätts upp senare, mot tikkr.se.
 | Port 80/443 | 🔴 upptagna av **Nginx Proxy Manager** — rör dem inte |
 | Port 3000 | ✅ Tikkr, men bara `127.0.0.1` — all trafik går via proxyn |
 | Adress | ✅ `https://www.tikkr.se` och `portal.tikkr.se` via NPM, tills produktionen tar över dem |
-| Gren | `main`. En gren under arbete kan provas här före sammanslagning |
+| Gren | `dev`. En gren under arbete kan provas här före sammanslagning, och `prod` vid en akut rättelse |
 | Övrigt på servern | kör andra tjänster — kontrollera alltid innan portar tas |
 
 ### Miljöerna (beslutat 2026-10-10)
@@ -1640,7 +2536,7 @@ varje skärm kopplas om med en ny kod.
 
 | Sak | Status |
 |---|---|
-| GitHub-repo | ⚠ `TERAFALK/Tikkr` finns men är **publikt**. Ska bli privat; gratisplanen kan då inte skydda `main` |
+| GitHub-repo | ⚠ `TERAFALK/Tikkr` finns men är **publikt**. Ska bli privat; gratisplanen kan då inte skydda `prod` |
 | Produktionsserver | ⏸ Glesys-VPS, senare. Föreslaget: 2 vCPU, 4 GB RAM, 50 GB, Ubuntu 24.04 |
 | Offsite-backup (rclone-mål) | ⏸ Glesys Object Storage, köps till. `BACKUP_REMOTE` sätts före lansering |
 | Uptime-övervakning | ⏸ sätts upp mot produktionens adress |

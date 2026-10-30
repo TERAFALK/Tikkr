@@ -91,10 +91,14 @@ export function openSecret(sealed, authSecret) {
   if (version !== VERSION || !iv || !tag || !body) return null;
 
   try {
+    // Taggens längd anges uttryckligen (2026-10-18). Utan den godtar Node en
+    // avkortad tagg, ner till fyra byte, och den som kan skriva i databasen
+    // har då lättare att förfalska ett krypterat värde.
     const decipher = createDecipheriv(
       "aes-256-gcm",
       keyFrom(authSecret),
-      Buffer.from(iv, "base64url")
+      Buffer.from(iv, "base64url"),
+      { authTagLength: 16 }
     );
     decipher.setAuthTag(Buffer.from(tag, "base64url"));
 

@@ -1,0 +1,15 @@
+# Gitleaks för Tikkr (2026-10-18). Läses av .github/workflows/security.yml.
+#
+# Standardreglerna gäller överallt. Det enda undantaget är regeln för
+# "generiska nycklar" i testerna, som larmar på påhittade lösenord som
+# "ett-langt-losenord" i ett testformulär. Alla andra regler, som AWS-, Stripe-
+# och privata nycklar, gäller även där: en riktig nyckel hör inte hemma i ett
+# test heller.
+
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "Testernas påhittade lösenord"
+targetRules = ["generic-api-key"]
+paths = ['''^tests/''']

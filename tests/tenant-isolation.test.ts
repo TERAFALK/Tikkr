@@ -178,6 +178,36 @@ describe("skrivning hamnar alltid i rätt företag", () => {
     await forCompany(companyA).workMoment.delete({ where: { id: created.id } });
   });
 
+  it("en nästlad ny rad med eget företag går igenom", async () => {
+    // Så skapas schemats och stationernas raster. Lagret prövar sedan
+    // 2026-10-18 nästlade skrivningar, och det här är formen som ska fungera.
+    // Fallen som ska avvisas står i tenant-writes.test.ts.
+    const db = forCompany(companyA);
+
+    const schedule = await db.workSchedule.create({
+      data: { companyId: companyA, name: "Nästlat test" },
+    });
+
+    const day = await db.scheduleDay.create({
+      data: {
+        companyId: companyA,
+        scheduleId: schedule.id,
+        weekday: 1,
+        startMinute: 390,
+        endMinute: 960,
+        breaks: {
+          create: [{ companyId: companyA, startMinute: 720, endMinute: 760 }],
+        },
+      },
+      include: { breaks: true },
+    });
+
+    expect(day.breaks).toHaveLength(1);
+    expect(day.breaks[0].companyId).toBe(companyA);
+
+    await db.workSchedule.delete({ where: { id: schedule.id } });
+  });
+
   it("create kan inte tvinga in data hos ett annat företag", async () => {
     await expect(
       // Försök att smuggla in raden hos kund B.

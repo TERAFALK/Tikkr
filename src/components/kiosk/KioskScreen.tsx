@@ -2,12 +2,20 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { enqueue, flush, pending, type QueuedPunch } from "@/lib/offline-queue";
+import {
+  enqueue,
+  flush,
+  loadView,
+  pending,
+  saveView,
+  shouldRestoreAtStart,
+  type QueuedPunch,
+} from "@/lib/offline-queue";
 import {
   applyBrightness,
   hasFully,
   readDeviceInfo,
-  restartApp,
+  restartDevice,
 } from "@/lib/fully";
 import CompanyBadge from "@/components/ui/CompanyBadge";
 import { LogoMark, WordmarkOnly } from "@/components/ui/Logo";
@@ -156,6 +164,10 @@ function jobKey(choice: KioskJobChoice): string {
  * Skillnaden ska gå att läsa tvärs över en verkstad, precis som skillnaden
  * mellan instämplad och utstämplad. Den som ser ett gult kort vet att personen
  * är på plats men inte på ett jobb som betalas.
+ *
+ * TEXTEN PÅ GULT ÄR FJORD (beslutat 2026-10-30, produktägarens val). Vitt på
+ * gult ger 2,1:1 och Fjord 8,2:1, och det är just felmeddelandet som ska gå att
+ * läsa på avstånd.
  */
 const JOB_TONE = {
   order: "border-emerald-600 bg-emerald-600 active:bg-emerald-700",
@@ -216,6 +228,20 @@ function jobLabel(choice: KioskJobChoice): string {
  * src/app/kiosk/page.tsx.
  */
 type RecentJob = KioskRecentJob;
+
+/**
+ * Skärmens bild av läget, så som den sparas medan tryck väntar i kön.
+ *
+ * Exakt de fyra som följer regeln om kön nedan: medan tryck väntar är den
+ * lokala bilden nyare än serverns. Sparades bara en del visade skärmen efter
+ * ett avbrott en blandning av två tidpunkter. Se `saveView` i offline-queue.ts.
+ */
+interface KioskView {
+  active: Record<string, ActiveJob[]>;
+  breaks: Record<string, KioskBreak>;
+  autoClosed: Record<string, KioskAutoClosedJob[]>;
+  recent: Record<string, RecentJob>;
+}
 
 /** Driftmeddelande från plattformen. Kortad form — bannern behöver inte datum. */
 export interface KioskNotice {
@@ -301,9 +327,15 @@ type View =
       employee: Employee;
       orderNumber: string;
       customer: KioskCustomer | null;
+      from: "order" | "orderNumber";
     }
-  | { name: "moment"; employee: Employee; order: Order }
-  | { name: "indirect"; employee: Employee }
+  | {
+      name: "moment";
+      employee: Employee;
+      order: Order;
+      from: "order" | "orderNumber";
+    }
+  | { name: "indirect"; employee: Employee; from: "order" | "orderNumber" }
   | { name: "flex"; employee: Employee };
 
 /** Hur många siffror ett ordernummer får vara innan knappsatsen slutar ta emot. */
@@ -351,6 +383,20 @@ const SYNC_MS = 5_000;
  * listorna hämtas dessutom om varje gång skärmen återgår till namnrutnätet.
  */
 const LIST_REFRESH_MS = 60_000;
+
+/**
+ * Hur ofta en skärm vi sålt rapporterar sitt nät till adminpanelen. Tätt nog
+ * att uppgiften stämmer när supporten tittar, glest nog att aldrig märkas. En
+ * kunds egen dator rapporterar aldrig.
+ */
+const DEVICE_REPORT_MS = 5 * 60_000;
+
+/**
+ * Hur länge skärmen väntar på servern när den startar, innan den lägger
+ * tillbaka sin sparade bild. Utan nät svarar frågan direkt med ett fel; tiden
+ * gäller bara ett nät som finns men inte når fram.
+ */
+const START_PROBE_MS = 4_000;
 
 export default function KioskScreen({
   companyName,
@@ -516,6 +562,53 @@ export default function KioskScreen({
     router.refresh();
   }, [backToGrid, router]);
 
+  /**
+   * TILLBAKA ETT STEG (tillagt 2026-10-30, UX-granskningen).
+   *
+   * Avbryt går alltid hem till namnen. Valdes fel order fanns ingen annan väg,
+   * och felet kostade tre tryck: namnet, numret och ordern igen. I kundvalet
+   * stod dessutom två Avbryt med olika betydelse.
+   *
+   * Null betyder att det inte finns något steg före det här, utom namnen.
+   */
+  const previousView = useCallback(
+    (current: View): View | null => {
+      if (current.name === "employees" || current.name === "action") return null;
+
+      const { employee } = current;
+      const hasAction = Boolean(
+        active[employee.id]?.length ||
+          autoClosed[employee.id]?.length ||
+          recent[employee.id] ||
+          breaks[employee.id]
+      );
+      const start: View | null = hasAction ? { name: "action", employee } : null;
+
+      switch (current.name) {
+        case "orderNumber":
+          return start;
+        case "order":
+          return { name: "orderNumber", employee };
+        case "moment":
+        case "indirect":
+        case "quickCustomer":
+          return { name: current.from, employee };
+        case "quickMoment":
+          return {
+            name: "quickCustomer",
+            employee,
+            orderNumber: current.orderNumber,
+            from: current.from,
+          };
+        case "break":
+          return { name: "action", employee };
+        case "flex":
+          return start ?? { name: "orderNumber", employee };
+      }
+    },
+    [active, autoClosed, breaks, recent]
+  );
+
   // Skärmen återgår själv om någon lämnar den mitt i ett val.
   useEffect(() => {
     if (view.name === "employees") return;
@@ -530,6 +623,41 @@ export default function KioskScreen({
   }, [receiptVisible, receipt]);
 
   const [waiting, setWaiting] = useState(0);
+
+  /**
+   * true när skärmen prövat att lägga tillbaka sin sparade bild.
+   *
+   * Förrän dess sparas ingenting. Skärmen startar på sidans sparade kopia,
+   * och utan spärren hade effekten nedan skrivit den över den sparade bilden
+   * innan den hunnit läsas — och därmed raderat just det den är till för.
+   */
+  const [viewReady, setViewReady] = useState(false);
+
+  /** Den bild som senast sparades, som text. Se effekten nedan. */
+  const lastSavedView = useRef<string | null>(null);
+
+  /**
+   * Sparar bilden varje gång den ändras, och bara då.
+   *
+   * Serverns bild kommer var femte sekund och är nästan alltid densamma som
+   * förra gången. En skrivning till disken varje gång hade slitit på skärmens
+   * minne för ingenting, så bilden jämförs först. Den ändras när någon stämplar,
+   * här eller på en annan skärm.
+   */
+  useEffect(() => {
+    if (!viewReady) return;
+
+    const view: KioskView = { active, breaks, autoClosed, recent };
+    const text = JSON.stringify(view);
+    if (text === lastSavedView.current) return;
+
+    lastSavedView.current = text;
+    void saveView(view).catch(() => {
+      // Bilden är en hjälp, inte ett åtagande; trycken ligger i kön. Nästa
+      // ändring försöker igen.
+      lastSavedView.current = null;
+    });
+  }, [viewReady, active, breaks, autoClosed, recent]);
 
   // Tidpunkten då servern senast svarade. Visas i kugghjulet — en skärm som
   // tappat nätet ser annars likadan ut som en som fungerar.
@@ -654,7 +782,38 @@ export default function KioskScreen({
 
   // Töm kön när nätet kommer tillbaka, och regelbundet som skyddsnät.
   useEffect(() => {
-    void pending().then((queue) => setQueueLength(queue.length));
+    void pending()
+      .then(async (queue) => {
+        setQueueLength(queue.length);
+
+        // Bilden skärmen har nu är sidans sparade kopia, från senast sidan
+        // laddades — kanske i natt. Efter ett avbrott är den sparade bilden
+        // ofta bättre. Vilken som gäller avgör shouldRestoreAtStart.
+        const saved = await loadView<KioskView>();
+        const restore = await shouldRestoreAtStart(saved, queue, () =>
+          fetch("/api/kiosk/state", {
+            cache: "no-store",
+            signal: AbortSignal.timeout(START_PROBE_MS),
+          }).then((response) => response.ok)
+        );
+        if (!restore || !saved) return;
+
+        // Tömdes kön medan bilden lästes gäller serverns bild. Kom nätet
+        // tillbaka under frågan rättar nästa hämtning bilden inom fem sekunder.
+        if (queue.length > 0 && waitingRef.current === 0) return;
+
+        setActive(saved.view.active);
+        setBreaks(saved.view.breaks);
+        setAutoClosed(saved.view.autoClosed);
+        setRecent(saved.view.recent);
+      })
+      .catch(() => {
+        // En bild som inte går att läsa är ingen anledning att stoppa
+        // skärmen. Trycken ligger kvar i kön, och servern rättar bilden när
+        // nätet kommer tillbaka.
+      })
+      .finally(() => setViewReady(true));
+
     void drain();
 
     const onOnline = () => void drain();
@@ -701,7 +860,7 @@ export default function KioskScreen({
 
       // Första svaret sätter bara utgångsläget. Se kommentaren ovan.
       if (seen !== undefined && device.restartRequestedAt !== seen) {
-        restartApp();
+        restartDevice();
       }
     },
     []
@@ -713,19 +872,35 @@ export default function KioskScreen({
    * Bara skärmar som kör i kioskappen har något att säga. En kunds egen dator
    * hör aldrig av sig, och syns därför i adminpanelen utan fjärrkontroller —
    * vilket är hela skillnaden mellan de två sorternas skärm.
+   *
+   * Om och om igen, och inte bara vid laddning: nätet ändras, och en uppgift om
+   * wifisignalen som lästes av för en timme sedan säger ingenting om nu. Direkt
+   * när nätet kommer tillbaka också, eftersom det är just då frågan ställs.
    */
   useEffect(() => {
-    const info = readDeviceInfo();
-    if (!info) return;
+    const report = () => {
+      const info = readDeviceInfo();
+      if (!info) return;
 
-    void fetch("/api/kiosk/device", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify(info),
-    }).catch(() => {
-      // Nätet är nere. Rapporten är inte värd en omsändning — nästa laddning
-      // gör om den, och ingen arbetstid hänger på den.
-    });
+      void fetch("/api/kiosk/device", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(info),
+      }).catch(() => {
+        // Nätet är nere. Rapporten är inte värd en omsändning — nästa gör om
+        // den, och ingen arbetstid hänger på den.
+      });
+    };
+
+    report();
+
+    const timer = setInterval(report, DEVICE_REPORT_MS);
+    window.addEventListener("online", report);
+
+    return () => {
+      clearInterval(timer);
+      window.removeEventListener("online", report);
+    };
   }, []);
 
   /**
@@ -1103,6 +1278,18 @@ export default function KioskScreen({
         hasLogo={hasLogo}
         lastSyncedAt={lastSyncedAt}
         onBack={goHome}
+        onStepBack={
+          previousView(view)
+            ? () => {
+                const target = previousView(view);
+                if (!target) return;
+
+                // Tillbaka vid sitt jobb: bytet är avbrutet, som i Avbryt.
+                if (target.name === "action") setReplacing(null);
+                setView(target);
+              }
+            : null
+        }
         onFlex={
           // Bara när en namngiven person är vald OCH hen har en kod. På
           // startsidan finns ingen person, och saldoknappen hör till den som
@@ -1120,7 +1307,7 @@ export default function KioskScreen({
           nämner den för chefen — meningen är inte att störa den som stämplar,
           därför tar den ingen plats från knapparna. */}
       {subscriptionWarning && (
-        <div className="flex items-center gap-3 bg-amber-500 px-6 py-3 text-white">
+        <div className="flex items-center gap-3 bg-amber-500 px-6 py-3 text-fjord">
           <span className="text-lg font-semibold">{subscriptionWarning}</span>
           <span className="text-sm opacity-90">
             Stämplingen fungerar som vanligt. Informera närmaste chef.
@@ -1276,7 +1463,11 @@ export default function KioskScreen({
                 {indirectMoments.length > 0 && (
                   <button
                     onClick={() =>
-                      setView({ name: "indirect", employee: view.employee })
+                      setView({
+                        name: "indirect",
+                        employee: view.employee,
+                        from: "order",
+                      })
                     }
                     className="kiosk-press rounded-xl border border-neutral-200 bg-white px-5 py-4 text-base font-semibold text-neutral-600 active:bg-neutral-50 sm:text-lg"
                   >
@@ -1290,7 +1481,12 @@ export default function KioskScreen({
               primary: order.orderNumber,
               secondary: order.customerName ?? undefined,
               onPick: () =>
-                setView({ name: "moment", employee: view.employee, order }),
+                setView({
+                  name: "moment",
+                  employee: view.employee,
+                  order,
+                  from: "order",
+                }),
             }))}
           />
         )}
@@ -1301,7 +1497,12 @@ export default function KioskScreen({
             orders={orders}
             switchingFrom={replacing?.label ?? null}
             onPick={(order) =>
-              setView({ name: "moment", employee: view.employee, order })
+              setView({
+                name: "moment",
+                employee: view.employee,
+                order,
+                from: "orderNumber",
+              })
             }
             onBrowse={() =>
               setView({ name: "order", employee: view.employee })
@@ -1327,7 +1528,11 @@ export default function KioskScreen({
             // som ska registrera improduktiv tid hamnar här först. Vägen dit
             // måste därför finnas både här och i åtgärdsvyn.
             onIndirect={() =>
-              setView({ name: "indirect", employee: view.employee })
+              setView({
+                name: "indirect",
+                employee: view.employee,
+                from: "orderNumber",
+              })
             }
             hasIndirect={indirectMoments.length > 0}
           />
@@ -1349,17 +1554,8 @@ export default function KioskScreen({
                 employee: view.employee,
                 orderNumber: view.orderNumber,
                 customer,
+                from: view.from,
               })
-            }
-            onBack={() =>
-              // Grenarna skrivs ut. TypeScript kan inte smalna av en union ur
-              // en variabel, och att tvinga fram det med en typkonvertering
-              // vore att stänga av den kontroll som gör ändringen trygg.
-              setView(
-                view.from === "order"
-                  ? { name: "order", employee: view.employee }
-                  : { name: "orderNumber", employee: view.employee }
-              )
             }
           />
         )}
@@ -1467,6 +1663,7 @@ function Header({
   hasLogo,
   lastSyncedAt,
   onBack,
+  onStepBack,
   onFlex,
 }: {
   companyName: string;
@@ -1478,6 +1675,8 @@ function Header({
   hasLogo: boolean;
   lastSyncedAt: Date | null;
   onBack: () => void;
+  /** Ett steg bakåt. Null när steget före är namnen. */
+  onStepBack: (() => void) | null;
   /** Null när saldot inte går att visa. Se KioskScreen. */
   onFlex: (() => void) | null;
 }) {
@@ -1496,7 +1695,7 @@ function Header({
         <p className="truncate text-[15px] font-semibold text-neutral-900">
           {companyName}
         </p>
-        <p className="truncate text-[13px] text-neutral-400">{deviceName}</p>
+        <p className="truncate text-[13px] text-neutral-500">{deviceName}</p>
       </div>
 
       {step && (
@@ -1552,6 +1751,15 @@ function Header({
               <path d="M12 11v5" />
               <path d="M12 7.75h.01" />
             </svg>
+          </button>
+        )}
+
+        {onStepBack && (
+          <button
+            onClick={onStepBack}
+            className="kiosk-press shrink-0 rounded-xl border border-neutral-200 bg-white px-6 py-4 text-lg font-semibold text-neutral-900 active:bg-neutral-50"
+          >
+            Tillbaka
           </button>
         )}
 
@@ -1630,7 +1838,7 @@ function Toast({
   onDismiss?: () => void;
 }) {
   const styles =
-    tone === "ok" ? "bg-emerald-600 text-white" : "bg-amber-500 text-white";
+    tone === "ok" ? "bg-emerald-600 text-white" : "bg-amber-500 text-fjord";
 
   return (
     <div
@@ -1664,13 +1872,38 @@ function EmployeeGrid({
   breaks: Record<string, KioskBreak>;
   onPick: (employee: Employee) => void;
 }) {
+  const [letter, setLetter] = useState<string | null>(null);
+
+  // Nästa person ska mötas av alla namn, inte av en bokstav någon lämnat kvar.
+  useEffect(() => {
+    if (!letter) return;
+    const timer = setTimeout(() => setLetter(null), IDLE_MS);
+    return () => clearTimeout(timer);
+  }, [letter]);
+
+  const showLetters = employees.length > EMPLOYEE_LETTERS_FROM;
+  const letters = useMemo(
+    () => firstLetters(employees.map((employee) => employee.name)),
+    [employees]
+  );
+  const shown = letter
+    ? employees.filter((employee) => firstLetter(employee.name) === letter)
+    : employees;
+
   if (employees.length === 0) {
     return <Empty>Inga anställda upplagda. Kontakta kontoret.</Empty>;
   }
 
   return (
-    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 lg:grid-cols-4">
-      {employees.map((employee) => {
+    <>
+      {showLetters && (
+        <LetterBar letters={letters} letter={letter} onPick={setLetter} />
+      )}
+
+      {/* Fler kolumner på en stor skärm. Fyra lät 23,6 tum rymma sexton namn,
+          och resten låg under kanten. */}
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 lg:grid-cols-4 2xl:grid-cols-5 min-[112.5rem]:grid-cols-6">
+      {shown.map((employee) => {
         const jobs = active[employee.id] ?? [];
         const job = jobs[0];
         const last = recent[employee.id];
@@ -1679,6 +1912,10 @@ function EmployeeGrid({
         // Fylld knapp betyder "du är här": arbetar eller på rast. Vit betyder
         // utstämplad.
         const filled = Boolean(job) || Boolean(onBreak);
+
+        // Gult kort har mörk text. Se JOB_TONE.
+        const onAmber = Boolean(job) && onlyIndirect(jobs);
+        const ink = onAmber ? "text-fjord" : "text-white";
 
         return (
           <button
@@ -1711,11 +1948,11 @@ function EmployeeGrid({
                 name={employee.name}
                 hasPhoto={employee.hasPhoto}
                 size={52}
-                onDark={filled}
+                onDark={filled && !onAmber}
               />
               <span
                 className={`min-w-0 text-xl font-semibold leading-tight sm:text-2xl ${
-                  filled ? "text-white" : "text-neutral-900"
+                  filled ? ink : "text-neutral-900"
                 }`}
               >
                 {employee.name}
@@ -1736,21 +1973,35 @@ function EmployeeGrid({
                  först, eftersom ett dolt jobb är värre än ett förkortat namn. */
               <span className="mt-3 block">
                 {jobs.length > 1 && (
-                  <span className="mb-1.5 inline-flex items-center gap-2 rounded-md bg-white/15 px-2.5 py-1 text-sm font-semibold text-white ring-1 ring-inset ring-white/25">
-                    <span className="h-2 w-2 rounded-full bg-white" />
+                  <span
+                    className={`mb-1.5 inline-flex items-center gap-2 rounded-md px-2.5 py-1 text-sm font-semibold ring-1 ring-inset ${
+                      onAmber
+                        ? "bg-fjord/10 text-fjord ring-fjord/25"
+                        : "bg-white/15 text-white ring-white/25"
+                    }`}
+                  >
+                    <span
+                      className={`h-2 w-2 rounded-full ${
+                        onAmber ? "bg-fjord" : "bg-white"
+                      }`}
+                    />
                     {jobs.length} jobb igång
                   </span>
                 )}
                 {jobs.slice(0, 2).map((entry) => (
                   <span
                     key={jobKey(entry.choice)}
-                    className="block truncate text-lg font-semibold leading-snug text-white sm:text-xl"
+                    className={`block truncate text-lg font-semibold leading-snug sm:text-xl ${ink}`}
                   >
                     {entry.label}
                   </span>
                 ))}
                 {jobs.length > 2 && (
-                  <span className="mt-1 block text-base text-white/70">
+                  <span
+                    className={`mt-1 block text-base ${
+                      onAmber ? "text-fjord/80" : "text-white/70"
+                    }`}
+                  >
                     och {jobs.length - 2} till
                   </span>
                 )}
@@ -1776,13 +2027,72 @@ function EmployeeGrid({
                 Senast: {last.label}
               </span>
             ) : (
-              <span className="mt-3 block text-sm text-neutral-400">
+              <span className="mt-3 block text-sm text-neutral-500">
                 Ej instämplad
               </span>
             )}
           </button>
         );
       })}
+      </div>
+    </>
+  );
+}
+
+/** Över så här många anställda ryms inte namnen, och bokstavsraden dyker upp. */
+const EMPLOYEE_LETTERS_FROM = 24;
+
+function firstLetter(name: string): string {
+  return name.trim().charAt(0).toUpperCase();
+}
+
+/** Bokstäverna som faktiskt börjar ett namn, i svensk ordning. */
+function firstLetters(names: string[]): string[] {
+  return [...new Set(names.map(firstLetter))].sort((a, b) =>
+    a.localeCompare(b, "sv")
+  );
+}
+
+/**
+ * Bokstavsraden över namn- och kundvalet.
+ *
+ * Bara bokstäver som faktiskt börjar ett namn visas. En rad med hela alfabetet
+ * där mer än hälften inte går att trycka på är mest i vägen.
+ */
+function LetterBar({
+  letters,
+  letter,
+  onPick,
+}: {
+  letters: string[];
+  letter: string | null;
+  onPick: (letter: string | null) => void;
+}) {
+  const on = "bg-neutral-900 text-white";
+  const off =
+    "border border-neutral-200 bg-white text-neutral-900 active:bg-neutral-50";
+
+  return (
+    <div className="mb-3 flex flex-wrap gap-2">
+      <button
+        onClick={() => onPick(null)}
+        className={`kiosk-press min-h-14 min-w-14 rounded-lg px-4 text-lg font-semibold ${
+          letter === null ? on : off
+        }`}
+      >
+        Alla
+      </button>
+      {letters.map((option) => (
+        <button
+          key={option}
+          onClick={() => onPick(option)}
+          className={`kiosk-press min-h-14 min-w-14 rounded-lg text-lg font-semibold ${
+            letter === option ? on : off
+          }`}
+        >
+          {option}
+        </button>
+      ))}
     </div>
   );
 }
@@ -1872,13 +2182,17 @@ function ActionChoice({
               {single.label}
             </span>
             <span
-              className={`mt-2 inline-flex items-center gap-2 rounded-md px-3 py-1.5 text-[15px] font-semibold text-white ${
+              className={`mt-2 inline-flex items-center gap-2 rounded-md px-3 py-1.5 text-[15px] font-semibold ${
                 single.choice.kind === "INDIRECT"
-                  ? "bg-amber-500"
-                  : "bg-emerald-600"
+                  ? "bg-amber-500 text-fjord"
+                  : "bg-emerald-600 text-white"
               }`}
             >
-              <span className="h-2 w-2 rounded-full bg-white" />
+              <span
+                className={`h-2 w-2 rounded-full ${
+                  single.choice.kind === "INDIRECT" ? "bg-fjord" : "bg-white"
+                }`}
+              />
               Pågår
             </span>
           </div>
@@ -1929,10 +2243,22 @@ function ActionChoice({
               }`}
             >
               <span className="min-w-0 flex-1">
-                <span className="block truncate text-2xl font-semibold leading-snug text-white">
+                <span
+                  className={`block truncate text-2xl font-semibold leading-snug ${
+                    job.choice.kind === "INDIRECT" ? "text-fjord" : "text-white"
+                  }`}
+                >
                   {job.label}
                 </span>
-                <span className="mt-1 block text-sm text-white/80">Pågår</span>
+                <span
+                  className={`mt-1 block text-sm ${
+                    job.choice.kind === "INDIRECT"
+                      ? "text-fjord/80"
+                      : "text-white/80"
+                  }`}
+                >
+                  Pågår
+                </span>
               </span>
               <button
                 onClick={() => onClockOut(job)}
@@ -2118,27 +2444,21 @@ function CustomerPicker({
   orderNumber,
   customers,
   onPick,
-  onBack,
 }: {
   orderNumber: string;
   customers: KioskCustomer[];
   onPick: (customer: KioskCustomer | null) => void;
-  onBack: () => void;
 }) {
   const [letter, setLetter] = useState<string | null>(null);
 
-  const letters = useMemo(() => {
-    const found = new Set(
-      customers.map((customer) => customer.name.trim().charAt(0).toUpperCase())
-    );
-    return [...found].sort((a, b) => a.localeCompare(b, "sv"));
-  }, [customers]);
+  const letters = useMemo(
+    () => firstLetters(customers.map((customer) => customer.name)),
+    [customers]
+  );
 
   const shown = useMemo(() => {
     if (!letter) return customers;
-    return customers.filter(
-      (customer) => customer.name.trim().charAt(0).toUpperCase() === letter
-    );
+    return customers.filter((customer) => firstLetter(customer.name) === letter);
   }, [customers, letter]);
 
   const useAlphabet = customers.length > ALPHABET_THRESHOLD;
@@ -2155,31 +2475,7 @@ function CustomerPicker({
       </p>
 
       {useAlphabet && (
-        <div className="mb-3 flex flex-wrap gap-2">
-          <button
-            onClick={() => setLetter(null)}
-            className={`kiosk-press min-h-14 min-w-14 rounded-lg px-4 text-lg font-semibold ${
-              letter === null
-                ? "bg-neutral-900 text-white"
-                : "border border-neutral-200 bg-white text-neutral-900 active:bg-neutral-50"
-            }`}
-          >
-            Alla
-          </button>
-          {letters.map((option) => (
-            <button
-              key={option}
-              onClick={() => setLetter(option)}
-              className={`kiosk-press min-h-14 min-w-14 rounded-lg text-lg font-semibold ${
-                letter === option
-                  ? "bg-neutral-900 text-white"
-                  : "border border-neutral-200 bg-white text-neutral-900 active:bg-neutral-50"
-              }`}
-            >
-              {option}
-            </button>
-          ))}
-        </div>
+        <LetterBar letters={letters} letter={letter} onPick={setLetter} />
       )}
 
       {shown.length > 0 ? (
@@ -2205,21 +2501,15 @@ function CustomerPicker({
         </p>
       )}
 
-      <div className="mt-3 grid gap-3 sm:grid-cols-2">
+      <div className="mt-3">
         {/* Att hoppa över är tillåtet. Ordern flaggas ändå för kontoret,
             och att stå fast vid skärmen för att man inte vet vilken kund det
             är vore att förlora timmen man försökte rädda. */}
         <button
           onClick={() => onPick(null)}
-          className="kiosk-press min-h-20 rounded-xl border border-neutral-200 bg-white p-5 text-lg font-semibold text-neutral-500 active:bg-neutral-50"
+          className="kiosk-press min-h-20 w-full rounded-xl border border-neutral-200 bg-white p-5 text-lg font-semibold text-neutral-500 active:bg-neutral-50"
         >
           Vet inte
-        </button>
-        <button
-          onClick={onBack}
-          className="kiosk-press min-h-20 rounded-xl border border-neutral-200 bg-white p-5 text-lg font-semibold text-neutral-900 active:bg-neutral-50"
-        >
-          Avbryt
         </button>
       </div>
     </div>
@@ -2289,12 +2579,26 @@ function OrderNumberPad({
     /* Den högsta vyn i kiosken, och den som gjorde att skärmen måste skrollas:
        displayen, tolv siffertangenter och tre knappar under dem summerade till
        mer än en surfplattas höjd. Nu delar knappsatsen och knapparna på den
-       plats som blir över, i stället för att var och en kräva sitt mått. */
-    <div className="mx-auto flex min-h-0 w-full max-w-xl flex-1 flex-col">
+       plats som blir över, i stället för att var och en kräva sitt mått.
+
+       På en bred skärm står knappsatsen i mitten och vägarna vidare i en
+       kolumn på var sida, från displayen ner till bekräftelseknappen: det som
+       gäller ordrar till vänster, improduktiv tid till höger. Under
+       knappsatsen fick de bara den höjd som blev över och var de minsta
+       tryckytorna på skärmen, fast Improduktiv tid trycks varje dag.
+
+       VARJE del har en uttrycklig plats i rutnätet. Utan den lägger
+       webbläsaren delarna i första lediga ruta, och displayen hamnade en
+       gång i en sidokolumn.
+
+       Sidokolumnerna krymper före knappsatsen: på 1024 px ryms inte tre
+       kolumner i full bredd. Högerkolumnen står kvar tom utan improduktiva
+       moment, så att knappsatsen fortfarande står i mitten. */
+    <div className="mx-auto flex min-h-0 w-full max-w-xl flex-1 flex-col lg:grid lg:max-w-none lg:grid-cols-[minmax(0,14rem)_minmax(0,36rem)_minmax(0,14rem)] lg:grid-rows-[auto_auto_auto_minmax(0,1fr)_auto] lg:justify-center lg:gap-x-6">
       {/* Vid byte står det man lämnar i rubriken. Knappsatsen ser likadan ut
           i båda fallen, och den som tryckt fel ska se det innan numret är
           inslaget. */}
-      <h2 className="kiosk-frame-title mb-2 shrink-0 text-xl font-semibold text-neutral-900 sm:mb-4 sm:text-2xl">
+      <h2 className="kiosk-frame-title mb-2 shrink-0 lg:col-start-2 lg:row-start-1 text-xl font-semibold text-neutral-900 sm:mb-4 sm:text-2xl">
         {switchingFrom
           ? `${employee.name}: byter från ${switchingFrom}`
           : `${employee.name}: slå in ordernummer`}
@@ -2302,7 +2606,7 @@ function OrderNumberPad({
 
       {/* Fast höjd på både ruta och besked. Utan den hoppar knappsatsen nedåt
           i samma stund som första siffran trycks in. */}
-      <div className="kiosk-frame-display flex h-16 shrink-0 items-center justify-center rounded-xl border-2 border-neutral-200 bg-white sm:h-24">
+      <div className="kiosk-frame-display flex h-16 lg:col-start-2 lg:row-start-2 shrink-0 items-center justify-center rounded-xl border-2 border-neutral-200 bg-white sm:h-24">
         <span className="text-4xl font-semibold tabular-nums tracking-[0.2em] text-neutral-900">
           {typed || <span className="text-neutral-300">—</span>}
         </span>
@@ -2311,7 +2615,7 @@ function OrderNumberPad({
       {/* Tom när inget slagits in, men raden står kvar och behåller sin höjd.
           Utan den hoppar knappsatsen uppåt i samma stund som första siffran
           trycks in och beskedet dyker upp. */}
-      <div className="kiosk-frame-hint flex h-9 shrink-0 items-center justify-center sm:h-12">
+      <div className="kiosk-frame-hint flex h-9 lg:col-start-2 lg:row-start-3 shrink-0 items-center justify-center sm:h-12">
         {match ? (
           <span className="text-lg font-semibold text-emerald-700">
             {match.customerName ?? "Kund saknas på ordern"}
@@ -2323,7 +2627,7 @@ function OrderNumberPad({
         ) : null}
       </div>
 
-      <div className="grid min-h-0 flex-1 auto-rows-fr grid-cols-3 gap-2 sm:gap-3">
+      <div className="grid min-h-0 flex-1 auto-rows-fr grid-cols-3 lg:col-start-2 lg:row-start-4 gap-2 sm:gap-3">
         {["1", "2", "3", "4", "5", "6", "7", "8", "9"].map((digit) => (
           <button
             key={digit}
@@ -2387,14 +2691,18 @@ function OrderNumberPad({
           Färgen byter till amber i det läget. Att välja en befintlig order och
           att lägga upp en ny är olika saker, och skillnaden ska synas innan
           man trycker — en order som skapas av misstag blir en rad kontoret
-          får rätta. */}
+          får rätta.
+
+          Höjden är fast och rymmer två rader. Tom har knappen en rad och med
+          ett nummer två, och utan fast höjd hoppade knappsatsen ovanför den
+          vid första siffran. */}
       <button
         onClick={() => (match ? onPick(match) : typed && onCreate(typed))}
         disabled={!match && !typed}
-        className={`kiosk-frame-cta kiosk-press mt-2 min-h-14 w-full shrink-0 rounded-xl px-4 py-3.5 text-2xl font-semibold disabled:bg-neutral-200 disabled:text-neutral-400 ${
+        className={`kiosk-frame-cta kiosk-press mt-2 lg:col-start-2 lg:row-start-5 h-[5.5rem] w-full shrink-0 rounded-xl px-4 py-3.5 text-2xl font-semibold disabled:bg-neutral-200 disabled:text-neutral-400 ${
           match
             ? "bg-blue-600 text-white active:bg-blue-700"
-            : "bg-amber-500 text-white active:bg-amber-600"
+            : "bg-amber-500 text-fjord active:bg-amber-600"
         }`}
       >
         {!match && !typed ? (
@@ -2402,7 +2710,7 @@ function OrderNumberPad({
         ) : !match ? (
           <>
             Skapa order {typed}
-            <span className="mt-1 block text-base font-normal text-white/80">
+            <span className="mt-1 block text-base font-normal text-fjord/80">
               märks för kontoret
             </span>
           </>
@@ -2428,40 +2736,48 @@ function OrderNumberPad({
           Knappsatsen är första vyn sedan 2026-10-01, och allt som tidigare
           låg i rutnätet med öppna ordrar måste därför gå att nå härifrån.
           Improduktiv tid är det som annars hamnat längst bort, och den
-          registreras varje dag. */}
-      <div className="mt-2 flex shrink-0 flex-wrap gap-2">
-        <button
-          onClick={onBrowse}
-          className="kiosk-press min-h-11 flex-1 rounded-xl border border-neutral-200 bg-white px-4 py-2.5 text-lg font-semibold text-neutral-900 active:bg-neutral-50"
-        >
-          Visa öppna ordrar
-        </button>
+          registreras varje dag.
 
-        {/* SNABBJOBB, också härifrån.
-            
-            Vägen fanns: slår man in ett nummer som inte finns blir den stora
-            knappen "Skapa order NNN". Men den som INTE har ett nummer — en
-            akut reparation som kontoret får lägga upp efteråt — såg ingen väg
-            alls, och knappsatsen är numera första vyn även vid jobbyte.
-            
-            Samma amber som i ordervyn. Att lägga upp en ny order är något
-            annat än att välja en befintlig, och skillnaden ska synas innan
-            man trycker. */}
-        <button
-          onClick={onQuickJob}
-          className="kiosk-press min-h-11 rounded-xl border border-amber-300 bg-amber-50 px-5 py-2.5 text-lg font-semibold text-amber-900 active:bg-amber-100"
-        >
-          Snabbjobb
-        </button>
-
-        {hasIndirect && (
+          Under lg är de en rad under knappsatsen, och grupperna nedan finns
+          inte (`contents`). Från lg är raden borta och grupperna är var sin
+          sidokolumn. */}
+      <div className="mt-2 flex shrink-0 flex-wrap gap-2 lg:contents">
+        <div className="contents lg:col-start-1 lg:row-start-2 lg:row-end-6 lg:flex lg:flex-col lg:gap-3">
           <button
-            onClick={onIndirect}
-            className="kiosk-press min-h-11 rounded-xl border border-neutral-200 bg-white px-5 py-2.5 text-lg font-semibold text-neutral-600 active:bg-neutral-50"
+            onClick={onBrowse}
+            className="kiosk-press min-h-11 flex-1 rounded-xl border border-neutral-200 bg-white px-4 py-2.5 text-lg font-semibold text-neutral-900 active:bg-neutral-50 lg:text-2xl"
           >
-            Improduktiv tid
+            Visa öppna ordrar
           </button>
-        )}
+
+          {/* SNABBJOBB, också härifrån.
+            
+              Vägen fanns: slår man in ett nummer som inte finns blir den stora
+              knappen "Skapa order NNN". Men den som INTE har ett nummer — en
+              akut reparation som kontoret får lägga upp efteråt — såg ingen väg
+              alls, och knappsatsen är numera första vyn även vid jobbyte.
+            
+              Samma amber som i ordervyn. Att lägga upp en ny order är något
+              annat än att välja en befintlig, och skillnaden ska synas innan
+              man trycker. */}
+          <button
+            onClick={onQuickJob}
+            className="kiosk-press min-h-11 rounded-xl border border-amber-300 bg-amber-50 px-5 py-2.5 text-lg font-semibold text-amber-900 active:bg-amber-100 lg:flex-1 lg:text-2xl"
+          >
+            Snabbjobb
+          </button>
+        </div>
+
+        <div className="contents lg:col-start-3 lg:row-start-2 lg:row-end-6 lg:flex lg:flex-col">
+          {hasIndirect && (
+            <button
+              onClick={onIndirect}
+              className="kiosk-press min-h-11 rounded-xl border border-neutral-200 bg-white px-5 py-2.5 text-lg font-semibold text-neutral-600 active:bg-neutral-50 lg:flex-1 lg:text-2xl"
+            >
+              Improduktiv tid
+            </button>
+          )}
+        </div>
       </div>
     </div>
   );

@@ -2,7 +2,7 @@
 
 import { useActionState, useEffect, useRef, useState } from "react";
 import { useFormStatus } from "react-dom";
-import type { PairingFormState } from "@/app/admin/(panel)/skarmar/actions";
+import type { PairingFormState } from "@/app/admin/(panel)/installningar/skarmar/actions";
 import { Alert, Button } from "@/components/ui";
 
 /**

@@ -51,7 +51,7 @@ export const MODULES = {
   PAYROLL: {
     key: "PAYROLL",
     name: "Löneunderlag",
-    summary: "Schema, raster, flex, komp och frånvaro.",
+    summary: "Schema, raster, flex och frånvaro.",
 
     // Fast pris per företag, inte per skärm och inte per anställd.
     //
@@ -67,7 +67,7 @@ export const MODULES = {
   PLANNING: {
     key: "PLANNING",
     name: "Planering",
-    summary: "Stationer, veckovis tidslinje och planerade jobb mot stämpling.",
+    summary: "Stationer, personal, veckovis tidslinje och planerade jobb mot stämpling.",
 
     // Dyrare än löneunderlaget, och fast per företag av samma skäl.
     //
@@ -87,10 +87,26 @@ export type ModuleKey = keyof typeof MODULES;
 
 export const MODULE_KEYS = Object.keys(MODULES) as ModuleKey[];
 
-/** true när strängen är en nyckel vi känner igen. För data utifrån. */
+/**
+ * true när strängen är en nyckel vi känner igen. För data utifrån.
+ *
+ * Egna nycklar och inte `in`: "toString" finns på varje objekt, och ett
+ * formulär som skickade det hade annars godtagits som ett tillval.
+ */
 export function isModuleKey(value: unknown): value is ModuleKey {
-  return typeof value === "string" && value in MODULES;
+  return typeof value === "string" && Object.hasOwn(MODULES, value);
 }
+
+/**
+ * Tillvalen som använder ARBETSTIDERNA (beslutat 2026-10-17). Löneunderlaget
+ * mäter flexen mot dem och planeringen gråmarkerar och varnar efter dem, och
+ * båda läser samma tider, se work-hours.ts. Sidan Arbetstider och de egna
+ * tiderna under Anställda finns med vilket av dem som helst.
+ *
+ * Står här och inte i company-modules.ts, så att menyn i webbläsaren kan läsa
+ * samma lista som grinden på servern.
+ */
+export const WORK_HOURS_MODULES: readonly ModuleKey[] = ["PAYROLL", "PLANNING"];
 
 export function moduleName(key: ModuleKey): string {
   return MODULES[key].name;

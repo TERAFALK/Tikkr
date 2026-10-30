@@ -5,14 +5,18 @@ import MarkupForm from "@/components/admin/MarkupForm";
 import SaveForm from "@/components/admin/SaveForm";
 import { ButtonLink, Card, CardHeader, Field, Input } from "@/components/ui";
 import { formatDate } from "@/lib/format";
-import { saveCompany, saveMarkup } from "./actions";
+import ProfileFields from "@/components/admin/ProfileFields";
+import { profileToValues } from "@/lib/shop/profile";
+import { saveCompany, saveCompanyProfile, saveMarkup } from "./actions";
+
+export const metadata = { title: "Inställningar · Tikkr" };
 
 export const dynamic = "force-dynamic";
 
 export default async function CompanySettingsPage() {
   const { companyId, db } = await requireAdmin();
 
-  const [company, employees, orders, devices] = await Promise.all([
+  const [company, employees, orders, devices, profile] = await Promise.all([
     unsafeGlobalPrisma.company.findUnique({
       where: { id: companyId },
       select: {
@@ -28,7 +32,10 @@ export default async function CompanySettingsPage() {
     db.employee.count({ where: { active: true } }),
     db.order.count({ where: { status: "OPEN" } }),
     db.kioskDevice.count({ where: { tokenHash: { not: null } } }),
+    db.companyProfile.findFirst(),
   ]);
+
+  const profileForm = profileToValues(profile);
 
   if (!company) return null;
 
@@ -42,6 +49,19 @@ export default async function CompanySettingsPage() {
           <Field label="Företagsnamn">
             <Input name="name" defaultValue={company.name} required />
           </Field>
+        </SaveForm>
+      </Card>
+
+      {/* Förifyller beställningar under Tillbehör. En beställning kopierar
+          uppgifterna, så en ändring här rör aldrig en beställning som redan
+          är lagd. */}
+      <Card>
+        <CardHeader title="Leverans och faktura" />
+        <SaveForm action={saveCompanyProfile} className="max-w-2xl space-y-5 p-5">
+          <ProfileFields
+            values={profileForm.values}
+            separateBilling={profileForm.separateBilling}
+          />
         </SaveForm>
       </Card>
 

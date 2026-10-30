@@ -1,11 +1,8 @@
 import { requireAdmin } from "@/lib/admin-session";
-import { hasModule } from "@/lib/company-modules";
 import { unsafeGlobalPrisma } from "@/lib/db";
 import OrdersTable from "@/components/admin/OrdersTable";
 import ReviewForm from "@/components/admin/ReviewForm";
 import { orderRows } from "@/lib/orders";
-import { customerOptions } from "@/lib/customers";
-import { toggleOrder, updateOrder } from "../ordrar/actions";
 import {
   Badge,
   Card,
@@ -21,6 +18,8 @@ import { formatDateTime, formatDuration, minutesBetween } from "@/lib/format";
 import { describeEntry } from "@/lib/entry-label";
 import { wallTimeIn } from "@/lib/time-zone";
 import { reviewEntry } from "./actions";
+
+export const metadata = { title: "Granskning · Tikkr" };
 
 export const dynamic = "force-dynamic";
 
@@ -40,26 +39,20 @@ export const dynamic = "force-dynamic";
  * Snabbjobben står först. En order utan nummer går inte att fakturera alls;
  * en beräknad sluttid är en siffra som behöver bekräftas.
  *
- * Rutan för att rätta ett snabbjobb är orderlistans egen, med flit: den kan
- * redan allt som behövs och visar sina fel inuti sig. En egen liten
- * kompletteringsruta hade blivit ett andra ställe som ändrar samma order.
+ * Ett snabbjobb rättas på orderns egen sida, med flit: den kan redan allt som
+ * behövs och visar sina fel inuti sig. En egen liten kompletteringsruta hade
+ * blivit ett andra ställe som ändrar samma order.
  */
 export default async function ReviewPage() {
   const { db, companyId } = await requireAdmin();
-  // Leveransdatumet i orderrutan hör till tillvalet Planering. Samma flagga
-  // som under Ordrar: att dölja fältet är kosmetik, serveråtgärden frågar
-  // själv. Den skickas ändå med hit, så att samma order går att ändra likadant
-  // oavsett vilken sida man står på.
-  const planning = await hasModule(companyId, "PLANNING");
-
 
   const company = await unsafeGlobalPrisma.company.findUnique({
     where: { id: companyId },
-    select: { timezone: true, autoCloseAt: true },
+    select: { timezone: true },
   });
   const timeZone = company?.timezone ?? "Europe/Stockholm";
 
-  const [entries, quickJobs, customers, moments] = await Promise.all([
+  const [entries, quickJobs] = await Promise.all([
     db.timeEntry.findMany({
       where: { needsReview: true },
       orderBy: { clockInAt: "desc" },
@@ -67,6 +60,7 @@ export default async function ReviewPage() {
         id: true,
         clockInAt: true,
         clockOutAt: true,
+        source: true,
         reviewNote: true,
         employee: { select: { name: true } },
         kind: true,
@@ -78,11 +72,6 @@ export default async function ReviewPage() {
       },
     }),
     orderRows(db, { onlyQuickJobs: true }),
-    customerOptions(db),
-    db.workMoment.findMany({
-      orderBy: [{ active: "desc" }, { name: "asc" }],
-      select: { id: true, name: true, active: true },
-    }),
   ]);
 
   return (
@@ -90,18 +79,13 @@ export default async function ReviewPage() {
       <PageHeader
         title="Granskning"
         help="granskning"
-        description={`Snabbjobb att komplettera, och poster utan utstämpling som stängts ${company?.autoCloseAt ?? "18:00"} med beräknad sluttid.`}
+        description="Snabbjobb att komplettera och stämplingar som flaggats."
       />
 
       {quickJobs.length > 0 && (
         <div className="mb-6">
           <OrdersTable
             orders={quickJobs}
-            customers={customers}
-            moments={moments}
-            updateAction={updateOrder}
-            toggleAction={toggleOrder}
-            planning={planning}
             selectable={false}
             title={`${quickJobs.length} snabbjobb att komplettera`}
           />
@@ -113,15 +97,15 @@ export default async function ReviewPage() {
       ) : (
         <Card>
           <CardHeader
-            title={`${entries.length} ${entries.length === 1 ? "post" : "poster"} att gå igenom`}
-            description="Rätta sluttiden, eller godkänn den beräknade."
+            title={`${entries.length} ${entries.length === 1 ? "stämpling" : "stämplingar"} att granska`}
+            description="Rätta sluttiden eller godkänn den."
           />
           <Table>
             <thead>
               <tr>
-                <Th>Anställd och jobb</Th>
+                <Th>Anställd och order</Th>
                 <Th>Instämplad</Th>
-                <Th numeric>Beräknad tid (tim:min)</Th>
+                <Th numeric>Tid (timmar)</Th>
                 <Th>Sluttid</Th>
               </tr>
             </thead>
@@ -140,6 +124,15 @@ export default async function ReviewPage() {
                         <Badge tone="muted">Improduktiv</Badge>
                       </span>
                     )}
+                    {/* VARFÖR POSTEN ÄR HÄR. Den flaggas av flera skäl: glömd
+                        utstämpling, helg, skärm med fel klocka, ett köat tryck.
+                        Utan orsaken skulle den som granskar bekräfta en tid
+                        utan att veta vad som var fel. */}
+                    {entry.reviewNote && (
+                      <span className="mt-1 block text-[13px] text-amber-800">
+                        {entry.reviewNote}
+                      </span>
+                    )}
                   </Td>
 
                   <Td muted>{formatDateTime(entry.clockInAt, timeZone)}</Td>
@@ -150,11 +143,18 @@ export default async function ReviewPage() {
                         minutesBetween(entry.clockInAt, entry.clockOutAt)
                       )}
                     </Badge>
-                    <span className="mt-1 block text-xs text-neutral-400">
-                      beräknad till{" "}
-                      {entry.clockOutAt &&
-                        formatDateTime(entry.clockOutAt, timeZone)}
-                    </span>
+                    {/* Bara en automatiskt stängd post har en sluttid systemet
+                        räknat fram. Övriga har en som någon stämplat. */}
+                    {entry.clockOutAt ? (
+                      <span className="mt-1 block text-xs text-neutral-500">
+                        {entry.source === "AUTO_CLOSE" ? "beräknad till" : "till"}{" "}
+                        {formatDateTime(entry.clockOutAt, timeZone)}
+                      </span>
+                    ) : (
+                      <span className="mt-1 block">
+                        <Badge tone="active">Pågår</Badge>
+                      </span>
+                    )}
                   </Td>
 
                   <Td>

@@ -78,16 +78,26 @@ interface ModuleSurface {
 
 const MODULE_SURFACES: Record<string, ModuleSurface> = {
   PAYROLL: {
-    libs: ["payroll", "schedule", "absence", "breaks", "timesheet-pdf"],
+    libs: [
+      "payroll",
+      "schedule",
+      "absence",
+      "breaks",
+      "timesheet-pdf",
+      "atf",
+      "collective-agreements",
+      "holidays",
+    ],
     models: [
       "breakType",
       "breakEntry",
       "absence",
       "absenceReason",
       "compAdjustment",
-      "workSchedule",
-      "scheduleDay",
-      "scheduleBreak",
+      // workSchedule, scheduleDay och scheduleBreak stod här till 2026-10-17.
+      // Arbetstiderna är arbetsytans sedan dess, och läses av planeringen
+      // också. De har ett eget skyddsnät längre ner i filen.
+      "holiday",
     ],
     surface: [
       "app/admin/(panel)/tidrapport/page.tsx",
@@ -96,6 +106,10 @@ const MODULE_SURFACES: Record<string, ModuleSurface> = {
       "app/admin/(panel)/installningar/schema/actions.ts",
       "app/admin/(panel)/installningar/franvaro/page.tsx",
       "app/admin/(panel)/installningar/franvaro/actions.ts",
+      "app/admin/(panel)/installningar/atf/page.tsx",
+      "app/admin/(panel)/installningar/atf/actions.ts",
+      "app/admin/(panel)/installningar/roda-dagar/page.tsx",
+      "app/admin/(panel)/installningar/roda-dagar/actions.ts",
       "app/api/admin/export/timesheet/route.ts",
       "app/api/kiosk/flex/route.ts",
       "app/api/kiosk/punch/route.ts",
@@ -135,22 +149,44 @@ const MODULE_SURFACES: Record<string, ModuleSurface> = {
   },
 
   PLANNING: {
-    libs: ["planning", "plan-calendar", "plan-live"],
-    models: ["station", "stationDay", "stationBreak", "plannedBlock"],
+    libs: [
+      "planning",
+      "plan-calendar",
+      "plan-live",
+      "planning-modes",
+      "staff-planning",
+      "plan-geometry",
+      "staff-hours",
+      "plan-today",
+    ],
+    models: [
+      "station",
+      "stationDay",
+      "stationBreak",
+      "plannedBlock",
+      "staffBlock",
+    ],
     surface: [
       "app/admin/(panel)/planering/page.tsx",
       "app/admin/(panel)/planering/actions.ts",
-      "app/admin/(panel)/planering/stationer/page.tsx",
+      "app/admin/(panel)/installningar/stationer/page.tsx",
+      "app/admin/(panel)/installningar/planering/page.tsx",
+      "app/admin/(panel)/installningar/planering/actions.ts",
       "app/api/admin/plan/live/route.ts",
     ],
 
-    // ordrar/page.tsx och ordrar/actions.ts: orderlistan, kunden, påslaget och
-    // den beräknade tiden är basen. Bara leveransdatumet hör till planeringen,
-    // och bara det ligger bakom `hasModule`. Samma avvägning som anstallda/*
-    // gör för löneunderlaget.
+    // ordrar/page.tsx, ordrar/[orderId]/page.tsx och ordrar/actions.ts:
+    // orderlistan, ordern, kunden, påslaget och den beräknade tiden är basen.
+    // Bara leveransdatumet hör till planeringen, och bara det ligger bakom
+    // `hasModule`. Samma avvägning som anstallda/* gör för löneunderlaget.
+    //
+    // (oversikt)/page.tsx: översikten är basen. Bara kortet Planerat idag hör
+    // till planeringen, och det hämtas och ritas bara när `hasModule` säger ja.
     partial: [
       "app/admin/(panel)/ordrar/page.tsx",
+      "app/admin/(panel)/ordrar/[orderId]/page.tsx",
       "app/admin/(panel)/ordrar/actions.ts",
+      "app/admin/(panel)/(oversikt)/page.tsx",
     ],
 
     // PlanBoard.tsx: ren presentation. Tavlan renderas bara av sidan, som har
@@ -163,7 +199,15 @@ const MODULE_SURFACES: Record<string, ModuleSurface> = {
     // planeringens bibliotek eller dess tabeller. Formuläret läser
     // lib/weekly-hours.ts, som är neutral och delas med lönemodulens
     // schemasidor.
-    noGuard: ["components/admin/PlanBoard.tsx"],
+    //
+    // installningar/actions.ts: GDPR-anonymiseringen raderar personens
+    // planerade pass, och måste göra det ÄVEN när planeringen är avstängd.
+    // Samma skäl som för löneunderlagets frånvaro ovan: en avstängd modul får
+    // inte vara ett sätt att göra personuppgifter oåtkomliga.
+    noGuard: [
+      "components/admin/PlanBoard.tsx",
+      "app/admin/(panel)/installningar/actions.ts",
+    ],
   },
 };
 
@@ -397,6 +441,7 @@ describe("registret och schemat säger samma sak", () => {
       "StationDay",
       "StationBreak",
       "PlannedBlock",
+      "StaffBlock",
     ];
 
     for (const model of required) {
@@ -405,5 +450,79 @@ describe("registret och schemat säger samma sak", () => {
         `${model} saknas i TENANT_SCOPED_MODELS i src/lib/tenant.ts.`
       ).toContain(model as never);
     }
+  });
+});
+
+describe("arbetstiderna är grindade", () => {
+  // ARBETSTIDERNA ÄR ARBETSYTANS (beslutat 2026-10-17), men bara till nytta
+  // med löneunderlaget eller planeringen. Varje sida och åtgärd som rör dem
+  // ska fråga om företaget har något av tillvalen, och den här kontrollen
+  // härleder vilka filer det är, ur importen av work-hours.ts och
+  // tabellnamnen, på samma sätt som kontrollerna per modul ovan.
+  const WORK_HOURS_GUARD =
+    /await (requireWorkHours|hasWorkHours|requireModule|hasModule)\(/;
+
+  const touchesWorkHours = (source: string) =>
+    /from\s+["'](@\/lib\/work-hours|\.\/work-hours)["']/.test(source) ||
+    /\b(db|tx)\.(workSchedule|scheduleDay|scheduleBreak)\b/.test(source);
+
+  const files = [
+    ...walk(path.join(SRC, "app")),
+    ...walk(path.join(SRC, "components")),
+  ]
+    .map((full) => ({ file: relative(full), source: readFileSync(full, "utf8") }))
+    .filter(({ source }) => touchesWorkHours(source));
+
+  it("hittar sidan med företagets arbetstider", () => {
+    // Försvinner den ur listan har testet slutat granska något, och ska säga
+    // det i stället för att tystna.
+    expect(files.map(({ file }) => file)).toEqual(
+      expect.arrayContaining([
+        "app/admin/(panel)/installningar/arbetstider/page.tsx",
+        "app/admin/(panel)/installningar/arbetstider/actions.ts",
+      ])
+    );
+  });
+
+  it("varje fil som rör arbetstiderna har en vakt", () => {
+    const unguarded = files
+      .filter(({ source }) => !WORK_HOURS_GUARD.test(source))
+      .map(({ file }) => file);
+
+    expect(
+      unguarded,
+      "Dessa filer rör arbetstiderna utan att fråga om företaget har " +
+        "löneunderlaget eller planeringen. Lägg till requireWorkHours(session)."
+    ).toEqual([]);
+  });
+
+  it("varje åtgärd för arbetstiderna har vakten i samma funktion", () => {
+    const unguarded: string[] = [];
+
+    for (const { file, source } of files) {
+      if (!file.endsWith("actions.ts")) continue;
+
+      for (const block of source.split(/^export async function /m).slice(1)) {
+        const name = block.slice(0, block.indexOf("(")).trim();
+
+        if (!/await requireAdmin\(\)/.test(block)) continue;
+        if (WORK_HOURS_GUARD.test(block)) continue;
+
+        unguarded.push(`${file}: ${name}`);
+      }
+    }
+
+    expect(unguarded).toEqual([]);
+  });
+
+  it("vakten och menyn läser samma lista över tillval", () => {
+    // Menyn kör i webbläsaren och grinden på servern. Står listan på två
+    // ställen hinner de börja visa och spärra olika saker.
+    const nav = read("components/admin/SettingsNav.tsx");
+    const guard = read("lib/company-modules.ts");
+
+    expect(nav).toMatch(/WORK_HOURS_MODULES/);
+    expect(guard).toMatch(/WORK_HOURS_MODULES/);
+    expect(guard).not.toMatch(/\[\s*"PAYROLL",\s*"PLANNING"\s*\]/);
   });
 });

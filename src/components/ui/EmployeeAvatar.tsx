@@ -1,3 +1,5 @@
+import ImageWithFallback from "@/components/ui/ImageWithFallback";
+
 /**
  * PORTRÄTT PÅ EN ANSTÄLLD.
  *
@@ -33,7 +35,12 @@ const TONES = [
   "bg-neutral-200 text-neutral-700",
 ];
 
-function toneFor(name: string): string {
+/**
+ * Tonen ur namnet. Exporterad eftersom säljsidans produktbilder ritar samma
+ * kort: en kopia där hade varit två ställen som ska säga samma sak, och de
+ * hinner alltid sluta göra det.
+ */
+export function toneFor(name: string): string {
   let sum = 0;
   for (let i = 0; i < name.length; i += 1) sum += name.charCodeAt(i);
   return TONES[sum % TONES.length];
@@ -68,23 +75,7 @@ export default function EmployeeAvatar({
 }) {
   const style = { width: size, height: size };
 
-  if (hasPhoto) {
-    return (
-      // Vanlig img och inte next/image: bilden ligger bakom en behörighets-
-      // kontroll och kan inte optimeras i förväg av ramverket.
-      // eslint-disable-next-line @next/next/no-img-element
-      <img
-        src={`/api/anstallda/${employeeId}/foto`}
-        alt=""
-        style={style}
-        className={`shrink-0 rounded-full object-cover ${
-          onDark ? "ring-2 ring-white/40" : "ring-1 ring-neutral-200"
-        } ${className}`}
-      />
-    );
-  }
-
-  return (
+  const initials = (
     <span
       aria-hidden="true"
       style={{ ...style, fontSize: Math.round(size * 0.36) }}
@@ -94,5 +85,20 @@ export default function EmployeeAvatar({
     >
       {initialsOf(name)}
     </span>
+  );
+
+  if (!hasPhoto) return initials;
+
+  // Initialerna är också reserven när fotot inte går att hämta, till exempel
+  // på en skärm utan nät som inte hunnit spara det.
+  return (
+    <ImageWithFallback
+      src={`/api/anstallda/${employeeId}/foto`}
+      style={style}
+      className={`shrink-0 rounded-full object-cover ${
+        onDark ? "ring-2 ring-white/40" : "ring-1 ring-neutral-200"
+      } ${className}`}
+      fallback={initials}
+    />
   );
 }

@@ -2,49 +2,81 @@ import { requireAdmin } from "@/lib/admin-session";
 import { hasModule } from "@/lib/company-modules";
 import NewOrderDialog from "@/components/admin/NewOrderDialog";
 import OrdersTable from "@/components/admin/OrdersTable";
+import SearchForm from "@/components/admin/SearchForm";
+import { FilterChip } from "@/components/admin/FilterBar";
+import Pager from "@/components/ui/Pager";
 import { Alert, EmptyState, PageHeader } from "@/components/ui";
-import { orderRows } from "@/lib/orders";
+import { orderCount, orderRows } from "@/lib/orders";
 import { customerOptions } from "@/lib/customers";
-import { closeOrders, createOrder, toggleOrder, updateOrder } from "./actions";
+import { listHref, listPaging } from "@/lib/paging";
+import { closeOrders, createOrder } from "./actions";
+
+export const metadata = { title: "Ordrar · Tikkr" };
 
 export const dynamic = "force-dynamic";
 
-export default async function OrdersPage() {
+export default async function OrdersPage({
+  searchParams,
+}: {
+  /**
+   * `ny=1` öppnar Ny order direkt, genvägen på översikten. `q` är sökningen,
+   * som i kundregistret: den ligger i adressen och går att spara.
+   */
+  searchParams: Promise<{
+    ny?: string;
+    q?: string;
+    status?: string;
+    sida?: string;
+    antal?: string;
+  }>;
+}) {
   const { db, companyId } = await requireAdmin();
+  const { ny, q, status: statusParam, sida, antal } = await searchParams;
+  const query = q?.trim() ?? "";
+  const status =
+    statusParam === "OPEN" || statusParam === "CLOSED" ? statusParam : undefined;
 
   // Leveransdatumet i orderrutan hör till tillvalet Planering. Att det döljs
   // här är kosmetik — serveråtgärden frågar om modulen själv, se actions.ts.
   // Resten av sidan är basen och visas för varje kund.
   const planning = await hasModule(companyId, "PLANNING");
 
+  // Antalet först, så att ett sidnummer bortom slutet kan visa sista sidan.
+  const total = await orderCount(db, { query, status });
+  const page = listPaging(total, { sida, antal });
+
   // Hämtas parallellt: kundväljaren behöver hela registret, och en fråga till
   // kostar mindre än att sidan väntar på två i följd.
-  const [customerList, moments, rows] = await Promise.all([
+  const [customerList, moments, rows, quickJobs] = await Promise.all([
     customerOptions(db),
     db.workMoment.findMany({
       orderBy: [{ active: "desc" }, { name: "asc" }],
       select: { id: true, name: true, active: true },
     }),
-    orderRows(db),
+    orderRows(db, { query, status, skip: page.skip, take: page.take }),
+    // Räknas för sig och inte ur listan: en sökning ska inte ändra hur många
+    // ordrar som väntar på att kompletteras.
+    db.order.count({ where: { isQuickJob: true } }),
   ]);
 
-  const newOrder = (
+  // Två ställen, men bara rubrikens öppnas av genvägen. Öppnades båda
+  // skulle två rutor ligga ovanpå varandra på en tom sida.
+  const newOrder = (openOnMount: boolean) => (
     <NewOrderDialog
       customers={customerList}
       moments={moments}
       action={createOrder}
       planning={planning}
+      openOnMount={openOnMount}
     />
   );
-
-  const quickJobs = rows.filter((order) => order.isQuickJob).length;
 
   return (
     <>
       <PageHeader
         title="Ordrar"
         help="ordrar"
-        action={newOrder}
+        action={newOrder(ny === "1")}
       />
 
       {/* Ordrar som verkstaden lagt upp själv. De har ofta ett avskrivet
@@ -62,20 +94,59 @@ export default async function OrdersPage() {
         </div>
       )}
 
-      {rows.length === 0 ? (
+      {total === 0 && !query && !status ? (
         <EmptyState
           title="Inga ordrar upplagda"
-          action={newOrder}
+          action={newOrder(false)}
         />
       ) : (
         <OrdersTable
           orders={rows}
-          customers={customerList}
-          moments={moments}
-          updateAction={updateOrder}
-          toggleAction={toggleOrder}
+          total={total}
           closeAction={closeOrders}
-          planning={planning}
+          query={query}
+          search={
+            <>
+              <div className="flex gap-1">
+                {(
+                  [
+                    [undefined, "Alla"],
+                    ["OPEN", "Öppna"],
+                    ["CLOSED", "Stängda"],
+                  ] as const
+                ).map(([value, label]) => (
+                  <FilterChip
+                    key={label}
+                    href={listHref("/admin/ordrar", {
+                      keep: { q: query, status: value },
+                      page: 1,
+                      perPage: page.take,
+                    })}
+                    active={status === value}
+                  >
+                    {label}
+                  </FilterChip>
+                ))}
+              </div>
+              <SearchForm
+                query={query}
+                label="Sök ordrar"
+                placeholder="Ordernr, kund, kundnr…"
+                clearHref="/admin/ordrar"
+                perPage={page.take}
+                keep={{ status }}
+              />
+            </>
+          }
+          pager={
+            <Pager
+              paging={page}
+              total={total}
+              unit="ordrar"
+              path="/admin/ordrar"
+              keep={{ q: query, status }}
+            />
+          }
         />
       )}
     </>

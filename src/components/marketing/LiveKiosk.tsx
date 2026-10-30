@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { KioskCard, KioskChrome, type KioskPerson } from "./Mockups";
+import { KioskCard, KioskChrome, PEOPLE, type KioskPerson } from "./Mockups";
 
 /**
  * STÄMPLINGSSKÄRMEN, MEN LEVANDE.
@@ -13,52 +13,20 @@ import { KioskCard, KioskChrome, type KioskPerson } from "./Mockups";
  * INGEN TIDRÄKNARE. Namnknappen visar vad personen är instämplad på, inte hur
  * länge. Så ser skärmen ut, och hur länge ett jobb pågått står i panelen.
  *
+ * UTGÅNGSLÄGET ÄR `PEOPLE` OCH INTE EN EGEN LISTA. Filen bar länge en kopia
+ * med samma nio namn, och de två hann börja säga olika saker: rutnätet längre
+ * ned på sidan visade rast och improduktiv tid, hero gjorde det inte. Samma
+ * verkstad ska se likadan ut varhelst den visas.
+ *
+ * RAST OCH IMPRODUKTIV TID RÖRS INTE AV RÖRELSEN. En rast avslutar alla jobb i
+ * produkten, så att ge en rastande person ett jobb vore ett läge som inte kan
+ * inträffa. Den som städar lämnas också i fred: improduktiv tid väljs i en egen
+ * vy, och en slinga som stämplar in folk på ordrar ska inte flytta dem dit.
+ *
  * Utgångsläget är hårdkodat och identiskt med det servern renderar. Startade
  * rörelsen direkt skulle det som ritas i webbläsaren skilja sig från det
  * servern skickade, och React klagar med rätta på det.
  */
-
-const START: KioskPerson[] = [
-  {
-    name: "Anna Andersson",
-    job: "2601 · Svetsning",
-    tone: "bg-blue-100 text-blue-700",
-  },
-  {
-    name: "Björn Bergqvist",
-    job: null,
-    last: "2602 · Montering",
-    tone: "bg-emerald-100 text-emerald-700",
-  },
-  {
-    name: "Carina Cederlund",
-    job: "2603 · Montering",
-    tone: "bg-amber-100 text-amber-700",
-  },
-  { name: "David Dahl", job: null, tone: "bg-blue-200 text-blue-800" },
-  {
-    name: "Erik Ek",
-    job: "2601 · Fräsning",
-    tone: "bg-emerald-200 text-emerald-800",
-  },
-  {
-    name: "Frida Falk",
-    job: null,
-    last: "2603 · Kapning",
-    tone: "bg-neutral-200 text-neutral-700",
-  },
-  {
-    name: "Gustav Gran",
-    job: "2604 · Lackering",
-    tone: "bg-blue-100 text-blue-700",
-  },
-  { name: "Hanna Holm", job: null, tone: "bg-emerald-100 text-emerald-700" },
-  {
-    name: "Ivar Isaksson",
-    job: "2605 · Kapning",
-    tone: "bg-amber-100 text-amber-700",
-  },
-];
 
 /** Jobbet var och en går till när de stämplar in. */
 const JOBS = [
@@ -79,22 +47,32 @@ const SEQUENCE = [1, 4, 3, 0, 7, 2, 8, 5, 6];
 /** Hur ofta någon byter läge. Långsamt nog att hinna läsas. */
 const STEP_MS = 3200;
 
+/** Personen står still: hen är på rast eller på improduktiv tid. */
+function fixed(person: KioskPerson): boolean {
+  return Boolean(person.onBreak) || Boolean(person.indirect);
+}
+
 export default function LiveKiosk() {
-  const [people, setPeople] = useState<KioskPerson[]>(START);
+  const [people, setPeople] = useState<KioskPerson[]>(PEOPLE);
   const [step, setStep] = useState(0);
 
   useEffect(() => {
     const timer = setInterval(() => {
       setPeople((current) => {
         const index = SEQUENCE[step % SEQUENCE.length];
+        const person = current[index];
+        if (fixed(person)) return current;
 
-        return current.map((person, position) =>
-          position === index
-            ? person.job === null
-              ? { ...person, job: JOBS[index] }
-              : { ...person, job: null, last: person.job }
-            : person
-        );
+        return current.map((each, position) => {
+          if (position !== index) return each;
+
+          // Instämplad: ut från allt, och det sista jobbet blir "Senast".
+          if (each.job !== null) {
+            return { ...each, job: null, alsoJob: undefined, last: each.job };
+          }
+
+          return { ...each, job: JOBS[index] };
+        });
       });
 
       setStep((value) => value + 1);

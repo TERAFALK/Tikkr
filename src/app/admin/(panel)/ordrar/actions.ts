@@ -11,18 +11,21 @@ import { readBudgetRows, saveOrderBudgets } from "@/lib/order-budget";
 const PATH = "/admin/ordrar";
 
 /**
- * Ordrarna ritas på två ställen: under Ordrar och på kundens sida. Båda måste
- * ritas om, annars visar kundsidan ett ordernummer som just ändrats.
+ * Ordrarna ritas på tre ställen: under Ordrar, på orderns egen sida och på
+ * kundens sida. Alla måste ritas om, annars visar kundsidan ett ordernummer
+ * som just ändrats.
  *
- * Kundsidan tas om hand som "layout", vilket täcker varje kund utan att vi
- * behöver veta vilken order som flyttats — och en ändrad kund berör ju två.
+ * Båda tas om hand som "layout", vilket täcker varje order och kund utan att
+ * vi behöver veta vilken order som flyttats — och en ändrad kund berör ju två.
  */
 function revalidateOrders() {
-  revalidatePath(PATH);
+  revalidatePath(PATH, "layout");
   revalidatePath("/admin/kunder", "layout");
 }
 
 export interface OrderFormState {
+  /** Fältet felet gäller. Se useFieldError. */
+  field?: string;
   error?: string;
   /** Sattes senast sparandet gick igenom. Stänger rutan i gränssnittet. */
   savedAt?: number;
@@ -86,9 +89,11 @@ async function readPlannedDueDate(
  */
 function readOrderFields(
   formData: FormData
-): { error: string } | { values: OrderFields } {
+): { error: string; field?: string } | { values: OrderFields } {
   const orderNumber = String(formData.get("orderNumber") ?? "").trim();
-  if (!orderNumber) return { error: "Ange ett ordernummer." };
+  if (!orderNumber) {
+    return { error: "Ange ett ordernummer.", field: "orderNumber" };
+  }
 
   // Tomt fält betyder "företagets standardpåslag gäller", vilket är det
   // normala. Bara ett ifyllt men obegripligt värde är ett fel.

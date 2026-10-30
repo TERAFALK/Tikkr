@@ -5,7 +5,7 @@ import { useFormStatus } from "react-dom";
 import {
   addNotice,
   type NoticeFormState,
-} from "@/app/plattform/meddelanden/actions";
+} from "@/app/plattform/(panel)/meddelanden/actions";
 import {
   Alert,
   Button,

@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { requireAdmin } from "@/lib/admin-session";
+import { requireAdminEvenIfLocked } from "@/lib/admin-session";
 import { companyTimeZone } from "@/lib/company";
 import { buildPersonExport } from "@/lib/person-export";
 
@@ -17,7 +17,7 @@ import { buildPersonExport } from "@/lib/person-export";
 export const runtime = "nodejs";
 
 export async function GET(request: NextRequest) {
-  const { db, companyId } = await requireAdmin();
+  const { db, companyId } = await requireAdminEvenIfLocked();
 
   const employeeId = request.nextUrl.searchParams.get("employeeId") ?? "";
   if (!employeeId) {

@@ -28,6 +28,7 @@ const PATH = "/admin/installningar/franvaro";
  */
 export interface ReasonState {
   error?: string;
+  field?: string;
   ok?: string;
 }
 
@@ -41,7 +42,7 @@ export async function addAbsenceReason(
   const { db, companyId } = session;
 
   const name = String(formData.get("name") ?? "").trim();
-  if (!name) return { error: "Ange ett namn." };
+  if (!name) return { error: "Ange ett namn.", field: "name" };
 
   // Sist i listan. Ordningen ändras med pilarna, och en ny orsak ska inte
   // hamna överst bara för att den är ny.
@@ -54,12 +55,13 @@ export async function addAbsenceReason(
         name,
         sortOrder: count,
         countsAsComp: formData.get("countsAsComp") === "on",
+        givesAtf: givesAtfFrom(formData) ?? false,
       },
     });
   } catch (error) {
     // P2002: namnet är unikt per företag.
     if ((error as { code?: string } | null)?.code === "P2002") {
-      return { error: "Det finns redan en orsak med det namnet." };
+      return { error: "Det finns redan en orsak med det namnet.", field: "name" };
     }
     throw error;
   }
@@ -70,14 +72,26 @@ export async function addAbsenceReason(
 }
 
 /**
+ * Krysset "Ger ATF" ur formuläret, eller null när rutan inte visades.
+ *
+ * En flexledig orsak får aldrig krysset: den ledigheten syns redan i flexen,
+ * och ATF räknas på flexen. Det vaktas i atf.ts, som bortser från krysset på
+ * en sådan orsak, inte här.
+ */
+function givesAtfFrom(formData: FormData): boolean | null {
+  if (formData.get("givesAtfShown") !== "1") return null;
+  return formData.get("givesAtf") === "on";
+}
+
+/**
  * Byter namn på en orsak.
  *
- * Namnet, och ingenting annat. Kryssrutan som drar på komptidssaldot sätts när
+ * Namnet, och krysset för ATF. Kryssrutan som drar på flexsaldot sätts när
  * orsaken läggs upp och ändras inte i efterhand: den styr en RÄKNING, och
- * frånvaro som redan registrerats har skrivit sina komprader utifrån det läge
- * som gällde då. Att vända den i efterhand hade gjort gamla poster
- * oförklarliga utan att röra en siffra på skärmen. Är den fel läggs orsaken
- * upp på nytt och den gamla avaktiveras.
+ * saldot härleds på nytt vid varje läsning. Att vända den hade flyttat
+ * flexsaldot för varje person som någonsin varit ledig på orsaken, utan att en
+ * enda post ändrats. Är den fel läggs orsaken upp på nytt och den gamla
+ * avaktiveras.
  *
  * Omdöpningen når varje post som redan ligger på orsaken, eftersom frånvaron
  * pekar på raden och inte bär en kopia av namnet. Det är meningen: ett stavfel
@@ -96,22 +110,26 @@ export async function renameAbsenceReason(
   const name = String(formData.get("name") ?? "").trim();
 
   if (!id) return { error: "Ingen orsak vald." };
-  if (!name) return { error: "Ange ett namn." };
+  if (!name) return { error: "Ange ett namn.", field: "name" };
 
   try {
+    // Krysset för ATF rörs bara när rutan visades. Utan valt avtal finns den
+    // inte i formuläret, och ett namnbyte ska inte nollställa den.
+    const givesAtf = givesAtfFrom(formData);
+
     // updateMany och inte update: `where` får då företagsfiltret med sig, och
     // ett id från ett annat företag träffar ingenting. Samma skäl som i
     // toggleAbsenceReason nedan.
     const { count } = await db.absenceReason.updateMany({
       where: { id },
-      data: { name },
+      data: givesAtf === null ? { name } : { name, givesAtf },
     });
 
     if (count === 0) return { error: "Orsaken finns inte längre." };
   } catch (error) {
     // P2002: namnet är unikt per företag.
     if ((error as { code?: string } | null)?.code === "P2002") {
-      return { error: "Det finns redan en orsak med det namnet." };
+      return { error: "Det finns redan en orsak med det namnet.", field: "name" };
     }
     throw error;
   }

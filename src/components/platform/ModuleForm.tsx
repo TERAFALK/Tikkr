@@ -3,7 +3,7 @@
 import {
   changeModule,
   type ModuleFormState,
-} from "@/app/plattform/kunder/[companyId]/actions";
+} from "@/app/plattform/(panel)/kunder/[companyId]/actions";
 import ActionDialog from "@/components/ui/ActionDialog";
 import { MODULES, type ModuleKey } from "@/lib/modules";
 import { Badge, Field, Input } from "@/components/ui";
@@ -44,7 +44,7 @@ export default function ModuleForm({
               {MODULES[row.key].name}
             </span>
             {row.enabled && row.enabledBy && (
-              <span className="mt-0.5 block text-xs text-neutral-400">
+              <span className="mt-0.5 block text-xs text-neutral-500">
                 Påslaget av {row.enabledBy}
               </span>
             )}

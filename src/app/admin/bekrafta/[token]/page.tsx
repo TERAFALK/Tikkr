@@ -29,7 +29,7 @@ export default async function ConfirmEmailPage({
         footer={
           <Link
             href="/admin"
-            className="font-medium text-tick-deep hover:underline"
+            className="font-medium text-link hover:underline"
           >
             Till panelen
           </Link>
@@ -47,7 +47,7 @@ export default async function ConfirmEmailPage({
       title="E-postadressen är bekräftad"
       subtitle={email}
       footer={
-        <Link href="/admin" className="font-medium text-tick-deep hover:underline">
+        <Link href="/admin" className="font-medium text-link hover:underline">
           Till panelen
         </Link>
       }

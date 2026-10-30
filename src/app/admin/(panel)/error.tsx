@@ -69,7 +69,7 @@ export default function AdminError({
         </div>
 
         {error.digest && (
-          <p className="mt-5 border-t border-neutral-100 pt-4 text-xs text-neutral-400">
+          <p className="mt-5 border-t border-neutral-100 pt-4 text-xs text-neutral-500">
             Referens för felsökning: {error.digest}
           </p>
         )}

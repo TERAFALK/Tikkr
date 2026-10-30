@@ -11,8 +11,10 @@ import {
   sendEmailVerification,
 } from "@/lib/email-verification";
 import { normalizePhone } from "@/lib/phone";
+import { verifyAdminCode } from "@/lib/admin-mfa";
+import { nameProblem, storedName } from "@/lib/person-name";
 import { saved, type SaveState } from "@/lib/save-state";
-import { assertWritable, requireAdmin } from "@/lib/admin-session";
+import { assertWritable, requireAdminEvenIfLocked } from "@/lib/admin-session";
 
 /**
  * DET EGNA KONTOT: namn, telefon, e-postadress och lösenord.
@@ -31,6 +33,10 @@ const PATH = "/admin/konto";
 /**
  * Ändrar namn och telefonnummer på det EGNA kontot.
  *
+ * Förnamn och efternamn i varsina fält sedan 2026-10-11, se person-name.ts.
+ * Den som redan hade ett namn fick det delat av migrationen, vid sista
+ * mellanslaget, och rättar det här om delningen blev fel.
+ *
  * Bara det egna: uppgifterna är personens, och ingen annan administratör ska
  * kunna skriva in ett nummer åt någon. Id:t tas därför ur sessionen och aldrig
  * ur formuläret.
@@ -42,23 +48,29 @@ export async function saveOwnProfile(
   _previous: SaveState,
   formData: FormData
 ): Promise<SaveState> {
-  const session = await requireAdmin();
+  const session = await requireAdminEvenIfLocked();
   await assertWritable(session);
 
-  const name = String(formData.get("name") ?? "").trim();
+  const name = storedName({
+    firstName: String(formData.get("firstName") ?? ""),
+    lastName: String(formData.get("lastName") ?? ""),
+  });
   const rawPhone = String(formData.get("phone") ?? "").trim();
   const phone = rawPhone ? normalizePhone(rawPhone) : null;
 
   if (rawPhone && !phone) return { error: "Kontrollera telefonnumret." };
 
+  // Ägaren är den vi ringer, och ett halvt namn räcker inte. Den som bjudits
+  // in som administratör får lämna fälten tomma, precis som förut.
   if (session.role === "OWNER") {
-    if (name.length < 2) return { error: "Ange ditt namn." };
+    const problem = nameProblem(name);
+    if (problem) return { error: problem };
     if (!phone) return { error: "Ange ett telefonnummer." };
   }
 
   await session.db.adminUser.updateMany({
     where: { id: session.userId },
-    data: { name: name || null, phone },
+    data: { ...name, phone },
   });
 
   revalidatePath(PATH);
@@ -76,7 +88,7 @@ export async function changePassword(
   _previous: SaveState,
   formData: FormData
 ): Promise<SaveState> {
-  const session = await requireAdmin();
+  const session = await requireAdminEvenIfLocked();
   await assertWritable(session);
 
   const current = String(formData.get("current") ?? "");
@@ -105,7 +117,7 @@ export async function changePassword(
  * misstänker att någon annan är inne.
  */
 export async function logoutEverywhere() {
-  const session = await requireAdmin();
+  const session = await requireAdminEvenIfLocked();
   await assertWritable(session);
 
   await revokeOwnSessions(session.userId);
@@ -114,7 +126,7 @@ export async function logoutEverywhere() {
 
 /** Skickar bekräftelselänken på nytt, från remsan i panelen. */
 export async function resendVerification() {
-  const session = await requireAdmin();
+  const session = await requireAdminEvenIfLocked();
   await assertWritable(session);
 
   const outcome = await sendEmailVerification(session.userId);
@@ -134,7 +146,7 @@ export async function changeEmail(
   _previous: SaveState,
   formData: FormData
 ): Promise<SaveState> {
-  const session = await requireAdmin();
+  const session = await requireAdminEvenIfLocked();
   await assertWritable(session);
 
   try {
@@ -152,4 +164,39 @@ export async function changeEmail(
 
   revalidatePath("/admin", "layout");
   return saved("Adressen är ändrad. En ny länk är skickad");
+}
+
+/**
+ * KOPPLAR AUTENTISERINGSAPPEN INIFRÅN PANELEN (2026-10-11).
+ *
+ * Den som registrerat en arbetsyta släpps in utan app och sätter upp den
+ * härifrån, eller tvingas vid nästa inloggning. Se § 4 punkt 5 i CLAUDE.md.
+ *
+ * Nyckeln är redan skapad när rutan visades, se konto/page.tsx. Den första
+ * godkända koden är det som räknas som uppsatt: `verifyAdminCode` sätter
+ * `totpEnabledAt` när den saknas, och det är samma rad som inloggningens
+ * uppsättning går genom. Två vägar in i samma tillstånd, en enda som skriver
+ * det.
+ *
+ * Id:t tas ur sessionen och aldrig ur formuläret, som allt annat på sidan.
+ */
+export async function enableTwoStep(
+  _previous: SaveState,
+  formData: FormData
+): Promise<SaveState> {
+  const session = await requireAdminEvenIfLocked();
+  await assertWritable(session);
+
+  const code = String(formData.get("code") ?? "").replace(/\s/g, "");
+
+  if (!(await verifyAdminCode(session.userId, code))) {
+    return {
+      error:
+        "Koden stämmer inte. Kontrollera att telefonens klocka går rätt och försök igen.",
+    };
+  }
+
+  // Remsan högst upp ligger i layouten och försvinner först när den ritas om.
+  revalidatePath("/admin", "layout");
+  return saved("Appen är kopplad");
 }

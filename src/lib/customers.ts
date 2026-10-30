@@ -132,7 +132,9 @@ export async function searchCustomers(
           ],
         }
       : undefined,
-    orderBy: [{ active: "desc" }, { name: "asc" }],
+    // Id:t sist: Postgres lovar ingenting om rader som är lika, och två kunder
+    // med samma namn kunde då byta plats mellan två sidor i listan.
+    orderBy: [{ active: "desc" }, { name: "asc" }, { id: "asc" }],
     select: {
       id: true,
       name: true,

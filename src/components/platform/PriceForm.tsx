@@ -1,6 +1,6 @@
 "use client";
 
-import { savePrices } from "@/app/plattform/artiklar/actions";
+import { savePrices } from "@/app/plattform/(panel)/artiklar/actions";
 import SaveForm from "@/components/admin/SaveForm";
 import { Field, Input } from "@/components/ui";
 
@@ -63,7 +63,7 @@ export default function PriceForm({
       </div>
 
       {updatedByEmail && (
-        <p className="text-xs text-neutral-400">
+        <p className="text-xs text-neutral-500">
           Senast ändrat av {updatedByEmail}
         </p>
       )}

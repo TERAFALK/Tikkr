@@ -15,7 +15,7 @@ import type { HelpAreaKey } from "./areas";
  *
  * SAMMA REGLER SOM I PANELEN. Knapparnas namn skrivs exakt som de står på
  * skärmen, så att den som letar efter "Ny skärm" hittar just "Ny skärm".
- * Tid skrivs som tim:min, och tankstreck i löptext fälls av
+ * Tid skrivs som decimaltimmar, och tankstreck i löptext fälls av
  * tests/ui-text.test.ts. Se TONE-OF-VOICE.md.
  *
  * `slug` är adressen, /support/<slug>, och det namn panelens hjälplänkar pekar
@@ -99,7 +99,7 @@ export const GUIDES = [
     keywords: ["kiosk", "surfplatta", "pekskärm", "kod", "enhet", "terminal", "koppla om"],
     steps: [
       {
-        title: "Öppna Stämplingsskärmar och tryck Ny skärm",
+        title: "Öppna Inställningar, Stämplingsskärmar och tryck Ny skärm",
         body: "Ge skärmen ett namn efter var den sitter, t.ex. Monteringen, och tryck Skapa kod.",
       },
       {
@@ -209,7 +209,7 @@ export const GUIDES = [
       },
       {
         title: "Kontoret kompletterar ordern",
-        body: "Snabbjobbet står överst under Granskning. Tryck Ändra för att sätta rätt ordernummer och kund.",
+        body: "Snabbjobbet står överst under Granskning. Tryck på ordernumret och sedan Ändra för att sätta rätt ordernummer och kund.",
       },
     ],
     notes: [
@@ -228,7 +228,7 @@ export const GUIDES = [
     steps: [
       {
         title: "Lägg upp de improduktiva momenten",
-        body: "Under Improduktiv tid i panelen, tryck Nytt improduktivt moment.",
+        body: "Under Inställningar, Improduktiv tid, tryck Nytt improduktivt moment.",
       },
       {
         title: "Tryck Improduktiv tid på stämplingsskärmen",
@@ -267,7 +267,7 @@ export const GUIDES = [
       },
     ],
     notes: [
-      "Rasttyperna läggs upp under Inställningar, Arbetstider, med Ny rast.",
+      "Rasttyperna läggs upp under Inställningar, Rasttyper, med Ny rast.",
       "Rasten räknas inte som arbetad tid och kan inte faktureras.",
     ],
     related: ["arbetstider", "tidrapport"],
@@ -306,7 +306,7 @@ export const GUIDES = [
     title: "Lägg upp en order",
     summary:
       "Ordernummer, kund och beräknad tid per arbetsmoment. Påslag och fast pris om underlaget ska visa belopp.",
-    keywords: ["order", "beräknad tid", "budget", "fast pris", "påslag", "leveransdatum", "stäng order"],
+    keywords: ["order", "beräknad tid", "budget", "fast pris", "påslag", "leveransdatum", "stäng order", "öppna order", "sök order"],
     steps: [
       {
         title: "Öppna Ordrar och tryck Ny order",
@@ -317,7 +317,7 @@ export const GUIDES = [
       },
       {
         title: "Lägg till beräknad tid per arbetsmoment",
-        body: "En rad per moment. Tim:min, t.ex. 7:30. Orderns totala beräkning är summan av raderna.",
+        body: "En rad per moment. Timmar, t.ex. 7,5. Orderns totala beräkning är summan av raderna.",
       },
       {
         title: "Fyll i påslag eller fast kundpris vid behov",
@@ -325,6 +325,7 @@ export const GUIDES = [
       },
     ],
     notes: [
+      "Tryck på ordernumret för att öppna ordern. Där ändras och stängs den, och där tas efterkalkyl och underlag ut.",
       "En order med registrerad tid går inte att radera. Den stängs, och försvinner då från stämplingsskärmen.",
       "Stämplingen stoppas aldrig för att den beräknade tiden överskrids.",
     ],
@@ -368,7 +369,7 @@ export const GUIDES = [
     keywords: ["moment", "maskin", "operation", "timpris", "maskinkostnad", "självkostnad"],
     steps: [
       {
-        title: "Öppna Arbetsmoment och tryck Nytt arbetsmoment",
+        title: "Öppna Inställningar, Arbetsmoment och tryck Nytt arbetsmoment",
       },
       {
         title: "Skriv namn och timkostnad",
@@ -428,11 +429,11 @@ export const GUIDES = [
       },
       {
         title: "Komplettera snabbjobben",
-        body: "Tryck Ändra och sätt rätt ordernummer och kund.",
+        body: "Tryck på ordernumret och Ändra, och sätt rätt ordernummer och kund.",
       },
       {
         title: "Rätta sluttiden eller godkänn den beräknade",
-        body: "Skriv rätt sluttid och tryck Godkänn.",
+        body: "Skriv rätt sluttid och tryck Spara rättad tid.",
       },
     ],
     notes: [
@@ -444,10 +445,10 @@ export const GUIDES = [
   {
     slug: "andra-stampling",
     area: "DOCUMENTS",
-    title: "Ändra eller lägg till en stämpling",
+    title: "Ändra, lägg till eller ta bort en stämpling",
     summary:
-      "En felaktig stämpling rättas genom att skrivas om. Stämplingar raderas aldrig.",
-    keywords: ["ändra", "rätta", "fel tid", "lägga till tid", "manuell", "efterregistrera", "radera"],
+      "En felaktig stämpling skrivs om eller tas bort. Borttagna poster står kvar i ändringsloggen.",
+    keywords: ["ändra", "rätta", "fel tid", "lägga till tid", "manuell", "efterregistrera", "radera", "ta bort", "improduktiv"],
     steps: [
       {
         title: "Öppna Stämplingar",
@@ -459,11 +460,16 @@ export const GUIDES = [
       },
       {
         title: "Tryck Ny stämpling för tid som aldrig stämplades",
-        body: "Välj anställd, order, arbetsmoment och tider.",
+        body: "Välj Ordertid eller Improduktiv tid, sedan anställd, jobb och tider.",
+      },
+      {
+        title: "Tryck Ta bort på en stämpling som inte skulle ha funnits",
+        body: "Kan inte ångras. Posten står kvar i ändringsloggen med vem som tog bort den.",
       },
     ],
     notes: [
       "Två stämplingar på samma anställd och arbetsmoment får inte överlappa.",
+      "En pågående stämpling går varken att ändra eller ta bort förrän den avslutats.",
       "Ska en persons tid bort helt används raderingen under Inställningar, Dataskydd.",
     ],
     related: ["granskning", "gdpr"],
@@ -485,7 +491,7 @@ export const GUIDES = [
       },
       {
         title: "Kryssa i Visa belopp och rabatt vid behov",
-        body: "Utan kryss visas bara tid. Valet finns i menyn på en enskild order.",
+        body: "Utan kryss visas bara tid. Valet finns på sidan för en enskild order.",
       },
     ],
     notes: [
@@ -535,8 +541,8 @@ export const GUIDES = [
         body: "Sorts tid väljer ordertid, improduktiv tid eller båda. Tryck Visa.",
       },
       {
-        title: "Tryck Excel för att räkna vidare",
-        body: "Arket har tid både som tim:min och som decimaltimmar.",
+        title: "Tryck Ladda ner Excel för att räkna vidare",
+        body: "Arket har tiden som ett tal, så att den går att summera.",
       },
     ],
     notes: [
@@ -565,12 +571,16 @@ export const GUIDES = [
         body: "Planerad tid räknas netto efter schemats raster.",
       },
       {
-        title: "Lägg upp rasttyperna med Ny rast",
-        body: "De visas som val när någon trycker Rast på stämplingsskärmen.",
+        title: "Lägg upp rasttyperna under Inställningar, Rasttyper",
+        body: "Tryck Ny rast. De visas som val när någon trycker Rast på stämplingsskärmen.",
       },
       {
         title: "Ge en anställd egna tider vid behov",
         body: "Under Anställda, Ändra, kryssa i Egna arbetstider. Utan kryss gäller företagets.",
+      },
+      {
+        title: "Lägg in årets röda dagar",
+        body: "Under Inställningar, Röda dagar. En röd dag har ingen planerad tid för någon.",
       },
     ],
     notes: [
@@ -581,30 +591,42 @@ export const GUIDES = [
   {
     slug: "tidrapport",
     area: "PAYROLL",
-    title: "Tidrapport, flex och komp",
+    title: "Tidrapport och flex",
     summary:
-      "Planerad tid, närvarotid, flex, komp och frånvaro per anställd och period.",
+      "Planerad tid, närvarotid, flex och frånvaro per anställd och period.",
     module: "PAYROLL",
-    keywords: ["lön", "löneunderlag", "flex", "flexsaldo", "komp", "komptid", "närvaro", "saldo", "justera"],
+    keywords: ["lön", "löneunderlag", "lönespec", "flex", "flextid", "flexsaldo", "närvaro", "saldo", "justera", "startdatum", "atf", "arbetstidsförkortning"],
     steps: [
       {
         title: "Öppna Tidrapport och välj anställd och period",
       },
       {
         title: "Kontrollera summeringen",
-        body: "Flex är arbetad tid plus frånvaro, minus planerad tid och intjänad komp.",
+        body: "Flex är arbetad tid plus frånvaro, minus planerad tid. Flexledighet drar på saldot.",
       },
       {
         title: "Justera flexsaldot vid behov",
         body: "Tryck Justera flexsaldo och skriv vad saldot ska vara idag.",
       },
       {
-        title: "Skriv ut Förra veckan per anställd",
+        title: "Skriv ut Tidrapport föregående vecka",
         body: "En person per sida, för att dela ut.",
+      },
+      {
+        title: "Skriv ut Löneunderlag föregående månad till lönen",
+        body: "Samma sida per person, med bara frånvaron dag för dag.",
+      },
+      {
+        title: "Skriv ut en äldre månad med Löneunderlag vald period",
+        body: "Välj Från och Till. Hela personalen kommer med, även om en anställd är vald.",
       },
     ],
     notes: [
-      "Tid utöver schemat är flex tills någon beslutat att den är övertid och komp.",
+      "Tid utöver schemat är flex.",
+      "Flexen räknas från startdatumet, som sätts under Anställda. Utan startdatum räknas den från första stämplingen.",
+      "Intjänad ATF Period står på Löneunderlaget för en hel kalendermånad när ett kollektivavtal är valt under Inställningar, Arbetstidsförkortning. Flexen från föregående månad höjer eller sänker den. Tikkr håller inget ATF-saldo.",
+      "Registrera ATF-uttag som frånvaro på en egen orsak. Summan per orsak står på Löneunderlaget.",
+      "En äldre månad räknas om med dagens arbetstider och saldojusteringar. Talen kan därför skilja sig från utskriften när månaden var ny.",
       "Tikkr räknar timmar. Lönearter, OB och övertidsersättning hanteras i lönesystemet.",
       "Tidrapporten är ett internt dokument och ska inte skickas till en kund.",
       "Den anställde ser sitt saldo på stämplingsskärmen med en kod som sätts under Anställda.",
@@ -618,7 +640,7 @@ export const GUIDES = [
     summary:
       "Sjukdom, semester och annan frånvaro registreras i panelen och täcker den planerade tiden.",
     module: "PAYROLL",
-    keywords: ["sjuk", "semester", "vab", "ledig", "frånvaroorsak", "tjänstledig", "komp uttag"],
+    keywords: ["sjuk", "semester", "vab", "ledig", "frånvaroorsak", "tjänstledig", "flexledig"],
     steps: [
       {
         title: "Öppna Tidrapport och välj den anställde",
@@ -629,7 +651,7 @@ export const GUIDES = [
       },
     ],
     notes: [
-      "Orsakerna läggs upp under Inställningar, Frånvaroorsaker. En orsak som drar på komptid minskar komptidssaldot.",
+      "Orsakerna läggs upp under Inställningar, Frånvaroorsaker. En orsak som drar på flexsaldot, som Flexledig, minskar saldot.",
       "Frånvaro registreras aldrig på stämplingsskärmen.",
     ],
     related: ["tidrapport"],
@@ -645,11 +667,11 @@ export const GUIDES = [
     summary:
       "Orderns arbetsmoment placeras ut på en veckovis tidslinje, en rad per station.",
     module: "PLANNING",
-    keywords: ["planera", "tidslinje", "station", "maskin", "oplacerat", "whiteboard", "leveransdatum"],
+    keywords: ["planera", "tidslinje", "station", "maskin", "oplacerat", "whiteboard", "leveransdatum", "planeringsläge", "personal", "tjänst"],
     steps: [
       {
         title: "Lägg upp stationerna",
-        body: "Under Stationer, tryck Ny station. En station gör ett arbetsmoment.",
+        body: "Under Inställningar, Stationer, tryck Ny station. En station gör ett arbetsmoment.",
       },
       {
         title: "Ge ordern beräknad tid per arbetsmoment",
@@ -665,8 +687,15 @@ export const GUIDES = [
       },
     ],
     notes: [
+      "Under Inställningar, Planeringsläge, väljs Produktion eller Tjänst. Tjänst planerar personal, utan stationer.",
+      "Produktion: öppna en ruta och tryck Bemanna för att planera en anställd på jobbet. Passet räknas inte mot beräknad tid.",
+      "Tjänst: tryck på ett jobb i Oplacerat och sedan på en anställd.",
+      "En anställd med två pass samtidigt markeras i gult.",
+      "Personalens tider är desamma som löneunderlagets: företagets under Inställningar, Arbetstider, och egna under Anställda. Pass hoppar över rasterna, och Bemanna markerar pass utanför arbetstid.",
+      "Vecka och Dag växlar mellan hela veckan och en dag i taget. Tryck på en dag i rubriken för att öppna den.",
+      "Helgen är dold. Visa helg tar fram lördag och söndag, och en siffra på knappen visar hur mycket som är planerat där.",
       "Överbokning tillåts och markeras i gult.",
-      "En ruta som någon står instämplad på visas som pågående.",
+      "En ruta som någon står instämplad på visas som pågående. Under varje anställd står veckans planerade och stämplade tid.",
       "Planerad tid är en avsikt. Den faktureras aldrig och räknas inte som arbetad tid.",
     ],
     related: ["ordrar", "arbetsmoment"],
@@ -716,7 +745,7 @@ export const GUIDES = [
       },
       {
         title: "Fyll i e-postadress och behörighet",
-        body: "Ägare kan dessutom hantera prenumerationen och andra administratörer.",
+        body: "Ägare kan dessutom hantera prenumerationen, anonymisera anställda och hantera andra administratörer.",
       },
       {
         title: "Tryck Skapa inbjudan",
@@ -748,6 +777,7 @@ export const GUIDES = [
       },
     ],
     notes: [
+      "Licenser, tillval och betalning ändras av en ägare.",
       "Kort, kvitton och uppsägning hanteras på betaltjänstens sida, som nås från samma sida.",
       "Stämplingsskärmarna slutar aldrig fungera vid utebliven betalning. Panelen låses efter tio dagar.",
       "Ingen bindningstid.",
@@ -771,7 +801,7 @@ export const GUIDES = [
       },
       {
         title: "Radera personuppgifter",
-        body: "Välj den anställde och skriv ANONYMISERA. Kan inte ångras.",
+        body: "Välj den anställde och skriv ANONYMISERA. Görs av en ägare. Kan inte ångras.",
       },
     ],
     notes: [

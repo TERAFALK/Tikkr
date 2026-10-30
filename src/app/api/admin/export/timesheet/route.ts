@@ -1,10 +1,15 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { requireAdmin } from "@/lib/admin-session";
+import { requireAdminEvenIfLocked } from "@/lib/admin-session";
 import { hasModule } from "@/lib/company-modules";
 import { evaluateAccess } from "@/lib/subscription";
 import { unsafeGlobalPrisma } from "@/lib/db";
-import { buildPayrollPeriod, type PayrollPeriod } from "@/lib/payroll";
+import {
+  buildPayrollPeriod,
+  employeesForTimesheet,
+  type PayrollPeriod,
+} from "@/lib/payroll";
 import { buildTimesheetPdf } from "@/lib/timesheet-pdf";
+import { buildAtf, type AtfBasis } from "@/lib/atf";
 import { slugify } from "@/lib/order-export";
 import {
   addDaysInZone,
@@ -21,14 +26,19 @@ import {
  * kundens kund, tidrapporten till lönekontoret — och en tidrapport som råkar
  * bifogas en faktura lämnar ut vad en namngiven person gjort varje timme.
  *
- * Utan angiven anställd tas hela personalen med, en person per sida. Det är så
- * en lönekörning går till: alla på en gång, i en fil.
+ * Utan angiven anställd tas hela personalen med, en person per sida, och den
+ * som slutat men har tid i perioden. Det är så en lönekörning går till: alla på
+ * en gång, i en fil. Se employeesForTimesheet.
+ *
+ * `rader=franvaro` ger Löneunderlaget: samma dokument med bara frånvaron i
+ * raderna, utan stämplingar och raster. Summeringen är densamma. Se `rows` i
+ * timesheet-pdf.ts.
  */
 
 export const runtime = "nodejs";
 
 export async function GET(request: NextRequest) {
-  const { db, companyId, companyName } = await requireAdmin();
+  const { db, companyId, companyName } = await requireAdminEvenIfLocked();
   const params = request.nextUrl.searchParams;
 
   // MODULGRINDEN LIGGER HÄR OCH INTE I EN LAYOUT. Rutterna under /api nås
@@ -43,6 +53,7 @@ export async function GET(request: NextRequest) {
     where: { id: companyId },
     select: {
       timezone: true,
+      atfAgreement: true,
       logoWideData: true,
       logoWideMimeType: true,
       subscriptionStatus: true,
@@ -86,13 +97,7 @@ export async function GET(request: NextRequest) {
   const employeeIds =
     requested.length > 0
       ? requested
-      : (
-          await db.employee.findMany({
-            where: { active: true },
-            orderBy: { name: "asc" },
-            select: { id: true },
-          })
-        ).map((employee) => employee.id);
+      : await employeesForTimesheet(db, timeZone, from, to);
 
   if (employeeIds.length === 0) {
     return NextResponse.json(
@@ -101,7 +106,10 @@ export async function GET(request: NextRequest) {
     );
   }
 
+  const absenceOnly = params.get("rader") === "franvaro";
+
   const periods: PayrollPeriod[] = [];
+  const atf: Record<string, AtfBasis | null> = {};
 
   for (const employeeId of employeeIds) {
     // En i taget och inte parallellt: varje tidrapport gör flera frågor, och
@@ -117,7 +125,15 @@ export async function GET(request: NextRequest) {
 
     // En anställd som inte finns i företaget ger null. Den hoppas över
     // tyst — filtreringslagret har redan gjort sitt jobb.
-    if (period) periods.push(period);
+    if (!period) continue;
+
+    periods.push(period);
+
+    // Bara på Löneunderlaget, bara för en hel kalendermånad och bara med ett
+    // valt avtal; annars null, och PDF:en visar ingen ATF. Se atf.ts.
+    atf[period.employee.id] = absenceOnly
+      ? await buildAtf(db, timeZone, period, company?.atfAgreement ?? null)
+      : null;
   }
 
   if (periods.length === 0) {
@@ -134,15 +150,17 @@ export async function GET(request: NextRequest) {
 
   const pdf = await buildTimesheetPdf(
     { name: companyName, timezone: timeZone, logo },
-    periods
+    periods,
+    { rows: absenceOnly ? "absence" : "all", atf }
   );
 
   // Filnamnet säger vad filen är. En tidrapport ska inte kunna förväxlas med
   // ett orderunderlag i samma nedladdningsmapp.
+  const kind = absenceOnly ? "loneunderlag" : "tidrapport";
   const base =
     periods.length === 1
-      ? `tidrapport-${slugify(periods[0].employee.name)}-${toDateInput(from, timeZone)}`
-      : `tidrapporter-${slugify(companyName)}-${toDateInput(from, timeZone)}`;
+      ? `${kind}-${slugify(periods[0].employee.name)}-${toDateInput(from, timeZone)}`
+      : `${absenceOnly ? "loneunderlag" : "tidrapporter"}-${slugify(companyName)}-${toDateInput(from, timeZone)}`;
 
   // VISNING ELLER NEDLADDNING.
   //

@@ -1,12 +1,8 @@
 import { requireAdmin } from "@/lib/admin-session";
 import { requireModule } from "@/lib/company-modules";
-import ScheduleForm, {
-  type ScheduleDayValue,
-} from "@/components/admin/ScheduleForm";
 import ConfirmButton from "@/components/admin/ConfirmButton";
-import FormDialog from "@/components/admin/FormDialog";
+import ActionDialog from "@/components/ui/ActionDialog";
 import {
-  Alert,
   Badge,
   Card,
   CardHeader,
@@ -17,8 +13,17 @@ import {
   Th,
   Tr,
 } from "@/components/ui";
-import { formatMinuteOfDay } from "@/lib/schedule";
-import { createBreakType, saveSchedule, toggleBreakType } from "./actions";
+import { createBreakType, toggleBreakType } from "./actions";
+
+export const metadata = { title: "Rasttyper · Tikkr" };
+
+/**
+ * RASTERNA, alltså rasttyperna på stämplingsskärmen. Löneunderlagets.
+ *
+ * Företagets arbetstider låg här till 2026-10-17. De är arbetsytans nu och
+ * ligger under Inställningar, Arbetsytan, Arbetstider, eftersom planeringen
+ * läser samma tider. Se lib/work-hours.ts.
+ */
 
 export const dynamic = "force-dynamic";
 
@@ -28,64 +33,35 @@ export default async function SchedulePage() {
 
   const { db } = session;
 
-  const [schedule, breakTypes] = await Promise.all([
-    db.workSchedule.findFirst({
-      where: { isDefault: true },
-      select: {
-        days: {
-          orderBy: { weekday: "asc" },
-          select: {
-            weekday: true,
-            startMinute: true,
-            endMinute: true,
-            breaks: {
-              orderBy: { startMinute: "asc" },
-              select: { startMinute: true, endMinute: true },
-            },
-          },
-        },
-      },
-    }),
-    db.breakType.findMany({
-      orderBy: [{ active: "desc" }, { sortOrder: "asc" }],
-      select: {
-        id: true,
-        name: true,
-        active: true,
-        _count: { select: { breakEntries: true } },
-      },
-    }),
-  ]);
-
-  const initial: ScheduleDayValue[] = (schedule?.days ?? []).map((day) => ({
-    weekday: day.weekday,
-    start: formatMinuteOfDay(day.startMinute),
-    end: formatMinuteOfDay(day.endMinute),
-    breaks: day.breaks.map((rest) => ({
-      start: formatMinuteOfDay(rest.startMinute),
-      end: formatMinuteOfDay(rest.endMinute),
-    })),
-  }));
+  const breakTypes = await db.breakType.findMany({
+    orderBy: [{ active: "desc" }, { sortOrder: "asc" }],
+    select: {
+      id: true,
+      name: true,
+      active: true,
+      _count: { select: { breakEntries: true } },
+    },
+  });
 
   return (
     <div className="space-y-6">
-      <ScheduleForm action={saveSchedule} initial={initial} />
-
       <Card>
         <CardHeader
-          title="Raster"
+          title="Rasttyper"
           help="arbetstider"
           action={
-            <FormDialog
+            <ActionDialog
               trigger="Ny rast"
+              triggerTone="primary"
               title="Lägg till rast"
               action={createBreakType}
+              initial={{}}
               submitLabel="Lägg till"
             >
               <Field label="Namn">
                 <Input name="name" placeholder="Frukost" required autoFocus />
               </Field>
-            </FormDialog>
+            </ActionDialog>
           }
         />
 

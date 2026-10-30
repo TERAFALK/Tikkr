@@ -1,4 +1,4 @@
-import { requireAdmin } from "@/lib/admin-session";
+import { isOwner, requireAdmin } from "@/lib/admin-session";
 import { unsafeGlobalPrisma } from "@/lib/db";
 import { getBillingOverview } from "@/lib/billing";
 import { paymentsAvailable, yearlyAvailable } from "@/lib/stripe";
@@ -10,6 +10,8 @@ import { Alert, Button, Card, CardHeader, Field, Input } from "@/components/ui";
 import { formatDate } from "@/lib/format";
 import { discountFrom } from "@/lib/company-prices";
 import { openBillingPortal, startCheckout } from "./actions";
+
+export const metadata = { title: "Prenumeration · Tikkr" };
 
 /**
  * Belopp med tusentalsavgränsare. Ligger på modulnivå och inte i
@@ -24,7 +26,10 @@ export default async function SubscriptionPage({
 }: {
   searchParams: Promise<{ klart?: string; skots?: string }>;
 }) {
-  const { companyId } = await requireAdmin();
+  const session = await requireAdmin();
+  const { companyId } = session;
+  // Licenser, tillval och betalning ändras bara av ägaren, se isOwner.
+  const owner = isOwner(session);
   const params = await searchParams;
 
   const company = await unsafeGlobalPrisma.company.findUnique({
@@ -184,7 +189,7 @@ export default async function SubscriptionPage({
           {overview.used > overview.screens && (
             <Alert tone="warning">
               {overview.used} skärmar är upplagda men ni har {overview.screens}{" "}
-              {overview.screens === 1 ? "licens" : "licenser"}. Radera de
+              {overview.screens === 1 ? "licens" : "licenser"}. Ta bort de
               skärmar ni inte längre använder under Stämplingsskärmar, eller
               utöka antalet licenser igen. Skärmarna fortsätter fungera under
               tiden.
@@ -203,6 +208,10 @@ export default async function SubscriptionPage({
             <Alert tone="info">
               Prenumerationen sköts av Tikkr för det här företaget. Kontakta
               support@tikkr.se för att ändra antalet licenser eller tillvalen.
+            </Alert>
+          ) : !owner ? (
+            <Alert tone="info">
+              Prenumerationen ändras av arbetsytans ägare.
             </Alert>
           ) : overview.hasSubscription ? (
             <div className="space-y-6">
@@ -297,7 +306,7 @@ export default async function SubscriptionPage({
               modules={overview.modules}
               hasSubscription={overview.hasSubscription}
               interval={overview.interval ?? "month"}
-              managed={overview.platformManaged}
+              managed={overview.platformManaged || !owner}
             />
           </div>
         </Card>
@@ -360,7 +369,7 @@ function AgreedRow({
       <dt className="text-neutral-500">{label}</dt>
       <dd className="flex flex-wrap items-baseline justify-end gap-2">
         {list !== agreed && (
-          <span className="tabular-nums text-neutral-400 line-through">
+          <span className="tabular-nums text-neutral-500 line-through">
             {kr(list)} kr
           </span>
         )}

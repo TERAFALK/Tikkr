@@ -1,7 +1,5 @@
 import type { ReactNode } from "react";
-import type { FeedbackStatus } from "@prisma/client";
 import { Badge } from "@/components/ui";
-import { FEEDBACK_STATUS_LABEL } from "@/lib/feedback";
 
 /**
  * SMÅDELAR SOM ÅTERKOMMER I PLATTFORMSPANELEN.
@@ -62,14 +60,14 @@ export function Section({
     <section className="mt-8 first:mt-0">
       <div className="mb-3 flex flex-wrap items-end justify-between gap-3">
         <div className="min-w-0">
-          <h2 className="text-[13px] font-semibold uppercase tracking-wider text-neutral-400">
+          <h2 className="text-[13px] font-semibold uppercase tracking-wider text-neutral-500">
             {title}
           </h2>
           {description && (
             <p className="mt-1 text-[13px] text-neutral-500">{description}</p>
           )}
         </div>
-        {action && <div className="shrink-0">{action}</div>}
+        {action && <div className="min-w-0 max-w-full">{action}</div>}
       </div>
       {children}
     </section>
@@ -77,11 +75,9 @@ export function Section({
 }
 
 /**
- * Ett supportmeddelandes status i plattformen. Gult är Ny, eftersom något
- * väntar på oss; kundens sida har inget gult, där väntar ingenting på kunden.
+ * Ett fel eller förslag i plattformen. Gult är Ny, eftersom något väntar på
+ * oss; Klar betyder att det ligger i arkivet.
  */
-export function FeedbackStatusBadge({ status }: { status: FeedbackStatus }) {
-  const tone =
-    status === "NEW" ? "warning" : status === "IN_PROGRESS" ? "active" : "muted";
-  return <Badge tone={tone}>{FEEDBACK_STATUS_LABEL[status]}</Badge>;
+export function FeedbackStatusBadge({ doneAt }: { doneAt: Date | null }) {
+  return doneAt ? <Badge tone="muted">Klar</Badge> : <Badge tone="warning">Ny</Badge>;
 }

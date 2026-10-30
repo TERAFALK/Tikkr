@@ -1,11 +1,13 @@
 import Link from "next/link";
 import { requireAdmin } from "@/lib/admin-session";
 import { searchCustomers } from "@/lib/customers";
+import { listPaging, pageRows } from "@/lib/paging";
 import CustomerDialog from "@/components/admin/CustomerDialog";
+import SearchForm from "@/components/admin/SearchForm";
+import Pager from "@/components/ui/Pager";
 import {
   Badge,
   Button,
-  ButtonLink,
   Card,
   CardHeader,
   EmptyState,
@@ -14,8 +16,11 @@ import {
   Td,
   Th,
   Tr,
+  rowLink,
 } from "@/components/ui";
 import { createCustomer, toggleCustomer } from "./actions";
+
+export const metadata = { title: "Kunder · Tikkr" };
 
 /**
  * KUNDREGISTRET.
@@ -35,6 +40,8 @@ export const dynamic = "force-dynamic";
 
 interface SearchParams {
   q?: string;
+  sida?: string;
+  antal?: string;
 }
 
 export default async function CustomersPage({
@@ -48,7 +55,9 @@ export default async function CustomersPage({
 
   const customers = await searchCustomers(db, query);
 
+  // Rubrikens antal gäller hela urvalet. Bara raderna delas upp.
   const active = customers.filter((customer) => customer.active).length;
+  const page = listPaging(customers.length, params);
 
   return (
     <>
@@ -83,25 +92,13 @@ export default async function CustomersPage({
             }
             description={query ? `Sökning på ”${query}”` : `${active} aktiva`}
             action={
-              /* Vanligt GET-formulär, utan JavaScript. Sökningen hamnar i
-                 adressen och går därmed att spara som bokmärke. */
-              <form className="flex gap-2">
-                <input
-                  type="search"
-                  name="q"
-                  defaultValue={query}
-                  placeholder="Namn, kundnr, org.nr…"
-                  className="w-52 rounded-md border-0 bg-white px-2.5 py-1.5 text-[13px] text-neutral-900 ring-1 ring-inset ring-neutral-400 placeholder:text-neutral-400 focus:outline-hidden focus:ring-2 focus:ring-inset focus:ring-blue-600"
-                />
-                <Button type="submit" tone="secondary">
-                  Sök
-                </Button>
-                {query && (
-                  <ButtonLink href="/admin/kunder" tone="ghost">
-                    Rensa
-                  </ButtonLink>
-                )}
-              </form>
+              <SearchForm
+                query={query}
+                label="Sök kunder"
+                placeholder="Namn, kundnr, org.nr…"
+                clearHref="/admin/kunder"
+                perPage={page.take}
+              />
             }
           />
 
@@ -111,7 +108,7 @@ export default async function CustomersPage({
               kundnummer och organisationsnummer.
             </p>
           ) : (
-            <Table>
+            <Table cards>
               <thead>
                 <tr>
                   <Th>Kund</Th>
@@ -125,37 +122,37 @@ export default async function CustomersPage({
                 </tr>
               </thead>
               <tbody>
-                {customers.map((customer) => (
-                  <Tr key={customer.id} dimmed={!customer.active}>
+                {pageRows(customers, page).map((customer) => (
+                  <Tr key={customer.id} dimmed={!customer.active} linked>
                     <Td>
                       {/* Namnet är vägen till kundsidan. Det är den enda
                           platsen där tid, pengar och ordrar står samlade. */}
                       <Link
                         href={`/admin/kunder/${customer.id}`}
-                        className="font-medium text-tick-deep hover:underline"
+                        className={rowLink}
                       >
                         {customer.name}
                       </Link>
                       {customer.customerNumber && (
-                        <span className="ml-2 text-neutral-400">
+                        <span className="ml-2 text-neutral-500">
                           {customer.customerNumber}
                         </span>
                       )}
                     </Td>
-                    <Td muted>
+                    <Td label="Org.nr" muted>
                       {customer.orgNumber ?? (
                         <span className="text-neutral-300">—</span>
                       )}
                     </Td>
-                    <Td muted>
+                    <Td label="Ort" muted>
                       {customer.city ?? (
                         <span className="text-neutral-300">—</span>
                       )}
                     </Td>
-                    <Td numeric muted>
+                    <Td label="Ordrar" numeric muted>
                       {customer.orders}
                     </Td>
-                    <Td>
+                    <Td label="Status">
                       {customer.active ? (
                         <Badge tone="active">Aktiv</Badge>
                       ) : (
@@ -163,7 +160,7 @@ export default async function CustomersPage({
                       )}
                     </Td>
                     <Td>
-                      <div className="flex justify-end">
+                      <div className="relative z-10 flex justify-end">
                         <form action={toggleCustomer}>
                           <input
                             type="hidden"
@@ -186,6 +183,14 @@ export default async function CustomersPage({
               </tbody>
             </Table>
           )}
+
+          <Pager
+            paging={page}
+            total={customers.length}
+            unit="kunder"
+            path="/admin/kunder"
+            keep={{ q: query }}
+          />
         </Card>
       )}
     </>

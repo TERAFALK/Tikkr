@@ -4,6 +4,9 @@ import { auth } from "./auth";
 import { unsafeGlobalPrisma } from "./db";
 import { forCompany, type CompanyDb } from "./tenant";
 import { readSupportSession } from "./support-session";
+import { isPlatformAdmin } from "./platform-access";
+import { SESSION_MAX_AGE_SECONDS } from "./session-lifetime";
+import { evaluateAccess } from "./subscription";
 
 /**
  * Grinden till adminpanelen.
@@ -50,6 +53,22 @@ export interface AdminSession {
    * `unsafeGlobalPrisma` — måste börja med `await assertWritable(session)`.
    */
   support?: SupportContext;
+  /**
+   * SATT NÄR APPEN INTE ÄR KOPPLAD ÄN, och sessionen ändå släpps in.
+   *
+   * Gäller bara den första sessionen efter en registrering (2026-10-11). Är
+   * den satt visar panelen remsan om tvåstegsverifiering, och är dessutom
+   * e-postadressen obekräftad visas spärren i stället för panelen. Se
+   * admin/(panel)/layout.tsx.
+   */
+  mfaPending?: true;
+  /**
+   * SATT NÄR PRENUMERATIONEN ÄR LÅST. Se requireAdmin.
+   *
+   * Aldrig i supportläget: en obetald faktura är oftast varför kunden ringer,
+   * och läget kan ändå bara läsa.
+   */
+  locked?: true;
 }
 
 export interface SupportContext {
@@ -140,7 +159,13 @@ export async function currentAdmin(): Promise<AdminSession | null> {
   // Att låta kundsessionen vinna hade dessutom gett skrivrätt i ett läge som
   // ser ut som läsläge, vilket är det värsta av de två utfallen.
   const support = await readSupportSession();
-  if (support) return supportAdmin(support);
+
+  // Behörigheten prövas vid varje anrop, inte bara när besöket startades
+  // (tillagt 2026-10-18). En adress som tagits bort ur PLATFORM_ADMIN_EMAILS
+  // var annars kvar i kundens panel tills cookien gick ut, upp till en
+  // halvtimme. Cookien räknas då som ogiltig, och kundens egen session, om
+  // en sådan finns, prövas som vanligt nedan.
+  if (support && isPlatformAdmin(support.email)) return supportAdmin(support);
 
   const session = await auth();
   if (!session?.user?.id) return null;
@@ -157,33 +182,75 @@ export async function currentAdmin(): Promise<AdminSession | null> {
       passwordChangedAt: true,
       sessionsRevokedAt: true,
       totpEnabledAt: true,
-      company: { select: { name: true } },
+      company: {
+        select: {
+          name: true,
+          subscriptionStatus: true,
+          trialEndsAt: true,
+          pastDueSince: true,
+        },
+      },
     },
   });
 
   if (!account) return null;
 
-  // Tvåstegsinloggning är obligatorisk (2026-10-06). En session från innan
-  // kravet, eller ett konto vars tvåsteg nollställts, kommer inte in förrän
-  // appen satts upp — inloggningen visar då QR-koden.
-  if (!account.totpEnabledAt) return null;
+  /**
+   * TVÅSTEGSINLOGGNING ÄR OBLIGATORISK (2026-10-06), MED ETT UNDANTAG PÅ EN
+   * SESSION (2026-10-11).
+   *
+   * En session från innan kravet, eller ett konto vars tvåsteg nollställts,
+   * kommer inte in förrän appen satts upp — inloggningen visar då QR-koden.
+   *
+   * Undantaget är den som nyss registrerat en arbetsyta. Hen har ingen app
+   * och har aldrig loggat in, och att möta en QR-kod innan man sett vad man
+   * köpt är det branta steget produktägaren ville bort från. Märket sitter i
+   * sessionen och sätts bara av registreringen, se auth.ts: det går inte att
+   * be om, och det följer inte med till nästa inloggning, eftersom en ny
+   * session utfärdas av inloggningssidan, som kräver koden.
+   *
+   * Priset är uttryckligt: ett stulet lösenord räcker aldrig för att komma
+   * in, men den HÄR webbläsarens cookie räcker i upp till sju dagar för ett
+   * konto som inte hunnit koppla appen. Panelen tjatar därför om det, och
+   * nästa inloggning tvingar fram det.
+   */
+  const mfaPending = !account.totpEnabledAt;
+  if (mfaPending && session.user.mfaDeferred !== true) return null;
 
   // En session som utfärdades före det senaste lösenordsbytet, eller före en
   // utloggning på alla enheter, gäller inte. Annars vore det meningslöst att
   // byta lösenord när man misstänker att någon annan är inne — den andras
   // inloggning skulle fortsätta fungera.
   //
-  // Utfärdandetiden räknas i hela sekunder. En marginal på en sekund gör att
-  // den som byter sitt eget lösenord och loggas in på nytt i samma ögonblick
-  // inte råkar kastas ut av sin egen ändring.
-  if (session.user.issuedAt) {
-    const issued = session.user.issuedAt * 1000;
-    const cutoffs = [account.passwordChangedAt, account.sessionsRevokedAt];
+  // Prövas mot INLOGGNINGSTIDEN, aldrig mot `iat` (ändrat 2026-10-18). Auth.js
+  // sätter om `iat` vid varje förnyelse, så en stulen cookie klarade annars
+  // prövningen efter ett enda anrop till /api/auth/session. Se
+  // auth-callbacks.ts. Saknas tiden är sessionen från före ändringen, och den
+  // nekas: hellre en inloggning till än en cookie som går att förnya förbi
+  // regeln.
+  //
+  // Tiden räknas i hela sekunder. En marginal på en sekund gör att den som
+  // byter sitt eget lösenord och loggas in på nytt i samma ögonblick inte
+  // råkar kastas ut av sin egen ändring.
+  const authTime = session.user.authTime;
+  if (typeof authTime !== "number") return null;
 
-    for (const cutoff of cutoffs) {
-      if (cutoff && issued < cutoff.getTime() - 1000) return null;
-    }
+  const authenticated = authTime * 1000;
+
+  // Taket gäller från inloggningen. Cookien förlängs av Auth.js vid varje
+  // förnyelse, och utan taket levde en session så länge någon använde den.
+  if (Date.now() - authenticated > SESSION_MAX_AGE_SECONDS * 1000) return null;
+
+  for (const cutoff of [account.passwordChangedAt, account.sessionsRevokedAt]) {
+    if (cutoff && authenticated < cutoff.getTime() - 1000) return null;
   }
+
+  const locked =
+    evaluateAccess({
+      status: account.company.subscriptionStatus,
+      trialEndsAt: account.company.trialEndsAt,
+      pastDueSince: account.company.pastDueSince,
+    }).level === "locked";
 
   // Allt kommer från databasen, inget från token. Ett företagsnamn som ändrats
   // under Inställningar slår därmed igenom direkt i stället för vid nästa
@@ -194,6 +261,8 @@ export async function currentAdmin(): Promise<AdminSession | null> {
     companyId: account.companyId,
     companyName: account.company.name,
     role: account.role,
+    ...(mfaPending ? { mfaPending: true as const } : {}),
+    ...(locked ? { locked: true as const } : {}),
     db: forCompany(account.companyId),
   };
 }
@@ -258,7 +327,57 @@ async function touchVisit(visitId: string): Promise<void> {
   }
 }
 
+/**
+ * true för arbetsytans ägare.
+ *
+ * BARA ÄGAREN ÄNDRAR FAKTURAN OCH ANONYMISERAR (beslutat 2026-10-18,
+ * produktägarens val, säkerhetsgranskningen). Licenser, tillval, kassan och
+ * betalningsportalen ändrar vad kunden betalar, och anonymiseringen går inte
+ * att ångra. Tidigare krävde bara användarhanteringen en ägare, se
+ * admin-users.ts.
+ *
+ * Prövas i varje serveråtgärd det gäller, inte bara i gränssnittet, och
+ * bevisas av tests/owner-coverage.test.ts. Supportläget har rollen SUPPORT
+ * och räknas alltså aldrig som ägare.
+ */
+export function isOwner(session: AdminSession): boolean {
+  return session.role === "OWNER";
+}
+
+/** Sidan låsskärmen visas på. Layouten ritar den, sidan själv är tom. */
+export const LOCKED_PATH = "/admin/last";
+
+/**
+ * Den inloggade administratören, eller en omdirigering.
+ *
+ * PRENUMERATIONSLÅSET SITTER HÄR (ändrat 2026-10-30, säkerhetsgranskningen).
+ * Det låg i panelens layout, som ritade låsskärmen i stället för sidan. Det
+ * stoppade ingenting: Next kör sidan ändå och skickar den i svaret, även när
+ * layouten aldrig ritar `children`, och serveråtgärderna går inte genom en
+ * layout alls.
+ *
+ * En ny sida eller åtgärd är därmed låst utan att någon behöver komma ihåg
+ * det. Det som ska fungera ändå kallar requireAdminEvenIfLocked, och den
+ * listan bevisas av tests/subscription-lock.test.ts.
+ */
 export async function requireAdmin(): Promise<AdminSession> {
+  const admin = await requireAdminEvenIfLocked();
+
+  if (admin.locked) {
+    redirect(LOCKED_PATH);
+  }
+
+  return admin;
+}
+
+/**
+ * Som requireAdmin, men släpper in en låst arbetsyta.
+ *
+ * För det som är vägen ut ur låset och det som inte rör kunddata: betalningen,
+ * det egna kontot och panelens skal. Se listan i
+ * tests/subscription-lock.test.ts, och skriv in varför där.
+ */
+export async function requireAdminEvenIfLocked(): Promise<AdminSession> {
   const admin = await currentAdmin();
 
   if (!admin) {

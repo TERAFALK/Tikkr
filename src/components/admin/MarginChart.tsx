@@ -54,7 +54,7 @@ export default function MarginChart({ months }: { months: CustomerMonth[] }) {
               key={`${month.label}-${index}`}
               className="group flex min-w-0 flex-1 flex-col items-center"
             >
-              <span className="mb-1 h-4 text-[10px] tabular-nums text-neutral-400 opacity-0 transition-opacity group-hover:opacity-100">
+              <span className="mb-1 h-4 text-[10px] tabular-nums text-neutral-500 opacity-0 transition-opacity group-hover:opacity-100">
                 {month.marginOre === 0 ? "" : formatCurrency(month.marginOre)}
               </span>
 
@@ -64,8 +64,9 @@ export default function MarginChart({ months }: { months: CustomerMonth[] }) {
               >
                 {positive && (
                   <div
-                    className="w-full rounded-t bg-emerald-600/85 transition-colors group-hover:bg-emerald-600"
+                    className="animate-grow-up w-full rounded-t bg-emerald-600/85 transition-colors group-hover:bg-emerald-600"
                     style={{
+                      ["--i" as string]: index,
                       height: Math.max(
                         month.marginOre === 0 ? 0 : 2,
                         Math.round(share * upHeight)
@@ -80,8 +81,9 @@ export default function MarginChart({ months }: { months: CustomerMonth[] }) {
                 <div className="w-full" style={{ height: downHeight }}>
                   {!positive && (
                     <div
-                      className="w-full rounded-b bg-amber-600/85 transition-colors group-hover:bg-amber-600"
+                      className="animate-grow-down w-full rounded-b bg-amber-600/85 transition-colors group-hover:bg-amber-600"
                       style={{
+                        ["--i" as string]: index,
                         height: Math.max(2, Math.round(share * downHeight)),
                       }}
                       title={`${month.label}: ${formatCurrency(month.marginOre)}`}
@@ -90,7 +92,7 @@ export default function MarginChart({ months }: { months: CustomerMonth[] }) {
                 </div>
               )}
 
-              <span className="mt-1.5 truncate text-[10px] text-neutral-400">
+              <span className="mt-1.5 truncate text-[10px] text-neutral-500">
                 {month.label}
               </span>
             </div>

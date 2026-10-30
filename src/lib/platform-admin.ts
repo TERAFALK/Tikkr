@@ -21,6 +21,7 @@ import {
 } from "./company-prices";
 import { SCREEN_ITEM, type PriceItem } from "./price-book";
 import { resetAdminMfa } from "./admin-mfa";
+import { listPaging, type PageRequest, type Paging } from "./paging";
 
 /**
  * PLATTFORMSADMINISTRATION.
@@ -331,7 +332,8 @@ export async function getCompanyDetail(companyId: string) {
         select: {
           id: true,
           email: true,
-          name: true,
+          firstName: true,
+          lastName: true,
           phone: true,
           role: true,
           createdAt: true,
@@ -751,12 +753,8 @@ export interface AuditPage {
     createdAt: Date;
   }[];
   total: number;
-  page: number;
-  pageCount: number;
+  paging: Paging;
 }
-
-/** Hur många rader ur loggen som visas per sida. */
-export const AUDIT_PER_PAGE = 50;
 
 /**
  * Åtgärdsloggen, sidvis.
@@ -768,26 +766,24 @@ export const AUDIT_PER_PAGE = 50;
  * Sidnumret räknas om till ett giltigt intervall i stället för att avvisas. En
  * adress som pekar förbi slutet ska visa sista sidan, inte ett felmeddelande.
  */
-export async function auditLog(params: {
-  companyId?: string;
-  page?: number;
-}): Promise<AuditPage> {
+export async function auditLog(
+  params: { companyId?: string } & PageRequest
+): Promise<AuditPage> {
   const where = params.companyId
     ? { targetCompanyId: params.companyId }
     : undefined;
 
   const total = await unsafeGlobalPrisma.platformAuditLog.count({ where });
-  const pageCount = Math.max(1, Math.ceil(total / AUDIT_PER_PAGE));
-  const page = Math.min(Math.max(1, params.page ?? 1), pageCount);
+  const paging = listPaging(total, params);
 
   const rows = await unsafeGlobalPrisma.platformAuditLog.findMany({
     where,
     orderBy: { createdAt: "desc" },
-    skip: (page - 1) * AUDIT_PER_PAGE,
-    take: AUDIT_PER_PAGE,
+    skip: paging.skip,
+    take: paging.take,
   });
 
-  return { rows, total, page, pageCount };
+  return { rows, total, paging };
 }
 
 /**
@@ -834,6 +830,22 @@ export async function deleteCompany(params: {
     throw new PlatformActionError(
       "Företaget har en aktiv prenumeration hos Stripe. Avsluta den där " +
         "först. Annars fortsätter faktureringen mot en kund som inte finns."
+    );
+  }
+
+  // En beställning som är på väg är något vi är skyldiga kunden, och den ska
+  // avslutas eller avbrytas för sig innan företaget kan försvinna.
+  const openOrders = await unsafeGlobalPrisma.shopOrder.count({
+    where: {
+      companyId: params.companyId,
+      status: { notIn: ["DELIVERED", "CANCELED"] },
+    },
+  });
+
+  if (openOrders > 0) {
+    throw new PlatformActionError(
+      "Företaget har beställningar som inte är levererade eller avbrutna. " +
+        "Avsluta dem under Beställningar först."
     );
   }
 
@@ -893,6 +905,10 @@ export async function deleteCompany(params: {
     // den aldrig kan följa med i en fråga kunden själv gör. Priset är att den
     // inte heller följer med i kaskaden.
     unsafeGlobalPrisma.platformNote.deleteMany({
+      where: { targetCompanyId: params.companyId },
+    }),
+    // Samma sak för anteckningarna om beställningarna.
+    unsafeGlobalPrisma.shopOrderNote.deleteMany({
       where: { targetCompanyId: params.companyId },
     }),
     unsafeGlobalPrisma.company.delete({ where: { id: params.companyId } }),

@@ -30,6 +30,10 @@ export function faqQuestions(modules: ModulePricing): FaqItem[] {
       a: "En pekskärm eller surfplatta med webbläsare. Ingen installation krävs. Skärmen kopplas en gång med en sexsiffrig kod och kräver därefter ingen inloggning.",
     },
     {
+      q: "Måste vi köpa stämplingsskärmen av er?",
+      a: "Nej. En dator eller surfplatta med pekskärm och webbläsare fungerar likadant. Stämplingsskärmen från oss levereras uppsatt för Tikkr i ett stativ, och ljusstyrka och omstart styrs från panelen. Den tillverkas på beställning med en beräknad leveranstid på 3–4 veckor.",
+    },
+    {
       q: "Hur lång tid tar uppsättningen?",
       a: "Cirka femton minuter. Anställda, arbetsmoment och ordrar läggs upp i en guide, och skärmen kopplas genom att koden anges på den enhet som ska användas.",
     },
@@ -47,7 +51,7 @@ export function faqQuestions(modules: ModulePricing): FaqItem[] {
     },
     {
       q: "Kan Tikkr användas för löneunderlag?",
-      a: `Ja, som tillval för ${kr(modules.PAYROLL.month)} kr per månad: arbetstidsschema, stämplade raster, flex, komp, frånvaro och tidrapport per anställd. Tikkr redovisar timmar. Lönearter, OB och övertidsersättning regleras i kollektivavtal och hanteras i lönesystemet.`,
+      a: `Ja, som tillval för ${kr(modules.PAYROLL.month)} kr per månad: arbetstidsschema, stämplade raster, flex, frånvaro och tidrapport per anställd. Tikkr redovisar timmar. Lönearter, OB och övertidsersättning regleras i kollektivavtal och hanteras i lönesystemet.`,
     },
     {
       q: "Går det att planera jobben i Tikkr?",
@@ -63,7 +67,7 @@ export function faqQuestions(modules: ModulePricing): FaqItem[] {
     },
     {
       q: "Var lagras uppgifterna?",
-      a: "På servrar i Sverige. Personuppgiftsbiträdesavtal ingår och kan läsas innan ni börjar. Uppgifterna om en anställd omfattar namn, valfritt anställningsnummer och registrerad tid, och kan exporteras eller raderas i panelen.",
+      a: "På servrar i Sverige. Personuppgiftsbiträdesavtal ingår och kan läsas innan ni börjar. Uppgifterna om en anställd omfattar namn, valfritt anställningsnummer, valfritt porträtt och registrerad tid. Med tillvalet Löneunderlag tillkommer schema, raster, flex och frånvaro. Samtliga uppgifter kan exporteras eller raderas i panelen.",
     },
     {
       q: "Vad händer vid utebliven betalning?",

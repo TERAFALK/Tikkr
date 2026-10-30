@@ -1,5 +1,6 @@
 import PDFDocument from "pdfkit";
 import type { PayrollPeriod } from "./payroll";
+import type { AtfBasis } from "./atf";
 import {
   formatDate,
   formatDuration,
@@ -20,21 +21,22 @@ import { DOC } from "./brand";
  * sammanställning som står i en annan ordning blir läst fel innan den blir
  * läst rätt. Därför samma block, i samma följd: raderna per dag, dagssumman,
  * periodsumman, och sammanställningen längst ner med planerad tid, närvarotid,
- * produktiv och improduktiv tid, flex och komp — och sist vad den improduktiva
- * tiden gick till.
+ * produktiv och improduktiv tid och flex — och sist vad den improduktiva tiden
+ * gick till.
  *
- * TID SKRIVS SOM TIM:MIN (33:45), som i hela resten av applikationen. Se
- * `format.ts`: det som ska läsas skrivs tim:min, det som ska räknas skrivs
- * decimalt och bara i Excel-arket.
+ * MÅNADSUTSKRIFTEN HAR BARA FRÅNVARON I RADERNA (tillagt 2026-10-13). Samma
+ * dokument, men utan stämplingar och raster: lönen behöver frånvaron dag för
+ * dag och summeringen längst ner, inte en månad av stämplingar. Se `rows`.
+ * Den heter LÖNEUNDERLAG på pappret (ändrat 2026-10-30, kundens begäran).
  *
- * Stod i decimaltimmar till 2026-10-01, med skälet att kunden summerade
- * vidare på sammanställningen. Det vägde lättare än att samma tal såg olika
- * ut på skärmen och på pappret: "1,99" lästes som 1:59, vilket är fyra
- * minuter fel, och den som jämförde fick räkna om i huvudet.
+ * TID SKRIVS SOM DECIMALTIMMAR (33,75), som i hela resten av applikationen.
+ * Se `format.ts`. Det är kundens format: lönen räknar vidare på
+ * sammanställningen, och ett tal som ska räknas med ska inte stå i tim:min.
  *
- * Klockslagen i raderna skrivs som klockslag och inte som "6,23" — den gamla
- * rapportens sätt att skriva 06:23 som ett decimaltal är en fälla som inte
- * ska ärvas.
+ * KLOCKSLAGEN ÄR KLOCKSLAG. Ett pass börjar "06:23" och inte "6,38". Att
+ * längderna är decimala gör skillnaden viktigare och inte mindre viktig: den
+ * gamla rapportens sätt att skriva 06:23 som "6,23" är en fälla som inte ska
+ * ärvas.
  *
  * INGA BELOPP. Varken timkostnad, lön eller lönearter. Tikkr räknar tid; vad
  * tiden är värd avgörs av kollektivavtalet i lönesystemet.
@@ -48,24 +50,48 @@ const CONTENT_WIDTH = A4_WIDTH - MARGIN * 2;
 /** Höjden underskriftsraden behöver: texten plus linjen under den. */
 const SIGNATURE_HEIGHT = 34;
 
+/** Raden Totalt för perioden, med luften runt den. */
+const SUMMARY_TOTAL_HEIGHT = 38;
+
+/** Luften under sammanställningen och den finstilta raden, två rader hög. */
+const SUMMARY_NOTE_HEIGHT = 30;
+
 export interface TimesheetCompany {
   name: string;
   timezone: string;
   logo: { data: Buffer; mimeType: string } | null;
 }
 
+export interface TimesheetOptions {
+  /**
+   * Vad raderna visar. "all" är stämplingar, raster och frånvaro; "absence"
+   * är bara frånvaron. Summeringen är densamma i båda.
+   */
+  rows?: "all" | "absence";
+  /**
+   * ATF-underlaget per anställd, nyckel = personens id. Saknas personen här
+   * visas ingen ATF, vilket är fallet när företaget inte valt något avtal
+   * eller perioden inte är en hel kalendermånad. Se atf.ts.
+   *
+   * Bara Löneunderlaget visar det. Se summaryRows.
+   */
+  atf?: Record<string, AtfBasis | null>;
+}
+
 export function buildTimesheetPdf(
   company: TimesheetCompany,
-  periods: PayrollPeriod[]
+  periods: PayrollPeriod[],
+  options: TimesheetOptions = {}
 ): Promise<Buffer> {
+  const absenceOnly = options.rows === "absence";
+  const title = documentTitle(absenceOnly);
+
   const doc = new PDFDocument({
     size: "A4",
     margin: MARGIN,
     info: {
       Title:
-        periods.length === 1
-          ? `Tidrapport ${periods[0].employee.name}`
-          : "Tidrapport",
+        periods.length === 1 ? `${title} ${periods[0].employee.name}` : title,
       Author: company.name,
     },
   });
@@ -79,7 +105,7 @@ export function buildTimesheetPdf(
 
   periods.forEach((period, index) => {
     if (index > 0) doc.addPage();
-    renderPeriod(doc, company, period);
+    renderPeriod(doc, company, period, absenceOnly, options.atf?.[period.employee.id] ?? null);
   });
 
   if (periods.length === 0) {
@@ -93,10 +119,16 @@ export function buildTimesheetPdf(
   return finished;
 }
 
+function documentTitle(absenceOnly: boolean): string {
+  return absenceOnly ? "Löneunderlag" : "Tidrapport";
+}
+
 function renderPeriod(
   doc: PDFKit.PDFDocument,
   company: TimesheetCompany,
-  period: PayrollPeriod
+  period: PayrollPeriod,
+  absenceOnly: boolean,
+  atf: AtfBasis | null
 ) {
   const tz = company.timezone;
   let y = MARGIN;
@@ -114,7 +146,7 @@ function renderPeriod(
   }
 
   doc.font("Helvetica-Bold").fontSize(20).fillColor(DOC.heading);
-  doc.text("Tidrapport", MARGIN, y);
+  doc.text(documentTitle(absenceOnly), MARGIN, y);
 
   // Anställningsnumret till höger, som i kundens rapport. Det är så två
   // personer med samma namn hålls isär i lönekörningen.
@@ -154,7 +186,7 @@ function renderPeriod(
 
   /* --- Raderna ------------------------------------------------------------ */
 
-  y = drawRowHeader(doc, y);
+  y = drawRowHeader(doc, y, absenceOnly);
 
   for (const day of period.days) {
     // DAGAR UTAN RADER UTELÄMNAS HELT (ändrat 2026-10-01).
@@ -167,17 +199,18 @@ function renderPeriod(
     //
     // Den planerade tiden försvinner inte med dagen. Den står i summeringen
     // längre ned, som är där man läser den.
-    const empty =
-      day.entries.length === 0 &&
-      day.breaks.length === 0 &&
-      day.absences.length === 0;
+    const empty = absenceOnly
+      ? day.absences.length === 0
+      : day.entries.length === 0 &&
+        day.breaks.length === 0 &&
+        day.absences.length === 0;
 
     if (empty) continue;
 
     if (y > 690) {
       doc.addPage();
       y = MARGIN;
-      y = drawRowHeader(doc, y);
+      y = drawRowHeader(doc, y, absenceOnly);
     }
 
     const label = `${dayName(day.weekday)} ${formatDate(day.date, tz)}`;
@@ -195,6 +228,13 @@ function renderPeriod(
         lineBreak: false,
       });
       y += 16;
+    }
+
+    // Bara frånvaron: inga stämplingar, inga raster och ingen dagssumma, som
+    // är närvarotiden och alltså stämplingarnas summa.
+    if (absenceOnly) {
+      y = drawDayRule(doc, y);
+      continue;
     }
 
     for (const entry of day.entries) {
@@ -263,17 +303,32 @@ function renderPeriod(
       y += 15;
     }
 
-    doc
-      .moveTo(MARGIN, y)
-      .lineTo(A4_WIDTH - MARGIN, y)
-      .strokeColor(DOC.rule)
-      .stroke();
-    y += 4;
+    y = drawDayRule(doc, y);
+  }
+
+  // En månad utan frånvaro ska inte se ut som en sida där raderna fallit bort.
+  if (absenceOnly && period.absenceByReason.length === 0) {
+    doc.font("Helvetica").fontSize(9).fillColor(DOC.muted);
+    doc.text("Ingen frånvaro under perioden.", MARGIN + 4, y + 4, {
+      lineBreak: false,
+    });
+    y += 20;
   }
 
   /* --- Periodsumma -------------------------------------------------------- */
 
-  if (y > 640) {
+  const rows = summaryRows(period, absenceOnly, atf);
+  const lists = summaryLists(period, absenceOnly);
+
+  // SUMMORNA HÅLLER IHOP PÅ EN SIDA. Löneunderlaget har fler rader och en lista
+  // till, och den fasta gränsen som stod här lät dem rinna ut över foten.
+  const blockHeight =
+    SUMMARY_TOTAL_HEIGHT +
+    summaryHeight(rows) +
+    SUMMARY_NOTE_HEIGHT +
+    lists.reduce((sum, list) => sum + listHeight(list), 0);
+
+  if (y + blockHeight > FOOTER_Y - 16) {
     doc.addPage();
     y = MARGIN;
   }
@@ -282,8 +337,9 @@ function renderPeriod(
   doc.rect(MARGIN, y, CONTENT_WIDTH, 24).fill(DOC.tint);
   doc.font("Helvetica-Bold").fontSize(10).fillColor(DOC.heading);
   doc.text("Totalt för perioden", MARGIN + 8, y + 7, { width: 240 });
+  // Summan av raderna ovanför: frånvaron när det är den som står där.
   doc.text(
-    formatDuration(period.totals.worked),
+    formatDuration(absenceOnly ? period.totals.absence : period.totals.worked),
     A4_WIDTH - MARGIN - 68,
     y + 7,
     { width: 60, align: "right" }
@@ -292,20 +348,20 @@ function renderPeriod(
 
   /* --- Sammanställningen -------------------------------------------------- */
 
-  y = drawSummary(doc, y, period);
+  y = drawSummary(doc, y, period, rows, absenceOnly, atf);
 
-  /* --- Improduktiv tid per typ -------------------------------------------- */
+  /* --- Frånvaro per orsak och improduktiv tid per typ --------------------- */
 
-  if (period.indirectByMoment.length > 0) {
+  for (const list of lists) {
     y += 10;
     doc.font("Helvetica-Bold").fontSize(9).fillColor(DOC.heading);
-    doc.text("Improduktiv tid", MARGIN, y);
+    doc.text(list.title, MARGIN, y);
     y += 14;
 
-    for (const row of period.indirectByMoment) {
+    for (const [name, value] of list.rows) {
       doc.font("Helvetica").fontSize(9).fillColor(DOC.body);
-      doc.text(row.name, MARGIN + 8, y, { width: 300, lineBreak: false });
-      doc.text(formatDuration(row.minutes), A4_WIDTH - MARGIN - 68, y, {
+      doc.text(name, MARGIN + 8, y, { width: 300, lineBreak: false });
+      doc.text(value, A4_WIDTH - MARGIN - 68, y, {
         width: 60,
         align: "right",
         lineBreak: false,
@@ -352,24 +408,41 @@ function renderPeriod(
       .stroke();
   });
 
-  drawFooter(doc, "Tidrapport från Tikkr. Internt löneunderlag.", {
+  const footer = absenceOnly
+    ? "Löneunderlag från Tikkr. Internt dokument."
+    : "Tidrapport från Tikkr. Internt löneunderlag.";
+
+  drawFooter(doc, footer, {
     marginLeft: MARGIN,
     contentWidth: CONTENT_WIDTH,
     y: FOOTER_Y,
   });
 }
 
-function drawRowHeader(doc: PDFKit.PDFDocument, y: number): number {
+function drawRowHeader(
+  doc: PDFKit.PDFDocument,
+  y: number,
+  absenceOnly: boolean
+): number {
   doc.font("Helvetica-Bold").fontSize(8).fillColor(DOC.muted);
   doc.text("Dag", MARGIN + 4, y, { width: 90, lineBreak: false });
-  doc.text("Order / improduktivt", MARGIN + 100, y, { width: 200, lineBreak: false });
-  doc.text("Start", MARGIN + 305, y, { width: 46, lineBreak: false });
-  doc.text("Stopp", MARGIN + 355, y, { width: 46, lineBreak: false });
-  // P och I i stället för orden. Kolumnen är smal, och förkortningen förklaras
-  // i foten på sammanställningen.
-  doc.text("P/I", MARGIN + 408, y, { width: 20, lineBreak: false });
+
+  if (absenceOnly) {
+    doc.text("Frånvaro", MARGIN + 100, y, { width: 200, lineBreak: false });
+  } else {
+    doc.text("Order / improduktivt", MARGIN + 100, y, {
+      width: 200,
+      lineBreak: false,
+    });
+    doc.text("Start", MARGIN + 305, y, { width: 46, lineBreak: false });
+    doc.text("Stopp", MARGIN + 355, y, { width: 46, lineBreak: false });
+    // P och I i stället för orden. Kolumnen är smal, och förkortningen
+    // förklaras i foten på sammanställningen.
+    doc.text("P/I", MARGIN + 408, y, { width: 20, lineBreak: false });
+  }
+
   // Enheten i rubriken och inte i en fotnot, precis som i pdf.ts.
-  doc.text("Tid (tim:min)", A4_WIDTH - MARGIN - 74, y, {
+  doc.text("Tid (timmar)", A4_WIDTH - MARGIN - 74, y, {
     width: 70,
     align: "right",
     lineBreak: false,
@@ -385,17 +458,31 @@ function drawRowHeader(doc: PDFKit.PDFDocument, y: number): number {
   return y + 2;
 }
 
+/** Linjen som avslutar en dag. */
+function drawDayRule(doc: PDFKit.PDFDocument, y: number): number {
+  doc
+    .moveTo(MARGIN, y)
+    .lineTo(A4_WIDTH - MARGIN, y)
+    .strokeColor(DOC.rule)
+    .stroke();
+  return y + 4;
+}
+
 /**
- * Sammanställningen längst ner — kundens fyra efterfrågade rader plus flex
- * och komp.
+ * Raderna i sammanställningen längst ner — kundens fyra efterfrågade rader plus
+ * flex. Två kolumner, som i deras gamla rapport. Ordningen är deras.
  *
- * Två kolumner i tre rader, som i deras gamla rapport. Ordningen är deras.
+ * ATF STÅR BARA PÅ LÖNEUNDERLAGET (ändrat 2026-10-30, kundens begäran).
+ * Tidrapporten delas ut till var och en, och ATF är ett underlag till lönen.
+ * Flexen från föregående månad får en egen rad, eftersom den höjer eller sänker
+ * underlaget och annars bara syntes i den finstilta raden. En timanställd har
+ * ingen flex i underlaget, se atf.ts.
  */
-function drawSummary(
-  doc: PDFKit.PDFDocument,
-  y: number,
-  period: PayrollPeriod
-): number {
+export function summaryRows(
+  period: PayrollPeriod,
+  absenceOnly: boolean,
+  atf: AtfBasis | null
+): [string, string][][] {
   const rows: [string, string][][] = [
     [
       ["Planerad tid", formatDuration(period.totals.planned)],
@@ -413,14 +500,86 @@ function drawSummary(
       ["Flextid, perioden", pdfSigned(period.totals.flex)],
       ["Flexsaldo", pdfSigned(period.flex.closing)],
     ],
-    [
-      ["Intjänad komp", formatDuration(period.comp.earned)],
-      ["Uttagen komp", formatDuration(period.comp.taken)],
-    ],
-    [["Komptidssaldo", pdfSigned(period.comp.closing)], ["", ""]],
   ];
 
-  const height = rows.length * 16 + 14;
+  // ATF är ett underlag till lönen, inget saldo. Se atf.ts.
+  if (absenceOnly && atf) {
+    if (!period.employee.hourly) {
+      rows.push([
+        ["Flex föregående månad", pdfSigned(atf.previousMonthFlexMinutes)],
+        ["", ""],
+      ]);
+    }
+
+    rows.push([
+      ["Underlag ATF", formatDuration(atf.basisMinutes)],
+      ["Intjänad ATF Period", formatDuration(atf.earnedMinutes)],
+    ]);
+  }
+
+  return rows;
+}
+
+export interface SummaryList {
+  title: string;
+  rows: [string, string][];
+}
+
+/**
+ * Listorna under sammanställningen.
+ *
+ * FRÅNVARO PER ORSAK står bara på Löneunderlaget (tillagt 2026-10-30, kundens
+ * begäran), där en orsak som kunden döpt till ATF-uttag ger det totala uttaget
+ * för perioden. Listan vet inte vad orsakerna heter, och Tikkr håller inget
+ * ATF-saldo. Se atf.ts.
+ */
+export function summaryLists(
+  period: PayrollPeriod,
+  absenceOnly: boolean
+): SummaryList[] {
+  const lists: SummaryList[] = [];
+
+  if (absenceOnly && period.absenceByReason.length > 0) {
+    lists.push({
+      title: "Frånvaro per orsak",
+      rows: period.absenceByReason.map((row) => [
+        row.reason,
+        formatDuration(row.minutes),
+      ]),
+    });
+  }
+
+  if (period.indirectByMoment.length > 0) {
+    lists.push({
+      title: "Improduktiv tid",
+      rows: period.indirectByMoment.map((row) => [
+        row.name,
+        formatDuration(row.minutes),
+      ]),
+    });
+  }
+
+  return lists;
+}
+
+function summaryHeight(rows: [string, string][][]): number {
+  return rows.length * 16 + 14;
+}
+
+/** Luft, rubrik och rader, som listorna ritas i renderPeriod. */
+function listHeight(list: SummaryList): number {
+  return 10 + 14 + list.rows.length * 14;
+}
+
+function drawSummary(
+  doc: PDFKit.PDFDocument,
+  y: number,
+  period: PayrollPeriod,
+  rows: [string, string][][],
+  absenceOnly: boolean,
+  atf: AtfBasis | null
+): number {
+  const height = summaryHeight(rows);
   doc.rect(MARGIN, y, CONTENT_WIDTH, height).fill(DOC.tint);
 
   let cursor = y + 8;
@@ -447,6 +606,31 @@ function drawSummary(
   }
 
   y += height + 6;
+
+  // Hur underlaget räknats, så att lönekontoret kan stämma av det. Samma
+  // tre tal som formeln i atf.ts, i samma ordning.
+  if (absenceOnly && atf) {
+    doc.font("Helvetica").fontSize(7).fillColor(DOC.faint);
+    doc.text(
+      period.employee.hourly
+        ? `ATF enligt ${atf.agreementName}, ${atf.workFormLabel.toLowerCase()}: ` +
+            "arbetad tid och frånvaro som ger ATF"
+        : `ATF enligt ${atf.agreementName}, ${atf.workFormLabel.toLowerCase()}: ` +
+            `planerad tid ${formatDuration(atf.plannedMinutes)}, ` +
+            (atf.holidayMinutes > 0
+              ? `röda dagar ${formatDuration(atf.holidayMinutes)}, `
+              : "") +
+            `flex föregående månad ${pdfSigned(atf.previousMonthFlexMinutes)}, ` +
+            `frånvaro som inte ger ATF ${formatDuration(atf.invalidAbsenceMinutes)}`,
+      MARGIN,
+      y,
+      { width: CONTENT_WIDTH }
+    );
+    y = doc.y + 4;
+  }
+
+  // Utan stämplingar i raderna finns ingen P/I-kolumn att förklara.
+  if (absenceOnly) return y;
 
   // Teckenförklaring, inte en förklaring av räkningen. Två bokstäver i en smal
   // kolumn är inte självförklarande; hur flexen räknas fram hör hemma i

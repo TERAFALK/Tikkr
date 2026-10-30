@@ -1,7 +1,8 @@
 "use client";
 
 import { useActionState, useEffect, useRef } from "react";
-import { useFormStatus } from "react-dom";
+import { useFieldError, useKeptSubmit } from "@/components/ui/useFieldError";
+import UnsavedGuard from "@/components/ui/UnsavedGuard";
 import type { OrderFormState } from "@/app/admin/(panel)/ordrar/actions";
 import {
   Alert,
@@ -17,7 +18,7 @@ import type { SearchSelectOption } from "./SearchSelect";
 /**
  * RUTAN SOM LÄGGER UPP EN NY ORDER.
  *
- * Egen ruta och inte den allmänna FormDialog, av ett skäl: den här åtgärden
+ * Egen ruta och inte den allmänna ActionDialog, av ett skäl: den här åtgärden
  * kan avvisas. Ett påslag skrivet som "40" när man menade "1,4" ska inte
  * sparas tyst, och då måste rutan stå kvar med felet i stället för att stänga
  * sig och se ut som att allt gick bra.
@@ -30,6 +31,7 @@ export default function NewOrderDialog({
   action,
   trigger = "Ny order",
   planning = false,
+  openOnMount = false,
 }: {
   customers: SearchSelectOption[];
   moments: BudgetMomentOption[];
@@ -40,10 +42,23 @@ export default function NewOrderDialog({
   trigger?: string;
   /** Visar leveransdatumet. Sätts när tillvalet Planering är på. */
   planning?: boolean;
+  /**
+   * Öppnar rutan direkt, för genvägen på översikten (`?ny=1`). Utan den
+   * landade man på sidan och fick leta rätt på samma knapp en gång till.
+   */
+  openOnMount?: boolean;
 }) {
   const dialog = useRef<HTMLDialogElement>(null);
 
   const [state, submit] = useActionState<OrderFormState, FormData>(action, {});
+  const form = useRef<HTMLFormElement>(null);
+  const errorId = useFieldError(form, state);
+  const { pending, onSubmit } = useKeptSubmit(submit);
+
+  // En gång, vid uppkopplingen. Stängs rutan ska den stanna stängd.
+  useEffect(() => {
+    if (openOnMount) dialog.current?.showModal();
+  }, [openOnMount]);
 
   // Stängs bara när sparandet gick igenom. Ett avvisat påslag ska stå kvar med
   // sitt felmeddelande, inte försvinna och lämna kvar det man skrivit.
@@ -59,6 +74,7 @@ export default function NewOrderDialog({
 
       <dialog
         ref={dialog}
+        onClose={() => form.current?.reset()}
         className={`w-[min(42rem,calc(100vw-2rem))] ${dialogSurface}`}
       >
         <div className={`${dialogEdge} border-b border-neutral-200 px-5 py-4`}>
@@ -70,9 +86,10 @@ export default function NewOrderDialog({
           </p>
         </div>
 
-        <form action={submit} className="flex min-h-0 flex-1 flex-col">
+        <form ref={form} onSubmit={onSubmit} className="flex min-h-0 flex-1 flex-col">
+          <UnsavedGuard form={form} dialog={dialog} saved={state.savedAt} />
           <div className={`${dialogBody} space-y-4 px-5 py-5`}>
-            {state.error && <Alert>{state.error}</Alert>}
+            {state.error && <Alert id={errorId}>{state.error}</Alert>}
 
             {/* Nyckeln byts när en order lagts upp, vilket monterar om fälten
                 tomma. Nästa order ska börja på ett blankt formulär, inte på
@@ -101,7 +118,7 @@ export default function NewOrderDialog({
             >
               Avbryt
             </Button>
-            <SaveButton />
+            <SaveButton pending={pending} />
           </div>
         </form>
       </dialog>
@@ -109,9 +126,7 @@ export default function NewOrderDialog({
   );
 }
 
-function SaveButton() {
-  const { pending } = useFormStatus();
-
+function SaveButton({ pending }: { pending: boolean }) {
   return (
     <Button type="submit" disabled={pending}>
       {pending ? "Lägger till…" : "Lägg till"}

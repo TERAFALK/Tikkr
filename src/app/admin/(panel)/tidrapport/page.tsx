@@ -6,6 +6,7 @@ import FilterForm from "@/components/admin/FilterForm";
 import TimesheetView from "@/components/admin/TimesheetView";
 import WeekStepper from "@/components/admin/WeekStepper";
 import PrintButton from "@/components/admin/PrintButton";
+import { ExportGroup, ExportLink } from "@/components/admin/ExportButtons";
 import { datePresets } from "@/lib/date-presets";
 import { weekStep } from "@/lib/week-nav";
 import type { TimesheetDayRow } from "@/components/admin/TimesheetTable";
@@ -22,6 +23,7 @@ import {
   Stat,
 } from "@/components/ui";
 import { buildPayrollPeriod, currentFlexMinutes } from "@/lib/payroll";
+import { buildAtf } from "@/lib/atf";
 import {
   formatDate,
   formatDuration,
@@ -33,11 +35,11 @@ import ActionDialog from "@/components/ui/ActionDialog";
 import {
   adjustFlexBalance,
   deleteAbsence,
-  deleteCompEarned,
   saveAbsence,
-  saveCompEarned,
   type BalanceState,
 } from "./actions";
+
+export const metadata = { title: "Tidrapport · Tikkr" };
 
 /**
  * TIDRAPPORT PER ANSTÄLLD — LÖNEUNDERLAGET.
@@ -64,15 +66,13 @@ export default async function TimesheetPage({
   const { db, companyId } = session;
   const params = await searchParams;
 
-  const company = await unsafeGlobalPrisma.company.findUnique({
-    where: { id: companyId },
-    select: { timezone: true },
-  });
-
-  const timeZone = company?.timezone ?? "Europe/Stockholm";
-  const now = new Date();
-
-  const [employees, reasons] = await Promise.all([
+  // Företaget och listorna hämtas samtidigt. De väntade förut på varandra,
+  // fast ingen av dem behöver något ur de andra.
+  const [company, employees, reasons] = await Promise.all([
+    unsafeGlobalPrisma.company.findUnique({
+      where: { id: companyId },
+      select: { timezone: true, atfAgreement: true },
+    }),
     db.employee.findMany({
       orderBy: [{ active: "desc" }, { name: "asc" }],
       select: { id: true, name: true, employeeNumber: true, active: true },
@@ -87,6 +87,9 @@ export default async function TimesheetPage({
     }),
   ]);
 
+  const timeZone = company?.timezone ?? "Europe/Stockholm";
+  const now = new Date();
+
   // Förvald period är innevarande vecka. Det är den period en verkstad tänker
   // i, och kundens gamla rapport är också veckovis.
   const weekStart = startOfWeekIn(now, timeZone);
@@ -98,16 +101,23 @@ export default async function TimesheetPage({
 
   const employeeId = params.anstalld || employees[0]?.id || "";
 
-  const period = employeeId
-    ? await buildPayrollPeriod(db, timeZone, employeeId, from, to)
-    : null;
-
   // SALDOT IDAG, och inte periodens utgående. Rutan som justerar saldot
   // ändrar det här talet, och ett annat tal i samma ruta hade gjort
   // justeringen omöjlig att förutse: en period som slutar i framtiden stänger
   // på ett annat saldo än det personen har just nu.
-  const flexToday = employeeId
-    ? await currentFlexMinutes(db, timeZone, employeeId)
+  //
+  // Perioden och saldot hämtas samtidigt. Ingen av dem behöver den andra.
+  const [period, flexToday] = employeeId
+    ? await Promise.all([
+        buildPayrollPeriod(db, timeZone, employeeId, from, to),
+        currentFlexMinutes(db, timeZone, employeeId),
+      ])
+    : [null, null];
+
+  // ATF-underlaget, när perioden är en hel kalendermånad och företaget valt
+  // ett avtal. Annars null, och rutan visas inte. Se atf.ts.
+  const atf = period
+    ? await buildAtf(db, timeZone, period, company?.atfAgreement ?? null)
     : null;
 
   // Pilarna och veckonumret. Samma räkning som på Rapporter och Stämplingar,
@@ -131,20 +141,18 @@ export default async function TimesheetPage({
         </Field>
 
         <Field label="Från">
-          <input
+          <Input
             type="date"
             name="from"
             defaultValue={toDateInput(from, timeZone)}
-            className="block w-full rounded-md border-0 bg-white px-2.5 py-1.5 text-[13px] text-neutral-900 ring-1 ring-inset ring-neutral-400 focus:outline-hidden focus:ring-2 focus:ring-inset focus:ring-blue-600"
           />
         </Field>
 
         <Field label="Till">
-          <input
+          <Input
             type="date"
             name="to"
             defaultValue={toDateInput(to, timeZone)}
-            className="block w-full rounded-md border-0 bg-white px-2.5 py-1.5 text-[13px] text-neutral-900 ring-1 ring-inset ring-neutral-400 focus:outline-hidden focus:ring-2 focus:ring-inset focus:ring-blue-600"
           />
         </Field>
 
@@ -182,6 +190,8 @@ export default async function TimesheetPage({
     date: toDateInput(day.date, timeZone),
     dayLabel: `${dayName(day.weekday)} ${formatDate(day.date, timeZone)}`,
     weekday: day.weekday,
+    beforeStart: day.beforeStart,
+    holiday: day.holiday?.name ?? null,
     plannedMinutes: day.plannedMinutes,
     workedMinutes: day.workedMinutes,
     productiveMinutes: day.productiveMinutes,
@@ -189,15 +199,12 @@ export default async function TimesheetPage({
     breakMinutes: day.breakMinutes,
     absenceMinutes: day.absenceMinutes,
     flexMinutes: day.flexMinutes,
-    absences: day.absences.map((absence) => ({
-      ...absence,
-      withdrawsComp: day.comp.some((row) => row.absenceId === absence.id),
+    absences: day.absences.map(({ id, reason, minutes, note }) => ({
+      id,
+      reason,
+      minutes,
+      note,
     })),
-    // Bara det som skrivits för hand. Ett uttag som en frånvaro skrivit tas
-    // bort med frånvaron, och removeCompAdjustment vägrar ta det ensamt.
-    comp: day.comp
-      .filter((row) => row.absenceId === null)
-      .map(({ id, minutes, note }) => ({ id, minutes, note })),
     entries: day.entries.map((entry) => ({
       id: entry.id,
       from: formatTime(entry.clockInAt, timeZone),
@@ -225,8 +232,8 @@ export default async function TimesheetPage({
    * FÖRRA VECKAN FÖR HELA PERSONALEN, en person per sida.
    *
    * Utan `anstalld` tar rutten med alla aktiva, se timesheet/route.ts. Varje
-   * papper bär personens dagrader OCH summeringen med planerad tid, flex och
-   * komp — det är den summeringen som gör utskriften värd att dela ut.
+   * papper bär personens dagrader OCH summeringen med planerad tid och flex —
+   * det är den summeringen som gör utskriften värd att dela ut.
    *
    * Den hämtar alltså tidrapporten och inte rapportexporten. Knappen gjorde
    * det förut, och kunde då inte få med summeringen: de siffrorna är
@@ -236,9 +243,30 @@ export default async function TimesheetPage({
    * Konsekvensen är att knappen hör till lönemodulen, vilket den här sidan
    * redan gör.
    */
-  const lastWeek = datePresets(timeZone).lastWeek;
+  const { lastWeek, lastMonth } = datePresets(timeZone);
   const lastWeekHref =
     `/api/admin/export/timesheet?from=${lastWeek.from}&to=${lastWeek.to}`;
+
+  /*
+   * FÖRRA MÅNADEN FÖR HELA PERSONALEN, MED BARA FRÅNVARON (tillagt
+   * 2026-10-13, kundens begäran). Samma papper som veckan, men utan
+   * stämplingar och raster i raderna. Det går till lönen, som behöver
+   * frånvaron dag för dag och summeringen, men inte varje stämpling under en
+   * hel månad. Se `rows` i timesheet-pdf.ts.
+   */
+  const lastMonthHref =
+    `/api/admin/export/timesheet?from=${lastMonth.from}&to=${lastMonth.to}` +
+    `&rader=franvaro`;
+
+  /*
+   * SAMMA LÖNEUNDERLAG FÖR PERIODEN I RUTORNA (tillagt 2026-10-30, kundens
+   * fråga). Månadsknappen når bara föregående månad, och den som behöver en
+   * äldre hade ingen väg dit. Hela personalen, som månadsknappen, även om en
+   * person är vald ovanför: det är den utskriften lönen tar emot.
+   */
+  const selectedPeriodHref =
+    `/api/admin/export/timesheet?from=${toDateInput(from, timeZone)}` +
+    `&to=${toDateInput(to, timeZone)}&rader=franvaro`;
 
   return (
     <>
@@ -249,59 +277,14 @@ export default async function TimesheetPage({
           from,
           timeZone
         )} – ${formatDate(to, timeZone)}`}
-        action={
-          <div className="flex flex-wrap gap-2">
-            {/* JUSTERA SALDOT FÖR HAND. Skriv vad det ska vara; servern
-                räknar ut skillnaden mot det framräknade och flyttar det
-                ingående saldot. Se adjustFlexBalance.
-
-                Inte för en timanställd: det finns inget saldo att justera. */}
-            {!period.employee.hourly && (
-            <ActionDialog<BalanceState>
-              trigger="Justera flexsaldo"
-              title={`Flexsaldo för ${period.employee.name}`}
-              description={
-                flexToday === null
-                  ? undefined
-                  : `Saldot är ${formatSignedDuration(flexToday)} idag.`
-              }
-              action={adjustFlexBalance}
-              initial={{}}
-              submitLabel="Spara"
-            >
-              <input type="hidden" name="employeeId" value={employeeId} />
-              <Field label="Nytt saldo" hint="Tim:min, t.ex. 2:15 eller −0:45">
-                <Input
-                  name="flex"
-                  inputMode="decimal"
-                  autoComplete="off"
-                  placeholder="0"
-                />
-              </Field>
-            </ActionDialog>
-            )}
-
-            {/* Skriver ut direkt i stället för att ladda ner. Utskriften är
-                det den finns för, och den som ändå vill ha en fil väljer
-                "Spara som PDF" i skrivardialogen. */}
-            <PrintButton
-              href={lastWeekHref}
-              label="Förra veckan per anställd"
-            />
-
-            <ButtonLink href={exportHref} tone="secondary">
-              PDF
-            </ButtonLink>
-          </div>
-        }
-      />
+        />
 
       {!period.schedule && (
         <div className="mb-4">
           <Alert tone="warning">
             {period.employee.name} har inget arbetstidsschema.{" "}
             <Link
-              href="/admin/installningar/schema"
+              href="/admin/installningar/arbetstider"
               className="font-medium underline"
             >
               Lägg upp ett schema
@@ -313,37 +296,96 @@ export default async function TimesheetPage({
 
       {filters}
 
-      <div className="mb-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      {/* VEMS PAPPER DET ÄR STÅR VID KNAPPARNA. Sidan visar en person, men tre av
+          utskrifterna gäller hela personalen, också när en person är vald. De
+          stod på en rad utan skillnad, och det var lätt att skriva ut allas
+          frånvaro när man ville ha ett papper. Skriv ut går direkt till
+          skrivaren, se PrintButton.
+
+          Frågan är inte vilken knapp utan vilket dokument, som i Ordrar. */}
+      <Card className="mb-6 p-5">
+        <div className="flex flex-wrap items-end gap-x-4 gap-y-4">
+          <ExportGroup label={`${period.employee.name}, vald period`}>
+            <PrintButton href={exportHref} />
+            <ExportLink href={exportHref}>Ladda ner</ExportLink>
+          </ExportGroup>
+
+          <ExportGroup label="Hela personalen">
+            <PrintButton href={lastWeekHref} label="Tidrapport föregående vecka" />
+            <PrintButton
+              href={lastMonthHref}
+              label="Löneunderlag föregående månad"
+            />
+            <PrintButton
+              href={selectedPeriodHref}
+              label="Löneunderlag vald period"
+              disabled={to < from}
+            />
+          </ExportGroup>
+        </div>
+      </Card>
+
+      <div
+        className={`mb-6 grid gap-4 ${
+          atf ? "sm:grid-cols-2 lg:grid-cols-4" : "sm:grid-cols-3"
+        }`}
+      >
         <Stat
           label="Planerad tid"
           value={formatDuration(period.totals.planned)}
-          hint="tim:min"
+          hint="timmar"
         />
         <Stat
-          label="Närvarotid"
+          label="Arbetad tid"
           value={formatDuration(period.totals.worked)}
-          hint="tim:min"
+          hint="timmar"
         />
-        {/* FLEX OCH KOMP GÖMS FÖR EN TIMANSTÄLLD. Hen mäts inte mot något
-            schema, så det finns ingen planerad tid att ligga över eller under.
-            Två rutor med 0:00 hade sett ut som ett saldo i jämvikt, vilket är
-            något helt annat än att saldot inte finns. */}
+        {/* FLEXEN GÖMS FÖR EN TIMANSTÄLLD. Hen mäts inte mot något schema,
+            så det finns ingen planerad tid att ligga över eller under. En ruta
+            med 0:00 hade sett ut som ett saldo i jämvikt, vilket är något helt
+            annat än att saldot inte finns. */}
         {!period.employee.hourly && (
-          <>
-            <Stat
-              label="Flextid, perioden"
-              value={formatSignedDuration(period.totals.flex)}
-              tone={period.totals.flex >= 0 ? "active" : "warning"}
-              hint={`saldo ${formatSignedDuration(period.flex.closing)}`}
-            />
-            <Stat
-              label="Komptid"
-              value={formatSignedDuration(period.comp.closing)}
-              hint={`${formatSignedDuration(period.comp.earned)} intjänat, ${formatDuration(
-                period.comp.taken
-              )} uttaget`}
-            />
-          </>
+          <Stat
+            label="Flextid, perioden"
+            value={formatSignedDuration(period.totals.flex)}
+            tone={period.totals.flex >= 0 ? "active" : "warning"}
+            hint={`saldo ${formatSignedDuration(period.flex.closing)}`}
+            action={
+              // SALDOT RÄTTAS DÄR DET STÅR. Skriv vad det ska vara; servern
+              // räknar ut skillnaden mot det framräknade och flyttar det
+              // ingående saldot. Se adjustFlexBalance.
+              <ActionDialog<BalanceState>
+                trigger="Justera flexsaldo"
+                triggerTone="ghost"
+                title={`Flexsaldo för ${period.employee.name}`}
+                description={
+                  flexToday === null
+                    ? undefined
+                    : `Saldot är ${formatSignedDuration(flexToday)} idag.`
+                }
+                action={adjustFlexBalance}
+                initial={{}}
+                submitLabel="Spara"
+              >
+                <input type="hidden" name="employeeId" value={employeeId} />
+                <Field label="Nytt saldo" hint="Timmar, t.ex. 2,25 eller −0,75">
+                  <Input
+                    name="flex"
+                    inputMode="decimal"
+                    autoComplete="off"
+                    placeholder="0"
+                  />
+                </Field>
+              </ActionDialog>
+            }
+          />
+        )}
+        {atf && (
+          <Stat
+            label="Intjänad ATF"
+            value={formatDuration(atf.earnedMinutes)}
+            hint={`underlag ${formatDuration(atf.basisMinutes)}`}
+          />
         )}
       </div>
 
@@ -367,12 +409,9 @@ export default async function TimesheetPage({
           days={days}
           employeeId={employeeId}
           employeeName={period.employee.name}
-          hourly={period.employee.hourly}
           reasons={reasons}
           absenceAction={saveAbsence}
-          compAction={saveCompEarned}
           deleteAbsenceAction={deleteAbsence}
-          deleteCompAction={deleteCompEarned}
         />
       </div>
 

@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { requireAdmin } from "@/lib/admin-session";
+import { isOwner, requireAdmin } from "@/lib/admin-session";
 import { hasModule } from "@/lib/company-modules";
 import SaveForm from "@/components/admin/SaveForm";
 import {
@@ -13,15 +13,24 @@ import {
 } from "@/components/ui";
 import { anonymizeEmployee } from "../actions";
 
+export const metadata = { title: "Dataskydd · Tikkr" };
+
 export const dynamic = "force-dynamic";
 
 export default async function DataProtectionPage() {
-  const { db, companyId } = await requireAdmin();
+  const session = await requireAdmin();
+  const { db, companyId } = session;
+  // Anonymiseringen gör bara ägaren, se isOwner. Övriga ser varningen men
+  // inte formuläret.
+  const owner = isOwner(session);
 
   // VAD SOM SPARAS BEROR PÅ TILLVALET, och texten nedan måste säga rätt sak.
   // Med löneunderlaget registreras frånvaro med orsak, vilket kan vara en
   // uppgift om hälsa. Utan det finns ingen sådan uppgift i systemet alls.
   const payroll = await hasModule(companyId, "PAYROLL");
+  // Planeringens pass bär en person. Texten nämner dem bara när de kan finnas,
+  // av samma skäl som löneunderlagets rader ovan.
+  const planning = await hasModule(companyId, "PLANNING");
 
   const employees = await db.employee.findMany({
     orderBy: { name: "asc" },
@@ -78,6 +87,7 @@ export default async function DataProtectionPage() {
             <span className="mt-1.5 block">Detta går inte att ångra.</span>
           </Alert>
 
+          {owner ? (
           <SaveForm
             action={anonymizeEmployee}
             submitLabel="Anonymisera personen"
@@ -106,6 +116,11 @@ export default async function DataProtectionPage() {
               <Input name="confirm" placeholder="ANONYMISERA" required />
             </Field>
           </SaveForm>
+          ) : (
+            <p className="text-[13px] text-neutral-600">
+              Anonymiseringen görs av arbetsytans ägare.
+            </p>
+          )}
         </div>
       </Card>
 
@@ -119,8 +134,8 @@ export default async function DataProtectionPage() {
           {payroll ? (
             <>
               <p>
-                Med löneunderlaget registreras även arbetstidsschema, raster,
-                frånvaro med orsak och komptid.
+                Med löneunderlaget registreras även arbetstidsschema, raster
+                och frånvaro med orsak.
               </p>
               <p>
                 Frånvaro med orsak kan vara en uppgift om hälsa eller familj.
@@ -134,12 +149,18 @@ export default async function DataProtectionPage() {
               Ingen löneinformation, frånvaro eller sjukdom registreras.
             </p>
           )}
+          {planning && (
+            <p>
+              Med planeringen registreras planerade pass per anställd, med
+              order, arbetsmoment och tid, och anställdas egna arbetstider.
+            </p>
+          )}
           <p>
             Ert företag är personuppgiftsansvarigt och TERAFALK AB är
             personuppgiftsbiträde. Villkoren för det står i{" "}
             <Link
               href="/personuppgiftsbitradesavtal"
-              className="font-medium text-tick-deep hover:underline"
+              className="font-medium text-link hover:underline"
             >
               personuppgiftsbiträdesavtalet
             </Link>

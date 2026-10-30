@@ -7,6 +7,7 @@ import {
   deleteStation,
   moveStation,
   placeBlock,
+  planningModeOf,
   removeBlock,
   resizeBlock,
   saveStation,
@@ -682,5 +683,47 @@ describe("ta bort en station", () => {
       where: { id: theirStationId },
     });
     expect(still).not.toBeNull();
+  });
+});
+
+describe("planeringsläget", () => {
+  it("ett företag som aldrig valt planerar på stationer", async () => {
+    // Varje kund som fanns före lägena ska ha kvar det planeringen var.
+    expect(await planningModeOf(companyId)).toBe("PRODUCTION");
+  });
+
+  it("läget är företagets eget och rör inte grannen", async () => {
+    await unsafeGlobalPrisma.company.update({
+      where: { id: companyId },
+      data: { planningMode: "SERVICE" },
+    });
+
+    expect(await planningModeOf(companyId)).toBe("SERVICE");
+    expect(await planningModeOf(otherCompanyId)).toBe("PRODUCTION");
+  });
+
+  it("byte av läge rör ingen planerad tid", async () => {
+    const placed = await placeBlock(db, companyId, SE, {
+      orderId,
+      momentId: frasning,
+      stationId: fras1,
+      startsAt: at(8),
+      minutes: 120,
+      byEmail: "planerare@example.se",
+    });
+    expect(placed.error).toBeUndefined();
+
+    await unsafeGlobalPrisma.company.update({
+      where: { id: companyId },
+      data: { planningMode: "SERVICE" },
+    });
+    await unsafeGlobalPrisma.company.update({
+      where: { id: companyId },
+      data: { planningMode: "PRODUCTION" },
+    });
+
+    const blocks = await blocksInWeek(db, MONDAY, SE);
+    expect(blocks.map((block) => block.id)).toEqual([placed.id]);
+    expect(blocks[0].minutes).toBe(120);
   });
 });

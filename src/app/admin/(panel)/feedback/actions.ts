@@ -1,0 +1,54 @@
+"use server";
+
+import { assertWritable, requireAdminEvenIfLocked } from "@/lib/admin-session";
+import { FeedbackError, sendFeedback } from "@/lib/feedback";
+import { fullName } from "@/lib/person-name";
+
+export interface FeedbackFormState {
+  error?: string;
+  ok?: string;
+}
+
+/**
+ * Skickar ett fel, ett förslag eller en synpunkt från rutan i menyn.
+ *
+ * Företaget och avsändaren tas ur sessionen. Formuläret bär bara det kunden
+ * själv skrivit och valt, och sidan hen stod på. Supportläget kan inte
+ * skicka: ett meddelande från oss till oss, i kundens namn, vore just den
+ * sortens lånade identitet supportläget är byggt för att undvika.
+ */
+export async function sendFeedbackAction(
+  _previous: FeedbackFormState,
+  formData: FormData
+): Promise<FeedbackFormState> {
+  const session = await requireAdminEvenIfLocked();
+  await assertWritable(session);
+
+  const me = await session.db.adminUser.findFirst({
+    where: { id: session.userId },
+    select: { firstName: true, lastName: true },
+  });
+
+  try {
+    await sendFeedback(
+      {
+        db: session.db,
+        companyId: session.companyId,
+        userId: session.userId,
+        email: session.email,
+        name: me ? fullName(me) : null,
+      },
+      {
+        kind: String(formData.get("kind") ?? ""),
+        area: String(formData.get("area") ?? ""),
+        page: String(formData.get("page") ?? "") || null,
+        body: String(formData.get("body") ?? ""),
+      }
+    );
+  } catch (error) {
+    if (error instanceof FeedbackError) return { error: error.message };
+    throw error;
+  }
+
+  return { ok: "Meddelandet är skickat." };
+}

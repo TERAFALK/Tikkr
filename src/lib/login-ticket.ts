@@ -43,8 +43,26 @@ export interface LoginTicket {
    * byta lösenordet och ta emot koden. Se loginAlternatives i admin-mfa.ts.
    */
   afterReset?: boolean;
+  /**
+   * Satt när kontot just skapats vid registreringen (2026-10-11).
+   *
+   * Lappen är då beviset i stället för en kod från appen: lösenordet valdes
+   * för några sekunder sedan, i den här webbläsaren, och kontot har ingen app
+   * kopplad än. Se SIGNUP_METHOD i auth.ts, och § 4 punkt 5 i CLAUDE.md om
+   * varför tvåsteg ändå krävs från andra inloggningen.
+   *
+   * Gäller bara tio minuter, som alla lappar, och kan inte förfalskas: den är
+   * signerad med AUTH_SECRET.
+   */
+  fresh?: boolean;
   /** Utgångstid, sekunder sedan epoch. */
   exp: number;
+}
+
+/** Det som kan följa med utöver kontot och vägen vidare. */
+export interface TicketExtra {
+  afterReset?: boolean;
+  fresh?: boolean;
 }
 
 function signingKey(scope: TicketScope): string {
@@ -57,9 +75,36 @@ function sign(scope: TicketScope, data: string): string {
   return createHmac("sha256", signingKey(scope)).update(data).digest("base64url");
 }
 
-/** Bara en sökväg i samma app. En fullständig adress vore en öppen omdirigering. */
-function safeNext(next: string | undefined): string | undefined {
-  return next && next.startsWith("/") && !next.startsWith("//") ? next : undefined;
+/**
+ * Bara en sökväg i samma app. En fullständig adress vore en öppen omdirigering.
+ *
+ * Bakåtsnedstreck och styrtecken vägras också (ändrat 2026-10-18): webbläsare
+ * läser `/\evil.se` som `//evil.se`, alltså en annan sajt, och en tabb eller
+ * radbrytning i adressen tas bort innan den tolkas.
+ */
+export function safeNext(next: string | undefined): string | undefined {
+  if (!next || !next.startsWith("/") || next.startsWith("//")) return undefined;
+  if (/[\\\u0000-\u001f\u007f]/.test(next)) return undefined;
+  return next;
+}
+
+/**
+ * En returadress INOM ADMINPANELEN, eller undefined.
+ *
+ * Säljsidans Beställ-knapp skickar den som inte är inloggad till
+ * inloggningen med `?till=/admin/...`, och personen ska landa där efter
+ * tvåsteget. Adressen kommer utifrån, så den prövas som safeNext och måste
+ * dessutom ligga under /admin: en inloggning ska inte kunna skicka vidare
+ * till plattformspanelen eller tillbaka till inloggningen.
+ */
+export function safeAdminNext(next: string | undefined | null): string | undefined {
+  const safe = safeNext(next ?? undefined);
+  if (!safe) return undefined;
+  if (safe !== "/admin" && !safe.startsWith("/admin/") && !safe.startsWith("/admin?")) {
+    return undefined;
+  }
+  if (safe.startsWith("/admin/login")) return undefined;
+  return safe;
 }
 
 export function encodeTicket(
@@ -67,13 +112,14 @@ export function encodeTicket(
   sub: string,
   next?: string,
   now: Date = new Date(),
-  extra: { afterReset?: boolean } = {}
+  extra: TicketExtra = {}
 ): string {
   const payload: LoginTicket = {
     sub,
     next: safeNext(next),
     exp: Math.floor(now.getTime() / 1000) + LIFETIME_SECONDS,
     ...(extra.afterReset ? { afterReset: true } : {}),
+    ...(extra.fresh ? { fresh: true } : {}),
   };
   const body = Buffer.from(JSON.stringify(payload)).toString("base64url");
   return `${body}.${sign(scope, body)}`;
@@ -114,7 +160,7 @@ export async function issueTicket(
   scope: TicketScope,
   sub: string,
   next?: string,
-  extra: { afterReset?: boolean } = {}
+  extra: TicketExtra = {}
 ): Promise<void> {
   (await cookies()).set(COOKIE[scope], encodeTicket(scope, sub, next, new Date(), extra), {
     httpOnly: true,

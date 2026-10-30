@@ -50,6 +50,18 @@ beforeAll(async () => {
       clockOutAt: new Date("2026-09-01T14:00:00Z"),
     },
   });
+  // Ett planerat pass är en personuppgift och ska med i utdraget.
+  await unsafeGlobalPrisma.staffBlock.create({
+    data: {
+      companyId,
+      employeeId: anna,
+      orderId: order.id,
+      momentId: moment.id,
+      startsAt: new Date("2026-09-03T06:00:00Z"),
+      minutes: 120,
+      createdByEmail: "chef@test.se",
+    },
+  });
   const reason = await unsafeGlobalPrisma.absenceReason.create({
     data: { companyId, name: "Sjuk" },
   });

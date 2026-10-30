@@ -29,7 +29,7 @@ enum SubscriptionStatus {
 /// Ett nytt värde här är en additiv ändring. Ta ALDRIG bort ett värde som
 /// något företag kan ha en rad på — raden är deras köp.
 enum CompanyModuleKey {
-  /// Löneunderlaget: schema, raster, flex, komp och frånvaro.
+  /// Löneunderlaget: schema, raster, flex och frånvaro.
   PAYROLL
 
   /// Planeringen: stationer, veckovis tidslinje och planerade jobb.
@@ -43,6 +43,29 @@ enum ModuleSource {
   /// Satt för hand i plattformspanelen — fakturakund, labbmiljö, eller en
   /// modul vi bjuder på.
   MANUAL
+}
+
+/// PLANERINGSLÄGET (tillagt 2026-10-14, issue #21). Avgör vilka vyer
+/// planeringen har och vilken resurs som räknar av orderns beräknade tid.
+/// Registret med namn och vyer är src/lib/planning-modes.ts, som koden läser.
+///
+/// Ett nytt värde här är en additiv ändring, och en ny verksamhetstyp är ett
+/// nytt värde och en rad i registret.
+enum PlanningMode {
+  /// Verkstad: ordrar på stationer, och personal på jobben. Förvalet, så att
+  /// kunderna som redan planerar på stationer har kvar precis det de hade.
+  PRODUCTION
+  /// Tjänsteföretag, till exempel en elfirma: personal på jobb, utan stationer.
+  SERVICE
+}
+
+/// Hur en stämplingsskärm är ansluten, som den själv rapporterar det. Se
+/// KioskDevice.networkType.
+enum KioskNetworkType {
+  WIFI
+  /// Allt anslutet nät som inte är wifi. ProDVX-skärmarna har ingen SIM-plats,
+  /// så i praktiken nätverkskabel.
+  WIRED
 }
 
 /// Vad en stämpling avser. Se TimeEntry.kind.
@@ -121,6 +144,19 @@ model Company {
   /// mellan sommar och vinter.
   timezone String @default("Europe/Stockholm")
 
+  /// KOLLEKTIVAVTALET SOM ATF RÄKNAS EFTER (tillagt 2026-10-13). En nyckel i
+  /// `src/lib/collective-agreements.ts`, till exempel "TEKNIK_IF_METALL".
+  /// Tomt betyder ingen ATF, och då visas ingen rad om den någonstans.
+  ///
+  /// Text och inte en enum: ett nytt avtal är en rad i registret, inte en
+  /// migration. Värdet prövas mot registret när det sparas.
+  atfAgreement String? @map("atf_agreement")
+
+  /// PLANERINGSLÄGET, se enumen PlanningMode. Läses bara när företaget har
+  /// planeringen. Förvalet PRODUCTION ger varje befintligt företag det läge
+  /// planeringen alltid haft, utan att någon rad behöver skrivas om.
+  planningMode PlanningMode @default(PRODUCTION) @map("planning_mode")
+
   /// Påslag på självkostnaden i kalkylen, i PROCENT. 140 betyder ×1,40.
   ///
   /// Heltalsprocent och inte en faktor med decimaler, eftersom 1,4 inte går
@@ -161,9 +197,8 @@ model Company {
   customers       Customer[]
   supportVisits   SupportVisit[]
 
-  /// Supporten. Se FeedbackMessage.
+  /// Fel och förslag. Se FeedbackMessage.
   feedbackMessages FeedbackMessage[]
-  feedbackReplies  FeedbackReply[]
 
   // Löneunderlaget. Se avsnittet längst ner i filen.
   workSchedules   WorkSchedule[]
@@ -173,19 +208,32 @@ model Company {
   breakEntries    BreakEntry[]
   absenceReasons  AbsenceReason[]
   prices          CompanyPrice[]
+  kioskSettings   CompanyKioskSetting[]
+
+  /// DÖD sedan 2026-10-26, se KioskConfig.
+  kioskConfigId String?      @map("kiosk_config_id")
+  kioskConfig   KioskConfig? @relation(fields: [kioskConfigId], references: [id], onDelete: SetNull)
   absences        Absence[]
   compAdjustments CompAdjustment[]
+  holidays        Holiday[]
 
   /// Tillvalen. Se CompanyModule längst ner i filen.
   stations      Station[]
   stationDays   StationDay[]
   stationBreaks StationBreak[]
   plannedBlocks PlannedBlock[]
+  staffBlocks   StaffBlock[]
 
   modules CompanyModule[]
 
   /// Ändringsloggen. Se AuditEvent.
   auditEvents AuditEvent[]
+
+  /// Tillbehören: leveransuppgifterna och beställningarna. Se ShopOrder.
+  profile         CompanyProfile?
+  shopOrders      ShopOrder[]
+  shopOrderLines  ShopOrderLine[]
+  shopOrderEvents ShopOrderEvent[]
 
   @@map("companies")
 }
@@ -266,10 +314,12 @@ model Employee {
   /// arbetat in.
   flexOpeningMinutes Int @default(0) @map("flex_opening_minutes")
 
-  /// Komptidssaldot när Tikkr togs i bruk, i minuter.
+  /// DÖD KOLUMN sedan 2026-10-13, då komptiden togs bort. Bar komptidssaldot
+  /// när Tikkr togs i bruk. Läses bara av registerutdraget, för den som har ett
+  /// värde kvar. Tas bort i en senare release.
   compOpeningMinutes Int @default(0) @map("comp_opening_minutes")
 
-  /// TIMANSTÄLLD: ingen planerad tid, inget flexsaldo, ingen komptid.
+  /// TIMANSTÄLLD: ingen planerad tid och inget flexsaldo.
   ///
   /// Den som är timanställd har inte lovat några timmar, och mäts därför inte
   /// mot något schema. Utan det här fältet föll hen tillbaka på företagets
@@ -280,11 +330,18 @@ model Employee {
   /// bara mätningen mot ett schema som faller bort.
   hourly Boolean @default(false)
 
-  /// Dagen saldona ovan gällde. Tikkr räknar från och med denna dag och
-  /// framåt; allt före den ligger i ingående saldo.
+  /// STARTDATUMET, som sätts under Anställda. Flexen räknas från och med
+  /// denna dag; allt före den ligger i ingående saldo, och dagar före den har
+  /// ingen planerad tid.
   ///
   /// Tomt betyder att personen räknas från sin första stämpling.
   balanceOpeningDate DateTime? @map("balance_opening_date")
+
+  /// ARBETSTIDSFORMEN FÖR ATF (tillagt 2026-10-13), till exempel dagtid eller
+  /// tvåskift. En nyckel bland avtalets former i
+  /// `src/lib/collective-agreements.ts`. Tomt betyder avtalets förval, som är
+  /// dagtid. Används bara när företaget valt ett avtal.
+  atfWorkForm String? @map("atf_work_form")
 
   company     Company     @relation(fields: [companyId], references: [id], onDelete: Cascade)
   timeEntries TimeEntry[]
@@ -293,6 +350,9 @@ model Employee {
   breakEntries    BreakEntry[]
   absences        Absence[]
   compAdjustments CompAdjustment[]
+
+  /// Planerade personalpass. Se StaffBlock.
+  staffBlocks StaffBlock[]
 
   // Numret är unikt per företag, inte globalt. Två olika kunder ska kunna ha
   // varsin anställd med nummer 1 utan att krocka. Flera personer utan nummer
@@ -434,6 +494,9 @@ model Order {
   /// Planerade rutor på tavlan. Se PlannedBlock.
   plannedBlocks PlannedBlock[]
 
+  /// Planerade personalpass. Se StaffBlock.
+  staffBlocks StaffBlock[]
+
   // Restrict och inte Cascade: en kund med ordrar ska inte gå att radera, bara
   // avaktiveras. Samma regel som redan gäller ordrar och arbetsmoment med
   // registrerad tid — underlaget får inte försvinna under händerna på någon.
@@ -477,6 +540,7 @@ model WorkMoment {
   /// Stationerna som kör det här momentet. Se Station.
   stations      Station[]
   plannedBlocks PlannedBlock[]
+  staffBlocks   StaffBlock[]
 
   @@unique([companyId, name])
   @@index([companyId, active])
@@ -693,8 +757,29 @@ model AdminUser {
   createdAt    DateTime  @default(now()) @map("created_at")
   updatedAt    DateTime  @updatedAt @map("updated_at")
 
-  /// Personens namn. Krävs av den som registrerar en arbetsyta, frivilligt för
-  /// den som bjuds in.
+  /// FÖRNAMN OCH EFTERNAMN I VARSITT FÄLT (ändrat 2026-10-11, issue #16).
+  ///
+  /// Var ett enda `name`. Kunderna skrev då bara förnamnet, och en arbetsyta
+  /// med tre administratörer som heter Anna, Johan och Anna går inte att
+  /// skilja åt — varken på kundkortet i plattformspanelen eller av den som
+  /// ringer supporten.
+  ///
+  /// Krävs båda av den som registrerar en arbetsyta, frivilliga för den som
+  /// bjuds in. Visningsnamnet slås ihop av `fullName()` i person-name.ts och
+  /// lagras ingenstans: ett sammanslaget fält bredvid de två hinner alltid
+  /// sluta säga samma sak, samma skäl som att orderns beräknade tid aldrig
+  /// lagras (CLAUDE.md § 3 regel 6).
+  firstName String? @map("first_name")
+  lastName  String? @map("last_name")
+
+  /// DÖD KOLUMN. Bar personens hela namn fram till 2026-10-11, och
+  /// migrationen delade värdet i de två fälten ovan. Ingenting läser eller
+  /// skriver den längre.
+  ///
+  /// Ligger kvar eftersom en migration lägger till och inte tar bort, så att
+  /// den föregående versionen av appen fungerar mot den nya databasen
+  /// (CLAUDE.md § 0 punkt 7). Tas bort i en senare release, som fälten för
+  /// ingående komptid.
   name String?
 
   /// Telefonnummer, normaliserat till E.164 ("+46701234567"). Se phone.ts.
@@ -761,11 +846,6 @@ model AdminUser {
   /// synliga när versionen installeras, inte på ett datum.
   newsSeenVersion String? @map("news_seen_version")
 
-  /// SUPPORTEN (tillagt 2026-10-11, issue #8). När personen senast öppnade
-  /// sidan Support. Pricken i menyn står när ett av personens meddelanden fått
-  /// svar eller ny status efter det. Se feedback.ts.
-  supportSeenAt DateTime? @map("support_seen_at")
-
   company             Company             @relation(fields: [companyId], references: [id], onDelete: Cascade)
   passwordResets      PasswordReset[]
   emailVerifications  EmailVerification[]
@@ -800,6 +880,26 @@ model PasswordReset {
 
   @@index([userId, usedAt])
   @@map("password_resets")
+}
+
+/// Misslyckade försök att logga in, gissa en kod eller registrera sig.
+///
+/// I databasen och inte i minnet (ändrat 2026-10-18), så att en omstart eller
+/// en driftsättning inte nollar räkningen. Se src/lib/login-throttle.ts.
+///
+/// Ingen kunddata och ingen companyId: raden gäller en adress eller en IP, inte
+/// ett företag. Nyckeln lagras som SHA-256, så att tabellen inte blir en lista
+/// över e-postadresser och IP-adresser. Rader som löpt ut raderas löpande.
+model LoginThrottle {
+  id      String   @id @default(cuid())
+  scope   String
+  keyHash String   @map("key_hash")
+  count   Int
+  until   DateTime
+
+  @@unique([scope, keyHash])
+  @@index([until])
+  @@map("login_throttles")
 }
 
 /// En länk som bekräftar en administratörs e-postadress.
@@ -934,32 +1034,26 @@ model SupportVisit {
   @@map("support_visits")
 }
 
-/// Vad ett meddelande till supporten gäller. Styr etiketten, inget annat.
+/// Vad ett meddelande gäller. Styr etiketten, inget annat.
 enum FeedbackKind {
   BUG
   SUGGESTION
   FEEDBACK
 }
 
-/// Var ett meddelande står hos oss. Kunden ser samma ord.
-enum FeedbackStatus {
-  NEW
-  IN_PROGRESS
-  DONE
-}
-
-/// ETT MEDDELANDE FRÅN KUNDEN TILL SUPPORTEN (tillagt 2026-10-11, issue #8).
+/// ETT FEL, FÖRSLAG ELLER EN SYNPUNKT FRÅN KUNDEN (tillagt 2026-10-11, issue
+/// #8, förenklat samma dag).
 ///
-/// Fel, förslag och synpunkter, skickade från sidan Support i panelen och
-/// lästa i plattformens inkorg. Ingen mejlavisering: inkorgen är platsen.
+/// Skickas från knappen längst ner i panelens meny och läses i plattformens
+/// inkorg. Kunden får ingen återkoppling, och ingen mejlavisering skickas.
 ///
 /// Kundens egen data och därför företagsfiltrerad, se tenant.ts. Kunden
-/// skriver genom sin egen klient; plattformen läser och svarar globalt, på
+/// skriver genom sin egen klient; plattformen läser och arkiverar globalt, på
 /// samma sätt som CompanyPrice.
 ///
 /// Avsändarens adress och namn kopieras in. Tas användaren bort ska
-/// meddelandet fortfarande gå att läsa och besvara, och kopplingen till
-/// kontot nollas då av databasen.
+/// meddelandet fortfarande gå att läsa, och kopplingen till kontot nollas då
+/// av databasen.
 model FeedbackMessage {
   id        String @id @default(cuid())
   companyId String @map("company_id")
@@ -980,48 +1074,25 @@ model FeedbackMessage {
 
   body String
 
-  status               FeedbackStatus @default(NEW)
-  statusChangedAt      DateTime?      @map("status_changed_at")
-  statusChangedByEmail String?        @map("status_changed_by_email")
-
-  /// Senaste gången något hände som kunden ska se: ett svar eller en ny
-  /// status. Tänder pricken vid Support, se AdminUser.supportSeenAt.
-  customerUpdatedAt DateTime? @map("customer_updated_at")
+  /// KLARMARKERAD, och därmed i arkivet. Tomt betyder att det ligger i
+  /// inkorgen. Ingen statuskolumn bredvid: raden ÄR tillståndet, samma skäl
+  /// som company_modules (CLAUDE.md § 3.1).
+  ///
+  /// Anteckningen krävs. Ett arkiv där det inte står vad som gjordes går inte
+  /// att läsa ett halvår senare.
+  doneAt      DateTime? @map("done_at")
+  doneNote    String?   @map("done_note")
+  doneByEmail String?   @map("done_by_email")
 
   createdAt DateTime @default(now()) @map("created_at")
 
-  company Company         @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  author  AdminUser?      @relation(fields: [authorUserId], references: [id], onDelete: SetNull)
-  replies FeedbackReply[]
+  company Company    @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  author  AdminUser? @relation(fields: [authorUserId], references: [id], onDelete: SetNull)
 
   @@index([companyId, createdAt])
-  @@index([status, createdAt])
+  @@index([doneAt, createdAt])
   @@index([authorUserId, createdAt])
   @@map("feedback_messages")
-}
-
-/// Vårt svar på ett meddelande. Visas för kunden under meddelandet.
-///
-/// Bara åt ett håll: kunden svarar genom att skicka ett nytt meddelande. En
-/// tråd åt båda hållen är ett ärendesystem, och det är inte vad issuen bad om.
-model FeedbackReply {
-  id        String @id @default(cuid())
-  companyId String @map("company_id")
-  messageId String @map("message_id")
-
-  body String
-
-  /// Plattformskontot som svarade. Visas aldrig för kunden, där står "Tikkr".
-  authorEmail String @map("author_email")
-
-  createdAt DateTime @default(now()) @map("created_at")
-
-  company Company         @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  message FeedbackMessage @relation(fields: [messageId], references: [id], onDelete: Cascade)
-
-  @@index([messageId, createdAt])
-  @@index([companyId])
-  @@map("feedback_replies")
 }
 
 model PlatformState {
@@ -1179,6 +1250,143 @@ model CompanyPrice {
   @@map("company_prices")
 }
 
+/// DÖD sedan 2026-10-26. Fjärrstyrningen av skärmarnas inställningar och
+/// konfigurationer byggdes och togs bort samma dag (produktägarens val, se
+/// CLAUDE.md). Läses och skrivs inte, och tas bort i en senare release
+/// (CLAUDE.md § 0 punkt 7).
+///
+/// STANDARDINSTÄLLNINGARNA FÖR SKÄRMARNA VI SÄLJER.
+///
+/// Gäller varje såld skärm hos varje kund som inte har ett eget värde, se
+/// CompanyKioskSetting. Nycklarna och vad de betyder står i
+/// src/lib/kiosk-settings.ts. Saknas raden gäller värdet där.
+///
+/// Ingen company_id: raden gäller hela plattformen, som StripePrice.
+model KioskSettingDefault {
+  /// En nyckel ur KIOSK_SETTING_KEYS.
+  key   String @id
+  value String
+
+  updatedByEmail String   @map("updated_by_email")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  @@map("kiosk_setting_defaults")
+}
+
+/// DÖD sedan 2026-10-26. Fjärrstyrningen av skärmarnas inställningar och
+/// konfigurationer byggdes och togs bort samma dag (produktägarens val, se
+/// CLAUDE.md). Läses och skrivs inte, och tas bort i en senare release
+/// (CLAUDE.md § 0 punkt 7).
+///
+/// EN KUNDS EGET VÄRDE FÖR EN SKÄRMINSTÄLLNING.
+///
+/// Går före plattformens standard för just den kundens skärmar. Saknas raden
+/// gäller standarden. Skrivs bara av plattformspanelen, men hör till kunden
+/// och filtreras därför som CompanyPrice.
+model CompanyKioskSetting {
+  id        String @id @default(cuid())
+  companyId String @map("company_id")
+
+  /// En nyckel ur KIOSK_SETTING_KEYS.
+  key   String
+  value String
+
+  updatedByEmail String   @map("updated_by_email")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@unique([companyId, key])
+  @@index([companyId])
+  @@map("company_kiosk_settings")
+}
+
+/// DÖD sedan 2026-10-26. Fjärrstyrningen av skärmarnas inställningar och
+/// konfigurationer byggdes och togs bort samma dag (produktägarens val, se
+/// CLAUDE.md). Läses och skrivs inte, och tas bort i en senare release
+/// (CLAUDE.md § 0 punkt 7).
+///
+/// EN KONFIGURATION FÖR SKÄRMARNA VI SÄLJER.
+///
+/// En hel inställningsfil för kioskappen, i versioner. Plattformens egen
+/// tabell, som StripePrice: en konfiguration hör inte till en kund, kunderna
+/// pekar på den. Regler och format i src/lib/kiosk-config.ts.
+///
+/// Högst en är standarden. Det vaktas i kiosk-config-store.ts, eftersom ett
+/// villkor på en enda rad inte går att uttrycka här.
+model KioskConfig {
+  id        String  @id @default(cuid())
+  name      String  @unique
+  isDefault Boolean @default(false) @map("is_default")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  versions  KioskConfigVersion[]
+  companies Company[]
+  devices   KioskDevice[]
+
+  @@map("kiosk_configs")
+}
+
+/// DÖD sedan 2026-10-26. Fjärrstyrningen av skärmarnas inställningar och
+/// konfigurationer byggdes och togs bort samma dag (produktägarens val, se
+/// CLAUDE.md). Läses och skrivs inte, och tas bort i en senare release
+/// (CLAUDE.md § 0 punkt 7).
+///
+/// EN VERSION AV EN KONFIGURATION. Skrivs en gång och ändras aldrig.
+///
+/// Att backa är att spara en gammal version som en ny. Skärmen läser in den
+/// senaste versionen av sin konfiguration.
+///
+/// Hemligheterna (PIN-koden, lösenorden, volymnyckeln) ligger krypterade med
+/// AUTH_SECRET i `secrets_sealed`, aldrig i `settings`. Se secret-box.ts.
+model KioskConfigVersion {
+  id       String @id @default(cuid())
+  configId String @map("config_id")
+  version  Int
+
+  /// Inställningarna utan hemligheter, som ett JSON-objekt.
+  settings      Json
+  secretsSealed String? @map("secrets_sealed")
+
+  createdByEmail String   @map("created_by_email")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  config         KioskConfig   @relation(fields: [configId], references: [id], onDelete: Cascade)
+  appliedDevices KioskDevice[]
+
+  @@unique([configId, version])
+  @@map("kiosk_config_versions")
+}
+
+/// DÖD sedan 2026-10-26. Fjärrstyrningen av skärmarnas inställningar och
+/// konfigurationer byggdes och togs bort samma dag (produktägarens val, se
+/// CLAUDE.md). Läses och skrivs inte, och tas bort i en senare release
+/// (CLAUDE.md § 0 punkt 7).
+///
+/// EN ENGÅNGSADRESS TILL EN KONFIGURATIONSFIL.
+///
+/// Appen hämtar filen själv, utan sidans kakor, och kan därför inte visa vem
+/// den är. Adressen bär i stället ett slumpat värde som gäller en skärm, en
+/// version, i två minuter och en gång. Bara värdets SHA-256 sparas.
+///
+/// Ingen company_id och ingen relation: raden är en biljett, som
+/// login_throttles, och raderas när den löpt ut.
+model KioskConfigDownload {
+  id        String    @id @default(cuid())
+  tokenHash String    @unique @map("token_hash")
+  deviceId  String    @map("device_id")
+  versionId String    @map("version_id")
+  expiresAt DateTime  @map("expires_at")
+  usedAt    DateTime? @map("used_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  @@index([expiresAt])
+  @@map("kiosk_config_downloads")
+}
+
 /// En inbjudan att bli administratör.
 ///
 /// Den inbjudne sätter sitt eget lösenord via en engångslänk. Alternativet —
@@ -1268,6 +1476,37 @@ model KioskDevice {
   /// satt när sidan laddades verkställs aldrig — annars hade varje omstart
   /// lett till nästa, i all oändlighet.
   restartRequestedAt DateTime? @map("restart_requested_at")
+
+  /// Enhetens serienummer, för garanti och för ProDVX-licensen som är
+  /// kopplad till det. Går bara att läsa när Fully är device owner — modern
+  /// Android ger inte en vanlig app tillgång till det — så det är null tills
+  /// skärmen låsts.
+  serialNumber String? @map("serial_number")
+
+  /// NÄTET SOM SKÄRMEN SENAST RAPPORTERADE. Offline-kön finns för att
+  /// verkstadswifi hackar, och när tryck hamnar i kön är det här första frågan
+  /// supporten ställer. Uppgifterna är en ögonblicksbild från `reportedAt`;
+  /// en skärm som tappat nätet kan inte rapportera att den gjort det.
+  networkType KioskNetworkType? @map("network_type")
+  wifiSsid    String?           @map("wifi_ssid")
+  /// Som appen lämnar den. Fully dokumenterar den som en sträng utan skala,
+  /// så den lagras som den kommer och tolkas inte förrän den lästs av på en
+  /// fysisk skärm.
+  wifiSignal  String?           @map("wifi_signal")
+
+  /// När skärmen senast rapporterade uppgifterna ovan. Sätts av servern,
+  /// aldrig ur anropet.
+  reportedAt DateTime? @map("reported_at")
+
+  /// DÖD sedan 2026-10-26, se KioskConfig. Även de tre fälten nedan.
+  kioskConfigId String?      @map("kiosk_config_id")
+  kioskConfig   KioskConfig? @relation(fields: [kioskConfigId], references: [id], onDelete: SetNull)
+
+  /// Versionen skärmen senast rapporterat att den läst in, och när. Läses ur
+  /// märket i appen, se CONFIG_MARKER i kiosk-config.ts.
+  appliedConfigVersionId String?             @map("applied_config_version_id")
+  appliedConfigVersion   KioskConfigVersion? @relation(fields: [appliedConfigVersionId], references: [id], onDelete: SetNull)
+  configAppliedAt        DateTime?           @map("config_applied_at")
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -1509,13 +1748,20 @@ model AbsenceReason {
   /// Ordningen i listan. Den vanligaste orsaken ska stå först.
   sortOrder Int @default(0) @map("sort_order")
 
-  /// DRAR ÄVEN PÅ KOMPTIDSSALDOT.
+  /// DRAR PÅ FLEXSALDOT (ändrat 2026-10-13, hette komptid till dess).
   ///
-  /// Sätts på den orsak som betyder "jag tar ut komp". Registreras frånvaro på
-  /// den skrivs samtidigt ett uttag i komptidsboken, så att saldot minskar.
-  /// Utan den kopplingen skulle en uttagen komptimme räknas två gånger: en
-  /// gång som frånvaro och en gång som ett saldo som aldrig minskar.
+  /// Sätts på den orsak som betyder "jag är flexledig". Frånvaro på den täcker
+  /// inte den planerade tiden, och flexsaldot minskar med ledigheten. Se
+  /// flexformeln i payroll.ts. Namnet står kvar, eftersom ett namnbyte på en
+  /// kolumn kräver en migration i två steg och ingenting kunden ser ändras.
   countsAsComp Boolean @default(false) @map("counts_as_comp")
+
+  /// GER ATF (tillagt 2026-10-13). Frånvaron räknas som arbetad tid när
+  /// arbetstidsförkortningen tjänas in, till exempel permission. Utan kryss
+  /// dras frånvaron från ATF-underlaget. Kundens eget val per orsak; avtalen
+  /// säger olika. Betyder ingenting för en orsak som drar på flexen, eftersom
+  /// den redan syns i flexen. Se src/lib/atf.ts.
+  givesAtf Boolean @default(false) @map("gives_atf")
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -1529,6 +1775,10 @@ model AbsenceReason {
 }
 
 /// En post i komptidsboken. Plus är intjänat, minus är uttaget.
+///
+/// LÄSES INTE SEDAN 2026-10-13, då komptiden togs bort: kunden skiljer inte
+/// på komp och flex. Raderna ligger kvar, lämnas ut i registerutdraget och
+/// raderas vid anonymisering. Tabellen tas bort i en senare release.
 ///
 /// Intjänad komp skrivs in av administratören när övertid godkänts — den
 /// uppstår aldrig av sig själv. Skälet: tid utöver schemat är flex till dess
@@ -1563,6 +1813,38 @@ model CompAdjustment {
 
   @@index([companyId, employeeId, date])
   @@map("comp_adjustments")
+}
+
+/// EN RÖD DAG, SOM KUNDEN SJÄLV LÄGGER IN (tillagt 2026-10-13).
+///
+/// En röd dag har ingen planerad tid. Den som inte arbetar då tappar alltså
+/// ingenting i flex, och den som arbetar får tiden som plus.
+///
+/// Kundens egen lista och inte en uträknad kalender, kundens val. Verkstäder
+/// skiljer sig åt i vilka aftnar och klämdagar som är lediga, och en lista
+/// kunden skrivit själv säger exakt det som gäller hos dem.
+///
+/// Gäller alla anställda i arbetsytan. Räknas i payroll.ts, och dagen sparas
+/// vid dygnets början i företagets tidszon, som frånvaron.
+model Holiday {
+  id        String @id @default(cuid())
+  companyId String @map("company_id")
+
+  date DateTime
+  /// "Juldagen", "Klämdag". Visas på tidrapporten.
+  name String
+
+  createdByEmail String @map("created_by_email")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  // En dag är röd eller inte. Två rader för samma dag hade bara kunnat säga
+  // samma sak med olika namn.
+  @@unique([companyId, date])
+  @@map("holidays")
 }
 
 // ---------------------------------------------------------------------------
@@ -1762,10 +2044,71 @@ model PlannedBlock {
   station Station    @relation(fields: [stationId], references: [id], onDelete: Cascade)
   moment  WorkMoment @relation(fields: [momentId], references: [id], onDelete: Restrict)
 
+  /// Bemanningen: personalpassen som är kopplade till rutan. Se StaffBlock.
+  staffBlocks StaffBlock[]
+
   @@index([companyId, stationId, startsAt])
   @@index([companyId, orderId])
   @@index([companyId, startsAt])
   @@map("planned_blocks")
+}
+
+/// ETT PERSONALPASS (tillagt 2026-10-14, fas 2 av issue #21).
+///
+/// En anställd planerad på en order och ett arbetsmoment. Samma slags avsikt
+/// som en stationsruta: varken arbetad eller fakturerbar tid, och den når
+/// aldrig ett underlag. Allt som skriver går genom src/lib/staff-planning.ts.
+///
+/// I läget Tjänst räknar passen av orderns beräknade tid. I läget Produktion
+/// är de BEMANNING och räknas inte: stationens rutor gör det, och maskinens
+/// körtid och operatörens arbetstid skiljer sig. Se src/lib/planning-modes.ts.
+///
+/// TILL SKILLNAD FRÅN EN STATIONSRUTA ÄR PASSET EN PERSONUPPGIFT. Det säger
+/// var en namngiven person ska vara och när. Det raderas därför vid
+/// anonymisering och följer med i registerutdraget.
+model StaffBlock {
+  id         String @id @default(cuid())
+  companyId  String @map("company_id")
+  employeeId String @map("employee_id")
+  orderId    String @map("order_id")
+  momentId   String @map("moment_id")
+
+  /// Stationsrutan passet bemannar, i läget Produktion. Tomt för ett fritt
+  /// pass, och för ett vars ruta tagits bort.
+  plannedBlockId String? @map("planned_block_id")
+
+  startsAt DateTime @map("starts_at")
+
+  /// Planerad tid i minuter. Alltid större än noll.
+  minutes Int
+
+  note String?
+
+  /// Vem som la passet. Samma spår som stationsrutorna bär.
+  createdByEmail String @map("created_by_email")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  // Cascade från personen och ordern: utan dem är passet meningslöst.
+  employee Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  order    Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  // Restrict från momentet, som överallt annars.
+  moment WorkMoment @relation(fields: [momentId], references: [id], onDelete: Restrict)
+
+  // SetNull från stationsrutan: tas körningen bort ligger personens pass kvar,
+  // utan koppling. En persons planerade dag ska inte försvinna för att
+  // maskinplanen ändrades.
+  plannedBlock PlannedBlock? @relation(fields: [plannedBlockId], references: [id], onDelete: SetNull)
+
+  @@index([companyId, employeeId, startsAt])
+  @@index([companyId, orderId])
+  @@index([companyId, startsAt])
+  @@index([plannedBlockId])
+  @@map("staff_blocks")
 }
 
 // ---------------------------------------------------------------------------
@@ -1872,4 +2215,383 @@ model AuditEvent {
   @@index([companyId, createdAt])
   @@index([companyId, subjectEmployeeId])
   @@map("audit_events")
+}
+
+// ---------------------------------------------------------------------------
+// TILLBEHÖREN (tillagt 2026-10-20)
+//
+// Fysiska varor vi säljer till kunderna, med stämplingsskärmen som första.
+// Produkterna, deras texter och bilder står i src/lib/shop/catalog.ts och inte
+// här: en produktbeskrivning ändras i samma commit som det den beskriver,
+// som guiderna i hjälpcentret. Bara priset ligger i databasen, så att det går
+// att ändra i plattformspanelen utan en driftsättning.
+//
+// I gränssnittet heter det BESTÄLLNING och aldrig order. En order är kundens
+// arbetsorder, det allt annat i Tikkr hänger på.
+//
+// Betalningen sker utanför systemet, på en faktura från Fortnox vid leverans.
+// Betalstatusen sätts därför för hand i plattformspanelen, och den kan aldrig
+// säga att något är fakturerat utan ett fakturanummer.
+// ---------------------------------------------------------------------------
+
+/// VAR EN BESTÄLLNING STÅR. Skild från betalningen, se ShopPaymentStatus.
+enum ShopOrderStatus {
+  /// Kunden har skickat beställningen.
+  RECEIVED
+  /// Vi har gått igenom den och tagit den.
+  CONFIRMED
+  /// Skärmen förbereds eller tillverkas.
+  IN_PRODUCTION
+  /// Klar, väntar på att skickas.
+  READY
+  /// Lämnad till transportören.
+  SHIPPED
+  /// Kunden har bekräftat att den kommit fram. Sätts bara för hand.
+  DELIVERED
+  CANCELED
+  /// Något kräver att någon tar tag i det för hand.
+  PROBLEM
+}
+
+/// FAKTURAN, så som den står i Fortnox. Sätts bara för hand.
+enum ShopPaymentStatus {
+  NOT_INVOICED
+  INVOICED
+  PAID
+  CREDITED
+}
+
+/// Vad en rad i en beställnings historik gäller.
+enum ShopEventKind {
+  /// Beställningen skapades.
+  CREATED
+  /// Orderstatusen ändrades.
+  STATUS
+  /// Betalstatusen ändrades.
+  PAYMENT
+  /// Transportör, spårningslänk eller frakt ändrades.
+  SHIPPING
+}
+
+/// Om en kundavisering hör till händelsen, och hur det gick.
+enum ShopEmailState {
+  /// Ska skickas.
+  PENDING
+  /// Ett utskick pågår. Hindrar att samma mejl går två gånger.
+  SENDING
+  SENT
+  FAILED
+  /// Samma besked har redan gått ut för den här beställningen.
+  SKIPPED
+}
+
+/// FÖRETAGETS UPPGIFTER FÖR BESTÄLLNINGAR.
+///
+/// Förifyller beställningsformuläret. En beställning kopierar uppgifterna till
+/// sig själv när den läggs, så att en senare ändring här aldrig ändrar en
+/// beställning som redan finns.
+///
+/// En egen tabell och inte fler kolumner på companies: företaget ligger
+/// utanför företagsfiltreringen, och de här uppgifterna är kundens.
+/// Företagets namn står kvar på companies.
+///
+/// Tomma fält är tillåtna här. Det är beställningen som kräver dem.
+model CompanyProfile {
+  id        String @id @default(cuid())
+  companyId String @unique @map("company_id")
+
+  /// Tio siffror, sparat som "556677-8899".
+  orgNumber   String? @map("org_number")
+  contactName String? @map("contact_name")
+  /// Dit orderbekräftelsen och leveransbeskeden går.
+  orderEmail  String? @map("order_email")
+  /// E.164, se phone.ts.
+  phone       String?
+
+  addressLine String? @map("address_line")
+  /// Fem siffror, sparat som "123 45".
+  postalCode  String? @map("postal_code")
+  city        String?
+
+  /// Leveransen märks med den, t.ex. ett namn eller ett kostnadsställe.
+  deliveryReference String? @map("delivery_reference")
+
+  /// FAKTURAADRESSEN. Alla tre tomma betyder samma som leveransadressen.
+  billingAddressLine String? @map("billing_address_line")
+  billingPostalCode  String? @map("billing_postal_code")
+  billingCity        String? @map("billing_city")
+  /// Dit fakturan skickas, om inte till orderEmail.
+  invoiceEmail       String? @map("invoice_email")
+
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@map("company_profiles")
+}
+
+/// EN BESTÄLLNING AV TILLBEHÖR.
+///
+/// Bär en ÖGONBLICKSBILD av allt som gällde när den lades: företagets
+/// uppgifter, adresserna och varje rads pris. Inget läses i efterhand från
+/// företaget eller katalogen, eftersom en adressändring eller en
+/// prishöjning inte får ändra en beställning som redan finns. Samma princip
+/// som satserna på en stämpling (CLAUDE.md § 3 regel 4).
+///
+/// BELOPPEN LAGRAS, till skillnad från orderns beräknade tid. De är vad
+/// fakturan skrivs på, och de räknas ur raderna och frakten i
+/// src/lib/shop/pricing.ts när beställningen skapas och när frakten sätts.
+/// Ingenting annat skriver dem.
+model ShopOrder {
+  id        String @id @default(cuid())
+  companyId String @map("company_id")
+
+  /// Löpnumret kunden ser, "Beställning 1001". Börjar på 1001, se migrationen.
+  number Int @unique @default(autoincrement())
+
+  status        ShopOrderStatus   @default(RECEIVED)
+  paymentStatus ShopPaymentStatus @default(NOT_INVOICED) @map("payment_status")
+
+  /// Satt av formuläret när det ritades. Ett formulär som skickas två gånger
+  /// ger en beställning, inte två.
+  idempotencyKey String @map("idempotency_key")
+
+  /// Vem som lade beställningen. Adressen kopieras, så att den står kvar om
+  /// kontot tas bort.
+  placedByEmail String @map("placed_by_email")
+
+  // Ögonblicksbilden av köparen.
+  companyName String  @map("company_name")
+  orgNumber   String  @map("org_number")
+  contactName String  @map("contact_name")
+  email       String
+  phone       String
+  addressLine String  @map("address_line")
+  postalCode  String  @map("postal_code")
+  city        String
+  country     String  @default("Sverige")
+  reference   String?
+
+  billingAddressLine String? @map("billing_address_line")
+  billingPostalCode  String? @map("billing_postal_code")
+  billingCity        String? @map("billing_city")
+  invoiceEmail       String? @map("invoice_email")
+
+  /// Varornas summa exklusive moms, i öre.
+  goodsOre    Int    @map("goods_ore")
+  /// Frakten exklusive moms, i öre. Tomt tills vi satt den: frakten
+  /// tillkommer och varierar, och okänd frakt är inte noll kronor.
+  shippingOre Int?   @map("shipping_ore")
+  vatOre      Int    @map("vat_ore")
+  totalOre    Int    @map("total_ore")
+  currency    String @default("SEK")
+
+  carrier     String?
+  trackingUrl String?   @map("tracking_url")
+  shippedAt   DateTime? @map("shipped_at")
+
+  /// Fakturan i Fortnox. Numret krävs för att markera beställningen som
+  /// fakturerad: systemet ska aldrig säga att en faktura finns som ingen sett.
+  invoiceNumber String?   @map("invoice_number")
+  invoicedAt    DateTime? @map("invoiced_at")
+  paidAt        DateTime? @map("paid_at")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  company Company          @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  lines   ShopOrderLine[]
+  events  ShopOrderEvent[]
+
+  @@unique([companyId, idempotencyKey])
+  @@index([companyId, createdAt])
+  @@index([status, createdAt])
+  @@map("shop_orders")
+}
+
+/// En produkt och ett antal på en beställning, med priset som det var då.
+model ShopOrderLine {
+  id        String @id @default(cuid())
+  companyId String @map("company_id")
+  orderId   String @map("order_id")
+
+  /// Nyckeln i katalogen. Text och inte en enum: en ny produkt är en post i
+  /// catalog.ts, inte en migration.
+  productKey     String @map("product_key")
+  /// Produktens namn när den beställdes.
+  name           String
+  unitPriceOre   Int    @map("unit_price_ore")
+  vatRatePercent Int    @map("vat_rate_percent")
+  /// Vara eller tjänst när den beställdes. Avgör om beställningen skickas.
+  productKind    ShopProductKind @default(GOODS) @map("product_kind")
+  quantity       Int
+  subtotalOre    Int    @map("subtotal_ore")
+  vatOre         Int    @map("vat_ore")
+  sortOrder      Int    @default(0) @map("sort_order")
+
+  company Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  order   ShopOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId])
+  @@index([companyId])
+  @@map("shop_order_lines")
+}
+
+/// HISTORIKEN FÖR EN BESTÄLLNING. Bara tillägg.
+///
+/// Kunden ser raderna för status, med tidpunkt och meddelandet till kunden.
+/// Vem som gjorde ändringen och betalningens rader syns bara i
+/// plattformspanelen. Interna anteckningar ligger inte här alls, se
+/// ShopOrderNote.
+model ShopOrderEvent {
+  id        String @id @default(cuid())
+  companyId String @map("company_id")
+  orderId   String @map("order_id")
+
+  kind       ShopEventKind
+  fromStatus String?       @map("from_status")
+  toStatus   String?       @map("to_status")
+
+  /// Sammanfattning för plattformen, t.ex. "Faktura 1234, 2026-11-02".
+  detail String?
+
+  /// Text som gick till kunden med beskedet.
+  customerMessage String? @map("customer_message")
+
+  /// E-postadressen till den som gjorde ändringen.
+  actorEmail String @map("actor_email")
+
+  /// Tomt betyder att händelsen inte har någon kundavisering.
+  emailState ShopEmailState? @map("email_state")
+  emailedAt  DateTime?       @map("emailed_at")
+  emailError String?         @map("email_error")
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  company Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  order   ShopOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId, createdAt])
+  @@index([companyId])
+  @@map("shop_order_events")
+}
+
+/// INTERN ANTECKNING OM EN BESTÄLLNING. Syns bara i plattformspanelen.
+///
+/// Ingen relation till beställningen eller företaget, med flit, av samma skäl
+/// som PlatformNote: en rad kunden inte kan nå med en relation kan inte heller
+/// följa med i en fråga kunden gör, inte ens med `include`. Priset är att den
+/// inte följer med i kaskaden när ett företag raderas, se deleteCompany.
+model ShopOrderNote {
+  id              String   @id @default(cuid())
+  orderId         String   @map("order_id")
+  targetCompanyId String   @map("target_company_id")
+  body            String
+  authorEmail     String   @map("author_email")
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  @@index([orderId, createdAt])
+  @@index([targetCompanyId])
+  @@map("shop_order_notes")
+}
+
+/// PRISET PÅ ETT TILLBEHÖR, exklusive moms, i öre.
+///
+/// Sätts under Artiklar i plattformspanelen. Saknas raden gäller priset i
+/// catalog.ts. Plattformens egen tabell, som StripePrice: priset gäller alla
+/// kunder och syns aldrig som en rad hos en enskild.
+model ShopPrice {
+  productKey     String   @id @map("product_key")
+  priceOre       Int      @map("price_ore")
+  updatedByEmail String   @map("updated_by_email")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  @@map("shop_prices")
+}
+
+/// VARA ELLER TJÄNST. En vara skickas och kräver leveransadress, en tjänst,
+/// t.ex. en utbildning, gör det inte.
+enum ShopProductKind {
+  GOODS
+  SERVICE
+}
+
+/// EN PRODUKT I BUTIKEN (tillagt 2026-10-21, ersätter katalogen i koden).
+///
+/// Läggs upp och ändras under Produkter i plattformspanelen. Plattformens
+/// egen tabell, utan company_id: produkten är densamma för alla kunder.
+///
+/// EN BESTÄLLD PRODUKT RADERAS ALDRIG, den döljs. Beställningsraderna bär
+/// sitt eget namn och pris och pekar hit med `key`, som därför aldrig ändras
+/// efter att produkten skapats.
+///
+/// Texterna i listorna (fördelar, specifikationer) ligger som JSON. De läses
+/// och skrivs bara i src/lib/shop/products.ts, som prövar formen.
+model ShopProduct {
+  id   String @id @default(cuid())
+  /// Nyckeln beställningsraderna bär, t.ex. "STAMPLINGSSKARM". Ändras aldrig.
+  key  String @unique
+  /// Adressen, /tillbehor/<slug> och ?<slug>=2 i varukorgen.
+  slug String @unique
+  kind ShopProductKind @default(GOODS)
+
+  name        String
+  /// En mening, under namnet i butiken.
+  summary     String
+  /// Stycken, åtskilda av en tom rad.
+  description String @default("")
+
+  /// Pris exklusive moms, i öre. Gäller nya beställningar.
+  priceOre       Int @map("price_ore")
+  vatRatePercent Int @default(25) @map("vat_rate_percent")
+  maxQuantity    Int @default(20) @map("max_quantity")
+
+  /// T.ex. "Tillverkas på beställning. Beräknad leveranstid 3–4 veckor."
+  delivery String @default("")
+  warranty String @default("")
+
+  /// [{ title, body }]
+  benefits     Json     @default("[]")
+  included     String[] @default([])
+  requirements String[] @default([])
+  /// [{ title, rows: [{ label, value }] }]
+  specs        Json     @default("[]")
+
+  /// Var produkten syns. Båda av betyder dold, och så skapas en ny.
+  inShop Boolean @default(false) @map("in_shop")
+  onSite Boolean @default(false) @map("on_site")
+
+  sortOrder      Int      @default(0) @map("sort_order")
+  updatedByEmail String   @map("updated_by_email")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  images ShopProductImage[]
+
+  @@index([sortOrder])
+  @@map("shop_products")
+}
+
+/// EN BILD PÅ EN PRODUKT.
+///
+/// Uppladdade bilder ligger i databasen, som kundernas logotyper, så att de
+/// följer med i backupen. `staticPath` pekar i stället på en fil under
+/// public/, och finns för illustrationerna som fanns innan produkterna kom
+/// till databasen.
+model ShopProductImage {
+  id         String  @id @default(cuid())
+  productId  String  @map("product_id")
+  data       Bytes?
+  mimeType   String? @map("mime_type")
+  staticPath String? @map("static_path")
+  alt        String  @default("")
+  /// En ritning och inte ett foto. Märks "Illustration" där den visas.
+  illustration Boolean @default(false)
+  sortOrder    Int     @default(0) @map("sort_order")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  product ShopProduct @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@index([productId, sortOrder])
+  @@map("shop_product_images")
 }

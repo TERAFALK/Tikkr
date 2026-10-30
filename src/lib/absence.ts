@@ -1,9 +1,8 @@
 import type { CompanyDb } from "./tenant";
-import { plannedMinutesForDay, isoWeekdayIn, schedulesForEmployees } from "./schedule";
 import { recordAudit } from "./audit";
 
 /**
- * FRÅNVARO — SJUKDOM, VAB, SEMESTER OCH UTTAGEN KOMP.
+ * FRÅNVARO — SJUKDOM, VAB, SEMESTER OCH FLEXLEDIGHET.
  *
  * Frånvaron TÄCKER den planerade tiden. Det är hela poängen: en sjukdag ska ge
  * noll i flex, inte minus 8,5 timmar. Utan frånvaroregistrering skulle den som
@@ -37,8 +36,10 @@ export class AbsenceError extends Error {
  * Den som vill ha "arbetsskada" lägger till den själv under Inställningar.
  *
  * `countsAsComp` är den enda raden som betyder något för räkningen: frånvaro
- * på en sådan orsak skriver samtidigt ett uttag i komptidsboken. Utan den
- * kopplingen skulle en uttagen komptimme räknas två gånger.
+ * på en sådan orsak DRAR PÅ FLEXEN i stället för att täcka den planerade
+ * tiden. Den som är flexledig tar ut timmar hen arbetat in. Kolumnen heter
+ * fortfarande comp, efter komptiden som fanns till 2026-10-13; ett namnbyte
+ * kräver en migration i två steg och ändrar ingenting kunden ser.
  */
 export const DEFAULT_ABSENCE_REASONS: {
   name: string;
@@ -50,7 +51,7 @@ export const DEFAULT_ABSENCE_REASONS: {
   { name: "Föräldraledig" },
   { name: "Tjänstledig" },
   { name: "Permission" },
-  { name: "Uttagen komp", countsAsComp: true },
+  { name: "Flexledig", countsAsComp: true },
   { name: "Övrigt" },
 ];
 
@@ -101,15 +102,13 @@ export interface MarkAbsenceInput {
  * dag är däremot tillåtet: halva dagen semester och halva VAB är ett verkligt
  * fall.
  *
- * En orsak märkt `countsAsComp` skriver dessutom en rad i komptidsboken, så
- * att saldot minskar. Raderna hänger ihop via `absenceId`, vilket gör att en
- * borttagen frånvaro städar bort sitt eget uttag i stället för att lämna kvar
- * ett avdrag för en ledighet som aldrig blev av.
+ * En orsak märkt `countsAsComp` drar på flexen. Det räknas fram i payroll.ts
+ * ur orsaken, och ingen rad skrivs någon annanstans: en borttagen frånvaro tar
+ * då med sig avdraget av sig själv.
  */
 export async function markAbsence(
   db: CompanyDb,
   companyId: string,
-  timeZone: string,
   input: MarkAbsenceInput
 ): Promise<void> {
   const [employee, reason] = await Promise.all([
@@ -123,7 +122,7 @@ export async function markAbsence(
     // på — den finns kvar för att gamla poster ska gå att läsa.
     db.absenceReason.findFirst({
       where: { id: input.reasonId, active: true },
-      select: { id: true, countsAsComp: true },
+      select: { id: true },
     }),
   ]);
 
@@ -176,32 +175,9 @@ export async function markAbsence(
     after: absenceSnapshot(absence),
     subjectEmployeeId: input.employeeId,
   });
-
-  if (!reason.countsAsComp) return;
-
-  // Uttaget ska motsvara de timmar personen faktiskt är ledig. Är inget antal
-  // angivet gäller hela den schemalagda dagen, samma siffra som frånvaron
-  // täcker.
-  const minutes =
-    input.minutes ??
-    (await plannedMinutesFor(db, input.employeeId, input.date, timeZone));
-
-  await db.compAdjustment.upsert({
-    where: { absenceId: absence.id },
-    create: {
-      companyId,
-      employeeId: input.employeeId,
-      date: input.date,
-      minutes: -minutes,
-      note: "Uttagen komp",
-      createdByEmail: input.byEmail,
-      absenceId: absence.id,
-    },
-    update: { minutes: -minutes },
-  });
 }
 
-/** Tar bort en frånvaropost, och uttaget som hörde till den. */
+/** Tar bort en frånvaropost. */
 export async function removeAbsence(
   db: CompanyDb,
   absenceId: string,
@@ -212,7 +188,6 @@ export async function removeAbsence(
   const absence = await db.absence.findFirst({ where: { id: absenceId } });
   if (!absence) return;
 
-  await db.compAdjustment.deleteMany({ where: { absenceId } });
   await db.absence.deleteMany({ where: { id: absenceId } });
 
   await recordAudit(db, {
@@ -247,120 +222,4 @@ function absenceSnapshot(absence: {
     minutes: absence.minutes,
     note: absence.note,
   };
-}
-
-/** Planerad tid för en anställd en viss dag, i minuter. */
-export async function plannedMinutesFor(
-  db: CompanyDb,
-  employeeId: string,
-  date: Date,
-  timeZone: string
-): Promise<number> {
-  const schedules = await schedulesForEmployees(db, [employeeId]);
-  return plannedMinutesForDay(
-    schedules.get(employeeId) ?? null,
-    isoWeekdayIn(date, timeZone)
-  );
-}
-
-export interface CompEntryInput {
-  employeeId: string;
-  date: Date;
-  minutes: number;
-  note?: string | null;
-  byEmail: string;
-}
-
-/**
- * Skriver in intjänad komptid — godkänd övertid.
- *
- * Uppstår ALDRIG av sig själv. Tid utöver schemat är flex till dess att någon
- * beslutat att den är övertid, och det beslutet fattas av en människa och inte
- * av en stämplingsklocka. Den timmen flyttas då ur flexsaldot och in i
- * komptidsboken; se flexformeln i payroll.ts.
- *
- * TIMANSTÄLLD HAR INGEN KOMPTID, och avvisas HÄR och inte bara i
- * serveråtgärden. Knappen göms i panelen, men det här är enda vägen in i
- * komptidsboken för hand, och en rad som skrivs för en timanställd syns
- * ingenstans: buildPayrollPeriod nollar hens saldon. Den ligger då kvar och
- * dyker upp om personen en dag går över till fast anställning.
- */
-export async function addCompEarned(
-  db: CompanyDb,
-  companyId: string,
-  input: CompEntryInput
-): Promise<void> {
-  if (!Number.isFinite(input.minutes) || input.minutes === 0) {
-    throw new AbsenceError("Ange ett antal timmar skilt från noll.");
-  }
-
-  const employee = await db.employee.findFirst({
-    where: { id: input.employeeId },
-    select: { id: true, hourly: true },
-  });
-
-  if (!employee) throw new AbsenceError("Okänd anställd.");
-
-  if (employee.hourly) {
-    throw new AbsenceError("Personen är timanställd och har ingen komptid.");
-  }
-
-  const created = await db.compAdjustment.create({
-    data: {
-      companyId,
-      employeeId: input.employeeId,
-      date: input.date,
-      minutes: Math.round(input.minutes),
-      note: input.note?.trim() || null,
-      createdByEmail: input.byEmail,
-    },
-  });
-
-  await recordAudit(db, {
-    companyId,
-    actorEmail: input.byEmail,
-    entity: "CompAdjustment",
-    entityId: created.id,
-    action: "create",
-    after: compSnapshot(created),
-    subjectEmployeeId: input.employeeId,
-  });
-}
-
-function compSnapshot(row: {
-  employeeId: string;
-  date: Date;
-  minutes: number;
-  note: string | null;
-}): Record<string, unknown> {
-  return {
-    employeeId: row.employeeId,
-    date: row.date.toISOString(),
-    minutes: row.minutes,
-    note: row.note,
-  };
-}
-
-/** Tar bort en komprad. Uttag som hör till en frånvaro tas bort med frånvaron. */
-export async function removeCompAdjustment(
-  db: CompanyDb,
-  id: string,
-  byEmail: string
-): Promise<void> {
-  const row = await db.compAdjustment.findFirst({
-    where: { id, absenceId: null },
-  });
-  if (!row) return;
-
-  await db.compAdjustment.deleteMany({ where: { id, absenceId: null } });
-
-  await recordAudit(db, {
-    companyId: db.$companyId,
-    actorEmail: byEmail,
-    entity: "CompAdjustment",
-    entityId: id,
-    action: "delete",
-    before: compSnapshot(row),
-    subjectEmployeeId: row.employeeId,
-  });
 }

@@ -1,5 +1,6 @@
 import { requireAdmin } from "@/lib/admin-session";
 import { requireModule } from "@/lib/company-modules";
+import { unsafeGlobalPrisma } from "@/lib/db";
 import ConfirmButton from "@/components/admin/ConfirmButton";
 import ActionDialog from "@/components/ui/ActionDialog";
 import SaveForm from "@/components/admin/SaveForm";
@@ -25,6 +26,8 @@ import {
   type ReasonState,
 } from "./actions";
 
+export const metadata = { title: "Frånvaroorsaker · Tikkr" };
+
 /**
  * FRÅNVAROORSAKER.
  *
@@ -43,6 +46,14 @@ export default async function AbsenceReasonsPage() {
 
   const { db } = session;
 
+  // Kryssrutan för ATF visas bara när företaget valt ett avtal. Utan avtal
+  // räknas ingen ATF, och rutan hade varit ett val utan verkan.
+  const company = await unsafeGlobalPrisma.company.findUnique({
+    where: { id: session.companyId },
+    select: { atfAgreement: true },
+  });
+  const atf = Boolean(company?.atfAgreement);
+
   const reasons = await db.absenceReason.findMany({
     orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
     select: {
@@ -50,11 +61,12 @@ export default async function AbsenceReasonsPage() {
       name: true,
       active: true,
       countsAsComp: true,
+      givesAtf: true,
       _count: { select: { absences: true } },
     },
   });
 
-  // ActionDialog och inte FormDialog: ett namn som redan finns ska svara i
+  // ActionDialog: ett namn som redan finns ska svara i
   // rutan i stället för att stänga den som om allt gått bra.
   const newReason = (
     <ActionDialog<ReasonState>
@@ -78,14 +90,16 @@ export default async function AbsenceReasonsPage() {
         />
         <span>
           <span className="block font-medium text-neutral-900">
-            Drar på komptidssaldot
+            Drar på flexsaldot
           </span>
           <span className="block text-neutral-500">
-            För uttagen komp. Frånvaron skriver då också ett uttag i
-            komptidsboken
+            För flexledighet. Frånvaron minskar då flexsaldot i stället för
+            att täcka den planerade tiden
           </span>
         </span>
       </label>
+
+      {atf && <GivesAtfBox defaultChecked={false} />}
     </ActionDialog>
   );
 
@@ -106,7 +120,7 @@ export default async function AbsenceReasonsPage() {
               >
                 <p className="text-[13px] text-neutral-600">
                   Sjuk, vård av barn, semester, föräldraledig, tjänstledig,
-                  permission, uttagen komp och övrigt. Går att ändra efteråt.
+                  permission, flexledig och övrigt. Går att ändra efteråt.
                 </p>
               </SaveForm>
             }
@@ -134,7 +148,12 @@ export default async function AbsenceReasonsPage() {
                   <span className="font-medium">{reason.name}</span>
                   {reason.countsAsComp && (
                     <span className="ml-2">
-                      <Badge>Drar på komptid</Badge>
+                      <Badge>Drar på flexsaldot</Badge>
+                    </span>
+                  )}
+                  {atf && reason.givesAtf && !reason.countsAsComp && (
+                    <span className="ml-2">
+                      <Badge>Ger ATF</Badge>
                     </span>
                   )}
                 </Td>
@@ -168,11 +187,11 @@ export default async function AbsenceReasonsPage() {
 
                 <Td>
                   <div className="flex items-center justify-end gap-2">
-                    {/* ActionDialog och inte FormDialog: ett namn som redan
+                    {/* ActionDialog: ett namn som redan
                         finns ska svara inuti rutan. */}
                     <ActionDialog<ReasonState>
                       trigger="Ändra"
-                      triggerTone="ghost"
+                      triggerTone="secondary"
                       title={`Ändra ${reason.name}`}
                       action={renameAbsenceReason}
                       initial={{}}
@@ -188,6 +207,12 @@ export default async function AbsenceReasonsPage() {
                           autoFocus
                         />
                       </Field>
+
+                      {/* Inte för en orsak som drar på flexen: den ledigheten
+                          syns redan i flexen, och ATF räknas på flexen. */}
+                      {atf && !reason.countsAsComp && (
+                        <GivesAtfBox defaultChecked={reason.givesAtf} />
+                      )}
                     </ActionDialog>
 
                     <form action={toggleAbsenceReason}>
@@ -217,6 +242,35 @@ export default async function AbsenceReasonsPage() {
         </Table>
       )}
     </Card>
+  );
+}
+
+/**
+ * KRYSSRUTAN "GER ATF". Kundens eget val per orsak: avtalen säger olika om
+ * vilken frånvaro som räknas som arbetad tid när ATF tjänas in. Se atf.ts.
+ *
+ * Får ändras i efterhand, till skillnad från "Drar på flexsaldot". ATF är ett
+ * underlag som räknas fram vid varje utskrift, inte ett saldo som byggts upp.
+ */
+function GivesAtfBox({ defaultChecked }: { defaultChecked: boolean }) {
+  return (
+    <label className="flex cursor-pointer items-start gap-2 text-[13px]">
+      {/* Skickas alltid, så att ett urkryss går att skilja från en ruta som
+          inte visades alls. */}
+      <input type="hidden" name="givesAtfShown" value="1" />
+      <input
+        type="checkbox"
+        name="givesAtf"
+        defaultChecked={defaultChecked}
+        className="mt-0.5 h-3.5 w-3.5 rounded border-neutral-300 text-blue-600 focus:ring-blue-600"
+      />
+      <span>
+        <span className="block font-medium text-neutral-900">Ger ATF</span>
+        <span className="block text-neutral-500">
+          Frånvaron räknas som arbetad tid för arbetstidsförkortningen
+        </span>
+      </span>
+    </label>
   );
 }
 

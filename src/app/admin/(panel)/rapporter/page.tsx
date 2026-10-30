@@ -1,5 +1,7 @@
 import Link from "next/link";
-import FilterForm from "@/components/admin/FilterForm";
+import FilterBar from "@/components/admin/FilterBar";
+import { ExportGroup, ExportLink } from "@/components/admin/ExportButtons";
+import PrintButton from "@/components/admin/PrintButton";
 import SearchSelect from "@/components/admin/SearchSelect";
 import { requireAdmin } from "@/lib/admin-session";
 import { unsafeGlobalPrisma } from "@/lib/db";
@@ -11,8 +13,6 @@ import {
 } from "@/lib/time-zone";
 import {
   Badge,
-  Button,
-  ButtonLink,
   Card,
   CardHeader,
   EmptyState,
@@ -20,6 +20,7 @@ import {
   PageHeader,
   Select,
   Input,
+  SectionTitle,
   Stat,
   Table,
   Td,
@@ -30,9 +31,19 @@ import { formatDateTime, formatDuration } from "@/lib/format";
 import { datePresets } from "@/lib/date-presets";
 import { weekStep } from "@/lib/week-nav";
 import WeekStepper from "@/components/admin/WeekStepper";
+import Pager, { PerPageField } from "@/components/ui/Pager";
+import {
+  listPaging,
+  pageGroups,
+  pageRows,
+  presetHref,
+  PER_PAGE,
+} from "@/lib/paging";
 import { customerOptions } from "@/lib/customers";
 import type { ReportResult, ReportRow } from "@/lib/report";
 import type { ReportView } from "@/lib/report-pdf";
+
+export const metadata = { title: "Rapporter · Tikkr" };
 
 export const dynamic = "force-dynamic";
 
@@ -47,6 +58,8 @@ interface SearchParams {
   kind?: string;
   /** "detalj" (standard) eller "person". */
   visning?: string;
+  sida?: string;
+  antal?: string;
 }
 
 export default async function ReportsPage({
@@ -64,23 +77,6 @@ export default async function ReportsPage({
   const timeZone = company?.timezone ?? "Europe/Stockholm";
   const { presets } = datePresets(timeZone);
   const week = weekStep("/admin/rapporter", params, timeZone);
-
-  const [employees, orders, moments, customers] = await Promise.all([
-    db.employee.findMany({ orderBy: { name: "asc" }, select: { id: true, name: true } }),
-    db.order.findMany({
-      orderBy: { orderNumber: "asc" },
-      select: {
-        id: true,
-        orderNumber: true,
-        customer: { select: { name: true } },
-      },
-    }),
-    db.workMoment.findMany({
-      orderBy: { name: "asc" },
-      select: { id: true, name: true },
-    }),
-    customerOptions(db),
-  ]);
 
   // Datumfälten ger ett datum utan klockslag, och tolkas i FÖRETAGETS tidszon.
   // "Till och med" sträcker sig till dygnets sista millisekund — annars faller
@@ -102,15 +98,33 @@ export default async function ReportsPage({
       ? params.kind
       : "ALL";
 
-  const report = await buildReport(db, {
-    from: fromDate ? startOfDayIn(fromDate, timeZone) : undefined,
-    to: toDate ? endOfDayIn(toDate, timeZone) : undefined,
-    employeeId: params.employeeId,
-    orderId: params.orderId,
-    customerId: params.customerId,
-    momentId: params.momentId,
-    kind,
-  });
+  // Rapporten hämtas samtidigt med filtrens listor. Den väntade förut på
+  // dem, fast den inte behöver något ur dem.
+  const [employees, orders, moments, customers, report] = await Promise.all([
+    db.employee.findMany({ orderBy: { name: "asc" }, select: { id: true, name: true } }),
+    db.order.findMany({
+      orderBy: { orderNumber: "asc" },
+      select: {
+        id: true,
+        orderNumber: true,
+        customer: { select: { name: true } },
+      },
+    }),
+    db.workMoment.findMany({
+      orderBy: { name: "asc" },
+      select: { id: true, name: true },
+    }),
+    customerOptions(db),
+    buildReport(db, {
+      from: fromDate ? startOfDayIn(fromDate, timeZone) : undefined,
+      to: toDate ? endOfDayIn(toDate, timeZone) : undefined,
+      employeeId: params.employeeId,
+      orderId: params.orderId,
+      customerId: params.customerId,
+      momentId: params.momentId,
+      kind,
+    }),
+  ]);
 
   // "detalj" är standard: den som öppnar en rapport vill oftast se raderna.
   const view: ReportView =
@@ -126,11 +140,28 @@ export default async function ReportsPage({
   const employeeGroups =
     view === "persondetalj" ? groupByEmployee(report.rows) : [];
 
+  // EN SIDA RADER I TAGET (ändrat 2026-10-17, issue #24). En rapport utan
+  // datum är varje stämpling arbetsytan gjort, och att rita dem alla gjorde
+  // sidan långsammare för varje vecka den användes.
+  //
+  // Bara LISTAN delas upp. Rapporten hämtas hel, och totalen, grupperna och
+  // uttaget räknas på alla rader precis som förut: en summa som ändrades av
+  // att man bläddrade vore ett fakturaunderlag ingen kunde lita på. Därför
+  // sker bläddringen här och inte i frågan i report.ts.
+  const page = listPaging(report.rows.length, params);
+  const pageOfRows = pageRows(report.rows, page);
+  const pageOfGroups = pageGroups(employeeGroups, page);
+
   // Uttaget ska innehålla det skärmen visar. Valet skrivs därför alltid ut,
   // även när det inte står i adressen — annars hade en export gjord på en
   // orörd sida saknat den improduktiva tiden som syns i tabellen.
+  //
+  // Sidnumret och radantalet följer INTE med. Uttaget är hela rapporten, inte
+  // sidan man råkade stå på.
   const exportParams = new URLSearchParams(
-    Object.entries(params).filter(([, value]) => value) as [string, string][]
+    Object.entries(params).filter(
+      ([key, value]) => value && key !== "sida" && key !== "antal"
+    ) as [string, string][]
   );
   exportParams.set("kind", kind);
 
@@ -142,149 +173,113 @@ export default async function ReportsPage({
         title="Rapporter"
         help="rapporter"
         action={
-          <div className="flex flex-wrap gap-2">
-            {report.rows.length > 0 && (
-              <>
-                <ButtonLink
-                  href={`${exportHref}&format=pdf`}
-                  tone="secondary"
-                >
-                  PDF
-                </ButtonLink>
-                <ButtonLink href={exportHref}>Excel</ButtonLink>
-              </>
-            )}
-          </div>
+          report.rows.length > 0 && (
+            <ExportGroup label="Rapport">
+              <PrintButton href={`${exportHref}&format=pdf`} />
+              <ExportLink href={`${exportHref}&format=pdf`}>
+                Ladda ner PDF
+              </ExportLink>
+              <ExportLink href={exportHref}>Ladda ner Excel</ExportLink>
+            </ExportGroup>
+          )
         }
       />
 
-      <Card className="mb-6">
-        <CardHeader
-          title="Filter"
-          action={
-            // Snabbval istället för att skriva datum för hand. Det är det man
-            // gör oftast, och två datumfält per gång blir många knapptryck.
-            //
-            // Veckostegaren bredvid: snabbvalen tar en till en bestämd period,
-            // pilarna bläddrar därifrån. Utan dem var "veckan före förra"
-            // två datum att skriva in för hand.
-            <div className="flex flex-wrap items-center gap-2">
-              <WeekStepper {...week} />
+      {/* GET-formulär: filtren hamnar i adressen, så en rapport går att
+          spara som bokmärke eller skicka vidare till någon annan. */}
+      <FilterBar
+        week={week}
+        presets={presets}
+        current={params}
+        presetHref={(preset) =>
+          presetHref("/admin/rapporter", { ...params }, preset, page.take)
+        }
+        resetHref="/admin/rapporter"
+        columns="lg:grid-cols-3 xl:grid-cols-6"
+        moreActive={(kind !== "ALL" ? 1 : 0) + (params.momentId ? 1 : 0)}
+        more={
+          <>
+            <Field label="Sorts tid">
+              <Select name="kind" defaultValue={kind}>
+                <option value="ORDER">Ordertid</option>
+                <option value="INDIRECT">Improduktiv tid</option>
+                <option value="ALL">Båda</option>
+              </Select>
+            </Field>
 
-              <div className="flex flex-wrap gap-1">
-                {presets.map((preset) => {
-                  const active =
-                    params.from === preset.from && params.to === preset.to;
+            <Field label="Arbetsmoment">
+              <Select name="momentId" defaultValue={params.momentId ?? ""}>
+                <option value="">Alla arbetsmoment</option>
+                {moments.map((moment) => (
+                  <option key={moment.id} value={moment.id}>
+                    {moment.name}
+                  </option>
+                ))}
+              </Select>
+            </Field>
+          </>
+        }
+      >
+        <PerPageField perPage={page.take} />
 
-                  return (
-                    <Link
-                      key={preset.label}
-                      href={`/admin/rapporter?from=${preset.from}&to=${preset.to}`}
-                      className={`rounded-md px-2.5 py-1 text-xs font-medium transition-colors ${
-                        active
-                          ? "bg-neutral-900 text-white"
-                          : "bg-neutral-100 text-neutral-600 hover:bg-neutral-200"
-                      }`}
-                    >
-                      {preset.label}
-                    </Link>
-                  );
-                })}
-              </div>
-            </div>
-          }
-        />
-        {/* GET-formulär: filtren hamnar i adressen, så en rapport går att
-            spara som bokmärke eller skicka vidare till någon annan. Det
-            tillämpas direkt när ett fält ändras — se FilterForm. */}
-        <FilterForm className="grid gap-4 p-5 sm:grid-cols-2 lg:grid-cols-6">
-          <Field label="Från">
-            <Input type="date" name="from" defaultValue={params.from ?? ""} />
-          </Field>
+        <Field label="Från">
+          <Input type="date" name="from" defaultValue={params.from ?? ""} />
+        </Field>
 
-          <Field label="Till">
-            <Input type="date" name="to" defaultValue={params.to ?? ""} />
-          </Field>
+        <Field label="Till">
+          <Input type="date" name="to" defaultValue={params.to ?? ""} />
+        </Field>
 
-          <Field label="Order">
-            <SearchSelect
-              name="orderId"
-              options={orders.map((order) => ({
-                id: order.id,
-                label: order.orderNumber,
-                hint: order.customer?.name,
-              }))}
-              defaultValue={params.orderId}
-              placeholder="Sök order…"
-              emptyLabel="Alla ordrar"
-            />
-          </Field>
+        <Field label="Order">
+          <SearchSelect
+            name="orderId"
+            options={orders.map((order) => ({
+              id: order.id,
+              label: order.orderNumber,
+              hint: order.customer?.name,
+            }))}
+            defaultValue={params.orderId}
+            placeholder="Sök order…"
+            emptyLabel="Alla ordrar"
+          />
+        </Field>
 
-          <Field label="Kund">
-            <SearchSelect
-              name="customerId"
-              options={customers}
-              defaultValue={params.customerId}
-              placeholder="Sök kund…"
-              emptyLabel="Alla kunder"
-            />
-          </Field>
+        <Field label="Kund">
+          <SearchSelect
+            name="customerId"
+            options={customers}
+            defaultValue={params.customerId}
+            placeholder="Sök kund…"
+            emptyLabel="Alla kunder"
+          />
+        </Field>
 
-          <Field label="Anställd">
-            <Select name="employeeId" defaultValue={params.employeeId ?? ""}>
-              <option value="">Alla anställda</option>
-              {employees.map((employee) => (
-                <option key={employee.id} value={employee.id}>
-                  {employee.name}
-                </option>
-              ))}
-            </Select>
-          </Field>
-
-          <Field label="Visning">
-            <Select name="visning" defaultValue={params.visning ?? "detalj"}>
-              <option value="detalj">Varje stämpling</option>
-              <option value="persondetalj">
-                Varje stämpling, per anställd
+        <Field label="Anställd">
+          <Select name="employeeId" defaultValue={params.employeeId ?? ""}>
+            <option value="">Alla anställda</option>
+            {employees.map((employee) => (
+              <option key={employee.id} value={employee.id}>
+                {employee.name}
               </option>
-              <option value="person">Summerat per anställd</option>
-              <option value="kund">Summerat per kund</option>
-            </Select>
-          </Field>
+            ))}
+          </Select>
+        </Field>
 
-          <Field label="Sorts tid">
-            <Select name="kind" defaultValue={kind}>
-              <option value="ORDER">Fakturerbar tid</option>
-              <option value="INDIRECT">Improduktiv tid</option>
-              <option value="ALL">Båda</option>
-            </Select>
-          </Field>
-
-          <Field label="Arbetsmoment">
-            <Select name="momentId" defaultValue={params.momentId ?? ""}>
-              <option value="">Alla moment</option>
-              {moments.map((moment) => (
-                <option key={moment.id} value={moment.id}>
-                  {moment.name}
-                </option>
-              ))}
-            </Select>
-          </Field>
-
-          <div className="flex items-end gap-2">
-            <Button type="submit">Visa</Button>
-            <ButtonLink href="/admin/rapporter" tone="secondary">
-              Rensa
-            </ButtonLink>
-          </div>
-        </FilterForm>
-      </Card>
+        <Field label="Visning">
+          <Select name="visning" defaultValue={params.visning ?? "detalj"}>
+            <option value="detalj">Varje stämpling</option>
+            <option value="persondetalj">Varje stämpling, per anställd</option>
+            <option value="person">Summerat per anställd</option>
+            <option value="kund">Summerat per kund</option>
+          </Select>
+        </Field>
+      </FilterBar>
 
       <div className="mb-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <Stat
           label="Total tid"
           value={formatDuration(report.totalMinutes)}
-          hint="tim:min"
+          hint="timmar"
         />
         <Stat label="Stämplingar" value={report.rows.length} />
         <Stat
@@ -305,7 +300,13 @@ export default async function ReportsPage({
         />
       ) : (
         <>
-          <div className="mb-6 grid gap-4 lg:grid-cols-3">
+          {/* Summeringarna stod öppna före listan, som då började långt under
+              första skärmen. De finns kvar ett tryck bort. */}
+          <details className="mb-6">
+            <summary className="mb-3 cursor-pointer text-[13px] font-medium text-neutral-700">
+              Summeringar
+            </summary>
+          <div className="grid gap-4 lg:grid-cols-3">
             <Summary title="Per order" groups={report.byOrder} />
             {report.byCustomer.length > 0 && (
               <Summary title="Per kund" groups={report.byCustomer} />
@@ -316,6 +317,7 @@ export default async function ReportsPage({
               <Summary title="Improduktiv tid" groups={report.byIndirect} />
             )}
           </div>
+          </details>
 
           {view === "kund" ? (
             <Card>
@@ -332,7 +334,7 @@ export default async function ReportsPage({
                     <tr>
                       <Th>Kund</Th>
                       <Th numeric>Stämplingar</Th>
-                      <Th numeric>Tid (tim:min)</Th>
+                      <Th numeric>Tid (timmar)</Th>
                     </tr>
                   </thead>
                   <tbody>
@@ -344,7 +346,7 @@ export default async function ReportsPage({
                               vad den tiden gick till. */}
                           <Link
                             href={`/admin/kunder/${group.key}`}
-                            className="font-medium text-tick-deep hover:underline"
+                            className="font-medium text-link hover:underline"
                           >
                             {group.label}
                           </Link>
@@ -369,7 +371,7 @@ export default async function ReportsPage({
                   <tr>
                     <Th>Anställd</Th>
                     <Th numeric>Stämplingar</Th>
-                    <Th numeric>Tid (tim:min)</Th>
+                    <Th numeric>Tid (timmar)</Th>
                   </tr>
                 </thead>
                 <tbody>
@@ -378,7 +380,7 @@ export default async function ReportsPage({
                       <Td>
                         <span className="font-medium">{group.label}</span>
                         {group.sublabel && (
-                          <span className="ml-2 text-neutral-400">
+                          <span className="ml-2 text-neutral-500">
                             {group.sublabel}
                           </span>
                         )}
@@ -394,12 +396,14 @@ export default async function ReportsPage({
             </Card>
           ) : view === "persondetalj" ? (
             <div className="space-y-4">
-              {employeeGroups.map((group) => (
+              {pageOfGroups.map((group) => (
                 <Card key={group.heading}>
                   <CardHeader
                     title={group.heading}
-                    description={`${group.rows.length} ${
-                      group.rows.length === 1 ? "stämpling" : "stämplingar"
+                    // Hela personens antal och tid, även när bara en del av
+                    // raderna ryms på sidan. Se pageGroups.
+                    description={`${group.entries} ${
+                      group.entries === 1 ? "stämpling" : "stämplingar"
                     }`}
                     action={
                       <span className="text-[13px] font-medium tabular-nums text-neutral-900">
@@ -411,10 +415,10 @@ export default async function ReportsPage({
                     <thead>
                       <tr>
                         <Th>Order</Th>
-                        <Th>Moment</Th>
+                        <Th>Arbetsmoment</Th>
                         <Th>In</Th>
                         <Th>Ut</Th>
-                        <Th numeric>Tid (tim:min)</Th>
+                        <Th numeric>Tid (timmar)</Th>
                       </tr>
                     </thead>
                     <tbody>
@@ -429,6 +433,18 @@ export default async function ReportsPage({
                   </Table>
                 </Card>
               ))}
+
+              {report.rows.length > PER_PAGE && (
+                <Card>
+                  <Pager
+                    paging={page}
+                    total={report.rows.length}
+                    unit="stämplingar"
+                    path="/admin/rapporter"
+                    keep={{ ...params }}
+                  />
+                </Card>
+              )}
             </div>
           ) : (
           <Card>
@@ -440,14 +456,14 @@ export default async function ReportsPage({
                 <tr>
                   <Th>Anställd</Th>
                   <Th>Order</Th>
-                  <Th>Moment</Th>
+                  <Th>Arbetsmoment</Th>
                   <Th>In</Th>
                   <Th>Ut</Th>
-                  <Th numeric>Tid (tim:min)</Th>
+                  <Th numeric>Tid (timmar)</Th>
                 </tr>
               </thead>
               <tbody>
-                {report.rows.map((row) => (
+                {pageOfRows.map((row) => (
                   <EntryRow
                     key={row.id}
                     row={row}
@@ -457,6 +473,14 @@ export default async function ReportsPage({
                 ))}
               </tbody>
             </Table>
+
+            <Pager
+              paging={page}
+              total={report.rows.length}
+              unit="stämplingar"
+              path="/admin/rapporter"
+              keep={{ ...params }}
+            />
           </Card>
           )}
         </>
@@ -469,16 +493,14 @@ export default async function ReportsPage({
 function Summary({ title, groups }: { title: string; groups: ReportGroup[] }) {
   return (
     <Card className="p-5">
-      <h3 className="mb-3 text-sm font-semibold uppercase tracking-wide text-neutral-500">
-        {title}
-      </h3>
-      <ul className="space-y-2">
+      <SectionTitle>{title}</SectionTitle>
+      <ul className="space-y-2 text-[13px]">
         {groups.slice(0, 8).map((group) => (
           <li key={group.key} className="flex items-baseline justify-between gap-4">
             <span className="min-w-0 truncate">
               {group.label}
               {group.sublabel && (
-                <span className="ml-2 text-sm text-neutral-500">
+                <span className="ml-2 text-neutral-500">
                   {group.sublabel}
                 </span>
               )}
@@ -489,8 +511,8 @@ function Summary({ title, groups }: { title: string; groups: ReportGroup[] }) {
           </li>
         ))}
         {groups.length > 8 && (
-          <li className="pt-1 text-sm text-neutral-500">
-            och {groups.length - 8} till. Samtliga finns i Excel-exporten
+          <li className="pt-1 text-neutral-500">
+            och {groups.length - 8} till. Samtliga finns i Excel-arket
           </li>
         )}
       </ul>
@@ -520,12 +542,21 @@ function EntryRow({
         <Td>
           {row.employeeName}
           {row.employeeNumber && (
-            <span className="ml-2 text-neutral-400">{row.employeeNumber}</span>
+            <span className="ml-2 text-neutral-500">{row.employeeNumber}</span>
           )}
         </Td>
       )}
       <Td>
-        {row.orderNumber ?? <Badge tone="muted">Improduktiv</Badge>}
+        {row.orderId ? (
+          <Link
+            href={`/admin/ordrar/${row.orderId}`}
+            className="text-link hover:underline"
+          >
+            {row.orderNumber}
+          </Link>
+        ) : (
+          <Badge tone="muted">Improduktiv</Badge>
+        )}
         {row.customerName && (
           <span className="ml-2 text-neutral-500">{row.customerName}</span>
         )}
@@ -566,7 +597,7 @@ function EntryRow({
  */
 function groupByEmployee(
   rows: ReportResult["rows"]
-): { heading: string; rows: ReportRow[]; minutes: number }[] {
+): { heading: string; rows: ReportRow[]; minutes: number; entries: number }[] {
   const byEmployee = new Map<string, ReportRow[]>();
 
   for (const row of rows) {
@@ -589,5 +620,8 @@ function groupByEmployee(
         (a, b) => a.clockInAt.getTime() - b.clockInAt.getTime()
       ),
       minutes: grouped.reduce((total, row) => total + row.minutes, 0),
+      // Antalet sparas för sig. Raderna kapas till sidans, men rubriken ska
+      // fortsätta säga hur många personen har i hela urvalet.
+      entries: grouped.length,
     }));
 }

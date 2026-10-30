@@ -6,7 +6,7 @@ Så här går en skärm från kartong till färdig stämpelklocka.
 
 ## 1. Koppla skärmen
 
-Administratören lägger upp skärmen i adminpanelen under **Stämplingsskärmar**
+Administratören lägger upp skärmen i adminpanelen under **Inställningar → Stämplingsskärmar**
 och får en **sexsiffrig kod**.
 
 På skärmen som ska användas:

@@ -1,0 +1,57 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 900" role="img" aria-label="Illustration: skärmens baksida med VESA-fäste och stativets pelare">
+  <!--
+    TILLFÄLLIG ILLUSTRATION, INTE ETT FOTO.
+    Byts mot ett riktigt detaljfoto med samma filnamn, och flaggan
+    `illustration` i src/lib/shop/catalog.ts sätts då till false.
+    Visar skärmens baksida, VESA-plattan, pelarens topp och kablarna.
+    Infästningens utformning är inte beslutad.
+  -->
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#F5F6F2"/>
+      <stop offset="1" stop-color="#D9DDD6"/>
+    </linearGradient>
+    <linearGradient id="housing" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#35404F"/>
+      <stop offset="1" stop-color="#0E1A2B"/>
+    </linearGradient>
+    <linearGradient id="post" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#212D3D"/>
+      <stop offset="0.45" stop-color="#485261"/>
+      <stop offset="1" stop-color="#212D3D"/>
+    </linearGradient>
+    <linearGradient id="plate" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#485261"/>
+      <stop offset="1" stop-color="#35404F"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="1200" height="900" fill="url(#bg)"/>
+
+  <!-- Skärmens baksida, beskuren i bildens överkant -->
+  <path d="M120 0 H1080 V430 Q1080 470 1040 470 H160 Q120 470 120 430 Z" fill="url(#housing)"/>
+  <!-- VESA 100-plattan med fyra skruvar -->
+  <rect x="440" y="110" width="320" height="300" rx="10" fill="url(#plate)"/>
+  <g fill="#AFB5B5">
+    <circle cx="500" cy="170" r="14"/>
+    <circle cx="700" cy="170" r="14"/>
+    <circle cx="500" cy="350" r="14"/>
+    <circle cx="700" cy="350" r="14"/>
+  </g>
+  <g fill="#35404F">
+    <circle cx="500" cy="170" r="6"/>
+    <circle cx="700" cy="170" r="6"/>
+    <circle cx="500" cy="350" r="6"/>
+    <circle cx="700" cy="350" r="6"/>
+  </g>
+
+  <!-- Pelaren, pulverlackerad -->
+  <rect x="540" y="240" width="120" height="660" rx="8" fill="url(#post)"/>
+  <rect x="540" y="240" width="120" height="14" rx="6" fill="#5B6573"/>
+
+  <!-- Nätverkskabeln och strömkabeln från skärmens undersida -->
+  <path d="M760 466 C 770 600, 740 760, 720 900" fill="none" stroke="#0F9E68" stroke-width="14" stroke-linecap="round"/>
+  <path d="M800 466 C 820 620, 800 780, 790 900" fill="none" stroke="#0E1A2B" stroke-width="14" stroke-linecap="round"/>
+  <rect x="742" y="452" width="36" height="26" rx="4" fill="#212D3D"/>
+  <rect x="784" y="452" width="34" height="26" rx="4" fill="#212D3D"/>
+</svg>

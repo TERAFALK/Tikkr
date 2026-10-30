@@ -1,11 +1,17 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { assertWritable, requireAdmin } from "@/lib/admin-session";
+import {
+  assertWritable,
+  isOwner,
+  requireAdmin,
+  requireAdminEvenIfLocked,
+} from "@/lib/admin-session";
 import { unsafeGlobalPrisma } from "@/lib/db";
 import { recordAudit } from "@/lib/audit";
 import { parseMarkupPercent } from "@/lib/money";
 import { saved, type SaveState } from "@/lib/save-state";
+import { readProfileForm, validateProfile } from "@/lib/shop/profile";
 import { normalizeTimeOfDay } from "@/lib/time-input";
 import { parseTimeOfDay } from "@/lib/time-zone";
 
@@ -33,6 +39,42 @@ export async function saveCompany(
 
   revalidatePath("/admin/installningar");
   revalidatePath("/admin");
+
+  return saved();
+}
+
+/**
+ * Sparar företagets leverans- och fakturauppgifter.
+ *
+ * Inget fält krävs här: uppgifterna förifyller beställningsformuläret, och
+ * det är beställningen som kräver dem. Det som står prövas ändå, så att ett
+ * felskrivet postnummer upptäcks här och inte i formuläret om ett halvår.
+ *
+ * Varje administratör får ändra dem. Att beställa är ägarens, se
+ * placeShopOrder i butiken.
+ */
+export async function saveCompanyProfile(
+  _previous: SaveState,
+  formData: FormData
+): Promise<SaveState> {
+  const session = await requireAdmin();
+  await assertWritable(session);
+  const { companyId, db } = session;
+
+  const { errors, clean } = validateProfile(readProfileForm(formData), {
+    requireForOrder: false,
+  });
+
+  if (!clean) return { error: Object.values(errors)[0] };
+
+  await db.companyProfile.upsert({
+    where: { companyId },
+    create: { companyId, ...clean },
+    update: { ...clean },
+  });
+
+  revalidatePath("/admin/installningar");
+  revalidatePath("/admin/butik/kassa");
 
   return saved();
 }
@@ -265,13 +307,20 @@ export async function saveTimeSettings(
  * beteckning. Tiden finns kvar och går att fakturera, men går inte längre att
  * koppla till en namngiven person. Det är den tolkning som uppfyller båda
  * lagarna samtidigt.
+ *
+ * Fungerar även när prenumerationen är låst. Rätten att bli glömd kan inte
+ * hänga på att en faktura till oss är betald, samma skäl som registerutdraget.
  */
 export async function anonymizeEmployee(
   _previous: SaveState,
   formData: FormData
 ): Promise<SaveState> {
-  const session = await requireAdmin();
+  const session = await requireAdminEvenIfLocked();
   await assertWritable(session);
+  // Går inte att ångra, och bara ägaren gör det. Se isOwner.
+  if (!isOwner(session)) {
+    return { error: "Endast ägare kan anonymisera en anställd." };
+  }
   const { db } = session;
 
   const id = String(formData.get("employeeId") ?? "");
@@ -336,6 +385,12 @@ export async function anonymizeEmployee(
     // dess anteckningar är fritext som kan innehålla vad som helst.
     await tx.compAdjustment.deleteMany({ where: { employeeId: id } });
     await tx.absence.deleteMany({ where: { employeeId: id } });
+
+    // PLANERADE PASS RADERAS OCKSÅ. De är en avsikt och inget underlag mot
+    // någon, och de säger var en namngiven person skulle vara och när. Raderas
+    // även när planeringen är avstängd, av samma skäl som frånvaron. Ett pass
+    // som bemannade en stationsruta lämnar rutan orörd.
+    await tx.staffBlock.deleteMany({ where: { employeeId: id } });
 
     // Ändringsloggens rader om frånvaron och komptiden följer med ut. De bär
     // samma uppgifter som posterna själva, och en anonymisering som lämnar

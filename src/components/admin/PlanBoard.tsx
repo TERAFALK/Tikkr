@@ -8,7 +8,7 @@ import {
   useState,
   type PointerEvent as ReactPointerEvent,
 } from "react";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
   SNAP_MINUTES,
   blockEnd,
@@ -19,29 +19,72 @@ import {
   workingWindows,
   type StationHours,
 } from "@/lib/plan-calendar";
-import type { BlockProgress } from "@/lib/plan-live";
+import { laneTotals, type BlockProgress } from "@/lib/plan-live";
+import { filterUnplaced, unplacedMoments } from "@/lib/plan-filter";
 import { formatDuration } from "@/lib/format";
+import {
+  addDaysInZone,
+  instantFromWallTime,
+  wallTimeIn,
+} from "@/lib/time-zone";
+import {
+  DAY_BORDER,
+  WEEK_SCALE_FLOOR,
+  axisLabels,
+  dayAt,
+  fitScale,
+  hourLines,
+  layoutDays,
+  layoutWidth,
+  plannedDays,
+  stepDays,
+  type DayAxis,
+} from "@/lib/plan-geometry";
 import {
   Alert,
   Button,
   Field,
   Input,
+  Select,
   Textarea,
   dialogSurface,
 } from "@/components/ui";
 import {
   moveBlockAction,
+  moveStaffBlockAction,
   noteBlockAction,
+  noteStaffBlockAction,
   placeBlockAction,
+  placeStaffBlockAction,
   removeBlockAction,
+  removeStaffBlockAction,
   resizeBlockAction,
+  resizeStaffBlockAction,
 } from "@/app/admin/(panel)/planering/actions";
 
 /**
  * TAVLAN.
  *
- * En rad per station, dagarna åt höger, och rutor som hämtar sin tid ur
+ * En rad per resurs, dagarna åt höger, och rutor som hämtar sin tid ur
  * orderns beräkning.
+ *
+ * ── TVÅ SORTERS RADER (ändrat 2026-10-14, fas 2 av issue #21) ───────────
+ *
+ * En rad är en STATION eller en ANSTÄLLD, och samma tavla ritar båda. En
+ * kopia för personalen hade varit tvåtusen rader som gled isär vid första
+ * ändringen.
+ *
+ * Skillnaderna är tre, och de bärs av raden och inte av villkor i koden:
+ *
+ *   MOMENTET. En station kör ett arbetsmoment och tar bara emot det. En
+ *   anställd har `momentId: null` och tar vilket som helst.
+ *
+ *   TIDERNA. En station har öppettider och raster. En anställd har inga än
+ *   (fas 3), `hours: null`, och då ritas dagen vit, utan stängd tid, och
+ *   varnas bara för pass som ligger i varandra.
+ *
+ *   ÅTGÄRDERNA. Stationens rutor och personalens pass skrivs genom var sin
+ *   uppsättning serveråtgärder, med samma form.
  *
  * ── ATT PLACERA ETT JOBB SKA VARA TVÅ TRYCK ──────────────────────────────
  *
@@ -69,6 +112,18 @@ import {
  * på radernas behållare. Raderna är lika höga och dagarnas bredder är kända,
  * så svaret är ren aritmetik. Det går inte sönder av en omrendering.
  *
+ * ── VECKA OCH DAG (ändrat 2026-10-17) ────────────────────────────────────
+ *
+ * Vecka lägger alla sju dagar i den bredd som finns. Dag lägger en dag i full
+ * bredd, och är vägen till läsbara timmar och till en tavla som går att
+ * använda på en telefon. Den valda dagen står i
+ * adressfältet som `dag`, så att den överlever en omritning och ett bokmärke.
+ * Dagen ersatte zoomknapparna, som förstorade hela veckan och lämnade resten
+ * av den utanför kanten.
+ *
+ * Var dagarna ligger, vad ett tryck träffar och var klockslagen står räknas i
+ * lib/plan-geometry.ts, en gång, för rubriken, rutnätet och träffytan.
+ *
  * ── OPLACERAT LIGGER ÖVER, INTE BREDVID ──────────────────────────────────
  *
  * Som en rad över tavlan. Panelen vid sidan tog tvåhundrafemtio pixlar av
@@ -79,17 +134,45 @@ import {
 /* Formen                                                                      */
 /* -------------------------------------------------------------------------- */
 
-export interface BoardStation {
+/** Vad raderna är. Avgör åtgärderna och texterna. */
+export type LaneKind = "stations" | "staff";
+
+/** En rad på tavlan: en station eller en anställd. */
+export interface BoardLane {
   id: string;
   name: string;
-  momentId: string;
-  momentName: string;
-  hours: StationHours[];
+  /** Raden under namnet: stationens arbetsmoment, eller tomt. */
+  detail: string | null;
+  /** Momentet raden tar emot. Null betyder vilket som helst. */
+  momentId: string | null;
+  /** Öppettiderna per veckodag. Null när raden inte har några tider. */
+  hours: StationHours[] | null;
+}
+
+/** En anställd att bemanna en stationsruta med. */
+export interface BoardEmployee {
+  id: string;
+  name: string;
+}
+
+/** Ett pass som bemannar en stationsruta, som rutans dialog visar det. */
+export interface BoardStaffing {
+  id: string;
+  employeeName: string;
+  startsAt: string;
+  minutes: number;
+  /** Passet ligger utanför personens arbetstid. */
+  outsideHours: boolean;
+  /** Personen har ett annat pass samtidigt. */
+  overlaps: boolean;
+  /** Stämplat inom passet. Saknas innan utfallet hämtats. */
+  clockedMinutes?: number;
 }
 
 export interface BoardBlock {
   id: string;
-  stationId: string;
+  /** Raden rutan ligger på: stationens eller den anställdas id. */
+  laneId: string;
   orderId: string;
   orderNumber: string;
   customerName: string | null;
@@ -98,6 +181,8 @@ export interface BoardBlock {
   startsAt: string;
   minutes: number;
   note: string | null;
+  /** Stationen ett pass bemannar. Null för stationsrutor och fria pass. */
+  context: string | null;
 }
 
 export interface BoardUnplaced {
@@ -122,14 +207,6 @@ export interface BoardUnplaced {
 /** Hur ofta utfallet hämtas. Tio sekunder känns samtidigt utan att märkas. */
 const LIVE_MS = 10_000;
 
-/**
- * Zoomstegen är MULTIPLIKATORER av "hela veckan syns", inte pixlar per minut.
- *
- * Ett fast tal gav en vecka dubbelt så bred som fönstret, och tavlan öppnade
- * på måndag förmiddag med resten utanför kanten.
- */
-const ZOOM = [1, 1.75, 3];
-
 /** Stationskolumnens bredd. Används både för att rita och för att räkna. */
 const STATION_COLUMN = 160;
 
@@ -137,16 +214,6 @@ const STATION_COLUMN = 160;
 const ROW_HEIGHT = 72;
 const ROW_CLASS = "h-[72px]";
 
-/** Linjen mellan två dagar. Räknas med i träffytan. */
-const DAY_BORDER = 2;
-
-/**
- * Minsta läsbara skala.
- *
- * Under det blir en timme smalare än ett ordernummer, och då är en
- * rullningslist bättre än rutor som inte går att skilja åt.
- */
-const MIN_PX_PER_MINUTE = 0.25;
 
 /** Hur långt pekaren får röra sig och ändå räknas som ett tryck. */
 const CLICK_SLOP = 5;
@@ -164,12 +231,43 @@ const DAY_SHORT = ["Mån", "Tis", "Ons", "Tors", "Fre", "Lör", "Sön"];
 
 const MS_PER_MINUTE = 60_000;
 
+/**
+ * STÄNGD TID OCH RASTER: ytan utanför arbetstiden, och förklaringens ruta.
+ *
+ * Ett enda klassnamn för båda (ändrat 2026-10-17). Cellerna ritades med
+ * `neutral-100` på 70 procent, nästan vitt mot vitt, medan förklaringen visade
+ * Lav. Det gick inte att se vilka tider en person arbetade, och rutan
+ * "Stängt eller rast" stämde inte med det som ritades. Lav är guidens färg för
+ * tysta ytor.
+ */
+const CLOSED_CLASS = "bg-neutral-200/80";
+
+/**
+ * Serveråtgärderna per sorts rad. Samma form, så att tavlan inte behöver veta
+ * vilken den talar med utöver fältet som pekar ut raden.
+ */
+const STATION_ACTIONS = {
+  place: placeBlockAction,
+  move: moveBlockAction,
+  resize: resizeBlockAction,
+  note: noteBlockAction,
+  remove: removeBlockAction,
+};
+
+const STAFF_ACTIONS = {
+  place: placeStaffBlockAction,
+  move: moveStaffBlockAction,
+  resize: resizeStaffBlockAction,
+  note: noteStaffBlockAction,
+  remove: removeStaffBlockAction,
+};
+
 /* -------------------------------------------------------------------------- */
 /* Dragningens tillstånd                                                       */
 /* -------------------------------------------------------------------------- */
 
 interface Slot {
-  stationId: string;
+  laneId: string;
   dayIndex: number;
   /** Starttiden pekaren svarar mot, redan snäppt. */
   startsAt: Date;
@@ -204,24 +302,51 @@ type Drag =
 /* -------------------------------------------------------------------------- */
 
 export default function PlanBoard({
-  stations,
+  kind,
+  lanes,
   blocks: initialBlocks,
   unplaced: initialUnplaced,
+  placesFromUnplaced,
+  employees,
+  staffing = {},
   monday,
   weekNumber,
   timeZone,
   isCurrentWeek,
+  today,
+  focusDay,
+  showWeekend,
   sequences,
   readOnly,
 }: {
-  stations: BoardStation[];
+  kind: LaneKind;
+  lanes: BoardLane[];
   blocks: BoardBlock[];
   unplaced: BoardUnplaced[];
+  /**
+   * Om raderna räknar av orderns beräknade tid, och Oplacerat därför visas.
+   * Personalen i en verkstad är bemanning och gör det inte, se
+   * lib/planning-modes.ts.
+   */
+  placesFromUnplaced: boolean;
+  /**
+   * Anställda att bemanna stationsrutor med. Utelämnat när raderna inte är
+   * stationer, och då har rutans dialog ingen bemanning.
+   */
+  employees?: BoardEmployee[];
+  /** Bemanningen per stationsruta. */
+  staffing?: Record<string, BoardStaffing[]>;
   /** Måndagens dygnsbörjan, som ISO. */
   monday: string;
   weekNumber: number;
   timeZone: string;
   isCurrentWeek: boolean;
+  /** Dagens datum, "ÅÅÅÅ-MM-DD", i företagets tidszon. */
+  today: string;
+  /** Den valda dagen i dagvyn, "ÅÅÅÅ-MM-DD". Null betyder veckovyn. */
+  focusDay: string | null;
+  /** Om lördag och söndag ritas. Dolda som standard, se plannedDays. */
+  showWeekend: boolean;
   /**
    * I vilken ordning varje orders moment ska göras, som moment-id per order.
    *
@@ -233,15 +358,29 @@ export default function PlanBoard({
   readOnly: boolean;
 }) {
   const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+
+  const isStaff = kind === "staff";
+  const laneField = isStaff ? "employeeId" : "stationId";
+  const actions = isStaff ? STAFF_ACTIONS : STATION_ACTIONS;
 
   const [blocks, setBlocks] = useState(initialBlocks);
   const [drag, setDrag] = useState<Drag | null>(null);
   const [armed, setArmed] = useState<BoardUnplaced | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [zoom, setZoom] = useState(0);
   const [progress, setProgress] = useState<Record<string, BlockProgress>>({});
+  /** Om utfallet hämtats för veckan. Noll stämplat är ett svar, inget svar är inget. */
+  const [liveLoaded, setLiveLoaded] = useState(false);
+  /** Utfallet för bemanningen av stationsrutorna, per pass. */
+  const [staffingProgress, setStaffingProgress] = useState<
+    Record<string, BlockProgress>
+  >({});
   const [now, setNow] = useState<number | null>(null);
   const [editing, setEditing] = useState<BoardBlock | null>(null);
+
+  /** Jobbet som placeras med tangentbordet, se PlaceDialog. */
+  const [placing, setPlacing] = useState<BoardUnplaced | null>(null);
   const [boardWidth, setBoardWidth] = useState(0);
 
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -274,35 +413,124 @@ export default function PlanBoard({
     [mondayStart, timeZone]
   );
 
+  /** Veckans dagar som "ÅÅÅÅ-MM-DD". Samma form som adressfältet. */
+  const dayKeys = useMemo(
+    () => days.map((day) => toDateParam(day, timeZone)),
+    [days, timeZone]
+  );
+
+  const todayIndex = indexOrNull(dayKeys.indexOf(today));
+  const focusIndex = focusDay ? indexOrNull(dayKeys.indexOf(focusDay)) : null;
+  const isDay = focusIndex !== null;
+
+  // LINJEN FÖR NU går på webbläsarens klocka och flyttas varje halvminut.
+  // Den hämtades tidigare med utfallet, och syntes därför bara i stationsvyn.
+  useEffect(() => {
+    if (!isCurrentWeek) {
+      setNow(null);
+      return;
+    }
+
+    setNow(Date.now());
+    const timer = setInterval(() => setNow(Date.now()), 30_000);
+
+    return () => clearInterval(timer);
+  }, [isCurrentWeek]);
+
+  /**
+   * Till en dag i dagvyn, eller tillbaka till veckan.
+   *
+   * Genom adressfältet och inte ett lokalt läge: sidan hämtar veckan ur
+   * datumet, så en dag i nästa vecka är bara ett annat datum.
+   */
+  const show = useCallback(
+    (day: string | null) => {
+      const query = new URLSearchParams(searchParams.toString());
+
+      if (day) {
+        query.set("dag", day);
+        query.delete("v");
+      } else {
+        query.delete("dag");
+        query.set("v", dayKeys[0]);
+      }
+
+      router.push(`${pathname}?${query.toString()}`);
+    },
+    [dayKeys, pathname, router, searchParams]
+  );
+
+  /** Dagen före eller efter den valda, även över veckans kant. */
+  const step = useCallback(
+    (direction: -1 | 1) => {
+      if (focusIndex === null) return;
+
+      // Över helgen när den är dold, se stepDays.
+      const offset = stepDays(focusIndex, direction, showWeekend);
+      const target = focusIndex + offset;
+
+      show(
+        target >= 0 && target < 7
+          ? dayKeys[target]
+          : toDateParam(addDaysInZone(days[focusIndex], offset, timeZone), timeZone)
+      );
+    },
+    [dayKeys, days, focusIndex, show, showWeekend, timeZone]
+  );
+
+  /**
+   * Visar eller döljer helgen. I adressfältet som `helg=visa`, som dagvyn, och
+   * inte i en kaka: valet följer med mellan veckor och dagar, och nästa gång
+   * tavlan öppnas är helgen dold igen. En kaka hade dessutom behövt stå i
+   * integritetspolicyns uppräkning.
+   */
+  const toggleWeekend = useCallback(() => {
+    const query = new URLSearchParams(searchParams.toString());
+
+    if (showWeekend) query.delete("helg");
+    else query.set("helg", "visa");
+
+    router.push(`${pathname}?${query.toString()}`);
+  }, [pathname, router, searchParams, showWeekend]);
+
   /* --- Utfallet ---------------------------------------------------------- */
 
   const syncProgress = useCallback(async () => {
     try {
       const response = await fetch(
-        `/api/admin/plan/live?v=${toDateParam(mondayStart, timeZone)}`,
+        `/api/admin/plan/live?v=${toDateParam(mondayStart, timeZone)}${
+          isStaff ? "&vy=personal" : ""
+        }`,
         { cache: "no-store" }
       );
 
       if (!response.ok) return;
 
       const data = (await response.json()) as {
-        now: string;
         progress: Record<string, BlockProgress>;
+        staffing?: Record<string, BlockProgress>;
       };
 
       setProgress(data.progress);
-      setNow(new Date(data.now).getTime());
+      setStaffingProgress(data.staffing ?? {});
+      setLiveLoaded(true);
     } catch {
       // Nätet glappade. Behåll det vi vet i stället för att tömma vyn.
     }
-  }, [mondayStart, timeZone]);
+  }, [isStaff, mondayStart, timeZone]);
 
   useEffect(() => {
-    // INGEN POLLNING I EN VECKA SOM INTE PÅGÅR. I en vecka som varit eller
-    // inte börjat finns ingenting levande att hämta.
+    // INGEN POLLNING I EN VECKA SOM INTE PÅGÅR. I en vecka som varit finns
+    // ingenting levande att hämta, men utfallet hämtas EN gång: planerat mot
+    // stämplat är lika mycket värt i efterhand (fas 4, 2026-10-17). En vecka
+    // som inte börjat har inget utfall alls.
+    setLiveLoaded(false);
+
     if (!isCurrentWeek) {
       setProgress({});
-      setNow(null);
+      setStaffingProgress({});
+
+      if (mondayStart.getTime() < Date.now()) void syncProgress();
       return;
     }
 
@@ -319,40 +547,39 @@ export default function PlanBoard({
       document.removeEventListener("visibilitychange", onWake);
       window.removeEventListener("focus", onWake);
     };
-  }, [isCurrentWeek, syncProgress]);
+  }, [isCurrentWeek, mondayStart, syncProgress]);
 
   /* --- Måtten ------------------------------------------------------------ */
 
   const hoursFor = useCallback(
-    (stationId: string, dayIndex: number): StationHours | null => {
-      const station = stations.find((item) => item.id === stationId);
-      if (!station) return null;
+    (laneId: string, dayIndex: number): StationHours | null => {
+      const lane = lanes.find((item) => item.id === laneId);
+      if (!lane?.hours) return null;
 
-      return station.hours.find((day) => day.weekday === dayIndex + 1) ?? null;
+      return lane.hours.find((day) => day.weekday === dayIndex + 1) ?? null;
     },
-    [stations]
+    [lanes]
   );
 
-  /** Vilka dagar som ritas. Helg visas när någon station går eller något ligger där. */
-  const visibleDays = useMemo(() => {
-    const shown: number[] = [];
+  /**
+   * Vilka dagar som ritas: alla sju, eller bara den valda dagen. Se
+   * plannedDays i lib/plan-geometry.ts.
+   */
+  const plans = useMemo(
+    () => plannedDays(focusIndex, showWeekend),
+    [focusIndex, showWeekend]
+  );
 
-    for (let index = 0; index < 7; index++) {
-      const weekend = index >= 5;
+  /**
+   * Planerat på lördag och söndag. Står på knappen när helgen är dold, så att
+   * ett jobb på en lördag inte försvinner ur sikte bara för att knappen står
+   * på Dölj.
+   */
+  const weekendBlocks = blocks.filter(
+    (block) => (dayIndexOf(new Date(block.startsAt), days) ?? 0) >= 5
+  ).length;
 
-      const open = stations.some((station) =>
-        station.hours.some((day) => day.weekday === index + 1)
-      );
-
-      const used = blocks.some(
-        (block) => dayIndexOf(new Date(block.startsAt), days) === index
-      );
-
-      if (!weekend || open || used) shown.push(index);
-    }
-
-    return shown;
-  }, [blocks, days, stations]);
+  const visibleDays = useMemo(() => plans.map((plan) => plan.index), [plans]);
 
   /**
    * Tidsaxeln per dag.
@@ -364,7 +591,7 @@ export default function PlanBoard({
    * när servern svarat, i stället för två gånger varav en under handen.
    */
   const windows = useMemo(() => {
-    const result = new Map<number, { startMinute: number; endMinute: number }>();
+    const result = new Map<number, DayAxis>();
 
     for (const index of visibleDays) {
       const spans = initialBlocks
@@ -372,57 +599,52 @@ export default function PlanBoard({
         .map((block) => ({
           startsAt: new Date(block.startsAt),
           minutes: block.minutes,
-          hours: hoursFor(block.stationId, index),
+          hours: hoursFor(block.laneId, index),
         }));
 
-      const hours = stations.map((station) => hoursFor(station.id, index));
+      const hours = lanes.map((lane) => hoursFor(lane.id, index));
 
       result.set(index, dayWindow(hours, spans, days[index], timeZone));
     }
 
     return result;
-  }, [days, hoursFor, initialBlocks, stations, timeZone, visibleDays]);
+  }, [days, hoursFor, initialBlocks, lanes, timeZone, visibleDays]);
+
+  const axisOf = useCallback(
+    (index: number): DayAxis =>
+      windows.get(index) ?? { startMinute: 0, endMinute: 0 },
+    [windows]
+  );
 
   /**
-   * Skalan: pixlar per minut.
+   * Skalan: pixlar per minut, så att de dagar som ritas fyller bredden.
    *
-   * Steg ett lägger hela veckan i den bredd som finns. Måtten är kända först
-   * när dagfönstren räknats, eftersom en fredag som slutar 13:00 är smalare
-   * än en måndag som slutar 16:00.
+   * Måtten är kända först när dagfönstren räknats, eftersom en dag med en
+   * station som går till 20:00 är bredare än en som slutar 16:00.
    */
-  const pxPerMinute = useMemo(() => {
-    const minutes = visibleDays.reduce((total, index) => {
-      const axis = windows.get(index);
-      return total + (axis ? axis.endMinute - axis.startMinute : 0);
-    }, 0);
+  const pxPerMinute = useMemo(
+    () =>
+      boardWidth === 0
+        ? 0.5
+        : fitScale({
+            available: boardWidth - STATION_COLUMN,
+            plans,
+            axisOf,
+            floor: WEEK_SCALE_FLOOR,
+          }),
+    [axisOf, boardWidth, plans]
+  );
 
-    if (boardWidth === 0 || minutes === 0) return 0.5 * ZOOM[zoom];
-
-    const usable =
-      boardWidth - STATION_COLUMN - visibleDays.length * DAY_BORDER;
-
-    return Math.max(MIN_PX_PER_MINUTE, usable / minutes) * ZOOM[zoom];
-  }, [boardWidth, visibleDays, windows, zoom]);
-
-  /**
-   * En dags bredd i HELA pixlar.
-   *
-   * Avrundningen är inte kosmetik. Med bruten bredd hamnar kolumnlinjen,
-   * timlinjerna och rutornas kanter på var sin sida om samma halva pixel, och
-   * webbläsaren väljer olika håll beroende på var i kolumnen de ligger. Det
-   * syns som att saker byter storlek med en pixel när något annat ändras, och
-   * det är precis den sortens vaghet som får en vy att kännas opålitlig.
-   *
-   * Träffytan använder samma funktion, så det pekaren pekar på är det som
-   * ritats.
-   */
-  const widthOf = useCallback(
-    (dayIndex: number) => {
-      const axis = windows.get(dayIndex);
-      if (!axis) return 0;
-      return Math.round((axis.endMinute - axis.startMinute) * pxPerMinute);
-    },
-    [pxPerMinute, windows]
+  /** Var varje dag ligger. Rubriken, rutnätet och träffytan läser härifrån. */
+  const columns = useMemo(
+    () =>
+      layoutDays(
+        plans,
+        axisOf,
+        pxPerMinute,
+        boardWidth === 0 ? undefined : boardWidth - STATION_COLUMN
+      ),
+    [axisOf, boardWidth, plans, pxPerMinute]
   );
 
   /* --- Träffytan --------------------------------------------------------- */
@@ -448,51 +670,36 @@ export default function PlanBoard({
       const rect = body.getBoundingClientRect();
 
       const row = Math.floor((clientY - rect.top) / ROW_HEIGHT);
-      if (row < 0 || row >= stations.length) return null;
+      if (row < 0 || row >= lanes.length) return null;
 
-      let x = clientX - rect.left - STATION_COLUMN;
-      if (x < 0) return null;
+      const hit = dayAt(
+        columns,
+        clientX - rect.left - STATION_COLUMN,
+        axisOf,
+        pxPerMinute,
+        SNAP_MINUTES
+      );
 
-      for (const dayIndex of visibleDays) {
-        const width = widthOf(dayIndex);
+      if (!hit) return null;
 
-        if (x <= width) {
-          const axis = windows.get(dayIndex);
-          if (!axis) return null;
-
-          const minute = axis.startMinute + x / Math.max(pxPerMinute, 0.01);
-          const snapped = Math.round(minute / SNAP_MINUTES) * SNAP_MINUTES;
-
-          return {
-            stationId: stations[row].id,
-            dayIndex,
-            startsAt: new Date(
-              days[dayIndex].getTime() + Math.max(0, snapped) * MS_PER_MINUTE
-            ),
-          };
-        }
-
-        x -= width + DAY_BORDER;
-      }
-
-      return null;
+      return {
+        laneId: lanes[row].id,
+        dayIndex: hit.index,
+        startsAt: new Date(days[hit.index].getTime() + hit.minute * MS_PER_MINUTE),
+      };
     },
-    [days, pxPerMinute, stations, visibleDays, widthOf, windows]
+    [axisOf, columns, days, lanes, pxPerMinute]
   );
 
-  /** Pixlar från tavlans vänsterkant till en dags början. */
+  /** Pixlar från tavlans vänsterkant till innehållet i en dag. */
   const dayOffset = useCallback(
     (dayIndex: number) => {
-      let x = STATION_COLUMN;
-
-      for (const index of visibleDays) {
-        if (index === dayIndex) return x;
-        x += widthOf(index) + DAY_BORDER;
-      }
-
-      return null;
+      const column = columns.find(
+        (item) => item.index === dayIndex
+      );
+      return column ? STATION_COLUMN + column.left : null;
     },
-    [visibleDays, widthOf]
+    [columns]
   );
 
   /* --- Skrivningarna ----------------------------------------------------- */
@@ -525,15 +732,15 @@ export default function PlanBoard({
 
   const place = useCallback(
     async (row: BoardUnplaced, slot: Slot) => {
-      const station = stations.find((item) => item.id === slot.stationId);
-      if (!station) return;
+      const lane = lanes.find((item) => item.id === slot.laneId);
+      if (!lane) return;
 
-      if (station.momentId !== row.momentId) {
-        setError(`${station.name} kör inte ${row.momentName}.`);
+      if (lane.momentId !== null && lane.momentId !== row.momentId) {
+        setError(`${lane.name} kör inte ${row.momentName}.`);
         return;
       }
 
-      const hours = hoursFor(station.id, slot.dayIndex);
+      const hours = hoursFor(lane.id, slot.dayIndex);
       const room = fitsFrom(hours, slot.startsAt, timeZone);
 
       if (room < 1) {
@@ -549,7 +756,7 @@ export default function PlanBoard({
       // Tillfälligt id. Ersätts av serverns när sidan ritas om.
       const draft: BoardBlock = {
         id: `ny-${Date.now()}`,
-        stationId: station.id,
+        laneId: lane.id,
         orderId: row.orderId,
         orderNumber: row.orderNumber,
         customerName: row.customerName,
@@ -558,6 +765,7 @@ export default function PlanBoard({
         startsAt: slot.startsAt.toISOString(),
         minutes,
         note: null,
+        context: null,
       };
 
       setArmed(null);
@@ -569,23 +777,23 @@ export default function PlanBoard({
           const data = new FormData();
           data.set("orderId", row.orderId);
           data.set("momentId", row.momentId);
-          data.set("stationId", station.id);
+          data.set(laneField, lane.id);
           data.set("startsAt", slot.startsAt.toISOString());
           data.set("minutes", String(minutes));
-          return placeBlockAction({}, data);
+          return actions.place({}, data);
         }
       );
     },
-    [blocks, hoursFor, run, stations, timeZone]
+    [actions, blocks, hoursFor, laneField, lanes, run, timeZone]
   );
 
   const moveTo = useCallback(
     async (block: BoardBlock, slot: Slot) => {
-      const station = stations.find((item) => item.id === slot.stationId);
-      if (!station) return;
+      const lane = lanes.find((item) => item.id === slot.laneId);
+      if (!lane) return;
 
-      if (station.momentId !== block.momentId) {
-        setError(`${station.name} kör inte ${block.momentName}.`);
+      if (lane.momentId !== null && lane.momentId !== block.momentId) {
+        setError(`${lane.name} kör inte ${block.momentName}.`);
         return;
       }
 
@@ -597,7 +805,7 @@ export default function PlanBoard({
               item.id === block.id
                 ? {
                     ...item,
-                    stationId: station.id,
+                    laneId: lane.id,
                     startsAt: slot.startsAt.toISOString(),
                   }
                 : item
@@ -606,13 +814,13 @@ export default function PlanBoard({
         () => {
           const data = new FormData();
           data.set("blockId", block.id);
-          data.set("stationId", station.id);
+          data.set(laneField, lane.id);
           data.set("startsAt", slot.startsAt.toISOString());
-          return moveBlockAction({}, data);
+          return actions.move({}, data);
         }
       );
     },
-    [blocks, run, stations]
+    [actions, blocks, laneField, lanes, run]
   );
 
   const resize = useCallback(
@@ -631,11 +839,11 @@ export default function PlanBoard({
           const data = new FormData();
           data.set("blockId", block.id);
           data.set("minutes", String(minutes));
-          return resizeBlockAction({}, data);
+          return actions.resize({}, data);
         }
       );
     },
-    [blocks, run]
+    [actions, blocks, run]
   );
 
   const saveNote = useCallback(
@@ -656,11 +864,11 @@ export default function PlanBoard({
           const data = new FormData();
           data.set("blockId", block.id);
           data.set("note", note);
-          return noteBlockAction({}, data);
+          return actions.note({}, data);
         }
       );
     },
-    [blocks, run]
+    [actions, blocks, run]
   );
 
   const remove = useCallback(
@@ -674,11 +882,55 @@ export default function PlanBoard({
         () => {
           const data = new FormData();
           data.set("blockId", block.id);
-          return removeBlockAction({}, data);
+          return actions.remove({}, data);
         }
       );
     },
-    [blocks, run]
+    [actions, blocks, run]
+  );
+
+  /**
+   * Bemannar en stationsruta: ett pass för en anställd, kopplat till rutan.
+   *
+   * Svarar med felet i stället för att lägga det överst på tavlan. Dialogen
+   * ligger över tavlan, och ett fel bakom den hade ingen sett.
+   */
+  const staff = useCallback(
+    async (
+      block: BoardBlock,
+      employeeId: string,
+      startsAt: Date,
+      minutes: number
+    ): Promise<string | null> => {
+      const data = new FormData();
+      data.set("employeeId", employeeId);
+      data.set("orderId", block.orderId);
+      data.set("momentId", block.momentId);
+      data.set("plannedBlockId", block.id);
+      data.set("startsAt", startsAt.toISOString());
+      data.set("minutes", String(minutes));
+
+      const result = await placeStaffBlockAction({}, data);
+      if (result.error) return result.error;
+
+      router.refresh();
+      return null;
+    },
+    [router]
+  );
+
+  const unstaff = useCallback(
+    async (id: string): Promise<string | null> => {
+      const data = new FormData();
+      data.set("blockId", id);
+
+      const result = await removeStaffBlockAction({}, data);
+      if (result.error) return result.error;
+
+      router.refresh();
+      return null;
+    },
+    [router]
   );
 
   /* --- Pekaren ----------------------------------------------------------- */
@@ -861,12 +1113,12 @@ export default function PlanBoard({
     }
 
     if (drag.kind === "move" && drag.slot) {
-      const { stationId, startsAt } = drag.slot;
+      const { laneId, startsAt } = drag.slot;
       const moving = drag.block.id;
 
       return blocks.map((block) =>
         block.id === moving
-          ? { ...block, stationId, startsAt: startsAt.toISOString() }
+          ? { ...block, laneId, startsAt: startsAt.toISOString() }
           : block
       );
     }
@@ -912,14 +1164,13 @@ export default function PlanBoard({
   const dropSlot = drag && drag.kind !== "resize" ? drag.slot : null;
 
   /** Tavlans hela bredd. Pilarnas lager spänner över den. */
-  const contentWidth = useMemo(
-    () =>
-      visibleDays.reduce(
-        (total, index) => total + widthOf(index) + DAY_BORDER,
-        STATION_COLUMN
-      ),
-    [visibleDays, widthOf]
-  );
+  const contentWidth = STATION_COLUMN + layoutWidth(columns);
+
+  /**
+   * Veckans planerade och stämplade tid per anställd. Står under namnet i
+   * personalvyn, se laneTotals i lib/plan-live.ts.
+   */
+  const totals = useMemo(() => laneTotals(blocks, progress), [blocks, progress]);
 
   /**
    * PILARNA SOM VISAR FÖLJDEN I ETT JOBB.
@@ -954,7 +1205,12 @@ export default function PlanBoard({
    * är okänd då, men att en fräsning delats på två dagar vet vi ändå.
    */
   const arrows = useMemo(() => {
-    const rows = new Map(stations.map((station, index) => [station.id, index]));
+    // Bara där raderna räknar av beräkningen. Bemanningen i en verkstad följer
+    // stationens rutor, och samma pilar en gång till på personalens rader
+    // säger ingenting nytt.
+    if (!placesFromUnplaced) return [];
+
+    const rows = new Map(lanes.map((lane, index) => [lane.id, index]));
 
     const found: {
       key: string;
@@ -1051,7 +1307,7 @@ export default function PlanBoard({
 
       const axis = windows.get(dayIndex);
       const base = dayOffset(dayIndex);
-      const row = rows.get(block.stationId);
+      const row = rows.get(block.laneId);
 
       if (!axis || base === null || row === undefined) return null;
 
@@ -1070,10 +1326,11 @@ export default function PlanBoard({
     dayOffset,
     days,
     hoursFor,
+    lanes,
+    placesFromUnplaced,
     pxPerMinute,
     sequences,
     shown,
-    stations,
     timeZone,
     windows,
   ]);
@@ -1092,12 +1349,16 @@ export default function PlanBoard({
     >
       {error && <Alert>{error}</Alert>}
 
-      <UnplacedStrip
-        rows={unplaced}
-        armed={armed}
-        readOnly={readOnly}
-        onPointerDownRow={beginNew}
-      />
+      {placesFromUnplaced && (
+        <UnplacedStrip
+          kind={kind}
+          rows={unplaced}
+          armed={armed}
+          readOnly={readOnly}
+          onPointerDownRow={beginNew}
+          onKeyboardPlace={setPlacing}
+        />
+      )}
 
       <div className="flex items-center justify-between gap-3">
         <p className="text-[13px] text-neutral-500">
@@ -1109,38 +1370,93 @@ export default function PlanBoard({
           )}
         </p>
 
-        <div className="flex items-center gap-1">
-          <Button
-            type="button"
-            tone="ghost"
-            onClick={() => setZoom((value) => Math.max(0, value - 1))}
-            disabled={zoom === 0}
-            aria-label="Zooma ut"
-          >
-            −
-          </Button>
-          <Button
-            type="button"
-            tone="ghost"
-            onClick={() =>
-              setZoom((value) => Math.min(ZOOM.length - 1, value + 1))
-            }
-            disabled={zoom === ZOOM.length - 1}
-            aria-label="Zooma in"
-          >
-            +
-          </Button>
+        <div className="flex flex-wrap items-center gap-2">
+          {focusIndex !== null && (
+            <div className="flex items-center gap-1">
+              <button
+                type="button"
+                onClick={() => step(-1)}
+                aria-label="Föregående dag"
+                className="inline-flex h-7 w-7 items-center justify-center rounded-md text-neutral-600 hover:bg-neutral-100"
+              >
+                ‹
+              </button>
+              <span
+                className={`min-w-[8.5rem] text-center text-[13px] font-medium ${
+                  focusIndex === todayIndex ? "text-link" : "text-neutral-900"
+                }`}
+              >
+                {DAY_LONG[focusIndex]} {dayLabel(days[focusIndex], timeZone)}
+              </span>
+              <button
+                type="button"
+                onClick={() => step(1)}
+                aria-label="Nästa dag"
+                className="inline-flex h-7 w-7 items-center justify-center rounded-md text-neutral-600 hover:bg-neutral-100"
+              >
+                ›
+              </button>
+            </div>
+          )}
+
+          {!isDay && (
+            <button
+              type="button"
+              onClick={toggleWeekend}
+              aria-pressed={showWeekend}
+              className="inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-[13px] font-medium text-neutral-600 hover:bg-neutral-100"
+            >
+              {showWeekend ? "Dölj helg" : "Visa helg"}
+              {!showWeekend && weekendBlocks > 0 && (
+                <span
+                  title={`${weekendBlocks} planerade i helgen`}
+                  className="rounded bg-amber-100 px-1.5 py-0.5 text-[11px] font-semibold tabular-nums text-amber-800"
+                >
+                  {weekendBlocks}
+                </span>
+              )}
+            </button>
+          )}
+
+          <div role="group" aria-label="Visa" className="flex gap-1">
+            {(
+              [
+                ["Vecka", false],
+                ["Dag", true],
+              ] as const
+            ).map(([label, day]) => (
+              <button
+                key={label}
+                type="button"
+                aria-pressed={isDay === day}
+                onClick={() =>
+                  isDay === day
+                    ? undefined
+                    : show(day ? dayKeys[todayIndex ?? 0] : null)
+                }
+                className={`rounded-md px-2.5 py-1 text-[13px] font-medium transition-colors ${
+                  isDay === day
+                    ? "bg-fjord text-white"
+                    : "text-neutral-600 hover:bg-neutral-100"
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 
-      {stations.length === 0 ? (
+      {lanes.length === 0 ? (
         <div className="rounded-lg border border-dashed border-neutral-200 bg-neutral-50/50 px-6 py-14 text-center">
           <p className="text-sm font-medium text-neutral-900">
-            Inga öppna stationer
+            {isStaff ? "Inga aktiva anställda" : "Inga öppna stationer"}
           </p>
-          <p className="mx-auto mt-1 max-w-md text-[13px] text-neutral-500">
-            Lägg upp stationerna innan du planerar.
-          </p>
+          {!isStaff && (
+            <p className="mx-auto mt-1 max-w-md text-[13px] text-neutral-500">
+              Lägg upp stationerna innan du planerar.
+            </p>
+          )}
         </div>
       ) : (
         <div
@@ -1148,30 +1464,58 @@ export default function PlanBoard({
           className="overflow-x-auto rounded-lg border border-neutral-200 bg-white"
         >
           <div className="inline-block min-w-full">
-            {/* Dagrubrikerna */}
-            <div className="flex border-b border-neutral-200 bg-neutral-50">
+            {/* Dagrubrikerna.
+
+                FÖRSTA DAGENS SKILJELINJE ÄR GENOMSKINLIG, här och i varje rad.
+                Den låg bredvid stationskolumnens kant och blev en dubbel linje.
+                Den finns kvar som bredd, så att måtten i lib/plan-geometry.ts
+                gäller varje dag lika. */}
+            <div className="flex border-b border-neutral-200 bg-neutral-50 [&>*:nth-child(2)]:border-l-transparent">
               <div
                 style={{ width: STATION_COLUMN }}
-                className="sticky left-0 z-20 shrink-0 border-r border-neutral-200 bg-neutral-50 px-3 py-2 text-[11px] font-semibold uppercase tracking-wider text-neutral-400"
+                className="sticky left-0 z-20 shrink-0 border-r border-neutral-200 bg-neutral-50 px-3 py-2 text-[11px] font-semibold uppercase tracking-wider text-neutral-500"
               >
-                Station
+                {isStaff ? "Anställd" : "Station"}
               </div>
 
-              {visibleDays.map((index) => (
-                <div
-                  key={index}
-                  style={{ width: widthOf(index) }}
-                  className="shrink-0 border-l-2 border-neutral-200 px-2 py-2 first:border-l-0"
-                >
-                  <p className="truncate text-[13px] font-medium text-neutral-900">
-                    {widthOf(index) > 160 ? DAY_LONG[index] : DAY_SHORT[index]}{" "}
-                    <span className="font-normal text-neutral-400">
-                      {dayLabel(days[index], timeZone)}
-                    </span>
-                  </p>
-                  <Axis axis={windows.get(index)} pxPerMinute={pxPerMinute} />
-                </div>
-              ))}
+              {/* VARJE KOLUMN ÄR SKILJELINJEN PLUS INNEHÅLLET, och bredden
+                  sätts till båda. Klockslagen räknas från innehållets kant,
+                  precis som rutnätet under, se lib/plan-geometry.ts. */}
+              {columns.map((column) => {
+                const isToday = column.index === todayIndex;
+
+                return (
+                  <div
+                    key={column.index}
+                    style={{ width: column.width + DAY_BORDER }}
+                    className="shrink-0 border-l-2 border-neutral-200 py-2"
+                  >
+                    <button
+                      type="button"
+                      onClick={() => show(dayKeys[column.index])}
+                      disabled={isDay}
+                      className={`block max-w-full truncate px-2 text-left text-[13px] font-medium enabled:hover:underline ${
+                        isToday ? "text-link" : "text-neutral-900"
+                      }`}
+                    >
+                      {column.width > 160
+                        ? DAY_LONG[column.index]
+                        : DAY_SHORT[column.index]}{" "}
+                      <span
+                        className={`font-normal ${
+                          isToday ? "text-link" : "text-neutral-500"
+                        }`}
+                      >
+                        {dayLabel(days[column.index], timeZone)}
+                      </span>
+                    </button>
+                    <Axis
+                      axis={windows.get(column.index)}
+                      pxPerMinute={pxPerMinute}
+                    />
+                  </div>
+                );
+              })}
             </div>
 
             {/* Raderna. Enda måttet träffytan räknas ur. */}
@@ -1190,7 +1534,7 @@ export default function PlanBoard({
                 <svg
                   className="pointer-events-none absolute left-0 top-0 z-[15]"
                   width={contentWidth}
-                  height={stations.length * ROW_HEIGHT}
+                  height={lanes.length * ROW_HEIGHT}
                   aria-hidden="true"
                 >
                   <defs>
@@ -1215,7 +1559,7 @@ export default function PlanBoard({
                       strokeWidth={1.5}
                       markerEnd="url(#plan-arrow)"
                       className={
-                        arrow.backwards ? "text-amber-600" : "text-skiffer"
+                        arrow.backwards ? "text-amber-700" : "text-skiffer"
                       }
                       stroke="currentColor"
                       strokeDasharray={arrow.backwards ? "4 3" : undefined}
@@ -1224,14 +1568,16 @@ export default function PlanBoard({
                 </svg>
               )}
 
-              {stations.map((station) => {
-                const dim = seeking !== null && seeking !== station.momentId;
-                const target = seeking !== null && seeking === station.momentId;
+              {lanes.map((lane) => {
+                const takes =
+                  lane.momentId === null || lane.momentId === seeking;
+                const dim = seeking !== null && !takes;
+                const target = seeking !== null && takes;
 
                 return (
                   <div
-                    key={station.id}
-                    className={`flex border-b border-neutral-100 last:border-b-0 ${ROW_CLASS} ${
+                    key={lane.id}
+                    className={`flex border-b border-neutral-100 last:border-b-0 [&>*:nth-child(2)]:border-l-transparent ${ROW_CLASS} ${
                       dim ? "opacity-40" : ""
                     }`}
                   >
@@ -1242,35 +1588,51 @@ export default function PlanBoard({
                       }`}
                     >
                       <p className="truncate text-[13px] font-medium text-neutral-900">
-                        {station.name}
+                        {lane.name}
                       </p>
-                      <p className="truncate text-[11px] text-neutral-400">
-                        {station.momentName}
-                      </p>
+                      {lane.detail && (
+                        <p className="truncate text-[11px] text-neutral-500">
+                          {lane.detail}
+                        </p>
+                      )}
+                      {isStaff && totals.has(lane.id) && (
+                        <p className="truncate text-[11px] tabular-nums text-neutral-500">
+                          Planerat{" "}
+                          {formatDuration(totals.get(lane.id)!.plannedMinutes)}
+                          {liveLoaded &&
+                            ` · Stämplat ${formatDuration(
+                              totals.get(lane.id)!.clockedMinutes
+                            )}`}
+                        </p>
+                      )}
                     </div>
 
-                    {visibleDays.map((dayIndex) => (
+                    {columns.map((column) => {
+                      const dayIndex = column.index;
+
+                      return (
                       <DayCell
                         key={dayIndex}
-                        stationName={station.name}
+                        laneName={lane.name}
+                        hoursKnown={lane.hours !== null}
                         day={days[dayIndex]}
                         days={days}
                         dayIndex={dayIndex}
                         axis={windows.get(dayIndex)}
-                        width={widthOf(dayIndex)}
+                        width={column.width}
                         pxPerMinute={pxPerMinute}
                         timeZone={timeZone}
-                        hours={hoursFor(station.id, dayIndex)}
+                        hours={hoursFor(lane.id, dayIndex)}
                         blocks={shown.filter(
                           (block) =>
-                            block.stationId === station.id &&
+                            block.laneId === lane.id &&
                             dayIndexOf(new Date(block.startsAt), days) ===
                               dayIndex
                         )}
                         progress={progress}
                         now={now}
                         highlight={
-                          dropSlot?.stationId === station.id &&
+                          dropSlot?.laneId === lane.id &&
                           dropSlot.dayIndex === dayIndex
                         }
                         draggedBlockId={draggedBlockId}
@@ -1278,8 +1640,10 @@ export default function PlanBoard({
                         readOnly={readOnly}
                         onBlockPointerDown={beginMove}
                         onResizeStart={beginResize}
+                        onBlockOpen={setEditing}
                       />
-                    ))}
+                      );
+                    })}
                   </div>
                 );
               })}
@@ -1288,7 +1652,7 @@ export default function PlanBoard({
         </div>
       )}
 
-      <Legend armed={armed} />
+      <Legend />
 
       {/* SPÖKET SOM FÖLJER PEKAREN under en dragning från Oplacerat.
           Utan det ser en dragning ut som att ingenting händer, vilket var en
@@ -1310,6 +1674,21 @@ export default function PlanBoard({
         </div>
       )}
 
+      {placing && (
+        <PlaceDialog
+          row={placing}
+          lanes={lanes}
+          days={days}
+          timeZone={timeZone}
+          onClose={() => setPlacing(null)}
+          onPlace={(slot) => {
+            const row = placing;
+            setPlacing(null);
+            void place(row, slot);
+          }}
+        />
+      )}
+
       {editing && (
         <BlockDialog
           block={editing}
@@ -1317,6 +1696,17 @@ export default function PlanBoard({
           progress={progress[editing.id]}
           timeZone={timeZone}
           readOnly={readOnly}
+          employees={employees}
+          staffing={(staffing[editing.id] ?? []).map((pass) => ({
+            ...pass,
+            clockedMinutes: liveLoaded
+              ? (staffingProgress[pass.id]?.clockedMinutes ?? 0)
+              : undefined,
+          }))}
+          onStaff={(employeeId, startsAt, minutes) =>
+            staff(editing, employeeId, startsAt, minutes)
+          }
+          onUnstaff={unstaff}
           onClose={() => setEditing(null)}
           onRemove={() => void remove(editing)}
           onSave={(minutes, note) => {
@@ -1348,11 +1738,14 @@ export default function PlanBoard({
  * nedåt trycker ned tavlan, och tavlan ska ligga still.
  */
 function UnplacedStrip({
+  kind,
   rows,
   armed,
   readOnly,
   onPointerDownRow,
+  onKeyboardPlace,
 }: {
+  kind: LaneKind;
   rows: BoardUnplaced[];
   armed: BoardUnplaced | null;
   readOnly: boolean;
@@ -1360,24 +1753,75 @@ function UnplacedStrip({
     event: ReactPointerEvent<HTMLElement>,
     row: BoardUnplaced
   ) => void;
+  onKeyboardPlace: (row: BoardUnplaced) => void;
 }) {
-  const plannable = rows.filter((row) => row.plannable);
-  const blocked = rows.filter((row) => !row.plannable);
+  const [query, setQuery] = useState("");
+  const [momentId, setMomentId] = useState("");
+
+  const moments = useMemo(() => unplacedMoments(rows), [rows]);
+  const shown = useMemo(
+    () => filterUnplaced(rows, query, momentId),
+    [rows, query, momentId]
+  );
+
+  const plannable = shown.filter((row) => row.plannable);
+  const blocked = shown.filter((row) => !row.plannable);
+  const target = kind === "staff" ? "en anställd" : "en station";
 
   return (
     <div className="rounded-lg border border-neutral-200 bg-white">
-      <div className="flex items-center gap-2 border-b border-neutral-200 px-4 py-2.5">
+      <div className="flex flex-wrap items-center gap-2 border-b border-neutral-200 px-4 py-2.5">
         <h2 className="text-sm font-semibold text-neutral-900">Oplacerat</h2>
 
         {rows.length > 0 && (
           <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[11px] font-semibold tabular-nums text-amber-800">
-            {rows.length}
+            {shown.length === rows.length
+              ? rows.length
+              : `${shown.length} av ${rows.length}`}
           </span>
         )}
 
-        {armed && (
-          <span className="ml-auto truncate text-[12px] font-medium text-tick-deep">
-            Tryck på en station för att placera {armed.orderNumber}
+        {rows.length > 0 && (
+          <span className="flex flex-wrap items-center gap-2">
+            <span className="w-44">
+              <Input
+                type="search"
+                aria-label="Sök i Oplacerat"
+                placeholder="Order, kund…"
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+              />
+            </span>
+            {moments.length > 1 && (
+              <span className="w-44">
+                <Select
+                  aria-label="Arbetsmoment"
+                  value={momentId}
+                  onChange={(event) => setMomentId(event.target.value)}
+                >
+                  <option value="">Alla arbetsmoment</option>
+                  {moments.map((moment) => (
+                    <option key={moment.id} value={moment.id}>
+                      {moment.name}
+                    </option>
+                  ))}
+                </Select>
+              </span>
+            )}
+          </span>
+        )}
+
+        {/* Instruktionen står vid det man ska trycka på. Den låg under tavlan,
+            längst till höger i liten grå text. */}
+        {!readOnly && rows.length > 0 && (
+          <span
+            className={`ml-auto text-[13px] ${
+              armed ? "font-medium text-link" : "text-neutral-500"
+            }`}
+          >
+            {armed
+              ? `Tryck på ${target} för att placera ${armed.orderNumber}, eller Esc för att avbryta`
+              : `Tryck på ett jobb, sedan på ${target}`}
           </span>
         )}
       </div>
@@ -1386,15 +1830,18 @@ function UnplacedStrip({
           placerats, och hela tavlan under hoppade uppåt i samma ögonblick som
           man släppte. Att ytan man just arbetat i flyttar sig är det som får en
           vy att kännas opålitlig, även när allt den gjorde var rätt. */}
-      {rows.length === 0 ? (
+      {shown.length === 0 ? (
         <p className="flex h-[88px] items-center px-4 text-[13px] text-neutral-500">
-          Allt beräknat arbete ligger på tavlan.
+          {rows.length === 0
+            ? "Allt beräknat arbete ligger på tavlan."
+            : "Inget jobb matchar sökningen"}
         </p>
       ) : (
         <div className="flex h-[88px] items-stretch gap-2 overflow-x-auto px-3 py-2">
           {plannable.map((row) => (
             <Chip
               key={`${row.orderId}:${row.momentId}`}
+              kind={kind}
               row={row}
               armed={
                 armed?.orderId === row.orderId &&
@@ -1402,12 +1849,14 @@ function UnplacedStrip({
               }
               readOnly={readOnly}
               onPointerDown={(event) => onPointerDownRow(event, row)}
+              onKeyboardPlace={() => onKeyboardPlace(row)}
             />
           ))}
 
           {blocked.map((row) => (
             <Chip
               key={`${row.orderId}:${row.momentId}`}
+              kind={kind}
               row={row}
               armed={false}
               readOnly
@@ -1421,26 +1870,46 @@ function UnplacedStrip({
 }
 
 function Chip({
+  kind,
   row,
   armed,
   readOnly,
   blocked = false,
   onPointerDown,
+  onKeyboardPlace,
 }: {
+  kind: LaneKind;
   row: BoardUnplaced;
   armed: boolean;
   readOnly: boolean;
   blocked?: boolean;
   onPointerDown?: (event: ReactPointerEvent<HTMLElement>) => void;
+  onKeyboardPlace?: () => void;
 }) {
   const over = row.remainingMinutes < 0;
+  const canPlace = !readOnly && !blocked && Boolean(onKeyboardPlace);
 
   return (
     <div
+      role={canPlace ? "button" : undefined}
+      tabIndex={canPlace ? 0 : undefined}
+      aria-label={
+        canPlace
+          ? `Placera ${row.orderNumber}, ${row.momentName}`
+          : undefined
+      }
+      onKeyDown={(event) => {
+        if (canPlace && (event.key === "Enter" || event.key === " ")) {
+          event.preventDefault();
+          onKeyboardPlace?.();
+        }
+      }}
       onPointerDown={onPointerDown}
       title={
         blocked
-          ? `Ingen station kör ${row.momentName}`
+          ? kind === "staff"
+            ? "Inga aktiva anställda"
+            : `Ingen station kör ${row.momentName}`
           : `${row.orderNumber} · ${row.momentName}`
       }
       className={`w-44 shrink-0 rounded-md border px-2.5 py-2 ${
@@ -1472,9 +1941,11 @@ function Chip({
 
       <p className="truncate text-[11px] text-neutral-500">{row.momentName}</p>
 
-      <p className="truncate text-[11px] text-neutral-400">
+      <p className="truncate text-[11px] text-neutral-500">
         {blocked
-          ? "Ingen station"
+          ? kind === "staff"
+            ? "Ingen anställd"
+            : "Ingen station"
           : row.budgetMinutes === null
             ? "Ingen beräkning"
             : over
@@ -1492,7 +1963,8 @@ function Chip({
 /* -------------------------------------------------------------------------- */
 
 function DayCell({
-  stationName,
+  laneName,
+  hoursKnown,
   day,
   days,
   dayIndex,
@@ -1510,8 +1982,15 @@ function DayCell({
   readOnly,
   onBlockPointerDown,
   onResizeStart,
+  onBlockOpen,
 }: {
-  stationName: string;
+  laneName: string;
+  /**
+   * false för en rad utan arbetstider, som en anställd i fas 2. Dagen ritas
+   * då vit, och bara pass som ligger i varandra varnas för: utan tider finns
+   * ingen dag att överboka.
+   */
+  hoursKnown: boolean;
   day: Date;
   days: Date[];
   dayIndex: number;
@@ -1528,6 +2007,7 @@ function DayCell({
   /** Ett valt jobb kan läggas här. Ger pekaren en annan form. */
   pickable: boolean;
   readOnly: boolean;
+  onBlockOpen: (block: BoardBlock) => void;
   onBlockPointerDown: (
     event: ReactPointerEvent<HTMLElement>,
     block: BoardBlock
@@ -1547,20 +2027,24 @@ function DayCell({
     timeZone
   );
 
-  const over = load.overlaps || load.plannedMinutes > load.capacityMinutes;
+  const over =
+    load.overlaps ||
+    (hoursKnown && load.plannedMinutes > load.capacityMinutes);
 
   return (
     <div
-      style={{ width }}
-      className={`relative shrink-0 border-l-2 border-neutral-200 first:border-l-0 ${
+      style={{ width: width + DAY_BORDER }}
+      className={`relative shrink-0 border-l-2 border-neutral-200 ${
         highlight ? "bg-blue-100" : ""
       } ${pickable ? "cursor-copy" : ""}`}
     >
       <div className="relative h-full">
-        {/* Stängd tid och raster i grått, det öppna vitt. */}
-        <div className="absolute inset-0 bg-neutral-100/70" />
+        {/* Stängd tid och raster i grått, det öppna vitt. En rad utan tider
+            har ingen stängd tid. */}
+        {hoursKnown && <div className={`absolute inset-0 ${CLOSED_CLASS}`} />}
 
         {axis &&
+          hoursKnown &&
           workingWindows(hours, day, timeZone).map((span, index) => (
             <div
               key={index}
@@ -1574,7 +2058,7 @@ function DayCell({
 
         {/* Timlinjer, så att ytan läses som en tidslinje och inte som en ruta. */}
         {axis &&
-          hourTicks(axis).map((minute) => (
+          hourLines(axis).map((minute) => (
             <div
               key={minute}
               className="absolute inset-y-0 w-px bg-neutral-200/70"
@@ -1604,6 +2088,7 @@ function DayCell({
               readOnly={readOnly}
               onPointerDown={(event) => onBlockPointerDown(event, block)}
               onResizeStart={(event) => onResizeStart(event, block)}
+              onOpen={() => onBlockOpen(block)}
             />
           ))}
       </div>
@@ -1613,10 +2098,12 @@ function DayCell({
           className="absolute right-1 top-1 z-20 rounded bg-amber-100 px-1 text-[10px] font-semibold text-amber-800"
           title={
             load.overlaps
-              ? "Två jobb ligger i varandra"
+              ? hoursKnown
+                ? "Två jobb ligger i varandra"
+                : `${laneName} har två pass samtidigt`
               : `${formatDuration(
                   load.plannedMinutes - load.capacityMinutes
-                )} mer än ${stationName} hinner`
+                )} mer än ${laneName} hinner`
           }
         >
           {load.overlaps ? "krock" : "över"}
@@ -1638,6 +2125,7 @@ function BlockBox({
   readOnly,
   onPointerDown,
   onResizeStart,
+  onOpen,
 }: {
   block: BoardBlock;
   hours: StationHours | null;
@@ -1650,6 +2138,8 @@ function BlockBox({
   readOnly: boolean;
   onPointerDown: (event: ReactPointerEvent<HTMLElement>) => void;
   onResizeStart: (event: ReactPointerEvent<HTMLElement>) => void;
+  /** Tangentbordets väg in i rutan. Musen går genom onPointerDown. */
+  onOpen: () => void;
 }) {
   const startsAt = new Date(block.startsAt);
   const end = blockEnd(hours, startsAt, block.minutes, timeZone);
@@ -1677,6 +2167,15 @@ function BlockBox({
 
   return (
     <div
+      role="button"
+      tabIndex={0}
+      aria-label={label.replaceAll("\n", ", ")}
+      onKeyDown={(event) => {
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          onOpen();
+        }
+      }}
       onPointerDown={onPointerDown}
       title={label}
       style={{ left, width }}
@@ -1726,65 +2225,38 @@ function BlockBox({
   );
 }
 
-/** Klockslagen under dagrubriken. */
+/**
+ * Klockslagen under dagrubriken.
+ *
+ * Utan inre marginal, och varje siffra MITT PÅ SIN LINJE. Rubriken hade en
+ * marginal som rutnätet under inte hade, och "09" stod till höger om
+ * 09-linjen. Bara klockslag som ryms inom dagen tas med, se axisLabels.
+ */
 function Axis({
   axis,
   pxPerMinute,
 }: {
-  axis?: { startMinute: number; endMinute: number };
+  axis?: DayAxis;
   pxPerMinute: number;
 }) {
   if (!axis) return null;
 
   return (
     <div className="relative mt-0.5 h-3">
-      {hourTicks(axis, pxPerMinute).map((minute) => (
+      {axisLabels(axis, pxPerMinute).map((label) => (
         <span
-          key={minute}
-          className="absolute top-0 text-[10px] tabular-nums text-neutral-400"
-          style={{ left: (minute - axis.startMinute) * pxPerMinute }}
+          key={label.minute}
+          className="absolute top-0 -translate-x-1/2 text-[10px] tabular-nums text-neutral-500"
+          style={{ left: label.x }}
         >
-          {String(Math.floor(minute / 60)).padStart(2, "0")}
+          {String(Math.floor(label.minute / 60)).padStart(2, "0")}
         </span>
       ))}
     </div>
   );
 }
 
-/**
- * Klockslagen som får plats.
- *
- * Utan pixelmåttet ges varje hel timme, vilket är rätt för linjerna i
- * bakgrunden. Med måttet glesas de ut så att etiketterna inte skriver över
- * varandra.
- */
-function hourTicks(
-  axis: { startMinute: number; endMinute: number },
-  pxPerMinute?: number
-): number[] {
-  const step =
-    pxPerMinute === undefined
-      ? 60
-      : pxPerMinute < 0.35
-        ? 180
-        : pxPerMinute < 0.7
-          ? 120
-          : 60;
-
-  const ticks: number[] = [];
-
-  for (
-    let minute = Math.ceil(axis.startMinute / step) * step;
-    minute < axis.endMinute;
-    minute += step
-  ) {
-    ticks.push(minute);
-  }
-
-  return ticks;
-}
-
-function Legend({ armed }: { armed: BoardUnplaced | null }) {
+function Legend() {
   return (
     <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-neutral-500">
       <span className="flex items-center gap-1.5">
@@ -1796,16 +2268,128 @@ function Legend({ armed }: { armed: BoardUnplaced | null }) {
         Stämplat
       </span>
       <span className="flex items-center gap-1.5">
-        <span className="h-2.5 w-4 rounded-sm bg-neutral-200" />
+        <span className={`h-2.5 w-4 rounded-sm ${CLOSED_CLASS}`} />
         Stängt eller rast
       </span>
-
-      <span className="ml-auto text-neutral-400">
-        {armed
-          ? "Tryck på en station, eller Esc för att avbryta"
-          : "Tryck på ett jobb i Oplacerat, sedan på en station"}
-      </span>
     </div>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+/* Att placera med tangentbordet                                               */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * TAVLANS VÄG UTAN PEKARE.
+ *
+ * Att dra och att trycka två gånger kräver en mus eller ett finger (WCAG 2.1.1).
+ * Enter på ett jobb i Oplacerat öppnar den här rutan, med samma tre svar som
+ * trycket på tavlan ger: var, vilken dag och när. Resten går samma väg som ett
+ * tryck, se `place`.
+ */
+function PlaceDialog({
+  row,
+  lanes,
+  days,
+  timeZone,
+  onPlace,
+  onClose,
+}: {
+  row: BoardUnplaced;
+  lanes: BoardLane[];
+  days: Date[];
+  timeZone: string;
+  onPlace: (slot: Slot) => void;
+  onClose: () => void;
+}) {
+  const dialog = useRef<HTMLDialogElement>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    dialog.current?.showModal();
+  }, []);
+
+  const eligible = lanes.filter(
+    (lane) => lane.momentId === null || lane.momentId === row.momentId
+  );
+
+  return (
+    <dialog
+      ref={dialog}
+      onClose={onClose}
+      className={`w-[min(28rem,calc(100vw-2rem))] ${dialogSurface}`}
+    >
+      <div className="border-b border-neutral-200 px-5 py-4">
+        <h2 className="text-sm font-semibold text-neutral-900">
+          Placera {row.orderNumber} · {row.momentName}
+        </h2>
+      </div>
+
+      <form
+        onSubmit={(event) => {
+          event.preventDefault();
+
+          const data = new FormData(event.currentTarget);
+          const dayIndex = Number(data.get("day"));
+          const startsAt = parseClockOnDay(
+            String(data.get("start") ?? ""),
+            days[dayIndex],
+            timeZone
+          );
+
+          if (!startsAt) {
+            setError("Skriv ett klockslag, t.ex. 07:00.");
+            return;
+          }
+
+          onPlace({ laneId: String(data.get("lane")), dayIndex, startsAt });
+        }}
+      >
+        <div className="space-y-4 px-5 py-5">
+          {error && <Alert>{error}</Alert>}
+
+          <Field label="Plats">
+            <Select name="lane" autoFocus>
+              {eligible.map((lane) => (
+                <option key={lane.id} value={lane.id}>
+                  {lane.name}
+                </option>
+              ))}
+            </Select>
+          </Field>
+
+          <Field label="Dag">
+            <Select name="day">
+              {days.map((day, index) => (
+                <option key={day.toISOString()} value={index}>
+                  {new Intl.DateTimeFormat("sv-SE", {
+                    weekday: "long",
+                    day: "numeric",
+                    month: "numeric",
+                    timeZone,
+                  }).format(day)}
+                </option>
+              ))}
+            </Select>
+          </Field>
+
+          <Field label="Starttid">
+            <Input type="time" name="start" defaultValue="07:00" required />
+          </Field>
+        </div>
+
+        <div className="flex justify-end gap-2 border-t border-neutral-200 bg-neutral-50 px-5 py-3">
+          <Button
+            type="button"
+            tone="secondary"
+            onClick={() => dialog.current?.close()}
+          >
+            Avbryt
+          </Button>
+          <Button type="submit">Placera</Button>
+        </div>
+      </form>
+    </dialog>
   );
 }
 
@@ -1819,6 +2403,10 @@ function BlockDialog({
   progress,
   timeZone,
   readOnly,
+  employees,
+  staffing,
+  onStaff,
+  onUnstaff,
   onClose,
   onRemove,
   onSave,
@@ -1828,6 +2416,15 @@ function BlockDialog({
   progress?: BlockProgress;
   timeZone: string;
   readOnly: boolean;
+  /** Utelämnat när rutan inte är en stationsruta. Då visas ingen bemanning. */
+  employees?: BoardEmployee[];
+  staffing: BoardStaffing[];
+  onStaff: (
+    employeeId: string,
+    startsAt: Date,
+    minutes: number
+  ) => Promise<string | null>;
+  onUnstaff: (id: string) => Promise<string | null>;
   onClose: () => void;
   onRemove: () => void;
   onSave: (minutes: number, note: string) => void;
@@ -1854,6 +2451,7 @@ function BlockDialog({
           {clockText(new Date(block.startsAt), timeZone)} till{" "}
           {clockText(end, timeZone)}
           {block.customerName ? ` · ${block.customerName}` : ""}
+          {block.context ? ` · ${block.context}` : ""}
         </p>
       </div>
 
@@ -1870,7 +2468,7 @@ function BlockDialog({
           </p>
         )}
 
-        <Field label="Planerad tid" hint="Tim:min, t.ex. 4:30">
+        <Field label="Planerad tid" hint="Timmar, t.ex. 4,5">
           <Input
             value={hours}
             onChange={(event) => setHours(event.target.value)}
@@ -1887,6 +2485,18 @@ function BlockDialog({
             disabled={readOnly}
           />
         </Field>
+
+        {employees && (
+          <Staffing
+            block={block}
+            timeZone={timeZone}
+            readOnly={readOnly}
+            employees={employees}
+            staffing={staffing}
+            onStaff={onStaff}
+            onUnstaff={onUnstaff}
+          />
+        )}
       </div>
 
       <div className="flex items-center justify-between gap-2 border-t border-neutral-200 bg-neutral-50 px-5 py-3">
@@ -1928,6 +2538,149 @@ function BlockDialog({
   );
 }
 
+/**
+ * BEMANNINGEN AV EN STATIONSRUTA.
+ *
+ * Vem som står vid maskinen, och när. Start och längd föreslås ur rutan men
+ * går att ändra: en CNC som kör sex timmar obemannad behöver en timmes
+ * ställtid, inte sex timmars operatör. Passen räknas inte mot orderns
+ * beräkning, se lib/planning-modes.ts.
+ */
+function Staffing({
+  block,
+  timeZone,
+  readOnly,
+  employees,
+  staffing,
+  onStaff,
+  onUnstaff,
+}: {
+  block: BoardBlock;
+  timeZone: string;
+  readOnly: boolean;
+  employees: BoardEmployee[];
+  staffing: BoardStaffing[];
+  onStaff: (
+    employeeId: string,
+    startsAt: Date,
+    minutes: number
+  ) => Promise<string | null>;
+  onUnstaff: (id: string) => Promise<string | null>;
+}) {
+  const [employeeId, setEmployeeId] = useState("");
+  const [start, setStart] = useState(() =>
+    clockText(new Date(block.startsAt), timeZone)
+  );
+  const [hours, setHours] = useState(() => formatDuration(block.minutes));
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  async function submit() {
+    const minutes = parseHourText(hours);
+    const startsAt = parseClockOnDay(start, new Date(block.startsAt), timeZone);
+
+    if (!employeeId) return setError("Välj en anställd.");
+    if (startsAt === null) return setError("Ange starttid, t.ex. 07:00.");
+    if (minutes === null) return setError("Ange planerad tid, t.ex. 1,5.");
+
+    setBusy(true);
+    const failed = await onStaff(employeeId, startsAt, minutes);
+    setBusy(false);
+
+    setError(failed);
+    if (!failed) setEmployeeId("");
+  }
+
+  async function remove(id: string) {
+    setBusy(true);
+    setError(await onUnstaff(id));
+    setBusy(false);
+  }
+
+  return (
+    <div className="space-y-3 border-t border-neutral-200 pt-4">
+      <h3 className="text-[13px] font-semibold text-neutral-900">Bemanning</h3>
+
+      {error && <Alert>{error}</Alert>}
+
+      {staffing.length > 0 && (
+        <ul className="divide-y divide-neutral-100 rounded-md border border-neutral-200">
+          {staffing.map((pass) => (
+            <li
+              key={pass.id}
+              className="flex items-center justify-between gap-2 px-3 py-2 text-[13px]"
+            >
+              <span className="min-w-0">
+                <span className="block truncate text-neutral-900">
+                  {pass.employeeName}
+                </span>
+                {(pass.outsideHours || pass.overlaps) && (
+                  <span className="block text-[12px] text-amber-700">
+                    {[
+                      pass.outsideHours ? "Utanför arbetstid" : null,
+                      pass.overlaps ? "Dubbelbokad" : null,
+                    ]
+                      .filter(Boolean)
+                      .join(" · ")}
+                  </span>
+                )}
+              </span>
+              <span className="flex shrink-0 items-center gap-3 tabular-nums text-neutral-500">
+                {clockText(new Date(pass.startsAt), timeZone)} ·{" "}
+                {formatDuration(pass.minutes)}
+                {pass.clockedMinutes !== undefined &&
+                  ` · stämplat ${formatDuration(pass.clockedMinutes)}`}
+                {!readOnly && (
+                  <button
+                    type="button"
+                    onClick={() => void remove(pass.id)}
+                    disabled={busy}
+                    className="text-[12px] font-medium text-red-700 hover:underline"
+                  >
+                    Ta bort
+                  </button>
+                )}
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      {!readOnly && (
+        <div className="grid gap-3 sm:grid-cols-[1fr_5.5rem_5.5rem_auto] sm:items-end">
+          <Field label="Anställd">
+            <Select
+              value={employeeId}
+              onChange={(event) => setEmployeeId(event.target.value)}
+            >
+              <option value="">Välj…</option>
+              {employees.map((employee) => (
+                <option key={employee.id} value={employee.id}>
+                  {employee.name}
+                </option>
+              ))}
+            </Select>
+          </Field>
+          <Field label="Start">
+            <Input value={start} onChange={(event) => setStart(event.target.value)} />
+          </Field>
+          <Field label="Tid">
+            <Input value={hours} onChange={(event) => setHours(event.target.value)} />
+          </Field>
+          <Button
+            type="button"
+            tone="secondary"
+            onClick={() => void submit()}
+            disabled={busy}
+          >
+            Bemanna
+          </Button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 /* -------------------------------------------------------------------------- */
 /* Räknehjälp                                                                  */
 /* -------------------------------------------------------------------------- */
@@ -1961,23 +2714,23 @@ function arrowPath(arrow: {
 /** Rutans slut som millisekunder. Används av pilarna. */
 function endMs(
   block: BoardBlock,
-  hoursFor: (stationId: string, dayIndex: number) => StationHours | null,
+  hoursFor: (laneId: string, dayIndex: number) => StationHours | null,
   days: Date[],
   timeZone: string
 ): number {
   return endOf(block, hoursFor, days, timeZone).getTime();
 }
 
-/** Rutans slut på väggen, givet stationernas tider. */
+/** Rutans slut på väggen, givet radernas tider. */
 function endOf(
   block: BoardBlock,
-  hoursFor: (stationId: string, dayIndex: number) => StationHours | null,
+  hoursFor: (laneId: string, dayIndex: number) => StationHours | null,
   days: Date[],
   timeZone: string
 ): Date {
   const startsAt = new Date(block.startsAt);
   const index = dayIndexOf(startsAt, days);
-  const hours = index === null ? null : hoursFor(block.stationId, index);
+  const hours = index === null ? null : hoursFor(block.laneId, index);
 
   return blockEnd(hours, startsAt, block.minutes, timeZone);
 }
@@ -2098,8 +2851,8 @@ function toDateParam(day: Date, timeZone: string): string {
  * "4:30" eller "4,5" till minuter.
  *
  * Tar båda formerna, av samma skäl som orderns beräkningsfält gör det:
- * systemet visar tim:min överallt, och det vore oanständigt att kräva att man
- * räknar om det till decimaltimmar för att skriva tillbaka samma tal.
+ * systemet visar decimaltimmar, och den som har "4:30" på ett papper ska inte
+ * behöva räkna om det för att skriva in samma tid.
  */
 function parseHourText(raw: string): number | null {
   const text = raw.trim();
@@ -2119,4 +2872,31 @@ function parseHourText(raw: string): number | null {
   if (!Number.isFinite(value) || value <= 0) return null;
 
   return snap(Math.round(value * 60));
+}
+
+/**
+ * "07:00" som en tidpunkt samma dag på väggen som `day`.
+ *
+ * Bara kolon, eftersom det är ett klockslag och inte en längd (CLAUDE.md
+ * § 7.1 punkt 8). "7" godtas som 07:00, som de flesta skriver det.
+ */
+function parseClockOnDay(
+  raw: string,
+  day: Date,
+  timeZone: string
+): Date | null {
+  const match = raw.trim().match(/^(\d{1,2})(?::(\d{2}))?$/);
+  if (!match) return null;
+
+  const hour = Number(match[1]);
+  const minute = Number(match[2] ?? "0");
+  if (hour > 23 || minute > 59) return null;
+
+  const wall = wallTimeIn(day, timeZone);
+  return instantFromWallTime({ ...wall, hour, minute }, timeZone);
+}
+
+/** -1 från indexOf som null. */
+function indexOrNull(index: number): number | null {
+  return index < 0 ? null : index;
 }

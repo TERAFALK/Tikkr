@@ -2,11 +2,7 @@ import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { unsafeGlobalPrisma } from "@/lib/db";
 import { forCompany } from "@/lib/tenant";
 import { buildPayrollPeriod, currentFlexMinutes } from "@/lib/payroll";
-import {
-  addCompEarned,
-  createDefaultAbsenceReasons,
-  markAbsence,
-} from "@/lib/absence";
+import { createDefaultAbsenceReasons, markAbsence } from "@/lib/absence";
 import { parseMinuteOfDay } from "@/lib/schedule";
 
 /**
@@ -34,7 +30,7 @@ let order: string;
 let svetsning: string;
 /** Orsakerna är kundens egna rader sedan 2026-10-01, inte en enum. */
 let sjuk: string;
-let kompUttag: string;
+let flexledig: string;
 
 /** "2019-04-15 06:23" i företagets tidszon. */
 function at(day: number, time: string): Date {
@@ -43,7 +39,7 @@ function at(day: number, time: string): Date {
   return new Date(Date.UTC(2019, 3, day, hour - 2, minute));
 }
 
-/** Dygnets början, som frånvaro och komprader dateras på. */
+/** Dygnets början, som frånvaro dateras på. */
 function dayStart(day: number): Date {
   return new Date(Date.UTC(2019, 3, day, -2, 0));
 }
@@ -126,7 +122,7 @@ beforeAll(async () => {
   });
 
   sjuk = reasons.find((reason) => reason.name === "Sjuk")!.id;
-  kompUttag = reasons.find((reason) => reason.name === "Uttagen komp")!.id;
+  flexledig = reasons.find((reason) => reason.name === "Flexledig")!.id;
 
   order = (
     await unsafeGlobalPrisma.order.create({
@@ -331,7 +327,7 @@ describe("flexformeln", () => {
   it("en sjukdag ger noll i flex, inte minus en arbetsdag", async () => {
     const db = forCompany(companyId);
 
-    await markAbsence(db, companyId, TZ, {
+    await markAbsence(db, companyId, {
       employeeId: johan,
       date: dayStart(23),
       reasonId: sjuk,
@@ -345,7 +341,7 @@ describe("flexformeln", () => {
     expect(period!.absenceByReason).toEqual([{ reason: "Sjuk", minutes: 510 }]);
   });
 
-  it("godkänd övertid flyttas ur flex och in i komptiden", async () => {
+  it("övertid blir flex, och det finns ingen komptid att flytta den till", async () => {
     const db = forCompany(companyId);
 
     // Tio och en halv timmes arbete på en dag med 8,5 planerat.
@@ -360,36 +356,27 @@ describe("flexformeln", () => {
       },
     });
 
-    await addCompEarned(db, companyId, {
-      employeeId: johan,
-      date: dayStart(24),
-      minutes: 120,
-      byEmail: "admin@test.se",
-    });
-
     const period = await buildPayrollPeriod(db, TZ, johan, dayStart(24), dayStart(24));
 
     expect(hours(period!.totals.worked)).toBe(10.5);
-    expect(hours(period!.totals.flex)).toBe(0);
-    expect(hours(period!.comp.earned)).toBe(2);
-    expect(hours(period!.comp.closing)).toBe(2);
+    expect(hours(period!.totals.flex)).toBe(2);
   });
 
-  it("uttagen komp täcker dagen och drar på saldot", async () => {
+  it("en flexledig dag står som frånvaro och drar hela dagen från flexen", async () => {
     const db = forCompany(companyId);
 
-    await markAbsence(db, companyId, TZ, {
+    await markAbsence(db, companyId, {
       employeeId: johan,
       date: dayStart(25),
-      reasonId: kompUttag,
+      reasonId: flexledig,
       byEmail: "admin@test.se",
     });
 
     const period = await buildPayrollPeriod(db, TZ, johan, dayStart(25), dayStart(25));
 
-    expect(hours(period!.totals.flex)).toBe(0);
-    expect(hours(period!.comp.taken)).toBe(8.5);
-    expect(hours(period!.comp.period)).toBe(-8.5);
+    expect(hours(period!.totals.absence)).toBe(8.5);
+    expect(hours(period!.totals.flex)).toBe(-8.5);
+    expect(period!.absenceByReason).toEqual([{ reason: "Flexledig", minutes: 510 }]);
   });
 });
 

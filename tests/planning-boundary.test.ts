@@ -37,7 +37,15 @@ const ROOT = path.resolve(__dirname, "..");
 const SRC = path.join(ROOT, "src");
 
 /** Planeringens bibliotek. */
-const PLANNING_MODULES = ["planning", "plan-calendar", "plan-live"];
+const PLANNING_MODULES = [
+  "planning",
+  "plan-calendar",
+  "plan-live",
+  "planning-modes",
+  "staff-planning",
+  "plan-geometry",
+  "staff-hours",
+];
 
 /** Lönemodulens. Speglar payroll-boundary.test.ts. */
 const PAYROLL_MODULES = [
@@ -249,5 +257,95 @@ describe("planeringen skriver aldrig en stämpling", () => {
     expect(planningFiles().length).toBeGreaterThanOrEqual(
       PLANNING_MODULES.length
     );
+  });
+});
+
+describe("personalpassen är personuppgifter", () => {
+  // Ett pass säger var en namngiven person ska vara och när. Till skillnad
+  // från en stationsruta ska det därför bort vid anonymisering och med i
+  // registerutdraget — även när planeringen är avstängd, av samma skäl som
+  // frånvaron (CLAUDE.md § 3.1). Testet läser källtexten, eftersom båda
+  // vägarna kräver en inloggad session att köra.
+
+  it("anonymiseringen raderar personens pass", () => {
+    const source = read("app/admin/(panel)/installningar/actions.ts");
+
+    expect(
+      source,
+      "anonymizeEmployee raderar inte personens planerade pass. De bär en " +
+        "person och ska bort när hen ber om att bli glömd."
+    ).toMatch(
+      /tx\.staffBlock\.deleteMany\(\{\s*where:\s*\{\s*employeeId:\s*id\s*\}\s*\}\)/
+    );
+  });
+
+  it("registerutdraget lämnar ut personens pass", () => {
+    const source = read("lib/person-export.ts");
+
+    expect(source).toMatch(/db\.staffBlock\.findMany\(\{\s*where:\s*\{\s*employeeId\s*\}/);
+    expect(source).toContain('addWorksheet("Planerade pass")');
+  });
+
+  it("registerutdraget frågar inte om modulen", () => {
+    // Ett utdrag som hoppade över passen för en kund som stängt av
+    // planeringen vore ett ofullständigt utdrag.
+    expect(read("lib/person-export.ts")).not.toMatch(/hasModule|requireModule/);
+  });
+});
+
+describe("arbetstiderna läses på ett ställe", () => {
+  // ARBETSTIDERNA ÄR ARBETSYTANS (beslutat 2026-10-17). Löneunderlaget mäter
+  // flexen mot dem och planeringen gråmarkerar efter dem, och båda läser dem
+  // genom work-hours.ts. Två läsare av samma tabeller hade börjat tolka dem
+  // olika vid första ändringen, och det hade synts först som ett felaktigt
+  // saldo eller en tavla som visar fel tider.
+
+  const SCHEDULE_TABLES = /\.(workSchedule|scheduleDay|scheduleBreak)\./;
+
+  it("work-hours.ts är neutral och känner ingen av modulerna", () => {
+    const forbidden = importsOf("lib/work-hours.ts").filter(
+      (specifier) =>
+        pointsAt(specifier, PAYROLL_MODULES) ||
+        pointsAt(specifier, PLANNING_MODULES)
+    );
+
+    expect(
+      forbidden,
+      "src/lib/work-hours.ts måste förbli neutral. Den läses av både " +
+        "lönemodulen och planeringen."
+    ).toEqual([]);
+  });
+
+  it("inget annat bibliotek läser schemats tabeller", () => {
+    // onboarding.ts räknar om ett standardschema finns, för introduktionens
+    // lista. Den läser ingen tid och tolkar ingenting.
+    const allowed = ["lib/work-hours.ts", "lib/onboarding.ts"];
+
+    const offenders = walk(path.join(SRC, "lib"))
+      .map(relative)
+      .filter((file) => !allowed.includes(file))
+      .filter((file) => SCHEDULE_TABLES.test(read(file)));
+
+    expect(
+      offenders,
+      "Dessa filer läser workSchedule, scheduleDay eller scheduleBreak " +
+        "direkt. Läs arbetstiderna genom src/lib/work-hours.ts."
+    ).toEqual([]);
+  });
+
+  it("planeringen och löneunderlaget läser båda genom work-hours.ts", () => {
+    expect(importsOf("lib/staff-hours.ts")).toContain("./work-hours");
+    expect(importsOf("lib/schedule.ts")).toContain("./work-hours");
+  });
+
+  it("planeringen läser aldrig frånvaron", () => {
+    // Frånvaro är känsliga uppgifter och hör till löneunderlaget. Tavlan visar
+    // tider, aldrig varför någon är borta.
+    for (const name of PLANNING_MODULES) {
+      const file = `lib/${name}.ts`;
+      if (!exists(file)) continue;
+
+      expect(read(file), file).not.toMatch(/\.(absence|absenceReason)\./);
+    }
   });
 });

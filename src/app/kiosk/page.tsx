@@ -15,6 +15,8 @@ import type {
   KioskRecentJob,
 } from "@/components/kiosk/KioskScreen";
 
+export const metadata = { title: "Stämplingsskärm · Tikkr" };
+
 /**
  * Gör om en databaspost till det val skärmen behöver för att kunna stämpla
  * om på jobbet.

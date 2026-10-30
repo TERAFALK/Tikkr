@@ -1,22 +1,16 @@
 "use client";
 
 import { useActionState, useEffect, useRef, type ReactNode } from "react";
-import { useFormStatus } from "react-dom";
 import { Alert, Button, dialogBody, dialogEdge, dialogSurface } from ".";
+import { useFieldError, useKeptSubmit } from "./useFieldError";
 
 /**
  * RUTA FÖR EN ÅTGÄRD SOM KAN SVARA MED ETT FEL.
  *
- * Systerkomponent till FormDialog, och skälet att den behövs är en rad:
- *
- *   onSubmit={() => dialog.current?.close()}
- *
- * FormDialog tar en vanlig serveråtgärd och stänger rutan i samma stund som
- * formuläret skickas. Det duger när åtgärden inte kan misslyckas på ett sätt
- * användaren kan rätta — men plattformspanelens åtgärder gör precis det:
- * "Ange en anledning till ändringen", "Antalet styrs av prenumerationen hos
- * Stripe". I FormDialog hade rutan redan varit stängd när det svaret kom, och
- * ändringen hade sett ut att gå igenom.
+ * Den enda rutan för ett formulär som skickas till en serveråtgärd. Det fanns
+ * en till, FormDialog, som stängde sig i samma stund som formuläret skickades.
+ * Den gick inte att svara i: ett namn som redan fanns byttes mot en hel felsida.
+ * Den togs bort 2026-10-30.
  *
  * Den här rutan äger därför sin egen useActionState, visar felet INUTI sig
  * och stänger först när åtgärden svarat att det gick.
@@ -29,6 +23,8 @@ import { Alert, Button, dialogBody, dialogEdge, dialogSurface } from ".";
 /** Minsta gemensamma svar. Varje åtgärd får ha fler fält än så. */
 export interface DialogState {
   error?: string;
+  /** Fältet felet gäller, med sitt `name`. Se useFieldError. */
+  field?: string;
   ok?: string;
 }
 
@@ -61,13 +57,20 @@ export default function ActionDialog<S extends DialogState>({
   submitTone = "primary",
   pendingLabel = "Sparar…",
   disabled = false,
+  openOnMount = false,
   onDone,
   children,
 }: {
-  trigger: ReactNode;
+  /**
+   * Knappens text, eller en funktion som ritar en egen knapp och får
+   * funktionen som öppnar rutan. Den senare för en ikon i menyn, där en
+   * vanlig knapp är för stor.
+   */
+  trigger: ReactNode | ((open: () => void) => ReactNode);
   triggerTone?: "primary" | "secondary" | "danger" | "ghost";
   title: string;
-  description?: string;
+  /** En mening under rubriken. Får bära en länk. */
+  description?: ReactNode;
   /** Se kommentaren ovanför om varför `previous` är DialogState och inte S. */
   action: (previous: DialogState, formData: FormData) => Promise<S>;
   /** Utgångsläget. Skickas in eftersom typen är åtgärdens, inte rutans. */
@@ -77,6 +80,17 @@ export default function ActionDialog<S extends DialogState>({
   pendingLabel?: string;
   /** Spärrar knappen inuti rutan. Förklaringen står då som children. */
   disabled?: boolean;
+  /**
+   * Öppnar rutan direkt när sidan visas.
+   *
+   * För den som kommit hit genom att trycka på något annat än knappen — en
+   * remsa högst upp, en länk i ett mejl. Utan den landar man på en sida där
+   * man måste leta rätt på samma knapp en gång till, och det är precis det
+   * steget remsan fanns till för att ta bort.
+   *
+   * Sidan avgör det, av sin adress. Rutan vet inget om varför.
+   */
+  openOnMount?: boolean;
   /** Anropas med beskedet när rutan stängt, så sidan kan visa det. */
   onDone?: (ok: string) => void;
   children: ReactNode;
@@ -87,6 +101,8 @@ export default function ActionDialog<S extends DialogState>({
     action,
     initial
   );
+  const errorId = useFieldError(form, state);
+  const { pending, onSubmit } = useKeptSubmit(submit);
 
   /**
    * Stänger när åtgärden svarat att det gick.
@@ -103,6 +119,12 @@ export default function ActionDialog<S extends DialogState>({
    * körning stänger, en omöppnad ruta gör det inte.
    */
   const handled = useRef<DialogState | null>(null);
+
+  // En gång, vid uppkopplingen. Stänger man rutan ska den stanna stängd, och
+  // adressen står kvar som den är.
+  useEffect(() => {
+    if (openOnMount) dialog.current?.showModal();
+  }, [openOnMount]);
 
   useEffect(() => {
     if (!state.ok || handled.current === state) return;
@@ -129,18 +151,22 @@ export default function ActionDialog<S extends DialogState>({
 
   return (
     <>
-      <Button
-        type="button"
-        tone={triggerTone}
-        onClick={() => dialog.current?.showModal()}
-      >
-        {trigger}
-      </Button>
+      {typeof trigger === "function" ? (
+        trigger(() => dialog.current?.showModal())
+      ) : (
+        <Button
+          type="button"
+          tone={triggerTone}
+          onClick={() => dialog.current?.showModal()}
+        >
+          {trigger}
+        </Button>
+      )}
 
       {/* Webbläsarens egen dialog. Den sköter bakgrundsdämpning,
           tangentbordsfokus, Escape och att resten av sidan inte går att nå
           medan rutan är öppen — allt sådant som blir många rader egen kod med
-          subtila fel. Samma val som i FormDialog. */}
+          subtila fel. */}
       <dialog
         ref={dialog}
         onClose={() => form.current?.reset()}
@@ -157,13 +183,13 @@ export default function ActionDialog<S extends DialogState>({
 
         <form
           ref={form}
-          action={submit}
+          onSubmit={onSubmit}
           className="flex min-h-0 flex-1 flex-col"
         >
           <div className={`${dialogBody} space-y-4 px-5 py-5`}>
             {/* Felet står överst i rutan, där blicken är efter ett tryck som
                 inte gav något. */}
-            {state.error && <Alert>{state.error}</Alert>}
+            {state.error && <Alert id={errorId}>{state.error}</Alert>}
             {children}
           </div>
 
@@ -178,6 +204,7 @@ export default function ActionDialog<S extends DialogState>({
               label={submitLabel}
               pendingLabel={pendingLabel}
               disabled={disabled}
+              pending={pending}
             />
           </div>
         </form>
@@ -191,14 +218,14 @@ function Submit({
   label,
   pendingLabel,
   disabled,
+  pending,
 }: {
   tone: "primary" | "secondary" | "danger" | "ghost";
   label: string;
   pendingLabel: string;
   disabled: boolean;
+  pending: boolean;
 }) {
-  const { pending } = useFormStatus();
-
   return (
     <Button type="submit" tone={tone} disabled={disabled || pending}>
       {pending ? pendingLabel : label}

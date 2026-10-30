@@ -1,14 +1,14 @@
 import Link from "next/link";
-import SearchSelect from "@/components/admin/SearchSelect";
 import { requireAdmin } from "@/lib/admin-session";
 import { companyTimeZone } from "@/lib/company";
 import NewEntryDialog from "@/components/admin/NewEntryDialog";
-import ActionDialog from "@/components/ui/ActionDialog";
-import FilterForm from "@/components/admin/FilterForm";
+import { EditEntryButton, EntryEditor } from "@/components/admin/EntryEditor";
+import FilterBar from "@/components/admin/FilterBar";
+import SearchSelect from "@/components/admin/SearchSelect";
+import { hasModule } from "@/lib/company-modules";
+import { personHref } from "@/lib/person-link";
 import {
   Badge,
-  Button,
-  ButtonLink,
   Card,
   CardHeader,
   EmptyState,
@@ -32,23 +32,35 @@ import {
 import { datePresets } from "@/lib/date-presets";
 import { weekStep } from "@/lib/week-nav";
 import WeekStepper from "@/components/admin/WeekStepper";
-import { editEntry, type EditEntryState } from "./actions";
+import ConfirmButton from "@/components/admin/ConfirmButton";
+import Pager, { PerPageField } from "@/components/ui/Pager";
+import { listPaging, presetHref } from "@/lib/paging";
+import { deleteEntry } from "./actions";
+
+export const metadata = { title: "Stämplingar · Tikkr" };
 
 export const dynamic = "force-dynamic";
 
 /**
- * Hur många poster listan visar innan den slutar.
+ * EN SIDA I TAGET (ändrat 2026-10-17, issue #24).
  *
- * Taket ersätter det datum som tidigare stod förifyllt i "Från och med".
- * Skillnaden är att ett tak syns: raden under rubriken säger att listan är
- * kapad, och då vet man att det finns mer att filtrera fram.
+ * Listan visade de 200 senaste avslutade och slutade där, med en rad som bad
+ * om ett datum för äldre. Varje rad bär en ruta för att ändra posten, och 200
+ * sådana gjorde sidan långsam att öppna. Nu visas 50, och äldre poster nås med
+ * Föregående och Nästa i stället för att behöva filtreras fram.
+ *
+ * Bläddringen sker i databasen: bara sidans rader hämtas, och antalet räknas.
  */
-const PAGE_SIZE = 200;
 
 interface SearchParams {
   employeeId?: string;
+  orderId?: string;
   from?: string;
   to?: string;
+  sida?: string;
+  antal?: string;
+  /** Öppnar Ny stämpling direkt. Genvägen på översikten. */
+  ny?: string;
 }
 
 export default async function EntriesPage({
@@ -60,6 +72,7 @@ export default async function EntriesPage({
   const params = await searchParams;
 
   const timeZone = await companyTimeZone(companyId);
+  const payroll = await hasModule(companyId, "PAYROLL");
 
   // INGET FÖRVALT FRÅNDATUM (ändrat 2026-09-29). Listan började tidigare två
   // veckor tillbaka, med skälet att en obegränsad lista blir oanvändbar. Det
@@ -95,6 +108,7 @@ export default async function EntriesPage({
    */
   const entryFilter = {
     employeeId: params.employeeId || undefined,
+    orderId: params.orderId || undefined,
     // Utelämnas helt när inget datum valts. Ett tomt villkorsobjekt hade gett
     // samma svar, men den här formen säger rakt ut att ingen gräns finns.
     ...(fromDayStart || toDayEnd
@@ -129,6 +143,12 @@ export default async function EntriesPage({
     indirectMoment: { select: { name: true } },
   } as const;
 
+  const finishedFilter = { ...entryFilter, clockOutAt: { not: null } };
+
+  // Antalet först, så att ett sidnummer bortom slutet kan visa sista sidan.
+  const finishedTotal = await db.timeEntry.count({ where: finishedFilter });
+  const page = listPaging(finishedTotal, params);
+
   const [employees, orders, moments, indirectMoments, ongoing, finished] =
     await Promise.all([
       db.employee.findMany({
@@ -151,28 +171,32 @@ export default async function EntriesPage({
         orderBy: [{ active: "desc" }, { name: "asc" }],
         select: { id: true, name: true, active: true },
       }),
-      // PÅGÅENDE FÖRST, och utan tak.
+      // PÅGÅENDE FÖRST, utan tak, och bara på första sidan.
       //
       // De är det man letar efter: någon som står instämplad och inte borde
-      // göra det. Låg de i samma fråga som resten kunde de trilla utanför de
-      // 200 senaste så fort en dag varit full av stämplingar, och då syns
-      // just det man kom för att leta efter inte alls.
+      // göra det. Låg de i samma fråga som resten kunde de trilla utanför
+      // första sidan så fort en dag varit full av stämplingar, och då syns
+      // just det man kom för att leta efter inte alls. På sida två och framåt
+      // har man redan sett dem, och där vore de bara i vägen. De hämtas ändå,
+      // eftersom de räknas i rubrikens antal; de är högst några per person.
       db.timeEntry.findMany({
         where: { ...entryFilter, clockOutAt: null },
         orderBy: [{ clockInAt: "desc" }, { id: "asc" }],
         select: entrySelect,
       }),
       db.timeEntry.findMany({
-        where: { ...entryFilter, clockOutAt: { not: null } },
+        where: finishedFilter,
         orderBy: [{ clockInAt: "desc" }, { id: "asc" }],
-        take: PAGE_SIZE,
+        skip: page.skip,
+        take: page.take,
         select: entrySelect,
       }),
     ]);
 
-  // Pågående överst, resten under. Båda listorna är redan sorterade med
-  // senaste först.
-  const entries = [...ongoing, ...finished];
+  // Pågående överst på första sidan, resten under. Båda listorna är redan
+  // sorterade med senaste först.
+  const entries = page.page === 1 ? [...ongoing, ...finished] : finished;
+  const total = ongoing.length + finishedTotal;
 
   // Vilka av raderna som har ändrats. De får en länk till sin historik; en
   // länk på varje rad vore brus, eftersom de flesta aldrig rörts.
@@ -207,25 +231,8 @@ export default async function EntriesPage({
     .filter((moment) => moment.active)
     .map((moment) => ({ id: moment.id, label: moment.name }));
 
-  // En BEFINTLIG post behåller däremot sitt eget moment i listan, avaktiverat
-  // eller inte. Föll det bort skulle rutan visa ett annat moment som valt, och
-  // ett sparat formulär flytta tiden dit — tyst, på ett underlag som kanske
-  // redan fakturerats.
-  const momentOptionsFor = (currentId: string | null) =>
-    moments
-      .filter((moment) => moment.active || moment.id === currentId)
-      .map((moment) => ({
-        id: moment.id,
-        label: moment.active ? moment.name : `${moment.name} (avaktiverat)`,
-      }));
-
-  const indirectOptionsFor = (currentId: string | null) =>
-    indirectMoments
-      .filter((moment) => moment.active || moment.id === currentId)
-      .map((moment) => ({
-        id: moment.id,
-        label: moment.active ? moment.name : `${moment.name} (avaktiverat)`,
-      }));
+  // En BEFINTLIG post behåller däremot sitt eget moment i listan, även
+  // avaktiverat. Det avgörs i rutan, se moment-options.ts.
 
   return (
     <>
@@ -237,98 +244,84 @@ export default async function EntriesPage({
             employees={employeeOptions}
             orders={orderOptions}
             moments={pickableMoments}
+            indirectMoments={indirectMoments
+              .filter((moment) => moment.active)
+              .map((moment) => ({ id: moment.id, label: moment.name }))}
+            openOnMount={params.ny === "1"}
           />
         }
       />
 
-      <Card className="mb-6">
-        <CardHeader
-          title="Filter"
-          action={
-            // Samma snabbval som i rapportvyn, av samma skäl: två datumfält per
-            // gång blir många knapptryck för det man gör oftast.
-            <div className="flex flex-wrap items-center gap-2">
-              {/* Veckostegaren bredvid snabbvalen, som i rapportvyn. */}
-              <WeekStepper {...week} />
+      <FilterBar
+        week={week}
+        presets={presets}
+        current={params}
+        presetHref={(preset) =>
+          presetHref(
+            "/admin/stamplingar",
+            { employeeId: params.employeeId, orderId: params.orderId },
+            preset,
+            page.take
+          )
+        }
+        resetHref="/admin/stamplingar"
+      >
+        <PerPageField perPage={page.take} />
 
-              <div className="flex flex-wrap gap-1">
-                {presets.map((preset) => {
-                  const active =
-                    params.from === preset.from && params.to === preset.to;
+        <Field label="Från och med">
+          <Input type="date" name="from" defaultValue={params.from ?? ""} />
+        </Field>
 
-                  return (
-                    <Link
-                      key={preset.label}
-                      href={`/admin/stamplingar?from=${preset.from}&to=${preset.to}${
-                        params.employeeId
-                          ? `&employeeId=${params.employeeId}`
-                          : ""
-                      }`}
-                      className={`rounded-md px-2.5 py-1 text-xs font-medium transition-colors ${
-                        active
-                          ? "bg-neutral-900 text-white"
-                          : "bg-neutral-100 text-neutral-600 hover:bg-neutral-200"
-                      }`}
-                    >
-                      {preset.label}
-                    </Link>
-                  );
-                })}
-              </div>
-            </div>
-          }
-        />
-        <FilterForm className="grid gap-4 p-5 sm:grid-cols-2 lg:grid-cols-4">
-          <Field label="Från och med">
-            <Input type="date" name="from" defaultValue={params.from ?? ""} />
-          </Field>
+        <Field label="Till och med">
+          <Input type="date" name="to" defaultValue={params.to ?? ""} />
+        </Field>
 
-          <Field label="Till och med">
-            <Input type="date" name="to" defaultValue={params.to ?? ""} />
-          </Field>
+        <Field label="Anställd">
+          <Select name="employeeId" defaultValue={params.employeeId ?? ""}>
+            <option value="">Alla</option>
+            {employees.map((employee) => (
+              <option key={employee.id} value={employee.id}>
+                {employee.name}
+              </option>
+            ))}
+          </Select>
+        </Field>
 
-          <Field label="Anställd">
-            <Select name="employeeId" defaultValue={params.employeeId ?? ""}>
-              <option value="">Alla</option>
-              {employees.map((employee) => (
-                <option key={employee.id} value={employee.id}>
-                  {employee.name}
-                </option>
-              ))}
-            </Select>
-          </Field>
+        {/* Ordersidan leder hit, så att en felaktig stämpling går att rätta
+            utan att man först måste veta vem som stämplade och när. */}
+        <Field label="Order">
+          <SearchSelect
+            name="orderId"
+            options={orderOptions}
+            defaultValue={params.orderId}
+            placeholder="Sök order…"
+            emptyLabel="Alla ordrar"
+          />
+        </Field>
+      </FilterBar>
 
-          <div className="flex items-end gap-2">
-            <Button type="submit">Visa</Button>
-            <ButtonLink href="/admin/stamplingar" tone="secondary">
-              Rensa
-            </ButtonLink>
-          </div>
-        </FilterForm>
-      </Card>
-
-      {entries.length === 0 ? (
+      {total === 0 ? (
         <EmptyState
           title="Inga stämplingar"
         />
       ) : (
+        <EntryEditor
+          orders={orderOptions}
+          moments={moments}
+          indirectMoments={indirectMoments}
+        >
         <Card>
           <CardHeader
-            title={`${entries.length} ${entries.length === 1 ? "post" : "poster"}`}
-            description={
-              finished.length === PAGE_SIZE
-                ? `Listan visar de ${PAGE_SIZE} senaste avslutade. Välj datum för äldre.`
-                : undefined
-            }
+            title={`${total.toLocaleString("sv-SE")} ${total === 1 ? "stämpling" : "stämplingar"}`}
           />
-          <Table>
+          <Table cards>
             <thead>
               <tr>
                 <Th>Anställd</Th>
                 <Th>Order och moment</Th>
                 <Th>Instämplad</Th>
                 <Th>Utstämplad</Th>
-                <Th numeric>Längd (tim:min)</Th>
+                <Th numeric>Längd (timmar)</Th>
                 <Th>
                   <span className="sr-only">Åtgärder</span>
                 </Th>
@@ -341,7 +334,12 @@ export default async function EntriesPage({
                 return (
                   <Tr key={entry.id}>
                     <Td>
-                      <span className="font-medium">{entry.employee.name}</span>
+                      <Link
+                        href={personHref(entry.employeeId, payroll)}
+                        className="font-medium hover:underline"
+                      >
+                        {entry.employee.name}
+                      </Link>
                       {entry.source === "ADMIN_MANUAL" && (
                         <span className="ml-2">
                           <Badge>Manuell</Badge>
@@ -354,18 +352,33 @@ export default async function EntriesPage({
                       )}
                     </Td>
 
-                    <Td muted>
-                      {describeEntry(entry).text}
-                      {entry.order?.customer && (
-                        <span className="mt-0.5 block text-xs text-neutral-400">
-                          {entry.order.customer.name}
-                        </span>
-                      )}
+                    <Td label="Order" muted>
+                      {/* En omslutning, så att allt står som ett värde i kortet på telefon. */}
+                      <span>
+                        {entry.orderId && entry.order ? (
+                          <>
+                            <Link
+                              href={`/admin/ordrar/${entry.orderId}`}
+                              className="text-link hover:underline"
+                            >
+                              {entry.order.orderNumber}
+                            </Link>
+                            {entry.moment && ` · ${entry.moment.name}`}
+                          </>
+                        ) : (
+                          describeEntry(entry).text
+                        )}
+                        {entry.order?.customer && (
+                          <span className="mt-0.5 block text-xs text-neutral-500">
+                            {entry.order.customer.name}
+                          </span>
+                        )}
+                      </span>
                     </Td>
 
-                    <Td muted>{formatDateTime(entry.clockInAt, timeZone)}</Td>
+                    <Td label="Instämplad" muted>{formatDateTime(entry.clockInAt, timeZone)}</Td>
 
-                    <Td muted>
+                    <Td label="Utstämplad" muted>
                       {ongoing ? (
                         <Badge tone="active">Pågår</Badge>
                       ) : (
@@ -373,7 +386,7 @@ export default async function EntriesPage({
                       )}
                     </Td>
 
-                    <Td numeric>
+                    <Td label="Timmar" numeric>
                       {formatDuration(
                         minutesBetween(entry.clockInAt, entry.clockOutAt)
                       )}
@@ -383,130 +396,55 @@ export default async function EntriesPage({
                       {/* Pågående poster ändras inte här. Att skriva in en
                           sluttid på ett jobb som fortfarande pågår skulle
                           stänga det bakom ryggen på den som står vid skärmen. */}
-                      {ongoing ? (
-                        <span className="block text-right text-xs text-neutral-400">
-                          Ändras när den avslutats
-                        </span>
-                      ) : (
-                        // BARA ÄNDRA, INGEN RADERING (ändrat 2026-09-29).
-                        // Knappen fanns för felregistreringar, men en
-                        // felstämpling rättas genom att skrivas om: tiden är
-                        // fakturaunderlag och numera även löneunderlag, och en
-                        // rad som försvinner går inte att få tillbaka. En
-                        // ändrad post bär dessutom spår av vem som ändrade
-                        // den, vilket en raderad inte gör.
+                      {ongoing ? null : (
+                        // ÄNDRA OCH TA BORT. Borttagningen fanns inte mellan
+                        // 2026-09-29 och 2026-10-13; den lämnar numera hela
+                        // posten i ändringsloggen. Se deleteEntryManually.
                         <div className="flex items-center justify-end gap-2">
                           {withHistory.has(entry.id) && (
                             <Link
                               href={`/admin/installningar/logg?post=${entry.id}`}
-                              className="px-2 text-[13px] font-medium text-tick-deep hover:underline"
+                              className="px-2 text-[13px] font-medium text-link hover:underline"
                             >
                               Historik
                             </Link>
                           )}
-                          {/* ActionDialog och inte FormDialog: den här rutan
-                              KAN avvisas. En sluttid före starttiden, en
-                              överlappande post eller en stängd order ska
-                              synas inuti rutan i stället för att stänga den
-                              som om allt gått bra. */}
-                          <ActionDialog<EditEntryState>
-                            trigger="Ändra"
-                            triggerTone="ghost"
-                            title={`Ändra stämpling: ${entry.employee.name}`}
-                            action={editEntry}
-                            initial={{}}
-                            submitLabel="Spara"
-                          >
+                          {/* En gemensam ruta för hela listan, se
+                              EntryEditor. Den KAN avvisas: en sluttid före
+                              starttiden, en överlappande post eller en
+                              stängd order syns inuti rutan. */}
+                          <EditEntryButton
+                            entry={{
+                              id: entry.id,
+                              employeeId: entry.employeeId,
+                              employeeName: entry.employee.name,
+                              kind: entry.kind,
+                              orderId: entry.orderId,
+                              momentId: entry.momentId,
+                              indirectMomentId: entry.indirectMomentId,
+                              clockInAt: toLocalDateTimeInput(
+                                entry.clockInAt,
+                                timeZone
+                              ),
+                              clockOutAt: toLocalDateTimeInput(
+                                entry.clockOutAt!,
+                                timeZone
+                              ),
+                            }}
+                          />
+
+                          <form action={deleteEntry}>
                             <input type="hidden" name="id" value={entry.id} />
-                            <input
-                              type="hidden"
-                              name="employeeId"
-                              value={entry.employeeId}
-                            />
-
-                            {/* Posten behåller sin sort. En improduktiv
-                                stämpling har varken order eller arbetsmoment,
-                                och visades den i orderformuläret skulle ett
-                                sparat formulär göra en städtimme till
-                                fakturerbar ordertid — tyst. */}
-                            <input
-                              type="hidden"
-                              name="kind"
-                              value={entry.kind}
-                            />
-
-                            {entry.kind === "INDIRECT" ? (
-                              <Field label="Improduktivt moment">
-                                <Select
-                                  name="indirectMomentId"
-                                  defaultValue={entry.indirectMomentId ?? ""}
-                                >
-                                  {indirectOptionsFor(
-                                    entry.indirectMomentId
-                                  ).map((option) => (
-                                    <option key={option.id} value={option.id}>
-                                      {option.label}
-                                    </option>
-                                  ))}
-                                </Select>
-                              </Field>
-                            ) : (
-                              <>
-                                <Field label="Order">
-                                  <SearchSelect
-                                    name="orderId"
-                                    inDialog
-                                    options={orderOptions}
-                                    defaultValue={entry.orderId}
-                                    placeholder="Sök order…"
-                                    emptyLabel="Välj order…"
-                                    required
-                                  />
-                                </Field>
-
-                                <Field label="Arbetsmoment">
-                                  <Select
-                                    name="momentId"
-                                    defaultValue={entry.momentId ?? ""}
-                                  >
-                                    {momentOptionsFor(entry.momentId).map(
-                                      (option) => (
-                                        <option
-                                          key={option.id}
-                                          value={option.id}
-                                        >
-                                          {option.label}
-                                        </option>
-                                      )
-                                    )}
-                                  </Select>
-                                </Field>
-                              </>
-                            )}
-
-                            <div className="grid gap-4 sm:grid-cols-2">
-                              <Field label="Instämplad">
-                                <Input
-                                  type="datetime-local"
-                                  name="clockInAt"
-                                  defaultValue={toLocalDateTimeInput(
-                                    entry.clockInAt,
-                                    timeZone
-                                  )}
-                                />
-                              </Field>
-                              <Field label="Utstämplad">
-                                <Input
-                                  type="datetime-local"
-                                  name="clockOutAt"
-                                  defaultValue={toLocalDateTimeInput(
-                                    entry.clockOutAt!,
-                                    timeZone
-                                  )}
-                                />
-                              </Field>
-                            </div>
-                          </ActionDialog>
+                            <ConfirmButton
+                              type="submit"
+                              tone="ghost"
+                              question={`Ta bort stämplingen för ${
+                                entry.employee.name
+                              }, ${formatDateTime(entry.clockInAt, timeZone)}? Kan inte ångras. Posten sparas i ändringsloggen.`}
+                            >
+                              Ta bort
+                            </ConfirmButton>
+                          </form>
                         </div>
                       )}
                     </Td>
@@ -515,7 +453,21 @@ export default async function EntriesPage({
               })}
             </tbody>
           </Table>
+
+          <Pager
+            paging={page}
+            total={finishedTotal}
+            unit="avslutade"
+            path="/admin/stamplingar"
+            keep={{
+              from: params.from,
+              to: params.to,
+              employeeId: params.employeeId,
+              orderId: params.orderId,
+            }}
+          />
         </Card>
+        </EntryEditor>
       )}
     </>
   );

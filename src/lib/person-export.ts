@@ -66,7 +66,7 @@ export async function buildPersonExport(
 
   if (!employee) return null;
 
-  const [entries, breaks, absences, comp, events] = await Promise.all([
+  const [entries, breaks, absences, comp, passes, events] = await Promise.all([
     db.timeEntry.findMany({
       where: { employeeId },
       orderBy: { clockInAt: "asc" },
@@ -90,6 +90,17 @@ export async function buildPersonExport(
     db.compAdjustment.findMany({
       where: { employeeId },
       orderBy: { date: "asc" },
+    }),
+    // Planerade pass säger var personen skulle vara och när, och är därför
+    // personens uppgifter. Läses även när planeringen är avstängd, av samma
+    // skäl som frånvaron: en avstängd modul får inte göra uppgifter oåtkomliga.
+    db.staffBlock.findMany({
+      where: { employeeId },
+      orderBy: { startsAt: "asc" },
+      include: {
+        order: { select: { orderNumber: true } },
+        moment: { select: { name: true } },
+      },
     }),
     db.auditEvent.findMany({
       where: { subjectEmployeeId: employeeId },
@@ -127,13 +138,21 @@ export async function buildPersonExport(
     ["Porträtt", employee.photoData && photoExtension ? "Bifogat i arkivet" : "Inget"],
     ["Arbetstidsschema", employee.schedule ? "Eget schema" : "Företagets"],
     ["Ingående flexsaldo", formatSignedDuration(employee.flexOpeningMinutes)],
-    ["Ingående komptid", formatSignedDuration(employee.compOpeningMinutes)],
+    // Komptiden togs bort 2026-10-13. Ett ingående värde från tiden innan
+    // finns kvar i databasen och lämnas ut så länge det finns, men en rad med
+    // 0:00 för alla andra vore en uppgift om något som inte längre finns.
+    ...(employee.compOpeningMinutes !== 0
+      ? [["Ingående komptid", formatSignedDuration(employee.compOpeningMinutes)] as [string, string]]
+      : []),
     [
-      "Saldon räknas från",
+      "Startdatum",
       employee.balanceOpeningDate
         ? formatDate(employee.balanceOpeningDate, timeZone)
         : "Första stämplingen",
     ],
+    ...(employee.atfWorkForm
+      ? [["Arbetstidsform för ATF", employee.atfWorkForm] as [string, string]]
+      : []),
     // Själva koden går inte att lämna ut: den lagras bara som envägskryptering.
     ["Personlig kod för flexsaldot", employee.flexCodeHash ? "Satt" : "Inte satt"],
   ];
@@ -146,10 +165,9 @@ export async function buildPersonExport(
   punches.columns = [
     { header: "Instämplad", key: "in", width: 18 },
     { header: "Utstämplad", key: "out", width: 18 },
-    // Bara tim:min. Utdraget är till för att LÄSAS av den som begärt det, inte
-    // för att räkna vidare i — därför ingen decimalkolumn, till skillnad från
-    // rapportens ark. Se tests/format.test.ts.
-    { header: "Tid (tim:min)", key: "duration", width: 14 },
+    // Tiden står som TEXT här och som ett tal i rapportens ark. Utdraget är
+    // till för att LÄSAS av den som begärt det, inte för att räknas vidare i.
+    { header: "Tid (timmar)", key: "duration", width: 14 },
     { header: "Jobb", key: "job", width: 32 },
     { header: "Kund", key: "customer", width: 24 },
     { header: "Källa", key: "source", width: 28 },
@@ -184,7 +202,7 @@ export async function buildPersonExport(
       { header: "Rast", key: "type", width: 16 },
       { header: "Började", key: "start", width: 18 },
       { header: "Slutade", key: "end", width: 18 },
-      { header: "Tid (tim:min)", key: "duration", width: 14 },
+      { header: "Tid (timmar)", key: "duration", width: 14 },
       { header: "Källa", key: "source", width: 28 },
     ];
 
@@ -204,7 +222,7 @@ export async function buildPersonExport(
     sheet.columns = [
       { header: "Datum", key: "date", width: 12 },
       { header: "Orsak", key: "reason", width: 20 },
-      { header: "Tid (tim:min)", key: "duration", width: 14 },
+      { header: "Tid (timmar)", key: "duration", width: 14 },
       { header: "Anteckning", key: "note", width: 40 },
       { header: "Registrerad av", key: "by", width: 28 },
     ];
@@ -224,7 +242,7 @@ export async function buildPersonExport(
     const sheet = workbook.addWorksheet("Komptid");
     sheet.columns = [
       { header: "Datum", key: "date", width: 12 },
-      { header: "Tid (tim:min)", key: "duration", width: 14 },
+      { header: "Tid (timmar)", key: "duration", width: 14 },
       { header: "Anteckning", key: "note", width: 40 },
       { header: "Registrerad av", key: "by", width: 28 },
     ];
@@ -233,6 +251,29 @@ export async function buildPersonExport(
       sheet.addRow({
         date: formatDate(row.date, timeZone),
         duration: formatSignedDuration(row.minutes),
+        note: row.note ?? "",
+        by: row.createdByEmail,
+      });
+    }
+  }
+
+  if (passes.length > 0) {
+    const sheet = workbook.addWorksheet("Planerade pass");
+    sheet.columns = [
+      { header: "Start", key: "start", width: 18 },
+      { header: "Order", key: "order", width: 14 },
+      { header: "Arbetsmoment", key: "moment", width: 20 },
+      { header: "Tid (timmar)", key: "duration", width: 14 },
+      { header: "Anteckning", key: "note", width: 40 },
+      { header: "Planerad av", key: "by", width: 28 },
+    ];
+
+    for (const row of passes) {
+      sheet.addRow({
+        start: formatDateTime(row.startsAt, timeZone),
+        order: row.order.orderNumber,
+        moment: row.moment.name,
+        duration: formatDuration(row.minutes),
         note: row.note ?? "",
         by: row.createdByEmail,
       });

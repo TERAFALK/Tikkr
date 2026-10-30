@@ -15,6 +15,14 @@ import { SYMBOL } from "@/lib/brand";
  * precis som i bannerna — annars läses de som en enda cirkel med ett hack i,
  * och hela poängen med märket är att det är två.
  *
+ * SKILLNADEN MELLAN HALVORNA ÄR HALVERAD (2026-10-11). Den var fem punkter
+ * mot tio, alltså dubbla tonen, och den skarven står lodrätt mitt i cirkeln.
+ * Där motivet går ut genom en kant — och det gör det alltid — såg man därför
+ * inte en cirkel utan två rektanglar i olika grå, med raka kanter mot
+ * varandra och mot ytan. Det läses som ett fel i renderingen och inte som ett
+ * motiv. Nu ligger halvorna så nära varandra att skarven bara anas, vilket är
+ * precis vad bannerna gör.
+ *
  * `aria-hidden`: det här är en yta, inte en bild med innehåll. Den som lyssnar
  * på sidan ska inte få höra att det finns en logotyp i bakgrunden sju gånger.
  */
@@ -24,11 +32,11 @@ export type MotifTone = "onDark" | "onLight" | "onTick";
 
 const FILLS: Record<MotifTone, [string, string]> = {
   // Snö över Fjord. Samma lyft som i den mörka LinkedIn-bannern.
-  onDark: ["fill-neutral-50/5", "fill-neutral-50/10"],
+  onDark: ["fill-neutral-50/4", "fill-neutral-50/6"],
   // Fjord över Snö, svagare: ett mörkt motiv syns mer än ett ljust.
-  onLight: ["fill-neutral-900/5", "fill-neutral-900/10"],
+  onLight: ["fill-neutral-900/4", "fill-neutral-900/6"],
   // Snö över Tick. Tål mer, eftersom grönt är ljusare än både Fjord och Snö.
-  onTick: ["fill-neutral-50/10", "fill-neutral-50/20"],
+  onTick: ["fill-neutral-50/10", "fill-neutral-50/14"],
 };
 
 export default function Motif({

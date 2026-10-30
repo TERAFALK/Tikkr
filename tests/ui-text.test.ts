@@ -234,7 +234,7 @@ const PROSE_FILES = [
   "src/lib/clock.ts",
   "src/lib/breaks.ts",
   "src/lib/break-close.ts",
-  // Felen i frånvaro- och komptidsrutan.
+  // Felen i frånvarorutan.
   "src/lib/absence.ts",
   "src/lib/notices.ts",
   "src/lib/platform-admin.ts",
@@ -242,6 +242,29 @@ const PROSE_FILES = [
   // Noten när skärmens klocka rättats, och ändringsloggens rubriker.
   "src/lib/punch-time.ts",
   "src/lib/audit-view.ts",
+  // Tillbehören: katalogens texter, felen och lägenas namn, och plattformens
+  // beställningssidor.
+  "src/lib/shop/catalog.ts",
+  "src/lib/shop/pricing.ts",
+  "src/lib/shop/profile.ts",
+  "src/lib/shop/status.ts",
+  "src/lib/shop/orders.ts",
+  "src/lib/shop/admin.ts",
+  "src/app/plattform/(panel)/bestallningar/page.tsx",
+  "src/app/plattform/(panel)/bestallningar/[orderId]/page.tsx",
+  "src/app/plattform/(panel)/bestallningar/actions.ts",
+  "src/lib/shop/product-admin.ts",
+  "src/lib/shop/cart.ts",
+  "src/app/plattform/(panel)/produkter/page.tsx",
+  "src/app/plattform/(panel)/produkter/ny/page.tsx",
+  "src/app/plattform/(panel)/produkter/[id]/page.tsx",
+  "src/app/plattform/(panel)/produkter/actions.ts",
+  "src/app/api/plattform/produkter/bild/route.ts",
+  "src/components/platform/ProductForm.tsx",
+  "src/components/platform/ProductImages.tsx",
+  "src/app/tillbehor/page.tsx",
+  "src/app/tillbehor/[slug]/page.tsx",
+  "src/components/marketing/ShopParts.tsx",
 ];
 
 describe("texterna utanför sidorna", () => {

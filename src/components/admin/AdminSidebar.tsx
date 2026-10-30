@@ -5,14 +5,11 @@ import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { logout } from "@/app/admin/actions";
 import {
-  IconBroom,
   IconBuilding,
   IconClock,
-  IconDevice,
   IconHelp,
+  IconPackage,
   IconLogout,
-  IconMessage,
-  IconMoment,
   IconOrder,
   IconOverview,
   IconPeople,
@@ -20,21 +17,23 @@ import {
   IconReview,
   IconSettings,
   IconSparkle,
-  IconStation,
   IconTimeline,
   IconUser,
 } from "@/components/ui/icons";
 import type { ModuleKey } from "@/lib/modules";
 import CompanyBadge from "@/components/ui/CompanyBadge";
+import FeedbackButton from "@/components/admin/FeedbackButton";
 import { LogoMark, WordmarkOnly } from "@/components/ui/Logo";
+import { PendingDot, useClickedLink } from "@/components/ui/NavFeedback";
 
 /**
  * Vänsternavigeringen.
  *
  * Grupperad i två sektioner, eftersom det speglar hur arbetet faktiskt ser ut:
- * "Dagligen" är det man öppnar varje morgon, "Register" är sådant man ändrar
- * någon gång i månaden. En platt lista med åtta likvärdiga länkar tvingar
- * ögat att läsa alla varje gång.
+ * "Dagligen" är det man öppnar varje morgon, "Register" är det man lägger
+ * till i varje vecka. Det som sätts upp en gång och sedan står ligger under
+ * Inställningar. En platt lista med åtta likvärdiga länkar tvingar ögat att
+ * läsa alla varje gång.
  *
  * Antalet ogranskade poster visas som siffra direkt i menyn — det är det enda
  * i systemet som kräver att någon gör något, och då ska det synas utan att man
@@ -64,54 +63,39 @@ const sections: { label: string; links: NavLink[] }[] = [
     label: "Dagligen",
     links: [
       { href: "/admin", label: "Översikt", icon: IconOverview, exact: true },
-      { href: "/admin/rapporter", label: "Rapporter", icon: IconReport },
+      // Granskning direkt under Översikt: den enda punkten som kräver att
+      // någon gör något, och därför den som ska hittas först.
+      { href: "/admin/granskning", label: "Granskning", icon: IconReview, badge: true },
+      { href: "/admin/stamplingar", label: "Stämplingar", icon: IconClock },
       { href: "/admin/vecka", label: "Veckovy", icon: IconClock },
-      {
-        href: "/admin/tidrapport",
-        label: "Tidrapport",
-        icon: IconPeople,
-        module: "PAYROLL",
-      },
       {
         href: "/admin/planering",
         label: "Planering",
         icon: IconTimeline,
         // Tavlan ligger under Dagligen och inte under Register: den öppnas
         // varje morgon, inte någon gång i månaden. Stationerna, som är ett
-        // register, ligger längre ner.
-        //
-        // `exact` eftersom stationssidan ligger under samma adress och har en
-        // egen menypunkt. Utan den skulle båda markeras som aktiva samtidigt.
-        exact: true,
+        // register, ligger under Inställningar.
         module: "PLANNING",
       },
-      { href: "/admin/granskning", label: "Granskning", icon: IconReview, badge: true },
-      { href: "/admin/stamplingar", label: "Stämplingar", icon: IconClock },
+      {
+        href: "/admin/tidrapport",
+        label: "Tidrapport",
+        icon: IconPeople,
+        module: "PAYROLL",
+      },
+      { href: "/admin/rapporter", label: "Rapporter", icon: IconReport },
     ],
   },
   {
+    // BARA DET SOM ÄNDRAS VARJE VECKA (ändrat 2026-10-14, issue #17).
+    // Arbetsmoment, improduktiv tid, stämplingsskärmar och stationer låg
+    // också här, och menyn hade fjorton punkter. De sätts upp en gång och
+    // ligger nu under Inställningar, se SettingsNav.
     label: "Register",
     links: [
-      { href: "/admin/kunder", label: "Kunder", icon: IconBuilding },
       { href: "/admin/ordrar", label: "Ordrar", icon: IconOrder },
+      { href: "/admin/kunder", label: "Kunder", icon: IconBuilding },
       { href: "/admin/anstallda", label: "Anställda", icon: IconPeople },
-      { href: "/admin/moment", label: "Arbetsmoment", icon: IconMoment },
-      {
-        href: "/admin/improduktivt",
-        label: "Improduktiv tid",
-        icon: IconBroom,
-      },
-      {
-        href: "/admin/planering/stationer",
-        label: "Stationer",
-        icon: IconStation,
-        module: "PLANNING",
-      },
-      {
-        href: "/admin/skarmar",
-        label: "Stämplingsskärmar",
-        icon: IconDevice,
-      },
     ],
   },
 ];
@@ -125,8 +109,6 @@ export default function AdminSidebar({
   modules,
   showAccount,
   unreadNews,
-  supportUpdates,
-  version,
 }: {
   companyName: string;
   email: string;
@@ -136,36 +118,39 @@ export default function AdminSidebar({
   hasLogo: boolean;
   /** Företagets påslagna tillval. Länkar till avstängda moduler utelämnas. */
   modules: ModuleKey[];
-  /** Falskt i supportläget, där ingen är inloggad som kunden. */
+  /**
+   * Falskt i supportläget, där ingen är inloggad som kunden. Döljer både
+   * kontot och rutan för fel och förslag, som inte kan skicka därifrån.
+   */
   showAccount: boolean;
   /** Pricken vid Nyheter: en nyare version än den personen sett. */
   unreadNews: boolean;
-  /** Pricken vid Support: svar eller ny status på ett eget meddelande. */
-  supportUpdates: boolean;
-  /** Versionen som kör, från bygget. */
-  version: string;
 }) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
+
+  // DEN KLICKADE PUNKTEN MARKERAS DIREKT (2026-10-20). Se NavFeedback.
+  const { clicked, follow: followLink } = useClickedLink(pathname);
+  const follow = (href: string) => followLink(href, () => setOpen(false));
+
+  const isActive = (href: string, exact = false) =>
+    clicked
+      ? clicked === href
+      : exact
+        ? pathname === href
+        : pathname.startsWith(href);
 
   // PRICKEN SLÄCKS NÄR SIDAN ÖPPNAS, även här. Layouten renderas inte om när
   // man går mellan sidorna i panelen, så värdet den skickade står kvar tills
   // nästa omladdning. Utan det här tändes pricken igen så fort man lämnade
   // sidan som just markerat allt som läst.
   const onNews = pathname.startsWith("/admin/nyheter");
+  const onShop = pathname.startsWith("/admin/butik");
   const [newsOpened, setNewsOpened] = useState(false);
   useEffect(() => {
     if (onNews) setNewsOpened(true);
   }, [onNews]);
   const showNewsDot = unreadNews && !newsOpened && !onNews;
-
-  // Samma sak för Support.
-  const onSupport = pathname.startsWith("/admin/support");
-  const [supportOpened, setSupportOpened] = useState(false);
-  useEffect(() => {
-    if (onSupport) setSupportOpened(true);
-  }, [onSupport]);
-  const showSupportDot = supportUpdates && !supportOpened && !onSupport;
 
   // Typen skrivs ut, annars slår TypeScript ihop avsnitten till en union där
   // fält som bara finns på vissa länkar (badge, exact) försvinner.
@@ -221,21 +206,19 @@ export default function AdminSidebar({
       <div className="min-h-0 flex-1 space-y-6 overflow-y-auto">
         {visibleSections.map((section) => (
           <div key={section.label}>
-            <p className="mb-1 px-2 text-[11px] font-semibold uppercase tracking-wider text-neutral-400">
+            <p className="mb-1 px-2 text-[11px] font-semibold uppercase tracking-wider text-neutral-500">
               {section.label}
             </p>
             <ul className="space-y-0.5">
               {section.links.map((link) => {
-                const active = link.exact
-                  ? pathname === link.href
-                  : pathname.startsWith(link.href);
+                const active = isActive(link.href, link.exact);
                 const Icon = link.icon;
 
                 return (
                   <li key={link.href}>
                     <Link
                       href={link.href}
-                      onClick={() => setOpen(false)}
+                      onClick={follow(link.href)}
                       className={`flex items-center gap-2.5 rounded-md px-2 py-1.5 text-[13px] font-medium transition-colors ${
                         active
                           ? "bg-neutral-100 text-neutral-900"
@@ -246,6 +229,7 @@ export default function AdminSidebar({
                         className={active ? "text-tick-deep" : "text-neutral-400"}
                       />
                       <span className="flex-1 truncate">{link.label}</span>
+                      <PendingDot />
 
                       {link.badge && reviewCount > 0 && (
                         <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[11px] font-semibold tabular-nums text-amber-700">
@@ -262,26 +246,6 @@ export default function AdminSidebar({
       </div>
 
       <div className="shrink-0 space-y-0.5 border-t border-neutral-200 pt-3">
-        {/* NYHETERNA ligger här nere och inte bland arbetet. De handlar om
-            Tikkr, inte om verkstaden, och öppnas en gång per version. */}
-        <Link
-          href="/admin/nyheter"
-          onClick={() => setOpen(false)}
-          className={`flex items-center gap-2.5 rounded-md px-2 py-1.5 text-[13px] font-medium transition-colors ${
-            onNews
-              ? "bg-neutral-100 text-neutral-900"
-              : "text-neutral-600 hover:bg-neutral-50 hover:text-neutral-900"
-          }`}
-        >
-          <IconSparkle className={onNews ? "text-tick-deep" : "text-neutral-400"} />
-          <span className="flex-1">Nyheter</span>
-          {showNewsDot && (
-            <span className="size-2 rounded-full bg-tick-deep">
-              <span className="sr-only">Nya</span>
-            </span>
-          )}
-        </Link>
-
         {/* DET EGNA KONTOT ligger här och inte under Inställningar. Namn,
             telefonnummer och lösenord är den inloggades egna uppgifter, inte
             inställningar för arbetsytan, och de låg länge på sidan som
@@ -290,16 +254,16 @@ export default function AdminSidebar({
         {showAccount && (
           <Link
             href="/admin/konto"
-            onClick={() => setOpen(false)}
+            onClick={follow("/admin/konto")}
             className={`flex items-center gap-2.5 rounded-md px-2 py-1.5 transition-colors ${
-              pathname.startsWith("/admin/konto")
+              isActive("/admin/konto")
                 ? "bg-neutral-100 text-neutral-900"
                 : "text-neutral-600 hover:bg-neutral-50 hover:text-neutral-900"
             }`}
           >
             <IconUser
               className={
-                pathname.startsWith("/admin/konto")
+                isActive("/admin/konto")
                   ? "shrink-0 text-tick-deep"
                   : "shrink-0 text-neutral-400"
               }
@@ -308,65 +272,25 @@ export default function AdminSidebar({
               <span className="block text-[13px] font-medium leading-tight">
                 Ditt konto
               </span>
-              <span className="block truncate text-[11px] leading-tight text-neutral-400">
+              <span className="block truncate text-[11px] leading-tight text-neutral-500">
                 {email}
               </span>
             </span>
           </Link>
         )}
 
-        {/* HJÄLPCENTRET, i en ny flik. Står ovanför Inställningar och inte
-            bland länkarna ovan: det är ingen del av arbetsytan, och den som
-            letar hjälp letar längst ner, där kontot och utloggningen står.
-            Adressen är relativ av samma skäl som i HelpLink. */}
-        <a
-          href="/support"
-          target="_blank"
-          rel="noopener"
-          className="flex items-center gap-2.5 rounded-md px-2 py-1.5 text-[13px] font-medium text-neutral-600 transition-colors hover:bg-neutral-50 hover:text-neutral-900"
-        >
-          <IconHelp className="text-neutral-400" />
-          Hjälp
-        </a>
-
-        {/* SUPPORTEN, bredvid hjälpcentret: den som inte hittade svaret där
-            är ett steg från att skriva till oss. Sidan man står på följer
-            med, så att formuläret kan förvälja området och vi ser var felet
-            uppstod. Se support/page.tsx. */}
-        <Link
-          href={
-            onSupport
-              ? "/admin/support"
-              : `/admin/support?sida=${encodeURIComponent(pathname)}`
-          }
-          onClick={() => setOpen(false)}
-          className={`flex items-center gap-2.5 rounded-md px-2 py-1.5 text-[13px] font-medium transition-colors ${
-            onSupport
-              ? "bg-neutral-100 text-neutral-900"
-              : "text-neutral-600 hover:bg-neutral-50 hover:text-neutral-900"
-          }`}
-        >
-          <IconMessage className={onSupport ? "text-tick-deep" : "text-neutral-400"} />
-          <span className="flex-1">Support</span>
-          {showSupportDot && (
-            <span className="size-2 rounded-full bg-tick-deep">
-              <span className="sr-only">Uppdaterat</span>
-            </span>
-          )}
-        </Link>
-
         <Link
           href="/admin/installningar"
-          onClick={() => setOpen(false)}
+          onClick={follow("/admin/installningar")}
           className={`flex items-center gap-2.5 rounded-md px-2 py-1.5 text-[13px] font-medium transition-colors ${
-            pathname.startsWith("/admin/installningar")
+            isActive("/admin/installningar")
               ? "bg-neutral-100 text-neutral-900"
               : "text-neutral-600 hover:bg-neutral-50 hover:text-neutral-900"
           }`}
         >
           <IconSettings
             className={
-              pathname.startsWith("/admin/installningar")
+              isActive("/admin/installningar")
                 ? "text-tick-deep"
                 : "text-neutral-400"
             }
@@ -385,12 +309,65 @@ export default function AdminSidebar({
         </form>
 
         {/* Tikkr-märket nedtonat. Panelen tillhör kunden — deras logotyp står
-            överst, vår står i marginalen. */}
-        <div className="flex items-center gap-2 px-2 pt-2.5 text-neutral-400">
+            överst, vår står i marginalen. Versionen står på sidan Nyheter
+            och inte här (ändrat 2026-10-11): den säger kunden något bara där
+            ändringarna i den står.
+
+            NYHETERNA, HJÄLPEN OCH RUTAN FÖR FEEDBACK står här, som ikoner,
+            och inte som rader i listan ovanför (ändrat 2026-10-11). De handlar
+            om Tikkr och inte om arbetsytan, precis som märket, och listan
+            växte till en vägg. Hjälpen nås dessutom från rubriken på varje
+            sida den gäller. Adressen är relativ av samma skäl som i HelpLink.
+
+            Pricken vid Nyheter sitter kvar, nu i ikonens hörn.
+
+            BUTIKEN står här av samma skäl (2026-10-21): den säljer Tikkrs
+            tillbehör och tjänster, och ingen öppnar den varje vecka. Där
+            behovet uppstår finns dessutom en knapp, t.ex. på sidan
+            Stämplingsskärmar. Se CLAUDE.md § 3.4. */}
+        <div className="relative flex flex-wrap items-center gap-2 px-2 pt-2.5 text-neutral-400">
           <LogoMark size={22} />
           <WordmarkOnly height={10} tone="current" />
-          <span className="ml-auto truncate text-[11px] tabular-nums">
-            {version}
+          <span className="flex w-full items-center justify-between lg:ml-auto lg:w-auto lg:justify-start">
+            <Link
+              href="/admin/nyheter"
+              onClick={() => setOpen(false)}
+              aria-label={showNewsDot ? "Nyheter, nya" : "Nyheter"}
+              title="Nyheter"
+              aria-current={onNews ? "page" : undefined}
+              className={`relative ${onNews ? footerIconActive : footerIcon}`}
+            >
+              <IconSparkle />
+              <FooterLabel>Nyheter</FooterLabel>
+              {showNewsDot && (
+                <span className="absolute right-1 top-1 size-2 rounded-full bg-tick-deep ring-2 ring-white" />
+              )}
+            </Link>
+            <Link
+              href="/admin/butik"
+              onClick={() => setOpen(false)}
+              aria-label="Butik"
+              title="Butik"
+              aria-current={onShop ? "page" : undefined}
+              className={onShop ? footerIconActive : footerIcon}
+            >
+              <IconPackage />
+              <FooterLabel>Butik</FooterLabel>
+            </Link>
+            <a
+              href="/support"
+              target="_blank"
+              rel="noopener"
+              aria-label="Hjälp"
+              title="Hjälp"
+              className={footerIcon}
+            >
+              <IconHelp />
+              <FooterLabel>Hjälp</FooterLabel>
+            </a>
+            {showAccount && (
+              <FeedbackButton pathname={pathname} className={footerIcon} />
+            )}
           </span>
         </div>
       </div>
@@ -404,7 +381,7 @@ export default function AdminSidebar({
         <button
           onClick={() => setOpen((value) => !value)}
           className="rounded-md p-1.5 text-neutral-600 hover:bg-neutral-100"
-          aria-label="Visa meny"
+          aria-label={open ? "Dölj meny" : "Visa meny"}
           aria-expanded={open}
         >
           <svg viewBox="0 0 24 24" width={20} height={20} fill="none" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round">
@@ -430,6 +407,22 @@ export default function AdminSidebar({
   );
 }
 
+/** Ikonknapparna i menyns fot. Stora nog att träffa, tysta tills man pekar. */
+const footerIcon =
+  "inline-flex items-center gap-1.5 rounded-md p-1.5 text-neutral-400 transition-colors hover:bg-neutral-100 hover:text-neutral-900";
+
+/** Samma ikon när man står på sidan den leder till. Grönt som i listan ovanför. */
+const footerIconActive =
+  "inline-flex items-center gap-1.5 rounded-md bg-neutral-100 p-1.5 text-tick-deep";
+
+/**
+ * Ikonens namn, bara på telefon. Skrivbordet har ett `title` vid hovring, som
+ * inte finns på en pekskärm.
+ */
+function FooterLabel({ children }: { children: React.ReactNode }) {
+  return <span className="text-xs lg:hidden">{children}</span>;
+}
+
 function CompanyHeader({
   companyName,
   hasLogo,
@@ -444,7 +437,7 @@ function CompanyHeader({
         <span className="block truncate text-[13px] font-semibold leading-tight text-neutral-900">
           {companyName}
         </span>
-        <span className="block text-[11px] leading-tight text-neutral-400">
+        <span className="block text-[11px] leading-tight text-neutral-500">
           Arbetsyta
         </span>
       </span>

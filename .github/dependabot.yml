@@ -1,0 +1,52 @@
+# Föreslår uppdateringar som pull requests mot dev (infört 2026-10-18,
+# säkerhetsgranskningen). Ingenting slås ihop av sig självt: varje förslag går
+# genom CI och en människa, som all annan kod. Se § 0 i CLAUDE.md.
+#
+# Säkerhetsrättelser kommer när de släpps. Övriga uppdateringar samlas en gång
+# i veckan, i en PR per ekosystem, så att de inte blir tjugo PR:er att läsa.
+
+version: 2
+
+updates:
+  - package-ecosystem: npm
+    directory: "/"
+    target-branch: dev
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: Europe/Stockholm
+    open-pull-requests-limit: 5
+    # Huvudversioner föreslås inte i den vanliga omgången. Next, Prisma och
+    # React ändrar beteende mellan dem, och en sådan uppgradering är ett eget
+    # arbete. Säkerhetsrättelser kommer ändå.
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
+    groups:
+      npm:
+        update-types: ["minor", "patch"]
+
+  - package-ecosystem: github-actions
+    directory: "/"
+    target-branch: dev
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: Europe/Stockholm
+    groups:
+      actions:
+        patterns: ["*"]
+
+  - package-ecosystem: docker
+    directory: "/"
+    target-branch: dev
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: Europe/Stockholm
+    ignore:
+      - dependency-name: "node"
+        update-types: ["version-update:semver-major"]

@@ -45,6 +45,24 @@ const UNKNOWN_ACCOUNT_HASH = bcrypt.hashSync("inget-konto-har-detta", 12);
 const SCOPE = "platform";
 
 /**
+ * Spärren per IP-adress, utöver spärren per adress (tillagt 2026-10-18).
+ *
+ * Gäller både lösenordet och koden. Plattformspanelen ser alla kunder, och den
+ * som prövar läckta lösenord mot flera adresser ska inte få fem försök per
+ * adress från samma dator.
+ */
+const IP_SCOPE = "platform-ip";
+const IP_MAX_FAILURES = 20;
+
+async function ipLocked(ip: string | undefined): Promise<boolean> {
+  return ip ? isLockedOut(IP_SCOPE, ip, IP_MAX_FAILURES) : false;
+}
+
+async function noteIpFailure(ip: string | undefined): Promise<void> {
+  if (ip) await noteFailedLogin(IP_SCOPE, ip);
+}
+
+/**
  * Samma besked för varje sorts fel. Ett mer hjälpsamt svar är hjälpsamt även
  * för den som inte ska in.
  */
@@ -62,7 +80,8 @@ export interface LoginOutcome {
 /** Steg 1: adress och lösenord, och att adressen har behörighet. */
 export async function checkPlatformPassword(
   rawEmail: string,
-  password: string
+  password: string,
+  ip?: string
 ): Promise<LoginOutcome> {
   const email = rawEmail.trim().toLowerCase();
 
@@ -70,7 +89,7 @@ export async function checkPlatformPassword(
     return { ok: false, problem: "Fyll i både adress och lösenord." };
   }
 
-  if (isLockedOut(SCOPE, email)) {
+  if ((await isLockedOut(SCOPE, email)) || (await ipLocked(ip))) {
     return {
       ok: false,
       problem: `${LOCKED_OUT_MESSAGE} Lösenordet kan sättas om på servern.`,
@@ -93,7 +112,8 @@ export async function checkPlatformPassword(
   const allowed = isPlatformAdmin(email);
 
   if (!account || !correct || !allowed) {
-    noteFailedLogin(SCOPE, email);
+    await noteFailedLogin(SCOPE, email);
+    await noteIpFailure(ip);
     return { ok: false, problem: WRONG };
   }
 
@@ -151,7 +171,8 @@ export async function platformTwoStep(
 export async function verifyPlatformCode(
   email: string,
   code: string,
-  now: Date = new Date()
+  now: Date = new Date(),
+  ip?: string
 ): Promise<LoginOutcome> {
   const wrong: LoginOutcome = {
     ok: false,
@@ -159,7 +180,13 @@ export async function verifyPlatformCode(
       "Koden stämmer inte. Kontrollera att telefonens klocka går rätt och försök igen.",
   };
 
-  if (!isPlatformAdmin(email) || isLockedOut(SCOPE, email)) return wrong;
+  if (
+    !isPlatformAdmin(email) ||
+    (await isLockedOut(SCOPE, email)) ||
+    (await ipLocked(ip))
+  ) {
+    return wrong;
+  }
 
   const account = await unsafeGlobalPrisma.platformUser.findUnique({
     where: { email },
@@ -175,7 +202,8 @@ export async function verifyPlatformCode(
       : null;
 
   if (!account || step === null) {
-    noteFailedLogin(SCOPE, email);
+    await noteFailedLogin(SCOPE, email);
+    await noteIpFailure(ip);
     return wrong;
   }
 
@@ -194,11 +222,11 @@ export async function verifyPlatformCode(
   });
 
   if (claimed.count === 0) {
-    noteFailedLogin(SCOPE, email);
+    await noteFailedLogin(SCOPE, email);
     return wrong;
   }
 
-  clearFailedLogins(SCOPE, email);
+  await clearFailedLogins(SCOPE, email);
 
   await unsafeGlobalPrisma.platformAuditLog.create({
     data: {

@@ -1,9 +1,10 @@
 import Link from "next/link";
 import { Wordmark } from "@/components/ui/Logo";
-import Motif from "./Motif";
+import { Grid, Motif } from "./Atmosphere";
 import { activeNotices } from "@/lib/notices";
 import ContactLine from "./ContactLine";
 import SiteNav from "./SiteNav";
+import ScrollProgress from "./ScrollProgress";
 import { CONTACT } from "@/lib/contact";
 import { LEGAL, NAV } from "./links";
 
@@ -109,8 +110,21 @@ export function SiteHeader() {
 
 function SiteHeaderBar() {
   return (
-    <header className="sticky top-0 z-50 border-b border-white/10 bg-neutral-900/85 backdrop-blur">
-      <div className="mx-auto flex max-w-6xl items-center gap-8 px-6 py-3.5">
+    /*
+      OSKÄRPAN ÄR KVAR MEN HÅLLS KORT, och ytan har i stället blivit en aning
+      tätare. Sidan har numera ljus och rutnät bakom listen, och med den förra
+      täckningen drog de igenom som fläckar bakom länkarna.
+
+      En `backdrop-filter` räknas om varje gång ytan bakom den förskjuts, och
+      bakom en fastnitad list förskjuts den vid varje bildruta man rullar.
+      Kostnaden växer med radien, så den tas ned och inte upp: tätheten löser
+      läsbarheten billigare än radien gör. Samma avvägning som ligger bakom att
+      sidans ljus ritas som gradienter och inte med `blur()`, se globals.css.
+    */
+    <header className="sticky top-0 z-50 border-b border-white/10 bg-neutral-900/90 backdrop-blur-md">
+      <ScrollProgress />
+
+      <div className="relative mx-auto flex max-w-6xl items-center gap-8 px-6 py-3.5">
         <Link href="/" aria-label="Tikkr, till startsidan">
           <Wordmark size={26} tone="reversed" />
         </Link>
@@ -124,9 +138,15 @@ function SiteHeaderBar() {
           >
             Logga in
           </Link>
+          {/* Ingen glans och ingen pil på den här knappen, till skillnad från
+              knapparna i avsnitten. Den är tretton punkter hög och sitter i en
+              list som följer med hela vägen ned; en effekt som rör sig i
+              ögonvrån under tio avsnitt är inte en effekt utan ett störande
+              moment. Kvar står lyftet och skuggan, som bara syns när man pekar
+              på den. */}
           <Link
             href="/registrera"
-            className="whitespace-nowrap rounded-md bg-tick px-3.5 py-2 text-[13px] font-semibold text-neutral-900 transition-colors hover:bg-emerald-300"
+            className="whitespace-nowrap rounded-md bg-tick px-3.5 py-2 text-[13px] font-semibold text-neutral-900 transition-all duration-300 hover:-translate-y-0.5 hover:bg-emerald-300 hover:shadow-[0_8px_20px_-8px_rgba(46,209,150,0.6)]"
           >
             Prova gratis
           </Link>
@@ -155,6 +175,15 @@ export function SiteFooter() {
       {/* Motivet en sista gång, nedsänkt i hörnet. Sidan började med det och
           slutar med det. */}
       <Motif tone="onDark" className="-bottom-72 -left-40 h-[36rem] w-[36rem]" />
+
+      {/* Rutnätet, en sista gång och vänt upp och ned.
+
+          Masken i `brand-grid` tonar ut nedåt, eftersom den är satt för ett
+          avsnitt man kommer in i ovanifrån. Foten läses åt andra hållet: man
+          kommer in i den underifrån på vägen ned, och linjerna ska tätna mot
+          botten. `rotate-180` på lagret vänder masken utan att behöva en andra
+          mask i globals.css. */}
+      <Grid tone="onDark" className="inset-0 rotate-180" />
 
       <div className="relative mx-auto max-w-6xl px-6 py-16">
         <div className="grid gap-10 sm:grid-cols-2 lg:grid-cols-[1.5fr_1fr_1fr_1fr]">

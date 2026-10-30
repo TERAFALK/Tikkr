@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { useState, type ReactNode } from "react";
 import { LogoMark, WordmarkOnly } from "@/components/ui/Logo";
 import ReloadOnDeploy from "@/components/ui/ReloadOnDeploy";
+import { PendingDot, useClickedLink } from "@/components/ui/NavFeedback";
 import {
   IconBuilding,
   IconHistory,
@@ -13,6 +14,7 @@ import {
   IconMail,
   IconMegaphone,
   IconOverview,
+  IconPackage,
   IconTag,
 } from "@/components/ui/icons";
 import { platformLogout } from "@/app/plattform/login/actions";
@@ -36,8 +38,10 @@ import { platformLogout } from "@/app/plattform/login/actions";
  *   /plattform/kunder       Vilka är kunderna, och var finns den jag söker?
  *   /plattform/kunder/[id]  Allt om ett företag
  *   /plattform/inkorg       Vad har kunderna skrivit till oss?
+ *   /plattform/bestallningar Vilka tillbehör ska förberedas, skickas eller faktureras?
  *   /plattform/meddelanden  Vad ser kunderna för banner just nu?
  *   /plattform/utskick      Mejl till kundernas administratörer
+ *   /plattform/produkter    Vad säljs i butiken, och till vilket pris?
  *   /plattform/artiklar     Vilka artiklar hos Stripe är vad?
  *   /plattform/handelser    Vad har gjorts härifrån?
  *
@@ -55,6 +59,7 @@ interface NavLink {
 }
 
 const INBOX_HREF = "/plattform/inkorg";
+const ORDERS_HREF = "/plattform/bestallningar";
 
 const SECTIONS: { label: string; links: NavLink[] }[] = [
   {
@@ -68,6 +73,7 @@ const SECTIONS: { label: string; links: NavLink[] }[] = [
       },
       { href: "/plattform/kunder", label: "Kunder", icon: IconBuilding },
       { href: INBOX_HREF, label: "Inkorg", icon: IconInbox },
+      { href: ORDERS_HREF, label: "Beställningar", icon: IconPackage },
       {
         href: "/plattform/meddelanden",
         label: "Meddelanden",
@@ -79,6 +85,7 @@ const SECTIONS: { label: string; links: NavLink[] }[] = [
   {
     label: "Drift",
     links: [
+      { href: "/plattform/produkter", label: "Produkter", icon: IconPackage },
       { href: "/plattform/artiklar", label: "Artiklar", icon: IconTag },
       { href: "/plattform/handelser", label: "Händelser", icon: IconHistory },
     ],
@@ -88,11 +95,14 @@ const SECTIONS: { label: string; links: NavLink[] }[] = [
 export default function PlatformFrame({
   email,
   inboxCount,
+  ordersCount,
   children,
 }: {
   email: string;
-  /** Nya supportmeddelanden, siffran vid Inkorg. Se PlatformShell. */
+  /** Fel och förslag som inte är klarmarkerade, siffran vid Inkorg. */
   inboxCount: number;
+  /** Beställningar som väntar på oss, se needsAttention i shop/status.ts. */
+  ordersCount: number;
   children: ReactNode;
 }) {
   const [open, setOpen] = useState(false);
@@ -101,6 +111,7 @@ export default function PlatformFrame({
     <Nav
       email={email}
       inboxCount={inboxCount}
+      ordersCount={ordersCount}
       onNavigate={() => setOpen(false)}
     />
   );
@@ -150,7 +161,9 @@ export default function PlatformFrame({
 
       <div className="min-w-0 flex-1">
         <main className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
-          {children}
+          {/* Ramen som sidbytet tonas in i, som i kundpanelen. Se
+              `.panel-content` i globals.css. */}
+          <div className="panel-content">{children}</div>
         </main>
       </div>
     </div>
@@ -160,13 +173,18 @@ export default function PlatformFrame({
 function Nav({
   email,
   inboxCount,
+  ordersCount,
   onNavigate,
 }: {
   email: string;
   inboxCount: number;
+  ordersCount: number;
   onNavigate: () => void;
 }) {
   const pathname = usePathname();
+
+  // Den klickade punkten markeras direkt. Se NavFeedback.
+  const { clicked, follow } = useClickedLink(pathname);
 
   return (
     <nav className="flex h-full flex-col gap-6 p-3">
@@ -178,7 +196,7 @@ function Nav({
           <span className="block leading-tight">
             <WordmarkOnly height={10} />
           </span>
-          <span className="mt-0.5 block text-[11px] leading-tight text-neutral-400">
+          <span className="mt-0.5 block text-[11px] leading-tight text-neutral-500">
             Plattform
           </span>
         </span>
@@ -187,21 +205,23 @@ function Nav({
       <div className="flex-1 space-y-6">
         {SECTIONS.map((section) => (
           <div key={section.label}>
-            <p className="mb-1 px-2 text-[11px] font-semibold uppercase tracking-wider text-neutral-400">
+            <p className="mb-1 px-2 text-[11px] font-semibold uppercase tracking-wider text-neutral-500">
               {section.label}
             </p>
             <ul className="space-y-0.5">
               {section.links.map((link) => {
-                const active = link.exact
-                  ? pathname === link.href
-                  : pathname.startsWith(link.href);
+                const active = clicked
+                  ? clicked === link.href
+                  : link.exact
+                    ? pathname === link.href
+                    : pathname.startsWith(link.href);
                 const Icon = link.icon;
 
                 return (
                   <li key={link.href}>
                     <Link
                       href={link.href}
-                      onClick={onNavigate}
+                      onClick={follow(link.href, onNavigate)}
                       className={`flex items-center gap-2.5 rounded-md px-2 py-1.5 text-[13px] font-medium transition-colors ${
                         active
                           ? "bg-neutral-100 text-neutral-900"
@@ -212,12 +232,18 @@ function Nav({
                         className={active ? "text-tick-deep" : "text-neutral-400"}
                       />
                       <span className="flex-1 truncate">{link.label}</span>
+                      <PendingDot />
 
                       {/* Gult, som Granskning i kundens panel: något väntar
                           på att någon tar hand om det. */}
                       {link.href === INBOX_HREF && inboxCount > 0 && (
                         <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[11px] font-semibold tabular-nums text-amber-700">
                           {inboxCount}
+                        </span>
+                      )}
+                      {link.href === ORDERS_HREF && ordersCount > 0 && (
+                        <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[11px] font-semibold tabular-nums text-amber-700">
+                          {ordersCount}
                         </span>
                       )}
                     </Link>
@@ -240,10 +266,11 @@ function Nav({
           </button>
         </form>
 
-        <p className="truncate px-2 pt-2 text-[11px] text-neutral-400">
+        <p className="truncate px-2 pt-2 text-[11px] text-neutral-500">
           {email}
         </p>
       </div>
     </nav>
   );
 }
+

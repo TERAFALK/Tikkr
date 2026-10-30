@@ -4,13 +4,7 @@ import { revalidatePath } from "next/cache";
 import { assertWritable, requireAdmin } from "@/lib/admin-session";
 import { requireModule } from "@/lib/company-modules";
 import { unsafeGlobalPrisma } from "@/lib/db";
-import {
-  AbsenceError,
-  addCompEarned,
-  markAbsence,
-  removeAbsence,
-  removeCompAdjustment,
-} from "@/lib/absence";
+import { AbsenceError, markAbsence, removeAbsence } from "@/lib/absence";
 import { currentFlexMinutes } from "@/lib/payroll";
 import { parseLocalDate } from "@/lib/time-zone";
 import { auditEmployeeChange, employeeBefore } from "@/lib/audit";
@@ -37,11 +31,10 @@ async function timeZoneOf(companyId: string): Promise<string> {
  * Tomt betyder hela den schemalagda dagen, vilket är det vanliga fallet — en
  * sjukdag är en hel dag. Bara ett ifyllt men obegripligt värde är ett fel.
  *
- * GÅR GENOM SAMMA TOLKNING SOM ALLA ANDRA TIDFÄLT. Fältet läste förut bara
- * decimaltimmar medan skärmen visar tim:min, och det blev fel varje gång
- * någon skrev av det hen såg: ett flexsaldo på −1:44 som skulle täckas av
- * frånvaro gav 1,44 timmar, alltså en timme och 26 minuter, och arton
- * minuter blev kvar som minus. Se CLAUDE.md § 7.1 punkt 8.
+ * GÅR GENOM SAMMA TOLKNING SOM ALLA ANDRA TIDFÄLT, och det är hela skälet att
+ * den ligger här och inte i fältet. Fältet läste en gång ett eget format, och
+ * det blev fel varje gång någon skrev av det hen såg på skärmen. Se
+ * CLAUDE.md § 7.1 punkt 8.
  */
 function parseAbsenceHours(
   raw: FormDataEntryValue | null
@@ -93,7 +86,7 @@ export async function saveAbsence(
 
   try {
     for (const date of daysInPeriod(from, to, timeZone)) {
-      await markAbsence(db, companyId, timeZone, {
+      await markAbsence(db, companyId, {
         employeeId,
         date,
         reasonId,
@@ -122,63 +115,6 @@ export async function deleteAbsence(formData: FormData) {
   await removeAbsence(session.db, id, session.email);
   revalidatePath(PATH);
 }
-
-export async function saveCompEarned(
-  _previous: TimesheetState,
-  formData: FormData
-): Promise<TimesheetState> {
-  const session = await requireAdmin();
-  await assertWritable(session);
-  await requireModule(session, "PAYROLL");
-  const { db, companyId, email } = session;
-
-  const employeeId = String(formData.get("employeeId") ?? "");
-  if (!employeeId) return { error: "Ingen anställd vald." };
-
-  const timeZone = await timeZoneOf(companyId);
-  const date = parseLocalDate(String(formData.get("date") ?? ""), timeZone);
-  if (!date) return { error: "Ange ett datum." };
-
-  // TIMANSTÄLLD HAR INGEN KOMPTID. Knappen göms i panelen, men en
-  // serveråtgärd ska inte lita på att gränssnittet gömde den. Vakten sitter i
-  // addCompEarned, som är enda vägen in, och svarar med ett AbsenceError.
-
-  // Samma tolkning som frånvaron: godkänd komptid skrivs av från ett saldo
-  // som står i tim:min.
-  const minutes = parseAbsenceHours(formData.get("hours"));
-  if (minutes === "error" || minutes === null) {
-    return { error: "Skriv tiden som 2:00 eller 2,5." };
-  }
-
-  try {
-    await addCompEarned(db, companyId, {
-      employeeId,
-      date,
-      minutes,
-      note: String(formData.get("note") ?? ""),
-      byEmail: email,
-    });
-  } catch (error) {
-    if (error instanceof AbsenceError) return { error: error.message };
-    throw error;
-  }
-
-  revalidatePath(PATH);
-  return { savedAt: Date.now() };
-}
-
-export async function deleteCompEarned(formData: FormData) {
-  const session = await requireAdmin();
-  await assertWritable(session);
-  await requireModule(session, "PAYROLL");
-
-  const id = String(formData.get("id") ?? "");
-  if (!id) return;
-
-  await removeCompAdjustment(session.db, id, session.email);
-  revalidatePath(PATH);
-}
-
 
 /** Svaret från rutan som ändrar saldot. ActionDialog stänger på `ok`. */
 export interface BalanceState {
@@ -267,10 +203,10 @@ export async function adjustFlexBalance(
 /**
  * Ett saldo som skrivits för hand, till minuter.
  *
- * Tar BÅDA formen: "2:15" och "2,25". Skärmen visar tim:min, och det vore
- * oanständigt att kräva att man räknar om det till decimaltimmar för att
- * kunna skriva tillbaka samma tal. Decimalformen står kvar eftersom den som
- * har en siffra ur ett gammalt system ofta har den så.
+ * Tar BÅDA formen: "2,25" och "2:15". Skärmen visar decimaltimmar, så det är
+ * den formen man skriver tillbaka samma tal i. Tim:min står kvar eftersom den
+ * som har en siffra på ett gammalt papper ofta har den så, och att avvisa
+ * "2:15" vore att kräva en omräkning för ingenting.
  *
  * Minuttecknet får vara både det vanliga och det långa, som Word gärna byter
  * till — ett klistrat "−3" ska inte bli ett fel.

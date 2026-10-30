@@ -1,5 +1,10 @@
 import { cookies } from "next/headers";
-import { READ_ONLY_COOKIE, requireAdmin } from "@/lib/admin-session";
+import { redirect } from "next/navigation";
+import {
+  isOwner,
+  READ_ONLY_COOKIE,
+  requireAdminEvenIfLocked,
+} from "@/lib/admin-session";
 import { unsafeGlobalPrisma } from "@/lib/db";
 import { getOnboardingState } from "@/lib/onboarding";
 import { evaluateAccess } from "@/lib/subscription";
@@ -11,7 +16,6 @@ import {
 } from "@/lib/stripe";
 import { activeNotices } from "@/lib/notices";
 import { hasUnreadNews, runningVersion, visibleReleases } from "@/lib/news";
-import { hasUnseenSupportUpdates } from "@/lib/feedback";
 import AdminSidebar from "@/components/admin/AdminSidebar";
 import NoticeBanner from "@/components/ui/NoticeBanner";
 import SupportBanner from "@/components/admin/SupportBanner";
@@ -24,8 +28,9 @@ import { resendVerification } from "./konto/actions";
 /**
  * Skalet runt de inloggade adminsidorna.
  *
- * Två kontroller ligger här, alltså på ETT ställe, och ärvs av varje undersida:
- * att man är inloggad, och att prenumerationen är i ordning.
+ * Layouten ritar menyn, remsorna och låsskärmen. SKYDDET LIGGER INTE HÄR, utan
+ * i requireAdmin(), som varje sida och åtgärd kallar själv. Next kör sidan även
+ * när layouten inte ritar `children`, se admin-session.ts.
  *
  * Mappnamnet inom parentes bildar ingen del av adressen. Det finns bara för att
  * kunna lägga inloggningssidan UTANFÖR det här skalet: låg den innanför skulle
@@ -38,7 +43,7 @@ export default async function PanelLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const session = await requireAdmin();
+  const session = await requireAdminEvenIfLocked();
 
   // Flaggan som assertWritable() satte när en ändring nekades. Läses här och
   // slängs av komponenten i webbläsaren — en cookie går inte att ta bort
@@ -80,18 +85,30 @@ export default async function PanelLayout({
     ? null
     : await session.db.adminUser.findFirst({
         where: { id: session.userId },
-        select: {
-          email: true,
-          emailVerifiedAt: true,
-          newsSeenVersion: true,
-          supportSeenAt: true,
-        },
+        select: { email: true, emailVerifiedAt: true, newsSeenVersion: true },
       });
 
   // OBEKRÄFTAD E-POSTADRESS. Remsan står tills länken använts, så att ett
-  // stavfel vid registreringen syns första dagen och inte den dag lösenordet
-  // glömts. Den spärrar ingenting. Se email-verification.ts.
+  // stavfel syns första dagen och inte den dag lösenordet glömts. Den spärrar
+  // ingenting. Se email-verification.ts.
   const unverifiedEmail = me && !me.emailVerifiedAt ? me.email : null;
+
+  /**
+   * DEN NYREGISTRERADE KOMMER INTE IN FÖRRÄN ADRESSEN ÄR BEKRÄFTAD
+   * (2026-10-11).
+   *
+   * Gäller bara den första sessionen, den som släpptes in utan uppsatt app
+   * (`mfaPending`, se admin-session.ts). För alla andra står remsan kvar som
+   * förut och spärrar ingenting: de har tvåsteg, och en adress som blivit
+   * obekräftad för att någon rättat den ska inte låsa ute en arbetsyta mitt i
+   * en arbetsdag.
+   *
+   * Spärren är ett FLÖDESSTEG och inte en säkerhetsgräns: arbetsytan är
+   * personens egen, och det som skyddas är att vi kan nå hen. Därför räcker
+   * den här kontrollen, till skillnad från modulgrinden i § 3.1, som måste
+   * ligga i varje rutt.
+   */
+  if (session.mfaPending && unverifiedEmail) redirect("/admin/bekrafta-adressen");
 
   // Vilka menypunkter som ska synas. ATT DÖLJA DEM ÄR BARA KOSMETIK —
   // sidorna bakom vaktas var för sig av requireModule() och svarar 404
@@ -108,12 +125,6 @@ export default async function PanelLayout({
     me !== null &&
     hasUnreadNews(visibleReleases(version, modules), me.newsSeenVersion);
 
-  // Pricken vid Support: svar eller ny status på ett av personens egna
-  // meddelanden sedan sidan senast öppnades. Se feedback.ts.
-  const supportUpdates =
-    me !== null &&
-    (await hasUnseenSupportUpdates(session.db, session.userId, me.supportSeenAt));
-
   const access = evaluateAccess({
     status: company?.subscriptionStatus ?? "TRIALING",
     trialEndsAt: company?.trialEndsAt ?? null,
@@ -125,6 +136,13 @@ export default async function PanelLayout({
       {/* Laddar om fliken efter en driftsättning. Utan den svarar knapparna i
           en sida som stått öppen "Failed to find Server Action". */}
       <ReloadOnDeploy />
+
+      <a
+        href="#innehall"
+        className="sr-only focus:not-sr-only focus:absolute focus:left-2 focus:top-2 focus:z-50 focus:rounded-md focus:bg-fjord focus:px-3 focus:py-2 focus:text-[13px] focus:font-medium focus:text-white"
+      >
+        Hoppa till innehållet
+      </a>
 
       <AdminSidebar
         companyName={session.companyName}
@@ -139,8 +157,6 @@ export default async function PanelLayout({
         // inte ett av kundens. Se admin-session.ts.
         showAccount={!session.support}
         unreadNews={unreadNews}
-        supportUpdates={supportUpdates}
-        version={version}
       />
 
       <div className="min-w-0 flex-1">
@@ -148,6 +164,30 @@ export default async function PanelLayout({
             Vilket läge man är i avgör hur allt annat på sidan ska läsas. */}
         {session.support && <SupportBanner companyName={session.companyName} />}
         <ReadOnlyToast show={deniedWrite} />
+
+        {/* TVÅSTEGSVERIFIERINGEN ÄR INTE UPPSATT (2026-10-11).
+            
+            Står bara för den som släppts in utan app, alltså den som nyss
+            registrerat. Den spärrar ingenting här — nästa inloggning gör det,
+            eftersom inloggningssidan möter ett konto utan app med QR-koden.
+            Remsan säger det rakt ut, så att det inte kommer som en
+            överraskning nästa morgon.
+            
+            Knappen leder till Ditt konto med rutan redan öppen. Rutan finns
+            byggd på ett ställe, se konto/page.tsx. */}
+        {session.mfaPending && (
+          <div className="border-b border-amber-200 bg-amber-50 px-4 py-2.5 sm:px-6 lg:px-8">
+            <div className="mx-auto flex max-w-7xl flex-wrap items-center gap-x-4 gap-y-1 text-[13px] text-amber-900">
+              <p>
+                <strong>Tvåstegsverifieringen är inte uppsatt.</strong> Nästa
+                gång du loggar in behöver du en kod från en app i telefonen.
+              </p>
+              <Link href="/admin/konto?tvasteg=1" className="font-medium underline">
+                Koppla app
+              </Link>
+            </div>
+          </div>
+        )}
 
         {unverifiedEmail && (
           <div className="border-b border-amber-200 bg-amber-50 px-4 py-2.5 sm:px-6 lg:px-8">
@@ -179,7 +219,11 @@ export default async function PanelLayout({
           </div>
         )}
 
-        <main className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
+        <main
+          id="innehall"
+          tabIndex={-1}
+          className="mx-auto max-w-7xl px-4 py-6 focus:outline-hidden sm:px-6 lg:px-8 lg:py-8"
+        >
           {/* Driftmeddelanden ligger överst och över allt annat innehåll.
               Ett pågående avbrott förklarar varför sidan under beter sig
               konstigt, och den förklaringen kommer för sent längre ned. */}
@@ -189,14 +233,14 @@ export default async function PanelLayout({
             </div>
           )}
 
-          {/* Vid låst prenumeration visas ingen adminsida alls. Inget kan
-              då råka nås via en direktlänk, vilket hade varit fallet om vi
-              istället gömt menyn och litat på att ingen gissar adresser. */}
-          {/* SUPPORTLÄGET SLÄPPS IGENOM PRENUMERATIONSLÅSET. En obetald faktura
-              är oftast precis varför kunden ringer, och en supportvy som visar
-              samma låsta sida som kunden ser hjälper ingen. Läget är läsning, så
-              ingenting kan ändras medan låset är på. */}
-          {access.level === "locked" && !session.support ? (
+          {/* Låsskärmen. Att sidan inte når hit är requireAdmin()s verk, se
+              toppen av filen. Grenen visar bara vad en låst arbetsyta ska se.
+
+              SUPPORTLÄGET ÄR ALDRIG LÅST. En obetald faktura är oftast precis
+              varför kunden ringer, och en supportvy som visar samma låsta sida
+              som kunden ser hjälper ingen. Läget är läsning, så ingenting kan
+              ändras. */}
+          {session.locked ? (
             <SubscriptionLocked
               state={access}
               companyName={session.companyName}
@@ -204,9 +248,12 @@ export default async function PanelLayout({
               paymentsAvailable={await paymentsAvailable()}
               yearlyAvailable={await yearlyAvailable()}
               pricing={await getScreenPricing()}
+              canBuy={isOwner(session)}
             />
           ) : (
-            children
+            // Ramen som sidbytet tonas in i, se `.panel-content` i
+            // globals.css. Den står kvar; det som byts är innehållet.
+            <div className="panel-content">{children}</div>
           )}
         </main>
       </div>

@@ -55,17 +55,25 @@ amerikansk startup översatt till svenska.
    verb i imperativ: "Lägg till", "Spara", "Koppla om".
 
 6. **Fälthjälp bara vid format eller konsekvens**, i en kort mening utan punkt
-   om den är ofullständig: "Tim:min, t.ex. 7:30", "Minst 10 tecken", "Kan inte
+   om den är ofullständig: "Timmar, t.ex. 7,5", "Minst 10 tecken", "Kan inte
    ångras". Inte varför fältet finns.
 
 7. **Felmeddelanden säger vad som är fel och vad som rättar det. Ett led, inte
    tre.** Och aldrig teknisk jargong: "Felet står i serverloggen" hjälper
    ingen som inte har en server.
 
-8. **Tid skrivs alltid som tim:min.** "8:30", aldrig "8,50". Saldon får sitt
-   tecken utskrivet: "+2:15", "−0:45", "0:00". Decimaltimmar finns bara i
-   Excel-arket, som är till för att räkna vidare i, och står där bredvid
-   tim:min. `src/lib/format.ts` äger båda formaten.
+8. **Tid skrivs alltid som decimaltimmar.** "8,5", aldrig "8:30". Nollor i
+   slutet faller bort, så "8" är åtta timmar. Saldon får sitt tecken
+   utskrivet: "+2,25", "−0,75", "0". Gäller varje yta kunden ser — panelen,
+   kiosken, varje PDF, Excel-arket och säljsidans produktbilder.
+
+   **Ett klockslag är inte en längd.** Ett pass som börjar "07:00", en rast
+   "11:30–12:15" och en beräknad sluttid skrivs som klockslag, med kolon och
+   två siffror. Bara TID SOM RÄKNAS är decimal.
+
+   Fälten där tid skrivs in tar båda formen, så att "7:30" på ett gammalt
+   papper går att skriva av: "7,5" och "7:30" ger samma sak.
+   `src/lib/format.ts` äger formatet.
 
 Där något verkligen är svårt — GDPR-radering, fast pris kontra påslag — får en
 mening stå kvar. Den ska då vara skriven för en verkstadschef.
@@ -109,13 +117,15 @@ Det här är den ordlista som gäller. Byt inte synonym för variationens skull.
 | **underlag** | rapport, faktureringsunderlag | Dokumentet som går till kunden, per order. |
 | **efterkalkyl** | kalkyl, lönsamhetsrapport | Internt. Självkostnad, påslag, pris. |
 | **rapport** | tidrapport | Uttaget under Rapporter. **Får inte heta tidrapport.** |
-| **tidrapport** | lönerapport, tidsrapport | Löneunderlaget per anställd. Bara detta dokument heter så. |
+| **tidrapport** | lönerapport, tidsrapport | Sidan i panelen och veckans papper per anställd, med stämplingarna. Bara detta dokument heter så. |
+| **löneunderlag** | lönespec, lönespecifikation, lönerapport | Månadens papper per anställd till lönen, med frånvaron och summeringen. Timmar, aldrig belopp. Med stor bokstav och bestämd form, *Löneunderlaget*, är det också tillvalets namn. |
 | **beräknad tid** | budget, budgeterad tid, estimat | Per arbetsmoment på ordern. |
 | **planerad tid** | schemalagd tid, bokad tid | Planeringsmodulens rutor. Varken arbetad eller fakturerbar. |
 | **tillval** | modul (mot kunden), add-on, paket | *Modul* är kodens ord. Kunden ser *tillval*. |
 | **påslag** | marginal, uppräkning | Faktor från kostnad till pris. |
 | **granskning** | kontroll, attestering | Sidan där flaggade poster rättas. |
-| **flexsaldo**, **komptid**, **frånvaro** | — | Löneunderlagets ord. Håll dem där. |
+| **flexsaldo**, **frånvaro** | — | Löneunderlagets ord. Håll dem där. |
+| **flex**, **flextid**, **flexledig** | komp, komptid, kompledig | Kunden skiljer inte på dem: övertid är flex. Komptiden togs bort 2026-10-13. |
 
 **Rapport och tidrapport är två olika dokument.** Rapporten svarar på hur
 mycket kunden ska faktureras. Tidrapporten svarar på hur mycket en person har
@@ -157,7 +167,7 @@ En fråga, sedan konsekvensen. Verbet i knappen säger vad som händer.
 > finns kvar.
 
 ### Fälthjälp
-> Tim:min, t.ex. 7:30 · Minst 10 tecken · Faktor, t.ex. 1,4. Tomt ger
+> Timmar, t.ex. 7,5 · Minst 10 tecken · Faktor, t.ex. 1,4. Tomt ger
 > företagets standard · Valfritt. Läggs till arbetsmomentets kostnad
 
 ### Fel
@@ -215,7 +225,7 @@ Delar av det här går att mäta, och mäts:
 | Test | Fäller |
 |---|---|
 | `tests/ui-text.test.ts` | Tankstreck i texten användaren ser — i panelen, kiosken, hjälpcentret, de fyra PDF-filerna, exportrutterna, granskningsnoterna och mejlen |
-| `tests/format.test.ts` | En ny sida som visar decimaltimmar |
+| `tests/format.test.ts` | En ny sida som visar tim:min |
 | `tests/brand.test.ts` | En färg utanför paletten, och ordmärket satt som text |
 
 Resten är omdöme, och omdöme går inte att mäta med ett reguljärt uttryck.

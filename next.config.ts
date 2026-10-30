@@ -1,5 +1,41 @@
 import type { NextConfig } from "next";
 
+/**
+ * CONTENT-SECURITY-POLICY, GRUNDNIVÅ (beslutat 2026-10-18, produktägarens val,
+ * säkerhetsgranskningen).
+ *
+ * Skript, stilar, bilder, typsnitt och anrop bara från egen adress. Inga
+ * plugins, ingen annan bas för relativa länkar, och formulär skickas bara hit
+ * eller till Stripes kassa och kundportal, dit prenumerationssidan skickar
+ * vidare. Ingen annan sajt får rama in sidorna, samma sak som
+ * X-Frame-Options nedan säger för äldre webbläsare.
+ *
+ * INLINE-SKRIPT TILLÅTS. Next lägger sina egna i varje sida, och utan dem
+ * krävs en nonce, som i sin tur kräver att varje sida renderas vid varje
+ * anrop, även säljsidan. Det valdes bort. Policyn stoppar därmed inte ett
+ * injicerat inline-skript, men väl ett som hämtas utifrån, och React escapar
+ * redan allt som ritas.
+ *
+ * I utvecklingsläge behöver React `eval` och omladdningen en websocket.
+ */
+function contentSecurityPolicy(development: boolean): string {
+  return [
+    "default-src 'self'",
+    `script-src 'self' 'unsafe-inline'${development ? " 'unsafe-eval'" : ""}`,
+    "style-src 'self' 'unsafe-inline'",
+    "img-src 'self' data: blob:",
+    "font-src 'self' data:",
+    `connect-src 'self'${development ? " ws:" : ""}`,
+    "worker-src 'self'",
+    "manifest-src 'self'",
+    "frame-src 'self'",
+    "frame-ancestors 'self'",
+    "object-src 'none'",
+    "base-uri 'self'",
+    "form-action 'self' https://checkout.stripe.com https://billing.stripe.com",
+  ].join("; ");
+}
+
 const nextConfig: NextConfig = {
   // "standalone" gör att Docker-imagen bara innehåller det appen faktiskt
   // behöver för att köra — betydligt mindre image och snabbare deploy.
@@ -60,7 +96,39 @@ const nextConfig: NextConfig = {
           { key: "Strict-Transport-Security", value: "max-age=31536000" },
         ],
       },
+      {
+        // Bara sidorna, inte /api. Policyn gäller dokument som ritar något,
+        // och på ett PDF-svar kan `object-src 'none'` hindra webbläsarens egen
+        // PDF-visare, som utskriftsknappen laddar i en ram.
+        source: "/((?!api/).*)",
+        headers: [
+          {
+            key: "Content-Security-Policy",
+            value: contentSecurityPolicy(process.env.NODE_ENV === "development"),
+          },
+        ],
+      },
     ];
+  },
+
+  /**
+   * GAMLA ADRESSER I PANELEN.
+   *
+   * Registren som sätts upp en gång flyttades till Inställningar 2026-10-14
+   * (issue #17). Bokmärken, öppna flikar och länkar i gamla mejl ska fortsätta
+   * fungera. Inte permanenta: en 308 sparas av webbläsaren, och skulle en sida
+   * flytta igen hade den gamla omdirigeringen stått kvar hos varje kund.
+   */
+  async redirects() {
+    return [
+      ["/admin/moment", "/admin/installningar/arbetsmoment"],
+      ["/admin/improduktivt", "/admin/installningar/improduktivt"],
+      ["/admin/skarmar", "/admin/installningar/skarmar"],
+      ["/admin/planering/stationer", "/admin/installningar/stationer"],
+      // Butiken låg under Inställningar, Tillbehör, en dag (2026-10-20). Mejlen
+      // som skickades då länkar dit. Se CLAUDE.md § 3.4.
+      ["/admin/installningar/tillbehor", "/admin/butik/bestallningar"],
+    ].map(([source, destination]) => ({ source, destination, permanent: false }));
   },
 };
 

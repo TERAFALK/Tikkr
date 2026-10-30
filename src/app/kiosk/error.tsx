@@ -61,7 +61,7 @@ export default function KioskError({
           Försök nu
         </button>
 
-        <p className="mt-6 text-sm text-neutral-400">
+        <p className="mt-6 text-sm text-neutral-500">
           Står detta kvar i mer än några minuter, kontakta er administratör.
         </p>
       </div>

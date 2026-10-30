@@ -1,0 +1,57 @@
+# OWASP ZAP mot labbet (infört 2026-10-18, säkerhetsgranskningen).
+#
+# BARA FÖR HAND, från fliken Actions, aldrig automatiskt. Skanningen går mot en
+# riktig server, och vem som skickar trafik dit ska vara ett beslut. Den körs
+# efter en driftsättning i labbet, före sammanslagningen till prod.
+#
+# Baseline-läget: ZAP läser sidorna, följer länkarna en minut och letar efter
+# saknade huvuden, läckande felmeddelanden och liknande. Det ANGRIPER
+# ingenting och skickar inga formulär. Aldrig mot produktionen, se § 0
+# punkt 15 i CLAUDE.md, och därför vägrar flödet en annan adress än labbets.
+#
+# Resultatet ligger som en bilaga till körningen. Varningar fäller inte; ZAP
+# varnar för mycket som är valt med flit, som 'unsafe-inline' i CSP:n.
+
+name: ZAP mot labbet
+
+on:
+  workflow_dispatch:
+    inputs:
+      target:
+        description: "Adress i labbet"
+        required: true
+        default: "https://test.tikkr.se"
+
+permissions:
+  contents: read
+
+jobs:
+  baseline:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Bara labbet
+        env:
+          TARGET: ${{ inputs.target }}
+        run: |
+          case "$TARGET" in
+            https://test.tikkr.se|https://test.tikkr.se/*) ;;
+            *) echo "ZAP körs bara mot labbet, inte mot $TARGET."; exit 1 ;;
+          esac
+
+      - name: ZAP baseline
+        env:
+          TARGET: ${{ inputs.target }}
+        run: |
+          mkdir -p zap && chmod 777 zap
+          docker run --rm -v "$PWD/zap:/zap/wrk:rw" ghcr.io/zaproxy/zaproxy:2.17.0 \
+            zap-baseline.py -t "$TARGET" -m 1 -I \
+            -r rapport.html -J rapport.json
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: zap-rapport
+          path: zap/
+          retention-days: 30

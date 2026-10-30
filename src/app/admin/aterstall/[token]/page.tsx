@@ -25,7 +25,7 @@ export default async function ResetPasswordPage({
         footer={
           <Link
             href="/admin/glomt-losenord"
-            className="font-medium text-tick-deep hover:underline"
+            className="font-medium text-link hover:underline"
           >
             Begär en ny länk
           </Link>

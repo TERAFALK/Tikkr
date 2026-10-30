@@ -3,10 +3,14 @@
 import { revalidatePath } from "next/cache";
 import bcrypt from "bcryptjs";
 import { assertWritable, requireAdmin } from "@/lib/admin-session";
-import { hasModule } from "@/lib/company-modules";
+import { hasModule, hasWorkHours } from "@/lib/company-modules";
 import { parseOre } from "@/lib/money";
 import { auditEmployeeChange, employeeBefore } from "@/lib/audit";
 import { readScheduleDays, saveOwnScheduleDays } from "@/lib/schedule";
+import { companyTimeZone } from "@/lib/company";
+import { parseLocalDate, startOfDayIn } from "@/lib/time-zone";
+import { unsafeGlobalPrisma } from "@/lib/db";
+import { findAgreement } from "@/lib/collective-agreements";
 import type { CompanyDb } from "@/lib/tenant";
 
 // Varje åtgärd börjar med requireAdmin(). Det ger både inloggningskontroll och
@@ -20,6 +24,8 @@ const PHOTO_TYPES = ["image/png", "image/jpeg", "image/webp"];
 const PHOTO_MAX_BYTES = 512 * 1024;
 
 export interface EmployeeState {
+  /** Fältet felet gäller. Se useFieldError. */
+  field?: string;
   error?: string;
   /**
    * Tidpunkten då sparandet lyckades.
@@ -129,7 +135,7 @@ interface PhotoFields {
  * Ger ett felmeddelande att visa, eller inget alls.
  */
 /**
- * TIMANSTÄLLD: ingen planerad tid, inget flexsaldo, ingen komptid.
+ * TIMANSTÄLLD: ingen planerad tid och inget flexsaldo.
  *
  * Krysset är bara läsbart med löneunderlaget. Utan modulen finns varken
  * schema eller flex att stänga av, och fältet ritas inte heller.
@@ -138,14 +144,79 @@ function readHourly(formData: FormData, payroll: boolean): boolean {
   return payroll && formData.get("hourly") === "on";
 }
 
+/**
+ * STARTDATUMET, dagen flexen börjar räknas (tillagt 2026-10-13).
+ *
+ * Lagras i `balanceOpeningDate`, som payroll.ts redan räknade från. Tomt fält
+ * betyder första stämplingen, vilket är vad kolumnen alltid betytt när den är
+ * tom.
+ *
+ * Fältet finns bara i rutan med löneunderlaget och utan krysset för
+ * timanställd. Saknas det i formuläret rörs datumet inte, så att den som
+ * kryssar i Timanställd och sedan ur igen inte tappar det.
+ *
+ * Sparas vid dygnets början i företagets tidszon. parseLocalDate landar
+ * klockan 12, och förmiddagens stämplingar på startdagen ska räknas med.
+ */
+async function startDateFields(
+  formData: FormData,
+  companyId: string,
+  payroll: boolean
+): Promise<{ error: string } | { balanceOpeningDate?: Date | null }> {
+  if (!payroll || !formData.has("startDate")) return {};
+
+  const raw = String(formData.get("startDate") ?? "").trim();
+  if (!raw) return { balanceOpeningDate: null };
+
+  const timeZone = await companyTimeZone(companyId);
+  const date = parseLocalDate(raw, timeZone);
+  if (!date) return { error: "Startdatumet går inte att läsa." };
+
+  return { balanceOpeningDate: startOfDayIn(date, timeZone) };
+}
+
+/**
+ * ARBETSTIDSFORMEN FÖR ATF (tillagt 2026-10-13), till exempel dagtid eller
+ * tvåskift. Prövas mot formerna i företagets avtal, så att en form som inte
+ * finns där aldrig sparas.
+ *
+ * Saknas fältet i formuläret rörs värdet inte. Det visas bara med
+ * löneunderlaget och ett valt avtal, och den som byter avtal fram och tillbaka
+ * ska inte tappa formen på varje person.
+ */
+async function atfWorkFormFields(
+  formData: FormData,
+  companyId: string,
+  payroll: boolean
+): Promise<{ error: string } | { atfWorkForm?: string }> {
+  if (!payroll || !formData.has("atfWorkForm")) return {};
+
+  const company = await unsafeGlobalPrisma.company.findUnique({
+    where: { id: companyId },
+    select: { atfAgreement: true },
+  });
+  const agreement = findAgreement(company?.atfAgreement);
+  if (!agreement) return {};
+
+  const key = String(formData.get("atfWorkForm") ?? "");
+  if (!agreement.forms.some((form) => form.key === key)) {
+    return { error: "Välj en arbetstidsform i listan." };
+  }
+
+  return { atfWorkForm: key };
+}
+
 async function saveSchedule(
   db: CompanyDb,
   companyId: string,
   employeeId: string,
   formData: FormData,
-  payroll: boolean
+  payroll: boolean,
+  workHours: boolean
 ): Promise<string | null> {
-  if (!payroll) return null;
+  // De egna tiderna finns med löneunderlaget eller planeringen, se
+  // work-hours.ts. Timanställd är löneunderlagets kryss.
+  if (!workHours) return null;
 
   // EN TIMANSTÄLLD HAR INGET SCHEMA ALLS, inte ens ett eget. Fälten göms i
   // rutan när krysset sätts, men ett formulär kan skickas av annat än
@@ -222,15 +293,26 @@ export async function createEmployee(
   const { db, companyId } = session;
 
   const name = String(formData.get("name") ?? "").trim();
-  if (!name) return { error: "Ange ett namn." };
+  if (!name) return { error: "Ange ett namn.", field: "name" };
 
   const photo = await readPhoto(formData);
   if (photo && "error" in photo) return { error: photo.error };
 
   const payroll = await hasModule(companyId, "PAYROLL");
+  const workHours = await hasWorkHours(companyId);
 
   const flexCode = await flexCodeFields(formData, payroll);
-  if ("error" in flexCode) return { error: flexCode.error };
+  if ("error" in flexCode) {
+    return { error: flexCode.error, field: "flexCode" };
+  }
+
+  const startDate = await startDateFields(formData, companyId, payroll);
+  if ("error" in startDate) {
+    return { error: startDate.error, field: "startDate" };
+  }
+
+  const atfWorkForm = await atfWorkFormFields(formData, companyId, payroll);
+  if ("error" in atfWorkForm) return { error: atfWorkForm.error };
 
   let created: { id: string };
 
@@ -244,6 +326,8 @@ export async function createEmployee(
         hourly: readHourly(formData, payroll),
         ...photoFields(photo, false),
         ...flexCode,
+        ...startDate,
+        ...atfWorkForm,
       },
       select: { id: true },
     });
@@ -258,7 +342,8 @@ export async function createEmployee(
     companyId,
     created.id,
     formData,
-    payroll
+    payroll,
+    workHours
   );
   if (scheduleError) return { error: scheduleError };
 
@@ -284,7 +369,7 @@ export async function updateEmployee(
   const name = String(formData.get("name") ?? "").trim();
 
   if (!id) return { error: "Okänd person." };
-  if (!name) return { error: "Ange ett namn." };
+  if (!name) return { error: "Ange ett namn.", field: "name" };
 
   const photo = await readPhoto(formData);
   if (photo && "error" in photo) return { error: photo.error };
@@ -292,9 +377,20 @@ export async function updateEmployee(
   const removePhoto = formData.get("removePhoto") === "on";
 
   const payroll = await hasModule(companyId, "PAYROLL");
+  const workHours = await hasWorkHours(companyId);
 
   const flexCode = await flexCodeFields(formData, payroll);
-  if ("error" in flexCode) return { error: flexCode.error };
+  if ("error" in flexCode) {
+    return { error: flexCode.error, field: "flexCode" };
+  }
+
+  const startDate = await startDateFields(formData, companyId, payroll);
+  if ("error" in startDate) {
+    return { error: startDate.error, field: "startDate" };
+  }
+
+  const atfWorkForm = await atfWorkFormFields(formData, companyId, payroll);
+  if ("error" in atfWorkForm) return { error: atfWorkForm.error };
 
   // Timkostnaden följer med varje ny stämpling. En ändring av den ska gå att
   // spåra, se audit.ts.
@@ -313,6 +409,8 @@ export async function updateEmployee(
         hourly: readHourly(formData, payroll),
         ...photoFields(photo, removePhoto),
         ...flexCode,
+        ...startDate,
+        ...atfWorkForm,
       },
     });
   } catch (error) {
@@ -327,7 +425,14 @@ export async function updateEmployee(
     });
   }
 
-  const scheduleError = await saveSchedule(db, companyId, id, formData, payroll);
+  const scheduleError = await saveSchedule(
+    db,
+    companyId,
+    id,
+    formData,
+    payroll,
+    workHours
+  );
   if (scheduleError) return { error: scheduleError };
 
   revalidatePath(PATH);

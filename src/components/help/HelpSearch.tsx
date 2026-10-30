@@ -39,7 +39,7 @@ export default function HelpSearch() {
 
       <div id={listId} aria-live="polite">
         {searching && hits.length === 0 && (
-          <p className="mt-4 text-[13px] text-neutral-400">
+          <p className="mt-4 text-[13px] text-neutral-500">
             Ingen guide matchar &quot;{query.trim()}&quot;
           </p>
         )}
@@ -52,7 +52,7 @@ export default function HelpSearch() {
                   href={`/support/${hit.slug}`}
                   className="block px-4 py-3 transition-colors hover:bg-neutral-50"
                 >
-                  <span className="block text-[11px] font-medium uppercase tracking-wider text-neutral-400">
+                  <span className="block text-[11px] font-medium uppercase tracking-wider text-neutral-500">
                     {hit.areaLabel}
                   </span>
                   <span className="mt-0.5 block text-[15px] font-medium text-neutral-900">

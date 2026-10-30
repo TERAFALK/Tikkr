@@ -2,12 +2,17 @@ import type { MetadataRoute } from "next";
 import { siteUrl } from "@/lib/site-url";
 import { LEGAL_UPDATED_AT } from "@/lib/legal";
 import { GUIDES, guideHref } from "@/lib/help/guides";
+import { listProducts } from "@/lib/shop/products";
 
 // Säljsidan och hjälpcentret. Resten kräver inloggning och hör inte hemma i
 // ett index.
-export default function sitemap(): MetadataRoute.Sitemap {
+export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const base = siteUrl();
   if (!base) return [];
+
+  // Produkterna ligger i databasen. Svarar den inte står kartan utan dem,
+  // hellre än att inte gå att hämta alls.
+  const products = await listProducts("site").catch(() => []);
 
   return [
     {
@@ -34,6 +39,14 @@ export default function sitemap(): MetadataRoute.Sitemap {
         lastModified: LEGAL_UPDATED_AT,
         changeFrequency: "yearly" as const,
         priority: 0.3,
+      })
+    ),
+    // Tillbehören, butiken och en sida per produkt.
+    ...["/tillbehor", ...products.map((product) => `/tillbehor/${product.slug}`)].map(
+      (path) => ({
+        url: `${base}${path}`,
+        changeFrequency: "monthly" as const,
+        priority: 0.6,
       })
     ),
     // Hjälpcentret. Publikt, och det kunden söker på när något inte går.

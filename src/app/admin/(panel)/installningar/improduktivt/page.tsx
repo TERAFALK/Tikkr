@@ -1,0 +1,171 @@
+import { requireAdmin } from "@/lib/admin-session";
+import ActionDialog from "@/components/ui/ActionDialog";
+import ConfirmButton from "@/components/admin/ConfirmButton";
+import {
+  Alert,
+  Badge,
+  Button,
+  Card,
+  CardHeader,
+  EmptyState,
+  Field,
+  Input,
+  Table,
+  Td,
+  Th,
+  Tr,
+} from "@/components/ui";
+import {
+  createIndirectMoment,
+  deleteIndirectMoment,
+  renameIndirectMoment,
+  toggleIndirectMoment,
+} from "./actions";
+
+export const metadata = { title: "Improduktiv tid · Tikkr" };
+
+export const dynamic = "force-dynamic";
+
+export default async function IndirectMomentsPage() {
+  const { db } = await requireAdmin();
+
+  const moments = await db.indirectMoment.findMany({
+    orderBy: [{ active: "desc" }, { name: "asc" }],
+    select: {
+      id: true,
+      name: true,
+      active: true,
+      _count: { select: { timeEntries: true } },
+    },
+  });
+
+  const newMoment = (
+    <ActionDialog
+      trigger="Nytt improduktivt moment"
+      triggerTone="primary"
+      title="Lägg till improduktivt moment"
+      action={createIndirectMoment}
+      initial={{}}
+      submitLabel="Lägg till"
+    >
+      <Field label="Namn">
+        <Input name="name" placeholder="Städning" required autoFocus />
+      </Field>
+    </ActionDialog>
+  );
+
+  return (
+    <>
+      <div className="mb-4">
+        <Alert tone="info">
+          Tid som stämplas här kommer aldrig med i ett orderunderlag eller en
+          efterkalkyl. Den syns i rapporterna.
+        </Alert>
+      </div>
+
+      {/* Ett kort och ingen egen sidrubrik, som de andra sidorna under
+          Inställningar (issue #17). */}
+      <Card>
+        <CardHeader
+          title="Improduktiv tid"
+          help="improduktiv-tid"
+          description="Tid som inte hör till en kundorder."
+          action={newMoment}
+        />
+
+        {moments.length === 0 ? (
+          <div className="p-5">
+            <EmptyState
+              title="Inga improduktiva moment upplagda"
+              action={newMoment}
+            />
+          </div>
+        ) : (
+          <Table>
+            <thead>
+              <tr>
+                <Th>Namn</Th>
+                <Th>Status</Th>
+                <Th numeric>Stämplingar</Th>
+                <Th>
+                  <span className="sr-only">Åtgärder</span>
+                </Th>
+              </tr>
+            </thead>
+            <tbody>
+              {moments.map((moment) => (
+                <Tr key={moment.id} dimmed={!moment.active}>
+                  <Td>
+                    <span className="font-medium">{moment.name}</span>
+                  </Td>
+                  <Td>
+                    {moment.active ? (
+                      <Badge tone="active">Aktiv</Badge>
+                    ) : (
+                      <Badge tone="muted">Avaktiverad</Badge>
+                    )}
+                  </Td>
+                  <Td numeric muted>
+                    {moment._count.timeEntries}
+                  </Td>
+                  <Td>
+                    <div className="flex justify-end gap-2">
+                      <ActionDialog
+                        trigger="Ändra"
+                        triggerTone="secondary"
+                        title="Ändra improduktivt moment"
+                        action={renameIndirectMoment}
+                        initial={{}}
+                        submitLabel="Spara"
+                      >
+                        <input type="hidden" name="id" value={moment.id} />
+                        <Field label="Namn">
+                          <Input
+                            name="name"
+                            defaultValue={moment.name}
+                            required
+                            autoFocus
+                          />
+                        </Field>
+                      </ActionDialog>
+
+                      <form action={toggleIndirectMoment}>
+                        <input type="hidden" name="id" value={moment.id} />
+                        <input
+                          type="hidden"
+                          name="active"
+                          value={String(moment.active)}
+                        />
+                        <Button type="submit" tone="ghost">
+                          {moment.active ? "Avaktivera" : "Återaktivera"}
+                        </Button>
+                      </form>
+
+                      {/* TA BORT finns bara för moment som aldrig stämplats
+                          på. Ett moment med registrerad tid avaktiveras, för
+                          tiden är underlag för en lön och en post vars moment
+                          försvunnit går inte att förklara. Se
+                          deleteIndirectMoment. */}
+                      {moment._count.timeEntries === 0 && (
+                        <form action={deleteIndirectMoment}>
+                          <input type="hidden" name="id" value={moment.id} />
+                          <ConfirmButton
+                            type="submit"
+                            tone="danger"
+                            question={`Ta bort ${moment.name}? Kan inte ångras.`}
+                          >
+                            Ta bort
+                          </ConfirmButton>
+                        </form>
+                      )}
+                    </div>
+                  </Td>
+                </Tr>
+              ))}
+            </tbody>
+          </Table>
+        )}
+      </Card>
+    </>
+  );
+}

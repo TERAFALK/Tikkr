@@ -2,13 +2,15 @@ import type { AuditEvent } from "@prisma/client";
 import type { CompanyDb } from "./tenant";
 import { formatDate, formatDateTime, formatDuration, formatSignedDuration } from "./format";
 import { formatCurrency, formatMarkup } from "./money";
+import { findAgreement } from "./collective-agreements";
+import { isPlanningMode, planningModeName } from "./planning-modes";
 
 /**
  * ÄNDRINGSLOGGEN SOM TEXT.
  *
  * Loggen sparar id:n och råa värden, med flit: ett ordernummer som ändras
  * senare ska inte skriva om historiken. Den här filen översätter till det en
- * administratör läser — namn i stället för id, tim:min i stället för minuter,
+ * administratör läser — namn i stället för id, timmar i stället för minuter,
  * datum i företagets tidszon.
  *
  * Namnen slås upp när loggen visas och inte när den skrivs. En anonymiserad
@@ -20,6 +22,7 @@ const ENTITY_LABELS: Record<string, string> = {
   TimeEntry: "Stämpling",
   Absence: "Frånvaro",
   CompAdjustment: "Komptid",
+  Holiday: "Röd dag",
   Employee: "Anställd",
   AdminUser: "Administratör",
   Company: "Företaget",
@@ -51,7 +54,7 @@ const FIELD_LABELS: Record<string, string> = {
   active: "Aktiv",
   flexOpeningMinutes: "Ingående flexsaldo",
   compOpeningMinutes: "Ingående komptid",
-  balanceOpeningDate: "Saldon räknas från",
+  balanceOpeningDate: "Startdatum",
   date: "Datum",
   reasonId: "Orsak",
   minutes: "Tid",
@@ -62,6 +65,10 @@ const FIELD_LABELS: Record<string, string> = {
   markupPercent: "Påslag",
   autoCloseAt: "Automatisk utstämpling",
   timezone: "Tidszon",
+  name: "Namn",
+  atfAgreement: "Kollektivavtal för ATF",
+  atfWorkForm: "Arbetstidsform för ATF",
+  planningMode: "Planeringsläge",
 };
 
 const SOURCE_LABELS: Record<string, string> = {
@@ -191,6 +198,10 @@ export async function describeAuditEvents(
       case "needsReview":
       case "active":
         return value ? "Ja" : "Nej";
+      case "atfAgreement":
+        return findAgreement(String(value))?.name ?? String(value);
+      case "planningMode":
+        return isPlanningMode(value) ? planningModeName(value) : String(value);
       default:
         return String(value);
     }

@@ -32,9 +32,17 @@ export default function AcceptInviteForm({
         <Input value={email} readOnly disabled />
       </Field>
 
-      <Field label="Ditt namn" hint="Valfritt">
-        <Input name="name" autoComplete="name" autoFocus />
-      </Field>
+      {/* Förnamn och efternamn i varsitt fält, som vid registreringen. Båda
+          frivilliga för den som bjuds in, se acceptInvite. */}
+      <div className="grid gap-4 sm:grid-cols-2">
+        <Field label="Förnamn" hint="Valfritt">
+          <Input name="firstName" autoComplete="given-name" autoFocus />
+        </Field>
+
+        <Field label="Efternamn" hint="Valfritt">
+          <Input name="lastName" autoComplete="family-name" />
+        </Field>
+      </div>
 
       <Field label="Telefonnummer" hint="Valfritt. T.ex. 070-123 45 67">
         <Input name="phone" type="tel" autoComplete="tel" />

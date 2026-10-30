@@ -1,16 +1,20 @@
-import type { FeedbackKind, FeedbackStatus } from "@prisma/client";
+import type { FeedbackKind } from "@prisma/client";
 import { unsafeGlobalPrisma } from "./db";
 import type { CompanyDb } from "./tenant";
 import { HELP_AREAS, isHelpAreaKey } from "./help/areas";
+import { FEEDBACK_KIND_LABEL, FEEDBACK_KINDS, MAX_BODY_LENGTH } from "./feedback-form";
+import { listPaging, type PageRequest } from "./paging";
 
 /**
- * SUPPORTEN: MEDDELANDEN FRÅN KUNDEN, SVAR FRÅN OSS (issue #8, steg 2).
+ * FEL, FÖRSLAG OCH SYNPUNKTER FRÅN KUNDEN (issue #8, steg 2).
  *
- * Kunden skickar fel, förslag och synpunkter från sidan Support i panelen.
- * Vi läser dem i plattformens inkorg, byter status och svarar. Kunden ser
- * status och svar under formuläret, och en prick vid Support i menyn när
- * något hänt sedan hen senast tittade. Ingen mejlavisering, med flit: det var
- * produktägarens val, och inkorgen är platsen.
+ * Kunden skickar dem från en liten ruta som öppnas längst ner i panelens meny.
+ * Vi läser dem i plattformens inkorg och klarmarkerar dem med en anteckning om
+ * vad som gjordes, varpå de ligger i arkivet.
+ *
+ * KUNDEN FÅR INGEN ÅTERKOPPLING (ändrat 2026-10-11, produktägarens val).
+ * Första versionen visade status och svar för kunden, och blev därmed ett
+ * supportärende i stället för en brevlåda. Ingen mejlavisering åt något håll.
  *
  * TVÅ VÄGAR IN I SAMMA TABELL, och det är därför de står i samma fil:
  *
@@ -19,34 +23,15 @@ import { HELP_AREAS, isHelpAreaKey } from "./help/areas";
  *   plattformen → genom unsafeGlobalPrisma, eftersom inkorgen ser alla
  *
  * Företaget och avsändaren tas alltid ur sessionen, aldrig ur formuläret. Se
- * actions.ts på sidan Support.
+ * admin/(panel)/feedback/actions.ts.
  */
 
-export const FEEDBACK_KIND_LABEL: Record<FeedbackKind, string> = {
-  BUG: "Fel",
-  SUGGESTION: "Förslag",
-  FEEDBACK: "Synpunkt",
-};
-
-export const FEEDBACK_KINDS = Object.keys(FEEDBACK_KIND_LABEL) as FeedbackKind[];
-
-export const FEEDBACK_STATUS_LABEL: Record<FeedbackStatus, string> = {
-  NEW: "Ny",
-  IN_PROGRESS: "Pågår",
-  DONE: "Klar",
-};
-
-export const FEEDBACK_STATUSES = Object.keys(
-  FEEDBACK_STATUS_LABEL
-) as FeedbackStatus[];
+export { FEEDBACK_KIND_LABEL, FEEDBACK_KINDS, MAX_BODY_LENGTH };
 
 /** Etiketten för ett område, eller Annat när inget är valt. */
 export function areaLabel(area: string | null): string {
   return area && isHelpAreaKey(area) ? HELP_AREAS[area].label : "Annat";
 }
-
-/** Längre än så är inte ett meddelande utan en bilaga. */
-export const MAX_BODY_LENGTH = 5000;
 
 /**
  * Högst så många meddelanden per användare och timme.
@@ -69,19 +54,15 @@ function isKind(value: string): value is FeedbackKind {
   return Object.hasOwn(FEEDBACK_KIND_LABEL, value);
 }
 
-export function isFeedbackStatus(value: string): value is FeedbackStatus {
-  return Object.hasOwn(FEEDBACK_STATUS_LABEL, value);
-}
-
-function cleanBody(raw: string): string {
-  const body = raw.trim();
-  if (!body) throw new FeedbackError("Skriv ett meddelande.");
-  if (body.length > MAX_BODY_LENGTH) {
+function cleanText(raw: string, empty: string): string {
+  const text = raw.trim();
+  if (!text) throw new FeedbackError(empty);
+  if (text.length > MAX_BODY_LENGTH) {
     throw new FeedbackError(
-      `Meddelandet får vara högst ${MAX_BODY_LENGTH.toLocaleString("sv-SE")} tecken.`
+      `Texten får vara högst ${MAX_BODY_LENGTH.toLocaleString("sv-SE")} tecken.`
     );
   }
-  return body;
+  return text;
 }
 
 /**
@@ -89,7 +70,7 @@ function cleanBody(raw: string): string {
  *
  * Kommer ur adressfältet och är därmed vad som helst. Bara en sökväg i
  * panelen sparas, utan frågedel: den kan bära ett namn eller ett datum som
- * inte hör hemma i en supportrad.
+ * inte hör hemma i inkorgen.
  */
 export function cleanPage(raw: string | null | undefined): string | null {
   const path = (raw ?? "").trim().split(/[?#]/)[0];
@@ -124,7 +105,7 @@ export async function sendFeedback(
   const area = input.area.trim();
   if (area && !isHelpAreaKey(area)) throw new FeedbackError("Välj ett område.");
 
-  const body = cleanBody(input.body);
+  const body = cleanText(input.body, "Skriv ett meddelande.");
 
   const recent = await author.db.feedbackMessage.count({
     where: {
@@ -154,84 +135,44 @@ export async function sendFeedback(
   });
 }
 
-/** Arbetsytans meddelanden med svar, nyast först. */
-export function listCompanyFeedback(db: CompanyDb, take = 50) {
-  return db.feedbackMessage.findMany({
-    orderBy: { createdAt: "desc" },
-    take,
-    include: { replies: { orderBy: { createdAt: "asc" } } },
-  });
-}
-
-/**
- * Pricken vid Support: har något av personens EGNA meddelanden fått svar
- * eller ny status sedan sidan senast öppnades?
- *
- * Bara de egna. Sidan visar hela arbetsytans meddelanden, men en kollegas
- * svar är inget att tända en prick för.
- */
-export async function hasUnseenSupportUpdates(
-  db: CompanyDb,
-  userId: string,
-  seenAt: Date | null
-): Promise<boolean> {
-  const count = await db.feedbackMessage.count({
-    where: {
-      authorUserId: userId,
-      customerUpdatedAt: { gt: seenAt ?? new Date(0) },
-    },
-  });
-  return count > 0;
-}
-
-export async function markSupportSeen(db: CompanyDb, userId: string, now = new Date()) {
-  await db.adminUser.updateMany({
-    where: { id: userId },
-    data: { supportSeenAt: now },
-  });
-}
-
 /* -------------------------------------------------------------------------- */
 /* Plattformens inkorg                                                        */
 /* -------------------------------------------------------------------------- */
 
-export const INBOX_PAGE_SIZE = 25;
-
-/** Standardvyn: det som inte är klart. Klar är arkivet. */
-export const OPEN_STATUSES: FeedbackStatus[] = ["NEW", "IN_PROGRESS"];
-
-export async function listInbox(filter: {
-  statuses: FeedbackStatus[];
-  kind?: FeedbackKind;
-  companyId?: string;
-  page: number;
-}) {
+export async function listInbox(
+  filter: {
+    /** true är arkivet, false inkorgen. */
+    archived: boolean;
+    kind?: FeedbackKind;
+    companyId?: string;
+  } & PageRequest
+) {
   const where = {
-    status: { in: filter.statuses },
+    doneAt: filter.archived ? { not: null } : null,
     ...(filter.kind && { kind: filter.kind }),
     ...(filter.companyId && { companyId: filter.companyId }),
   };
 
-  const [rows, total] = await Promise.all([
-    unsafeGlobalPrisma.feedbackMessage.findMany({
-      where,
-      orderBy: { createdAt: "desc" },
-      skip: (filter.page - 1) * INBOX_PAGE_SIZE,
-      take: INBOX_PAGE_SIZE,
-      include: {
-        company: { select: { id: true, name: true } },
-        replies: { orderBy: { createdAt: "asc" } },
-      },
-    }),
-    unsafeGlobalPrisma.feedbackMessage.count({ where }),
-  ]);
+  // Antalet först, så att ett sidnummer bortom slutet kan visa sista sidan.
+  const total = await unsafeGlobalPrisma.feedbackMessage.count({ where });
+  const paging = listPaging(total, filter);
 
-  return { rows, total };
+  const rows = await unsafeGlobalPrisma.feedbackMessage.findMany({
+    where,
+    // Arkivet i den ordning det klarmarkerades, inkorgen i den ordning det
+    // kom in.
+    orderBy: filter.archived ? { doneAt: "desc" } : { createdAt: "desc" },
+    skip: paging.skip,
+    take: paging.take,
+    include: { company: { select: { id: true, name: true } } },
+  });
+
+  return { rows, total, paging };
 }
 
-/** Siffran vid Inkorg i plattformens meny. */
-export function newFeedbackCount() {
-  return unsafeGlobalPrisma.feedbackMessage.count({ where: { status: "NEW" } });
+/** Siffran vid Inkorg i plattformens meny: det som inte är klarmarkerat. */
+export function openFeedbackCount() {
+  return unsafeGlobalPrisma.feedbackMessage.count({ where: { doneAt: null } });
 }
 
 /** Kortet på kundsidan i plattformen. */
@@ -240,101 +181,43 @@ export function recentCompanyFeedback(companyId: string, take = 5) {
     where: { companyId },
     orderBy: { createdAt: "desc" },
     take,
-    select: { id: true, kind: true, area: true, status: true, body: true, createdAt: true },
+    select: { id: true, kind: true, area: true, doneAt: true, body: true, createdAt: true },
   });
 }
 
 /**
- * Byter status och skriver det i plattformens händelselogg, i samma
- * transaktion. Kunden ser den nya statusen, och pricken tänds.
- */
-export async function setFeedbackStatus(params: {
-  id: string;
-  status: FeedbackStatus;
-  byEmail: string;
-  now?: Date;
-}) {
-  const now = params.now ?? new Date();
-
-  const message = await unsafeGlobalPrisma.feedbackMessage.findUnique({
-    where: { id: params.id },
-    select: { id: true, companyId: true, status: true, kind: true, authorEmail: true },
-  });
-  if (!message) throw new FeedbackError("Meddelandet finns inte.");
-  if (message.status === params.status) return;
-
-  await unsafeGlobalPrisma.$transaction([
-    unsafeGlobalPrisma.feedbackMessage.update({
-      where: { id: message.id },
-      data: {
-        status: params.status,
-        statusChangedAt: now,
-        statusChangedByEmail: params.byEmail,
-        customerUpdatedAt: now,
-      },
-    }),
-    unsafeGlobalPrisma.platformAuditLog.create({
-      data: {
-        actorEmail: params.byEmail,
-        action: "Ändrade status på supportmeddelande",
-        targetCompanyId: message.companyId,
-        detail:
-          `${FEEDBACK_KIND_LABEL[message.kind]} från ${message.authorEmail}: ` +
-          `${FEEDBACK_STATUS_LABEL[message.status]} → ${FEEDBACK_STATUS_LABEL[params.status]}`,
-      },
-    }),
-  ]);
-}
-
-/**
- * Svarar kunden.
+ * Klarmarkerar ett meddelande och flyttar det till arkivet.
  *
- * Ett nytt meddelande som besvaras blir Pågår av sig självt: det är inte
- * längre nytt, och lämnades det som Ny skulle siffran i menyn ljuga om vad som
- * väntar. Klar sätts aldrig av ett svar. Det är ett eget beslut.
+ * Anteckningen krävs: ett arkiv där det inte står vad som gjordes går inte att
+ * läsa ett halvår senare. Skrivs i plattformens händelselogg i samma
+ * transaktion. Ett meddelande som redan är klart rörs inte, så att två flikar
+ * inte skriver över varandras anteckning.
  */
-export async function replyToFeedback(params: {
+export async function markFeedbackDone(params: {
   id: string;
-  body: string;
+  note: string;
   byEmail: string;
   now?: Date;
 }) {
   const now = params.now ?? new Date();
-  const body = cleanBody(params.body);
+  const note = cleanText(params.note, "Skriv vad som gjordes.");
 
   const message = await unsafeGlobalPrisma.feedbackMessage.findUnique({
     where: { id: params.id },
-    select: { id: true, companyId: true, status: true, kind: true, authorEmail: true },
+    select: { id: true, companyId: true, doneAt: true, kind: true, authorEmail: true },
   });
   if (!message) throw new FeedbackError("Meddelandet finns inte.");
-
-  const startsWork = message.status === "NEW";
+  if (message.doneAt) throw new FeedbackError("Meddelandet är redan klarmarkerat.");
 
   await unsafeGlobalPrisma.$transaction([
-    unsafeGlobalPrisma.feedbackReply.create({
-      data: {
-        companyId: message.companyId,
-        messageId: message.id,
-        body,
-        authorEmail: params.byEmail,
-        createdAt: now,
-      },
-    }),
     unsafeGlobalPrisma.feedbackMessage.update({
       where: { id: message.id },
-      data: {
-        customerUpdatedAt: now,
-        ...(startsWork && {
-          status: "IN_PROGRESS",
-          statusChangedAt: now,
-          statusChangedByEmail: params.byEmail,
-        }),
-      },
+      data: { doneAt: now, doneNote: note, doneByEmail: params.byEmail },
     }),
     unsafeGlobalPrisma.platformAuditLog.create({
       data: {
         actorEmail: params.byEmail,
-        action: "Svarade på supportmeddelande",
+        action: "Klarmarkerade fel eller förslag",
         targetCompanyId: message.companyId,
         detail: `${FEEDBACK_KIND_LABEL[message.kind]} från ${message.authorEmail}`,
       },

@@ -2,14 +2,19 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import type { ModuleKey } from "@/lib/modules";
+import { WORK_HOURS_MODULES, type ModuleKey } from "@/lib/modules";
 import {
+  IconBroom,
   IconBuilding,
   IconCalendar,
   IconClock,
+  IconDevice,
   IconHistory,
+  IconMoment,
   IconPeople,
+  IconReport,
   IconShield,
+  IconStation,
   IconTag,
   IconTimeline,
 } from "@/components/ui/icons";
@@ -20,14 +25,15 @@ import {
  * En enda lång inställningssida gör att man måste läsa allt för att hitta det
  * man söker. Uppdelat efter vad man faktiskt kom hit för att göra.
  *
- * GRUPPERAD I TRE AVSNITT, av samma skäl som vänstermenyn är det: åtta
+ * GRUPPERAD I AVSNITT, av samma skäl som vänstermenyn är det: åtta
  * likvärdiga länkar i rad tvingar ögat att läsa alla varje gång. Avsnitten
- * svarar på tre olika frågor — hur arbetsytan är satt upp, hur tiden räknas
- * till lön, och vem som kommer in och vad som hänt.
+ * svarar på olika frågor — hur arbetsytan är satt upp, vad som går att
+ * stämpla och var, hur tavlan och tiden till lön räknas, och vem som kommer
+ * in och vad som hänt.
  *
- * Löneunderlagets två sidor ligger i ett EGET avsnitt och inte utspridda
- * bland de andra. Hela avsnittet faller bort med tillvalet, och det som står
- * kvar är då inte en lista med hål i.
+ * Varje tillvals sidor ligger i ett EGET avsnitt och inte utspridda bland de
+ * andra. Hela avsnittet faller bort med tillvalet, och det som står kvar är
+ * då inte en lista med hål i.
  *
  * Det egna kontot ligger INTE här. Namn, telefonnummer och lösenord är den
  * inloggades egna uppgifter och inte inställningar för arbetsytan, se
@@ -40,6 +46,8 @@ interface SettingsPage {
   description: string;
   icon: React.ComponentType<React.SVGProps<SVGSVGElement>>;
   exact?: boolean;
+  /** Sidan visas bara med något av dessa tillval. Utelämnad betyder alltid. */
+  anyModule?: readonly ModuleKey[];
 }
 
 interface SettingsSection {
@@ -67,10 +75,63 @@ const sections: SettingsSection[] = [
         icon: IconClock,
       },
       {
+        // Arbetsytans och inte ett tillvals sedan 2026-10-17, men bara till
+        // nytta med löneunderlaget eller planeringen. Se work-hours.ts.
+        href: "/admin/installningar/arbetstider",
+        label: "Arbetstider",
+        description: "Veckoschema",
+        icon: IconTimeline,
+        anyModule: WORK_HOURS_MODULES,
+      },
+      {
         href: "/admin/installningar/prenumeration",
         label: "Prenumeration",
         description: "Betalning och skärmar",
         icon: IconTag,
+      },
+    ],
+  },
+  {
+    // Register som sätts upp en gång och sedan står. De låg i vänstermenyn
+    // till 2026-10-14 (issue #17), bredvid ordrarna och kunderna som ändras
+    // varje vecka.
+    label: "Stämpling",
+    pages: [
+      {
+        href: "/admin/installningar/arbetsmoment",
+        label: "Arbetsmoment",
+        description: "Moment och timkostnad",
+        icon: IconMoment,
+      },
+      {
+        href: "/admin/installningar/improduktivt",
+        label: "Improduktiv tid",
+        description: "Städning, möten, underhåll",
+        icon: IconBroom,
+      },
+      {
+        href: "/admin/installningar/skarmar",
+        label: "Stämplingsskärmar",
+        description: "Koppla och styr skärmar",
+        icon: IconDevice,
+      },
+    ],
+  },
+  {
+    label: "Planering",
+    module: "PLANNING",
+    pages: [
+      {
+        href: "/admin/installningar/planering",
+        label: "Planeringsläge",
+        description: "Stationer eller personal",
+        icon: IconTimeline,
+      },
+      {
+        href: "/admin/installningar/stationer",
+        label: "Stationer",
+        description: "Maskiner och öppettider",
+        icon: IconStation,
       },
     ],
   },
@@ -80,15 +141,27 @@ const sections: SettingsSection[] = [
     pages: [
       {
         href: "/admin/installningar/schema",
-        label: "Arbetstider",
-        description: "Schema och raster",
+        label: "Rasttyper",
+        description: "Knappar på stämplingsskärmen",
         icon: IconTimeline,
       },
       {
         href: "/admin/installningar/franvaro",
         label: "Frånvaroorsaker",
-        description: "Sjuk, semester, komp",
+        description: "Sjuk, semester, flex",
         icon: IconCalendar,
+      },
+      {
+        href: "/admin/installningar/roda-dagar",
+        label: "Röda dagar",
+        description: "Dagar utan planerad tid",
+        icon: IconCalendar,
+      },
+      {
+        href: "/admin/installningar/atf",
+        label: "Arbetstidsförkortning",
+        description: "ATF enligt kollektivavtal",
+        icon: IconReport,
       },
     ],
   },
@@ -120,9 +193,15 @@ const sections: SettingsSection[] = [
 export default function SettingsNav({ modules }: { modules: ModuleKey[] }) {
   const pathname = usePathname();
 
-  const visible = sections.filter(
-    (section) => !section.module || modules.includes(section.module)
-  );
+  const visible = sections
+    .filter((section) => !section.module || modules.includes(section.module))
+    .map((section) => ({
+      ...section,
+      pages: section.pages.filter(
+        (page) =>
+          !page.anyModule || page.anyModule.some((key) => modules.includes(key))
+      ),
+    }));
 
   return (
     <nav className="mb-6 lg:mb-0 lg:w-56 lg:shrink-0">
@@ -144,7 +223,7 @@ export default function SettingsNav({ modules }: { modules: ModuleKey[] }) {
       <div className="hidden space-y-5 lg:block">
         {visible.map((section) => (
           <div key={section.label}>
-            <p className="mb-1 px-3 text-[11px] font-semibold uppercase tracking-wider text-neutral-400">
+            <p className="mb-1 px-3 text-[11px] font-semibold uppercase tracking-wider text-neutral-500">
               {section.label}
             </p>
             <ul className="space-y-0.5">
@@ -191,7 +270,7 @@ function NavItem({
       <span className="min-w-0">
         <span className="block text-[13px] font-medium">{page.label}</span>
         {!compact && (
-          <span className="block text-xs text-neutral-400">
+          <span className="block text-xs text-neutral-500">
             {page.description}
           </span>
         )}

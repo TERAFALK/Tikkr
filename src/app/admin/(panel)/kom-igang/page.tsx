@@ -19,7 +19,10 @@ import {
 } from "@/components/ui";
 import SearchSelect from "@/components/admin/SearchSelect";
 import { customerOptions } from "@/lib/customers";
+import { checkoutHrefFor } from "@/lib/shop/cart";
 import { addEmployees, addMoments, addOrder } from "./actions";
+
+export const metadata = { title: "Kom igång · Tikkr" };
 
 export const dynamic = "force-dynamic";
 
@@ -105,7 +108,7 @@ export default async function OnboardingPage() {
               name="names"
               rows={5}
               placeholder={"Anna Andersson\nBjörn Bergqvist\nCarina Cederlund"}
-              className="block w-full rounded-md border-0 bg-white px-2.5 py-1.5 text-[13px] text-neutral-900 ring-1 ring-inset ring-neutral-400 placeholder:text-neutral-400 focus:outline-hidden focus:ring-2 focus:ring-inset focus:ring-blue-600"
+              className="block w-full rounded-md border-0 bg-white px-2.5 py-1.5 text-base sm:text-[13px] text-neutral-900 ring-1 ring-inset ring-neutral-400 placeholder:text-neutral-400 focus:outline-hidden focus:ring-2 focus:ring-inset focus:ring-blue-600"
             />
           </Field>
           <Button type="submit">Lägg till</Button>
@@ -157,7 +160,7 @@ export default async function OnboardingPage() {
               name="names"
               rows={3}
               placeholder={"Kantpressning\nBlästring"}
-              className="block w-full rounded-md border-0 bg-white px-2.5 py-1.5 text-[13px] text-neutral-900 ring-1 ring-inset ring-neutral-400 placeholder:text-neutral-400 focus:outline-hidden focus:ring-2 focus:ring-inset focus:ring-blue-600"
+              className="block w-full rounded-md border-0 bg-white px-2.5 py-1.5 text-base sm:text-[13px] text-neutral-900 ring-1 ring-inset ring-neutral-400 placeholder:text-neutral-400 focus:outline-hidden focus:ring-2 focus:ring-inset focus:ring-blue-600"
             />
           </Field>
 
@@ -168,7 +171,7 @@ export default async function OnboardingPage() {
           <ChipList
             label={`${moments.length} upplagda`}
             items={moments.map((moment) => moment.name)}
-            href="/admin/moment"
+            href="/admin/installningar/arbetsmoment"
           />
         )}
       </StepCard>
@@ -220,9 +223,21 @@ export default async function OnboardingPage() {
         done={state.steps[3].done}
         last
       >
-        <ButtonLink href="/admin/skarmar">
-          {state.steps[3].done ? "Hantera skärmar" : "Skapa skärm"}
-        </ButtonLink>
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+          <ButtonLink href="/admin/installningar/skarmar">
+            {state.steps[3].done ? "Hantera skärmar" : "Skapa skärm"}
+          </ButtonLink>
+          {/* Den som saknar en pekskärm frågar sig det här, i det här steget.
+              Se CLAUDE.md § 3.4. */}
+          {!state.steps[3].done && (
+            <Link
+              href={checkoutHrefFor("stamplingsskarm")}
+              className="text-[13px] font-medium text-link hover:underline"
+            >
+              Beställ en stämplingsskärm
+            </Link>
+          )}
+        </div>
       </StepCard>
 
       {state.ready && (
@@ -353,7 +368,7 @@ function ChipList({
 }) {
   return (
     <div className="border-t border-neutral-100 pt-4">
-      <p className="mb-2 text-xs font-medium uppercase tracking-wider text-neutral-400">
+      <p className="mb-2 text-xs font-medium uppercase tracking-wider text-neutral-500">
         {label}
       </p>
       <div className="flex flex-wrap gap-1.5">
@@ -366,14 +381,14 @@ function ChipList({
           </span>
         ))}
         {items.length > 12 && (
-          <span className="px-2 py-1 text-xs text-neutral-400">
+          <span className="px-2 py-1 text-xs text-neutral-500">
             och {items.length - 12} till
           </span>
         )}
       </div>
       <Link
         href={href}
-        className="mt-2 inline-block text-[13px] font-medium text-tick-deep"
+        className="mt-2 inline-block text-[13px] font-medium text-link"
       >
         Hantera
       </Link>

@@ -1,7 +1,8 @@
 "use client";
 
 import { useActionState, useEffect, useRef } from "react";
-import { useFormStatus } from "react-dom";
+import { useFieldError, useKeptSubmit } from "@/components/ui/useFieldError";
+import UnsavedGuard from "@/components/ui/UnsavedGuard";
 import type { CustomerState } from "@/app/admin/(panel)/kunder/actions";
 import {
   Alert,
@@ -63,6 +64,9 @@ export default function CustomerDialog({
 }) {
   const dialog = useRef<HTMLDialogElement>(null);
   const [state, submit] = useActionState<CustomerState, FormData>(action, {});
+  const form = useRef<HTMLFormElement>(null);
+  const errorId = useFieldError(form, state);
+  const { pending, onSubmit } = useKeptSubmit(submit);
 
   useEffect(() => {
     if (state.savedAt) dialog.current?.close();
@@ -80,15 +84,17 @@ export default function CustomerDialog({
 
       <dialog
         ref={dialog}
+        onClose={() => form.current?.reset()}
         className={`w-[min(40rem,calc(100vw-2rem))] ${dialogSurface}`}
       >
         <div className={`${dialogEdge} border-b border-neutral-200 px-5 py-4`}>
           <h2 className="text-sm font-semibold text-neutral-900">{title}</h2>
         </div>
 
-        <form action={submit} className="flex min-h-0 flex-1 flex-col">
+        <form ref={form} onSubmit={onSubmit} className="flex min-h-0 flex-1 flex-col">
+          <UnsavedGuard form={form} dialog={dialog} saved={state.savedAt} />
           <div className={`${dialogBody} space-y-5 px-5 py-5`}>
-            {state.error && <Alert>{state.error}</Alert>}
+            {state.error && <Alert id={errorId}>{state.error}</Alert>}
 
             {customer && <input type="hidden" name="id" value={customer.id} />}
 
@@ -238,7 +244,7 @@ export default function CustomerDialog({
             >
               Avbryt
             </Button>
-            <SubmitButton label={submitLabel} />
+            <SubmitButton label={submitLabel} pending={pending} />
           </div>
         </form>
       </dialog>
@@ -246,9 +252,7 @@ export default function CustomerDialog({
   );
 }
 
-function SubmitButton({ label }: { label: string }) {
-  const { pending } = useFormStatus();
-
+function SubmitButton({ label, pending }: { label: string; pending: boolean }) {
   return (
     <Button type="submit" disabled={pending}>
       {pending ? "Sparar…" : label}

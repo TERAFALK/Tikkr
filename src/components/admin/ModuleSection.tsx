@@ -88,7 +88,7 @@ export default function ModuleSection({
                 fått, och samma sak ska se likadan ut på hela sidan. */}
             <span className="flex items-baseline gap-2 text-[13px] tabular-nums">
               {module.listAmount !== module.amount && (
-                <span className="text-neutral-400 line-through">
+                <span className="text-neutral-500 line-through">
                   {kr(module.listAmount)} kr
                 </span>
               )}
@@ -103,7 +103,7 @@ export default function ModuleSection({
             </span>
 
             {managed ? (
-              <span className="text-xs text-neutral-400">
+              <span className="text-xs text-neutral-500">
                 {module.enabled ? "Ingår" : "Ingår inte"}
               </span>
             ) : module.enabled || module.forSale || !hasSubscription ? (
@@ -117,7 +117,7 @@ export default function ModuleSection({
                 <ToggleButton on={!module.enabled} />
               </form>
             ) : (
-              <span className="text-xs text-neutral-400">
+              <span className="text-xs text-neutral-500">
                 {module.soldMonthly && interval === "year"
                   ? "Endast månadsbetalning"
                   : "Kan inte köpas än"}

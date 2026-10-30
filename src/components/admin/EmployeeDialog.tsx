@@ -1,7 +1,6 @@
 "use client";
 
 import { useActionState, useEffect, useRef, useState } from "react";
-import { useFormStatus } from "react-dom";
 import type { EmployeeState } from "@/app/admin/(panel)/anstallda/actions";
 import {
   Alert,
@@ -11,8 +10,11 @@ import {
   dialogSurface,
   Field,
   Input,
+  Select,
 } from "@/components/ui";
 import EmployeeAvatar from "@/components/ui/EmployeeAvatar";
+import { useFieldError, useKeptSubmit } from "@/components/ui/useFieldError";
+import UnsavedGuard from "@/components/ui/UnsavedGuard";
 import ScheduleDays, {
   type ScheduleDayValue,
 } from "@/components/admin/ScheduleDays";
@@ -46,6 +48,8 @@ export default function EmployeeDialog({
   employee,
   scheduleDays,
   payroll = false,
+  workHours = payroll,
+  atfForms,
 }: {
   trigger: string;
   triggerTone?: "primary" | "secondary" | "ghost";
@@ -65,8 +69,12 @@ export default function EmployeeDialog({
     hasPhoto: boolean;
     /** true när en kod för flexsaldot redan är satt. Koden går inte att läsa. */
     hasFlexCode: boolean;
-    /** Timanställd: inget schema, inget flexsaldo, ingen komptid. */
+    /** Timanställd: inget schema och inget flexsaldo. */
     hourly: boolean;
+    /** Dagen flexen räknas från, "ÅÅÅÅ-MM-DD". Tomt är första stämplingen. */
+    startDate: string | null;
+    /** Arbetstidsformen för ATF. Tomt är avtalets förval. */
+    atfWorkForm: string | null;
   };
   /**
    * Personens egna arbetstider, eller null när hen går på företagets schema.
@@ -77,14 +85,31 @@ export default function EmployeeDialog({
   /**
    * true när företaget har löneunderlaget.
    *
-   * Styr BÅDA de lönerelaterade fälten i rutan: koden för flexsaldot och de
-   * egna arbetstiderna. Utan modulen finns ingetdera, och serveråtgärden
-   * frågar själv om modulen innan den skriver något av dem.
+   * Styr de lönerelaterade fälten i rutan: koden för flexsaldot, krysset
+   * Timanställd, startdatumet och arbetstidsformen. Utan modulen finns inget
+   * av dem, och serveråtgärden frågar själv om modulen innan den skriver.
    */
   payroll?: boolean;
+  /**
+   * true när företaget har ett tillval som använder arbetstiderna:
+   * löneunderlaget eller planeringen (ändrat 2026-10-17). Styr de egna
+   * arbetstiderna, som båda läser. Se work-hours.ts.
+   */
+  workHours?: boolean;
+  /**
+   * Arbetstidsformerna i företagets kollektivavtal för ATF. Utelämnad när
+   * inget avtal är valt, och då visas inget val.
+   */
+  atfForms?: {
+    defaultForm: string;
+    forms: { key: string; label: string }[];
+  };
 }) {
   const dialog = useRef<HTMLDialogElement>(null);
   const [state, submit] = useActionState<EmployeeState, FormData>(action, {});
+  const form = useRef<HTMLFormElement>(null);
+  const errorId = useFieldError(form, state);
+  const { pending, onSubmit } = useKeptSubmit(submit);
   const [preview, setPreview] = useState<string | null>(null);
   const [removePhoto, setRemovePhoto] = useState(false);
   const [ownHours, setOwnHours] = useState(Boolean(scheduleDays?.length));
@@ -122,6 +147,7 @@ export default function EmployeeDialog({
           varandra, och de ska inte behöva radbrytas. */}
       <dialog
         ref={dialog}
+        onClose={() => form.current?.reset()}
         className={`w-[min(42rem,calc(100vw-2rem))] ${dialogSurface}`}
       >
         <div className={`${dialogEdge} border-b border-neutral-200 px-5 py-4`}>
@@ -133,9 +159,10 @@ export default function EmployeeDialog({
           )}
         </div>
 
-        <form action={submit} className="flex min-h-0 flex-1 flex-col">
+        <form ref={form} onSubmit={onSubmit} className="flex min-h-0 flex-1 flex-col">
+          <UnsavedGuard form={form} dialog={dialog} saved={state.savedAt} />
           <div className={`${dialogBody} space-y-4 px-5 py-5`}>
-            {state.error && <Alert>{state.error}</Alert>}
+            {state.error && <Alert id={errorId}>{state.error}</Alert>}
 
             {employee && (
               <input type="hidden" name="id" value={employee.id} />
@@ -277,8 +304,8 @@ export default function EmployeeDialog({
                 att tiderna ändå gäller.
 
                 Den enda förklaringen i rutan som behövs, eftersom följden
-                inte går att se på skärmen: flexsaldot och komptiden försvinner
-                för personen. */}
+                inte går att se på skärmen: flexsaldot försvinner för
+                personen. */}
             {payroll && (
               <div className="border-t border-neutral-200 pt-4">
                 <label className="flex cursor-pointer items-start gap-2 text-[13px]">
@@ -294,14 +321,51 @@ export default function EmployeeDialog({
                       Timanställd
                     </span>
                     <span className="block text-neutral-500">
-                      Inget schema, inget flexsaldo och ingen komptid
+                      Inget schema och inget flexsaldo
                     </span>
                   </span>
                 </label>
               </div>
             )}
 
+            {/* STARTDATUMET. Bara för den som har flex: en timanställd har
+                inget saldo som kan börja någonstans. Utan fältet i formuläret
+                rör servern inte datumet. */}
             {payroll && !hourly && (
+              <div className="border-t border-neutral-200 pt-4">
+                <Field
+                  label="Startdatum"
+                  hint="Flexen räknas från denna dag. Tomt betyder första stämplingen"
+                >
+                  <Input
+                    type="date"
+                    name="startDate"
+                    defaultValue={employee?.startDate ?? ""}
+                  />
+                </Field>
+              </div>
+            )}
+
+            {/* ARBETSTIDSFORMEN FÖR ATF. Även för en timanställd: ATF tjänas
+                in på arbetad tid, inte mot ett schema. */}
+            {payroll && atfForms && (
+              <div className="border-t border-neutral-200 pt-4">
+                <Field label="Arbetstidsform för ATF">
+                  <Select
+                    name="atfWorkForm"
+                    defaultValue={employee?.atfWorkForm ?? atfForms.defaultForm}
+                  >
+                    {atfForms.forms.map((form) => (
+                      <option key={form.key} value={form.key}>
+                        {form.label}
+                      </option>
+                    ))}
+                  </Select>
+                </Field>
+              </div>
+            )}
+
+            {workHours && !hourly && (
               <div className="border-t border-neutral-200 pt-4">
                 <label className="flex cursor-pointer items-start gap-2 text-[13px]">
                   <input
@@ -339,7 +403,7 @@ export default function EmployeeDialog({
             >
               Avbryt
             </Button>
-            <SubmitButton label={submitLabel} />
+            <SubmitButton label={submitLabel} pending={pending} />
           </div>
         </form>
       </dialog>
@@ -347,9 +411,7 @@ export default function EmployeeDialog({
   );
 }
 
-function SubmitButton({ label }: { label: string }) {
-  const { pending } = useFormStatus();
-
+function SubmitButton({ label, pending }: { label: string; pending: boolean }) {
   return (
     <Button type="submit" disabled={pending}>
       {pending ? "Sparar…" : label}

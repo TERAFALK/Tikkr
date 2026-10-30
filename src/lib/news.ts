@@ -8,7 +8,7 @@ import { RELEASES, type NewsItem, type Release } from "./release-notes";
  *
  * 1. **Bara installerade versioner.** Kör produktionen v1.2.0 visas ingen post
  *    för v1.3.0, även om texten redan ligger i koden. Det händer när en
- *    rättelse taggas på en `main` där nästa versions nyheter redan slagits
+ *    rättelse taggas på en `prod` där nästa versions nyheter redan slagits
  *    ihop. I labbet och lokalt, där versionen inte är en tagg, visas allt:
  *    där ska texten provläsas.
  * 2. **Bara kundens tillval.** En punkt om löneunderlaget visas inte för den
@@ -64,6 +64,16 @@ function itemsFor(items: NewsItem[] | undefined, modules: ModuleKey[]): string[]
   });
 }
 
+/** En post som bara är en mening, utan punkter som kan falla bort. */
+function isTextOnly(release: Release): boolean {
+  return (
+    Boolean(release.summary) &&
+    !release.added?.length &&
+    !release.improved?.length &&
+    !release.fixed?.length
+  );
+}
+
 /**
  * Releaserna kunden ska se, nyast först.
  *
@@ -79,6 +89,14 @@ export function visibleReleases(
     : releases;
 
   return installed
+    .filter(
+      (release) =>
+        isTextOnly(release) ||
+        itemsFor(release.added, modules).length +
+          itemsFor(release.improved, modules).length +
+          itemsFor(release.fixed, modules).length >
+          0
+    )
     .map((release) => ({
       version: release.version,
       date: release.date,
@@ -87,11 +105,7 @@ export function visibleReleases(
       added: itemsFor(release.added, modules),
       improved: itemsFor(release.improved, modules),
       fixed: itemsFor(release.fixed, modules),
-    }))
-    .filter(
-      (release) =>
-        release.added.length + release.improved.length + release.fixed.length > 0
-    );
+    }));
 }
 
 /**
