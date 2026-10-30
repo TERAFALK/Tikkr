@@ -3,21 +3,35 @@
 import { revalidatePath } from "next/cache";
 import { assertWritable, requireAdmin } from "@/lib/admin-session";
 import { parseOre } from "@/lib/money";
+import { isUniqueViolation } from "@/lib/save-state";
+import type { DialogState } from "@/components/ui/ActionDialog";
 
 const PATH = "/admin/installningar/arbetsmoment";
 
-export async function createMoment(formData: FormData) {
+const DUPLICATE = "Det finns redan ett arbetsmoment med det namnet.";
+
+export async function createMoment(
+  _previous: DialogState,
+  formData: FormData
+): Promise<DialogState> {
   const session = await requireAdmin();
   await assertWritable(session);
   const { db, companyId } = session;
 
   const name = String(formData.get("name") ?? "").trim();
-  if (!name) return;
+  if (!name) return { error: "Ange ett namn." };
 
-  await db.workMoment.create({
-    data: { companyId, name, costRateOre: parseOre(formData.get("costRate")) },
-  });
+  try {
+    await db.workMoment.create({
+      data: { companyId, name, costRateOre: parseOre(formData.get("costRate")) },
+    });
+  } catch (error) {
+    if (isUniqueViolation(error)) return { error: DUPLICATE };
+    throw error;
+  }
+
   revalidatePath(PATH);
+  return { ok: "Arbetsmomentet är tillagt." };
 }
 
 /**
@@ -28,20 +42,30 @@ export async function createMoment(formData: FormData) {
  * ändrat en kalkyl som redan fakturerats. Se TimeEntry.momentCostRateOre i
  * schemat.
  */
-export async function renameMoment(formData: FormData) {
+export async function renameMoment(
+  _previous: DialogState,
+  formData: FormData
+): Promise<DialogState> {
   const session = await requireAdmin();
   await assertWritable(session);
   const { db } = session;
 
   const id = String(formData.get("id") ?? "");
   const name = String(formData.get("name") ?? "").trim();
-  if (!id || !name) return;
+  if (!id || !name) return { error: "Ange ett namn." };
 
-  await db.workMoment.update({
-    where: { id },
-    data: { name, costRateOre: parseOre(formData.get("costRate")) },
-  });
+  try {
+    await db.workMoment.update({
+      where: { id },
+      data: { name, costRateOre: parseOre(formData.get("costRate")) },
+    });
+  } catch (error) {
+    if (isUniqueViolation(error)) return { error: DUPLICATE };
+    throw error;
+  }
+
   revalidatePath(PATH);
+  return { ok: "Arbetsmomentet är ändrat." };
 }
 
 export async function toggleMoment(formData: FormData) {

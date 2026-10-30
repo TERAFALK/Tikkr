@@ -1,5 +1,5 @@
 import { requireAdmin } from "@/lib/admin-session";
-import FormDialog from "@/components/admin/FormDialog";
+import ActionDialog from "@/components/ui/ActionDialog";
 import {
   Badge,
   Button,
@@ -37,10 +37,12 @@ export default async function MomentsPage() {
   });
 
   const newMoment = (
-    <FormDialog
+    <ActionDialog
       trigger="Nytt arbetsmoment"
+      triggerTone="primary"
       title="Lägg till arbetsmoment"
       action={createMoment}
+      initial={{}}
       submitLabel="Lägg till"
     >
       <Field label="Namn">
@@ -49,7 +51,7 @@ export default async function MomentsPage() {
       <Field label="Timkostnad" hint={COST_HINT}>
         <Input name="costRate" inputMode="decimal" placeholder="180" />
       </Field>
-    </FormDialog>
+    </ActionDialog>
   );
 
   // Ett kort och ingen egen sidrubrik, som de andra sidorna under
@@ -101,11 +103,12 @@ export default async function MomentsPage() {
                   </Td>
                   <Td>
                     <div className="flex justify-end gap-2">
-                      <FormDialog
+                      <ActionDialog
                         trigger="Ändra"
                         triggerTone="ghost"
                         title="Ändra arbetsmoment"
                         action={renameMoment}
+                        initial={{}}
                         submitLabel="Spara"
                       >
                         <input type="hidden" name="id" value={moment.id} />
@@ -132,7 +135,7 @@ export default async function MomentsPage() {
                             }
                           />
                         </Field>
-                      </FormDialog>
+                      </ActionDialog>
 
                       <form action={toggleMoment}>
                         <input type="hidden" name="id" value={moment.id} />

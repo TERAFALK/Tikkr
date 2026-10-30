@@ -28,7 +28,7 @@ interface Option {
 /**
  * Lägger in en stämpling som saknas.
  *
- * Egen komponent istället för den generella FormDialog, eftersom den här rutan
+ * Egen komponent istället för den generella ActionDialog, eftersom den här rutan
  * måste stanna öppen när servern avvisar. Krockar tiden med ett annat pass är
  * det något administratören behöver läsa och rätta — stängdes rutan skulle
  * felet försvinna tillsammans med de ifyllda värdena.

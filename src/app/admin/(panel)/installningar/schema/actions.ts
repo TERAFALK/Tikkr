@@ -3,6 +3,8 @@
 import { revalidatePath } from "next/cache";
 import { assertWritable, requireAdmin } from "@/lib/admin-session";
 import { requireModule } from "@/lib/company-modules";
+import { isUniqueViolation } from "@/lib/save-state";
+import type { DialogState } from "@/components/ui/ActionDialog";
 
 /**
  * RASTTYPERNA för stämplingsskärmen, som Frukost och Lunch. Löneunderlagets.
@@ -16,22 +18,33 @@ const PATH = "/admin/installningar/schema";
 
 /* --- Rasttyper ----------------------------------------------------------- */
 
-export async function createBreakType(formData: FormData) {
+export async function createBreakType(
+  _previous: DialogState,
+  formData: FormData
+): Promise<DialogState> {
   const session = await requireAdmin();
   await assertWritable(session);
   await requireModule(session, "PAYROLL");
   const { db, companyId } = session;
 
   const name = String(formData.get("name") ?? "").trim();
-  if (!name) return;
+  if (!name) return { error: "Ange ett namn." };
 
   const count = await db.breakType.count();
 
-  await db.breakType.create({
-    data: { companyId, name, sortOrder: count },
-  });
+  try {
+    await db.breakType.create({
+      data: { companyId, name, sortOrder: count },
+    });
+  } catch (error) {
+    if (isUniqueViolation(error)) {
+      return { error: "Det finns redan en rast med det namnet." };
+    }
+    throw error;
+  }
 
   revalidatePath(PATH);
+  return { ok: "Rasten är tillagd." };
 }
 
 export async function toggleBreakType(formData: FormData) {
