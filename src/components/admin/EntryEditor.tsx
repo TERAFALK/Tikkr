@@ -90,7 +90,7 @@ export function EditEntryButton({ entry }: { entry: EditableEntry }) {
   const open = useContext(OpenEditor);
 
   return (
-    <Button type="button" tone="ghost" onClick={() => open(entry)}>
+    <Button type="button" tone="secondary" onClick={() => open(entry)}>
       Ändra
     </Button>
   );

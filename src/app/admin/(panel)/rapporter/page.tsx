@@ -20,6 +20,7 @@ import {
   PageHeader,
   Select,
   Input,
+  SectionTitle,
   Stat,
   Table,
   Td,
@@ -30,7 +31,7 @@ import { formatDateTime, formatDuration } from "@/lib/format";
 import { datePresets } from "@/lib/date-presets";
 import { weekStep } from "@/lib/week-nav";
 import WeekStepper from "@/components/admin/WeekStepper";
-import Pager, { PerPageField } from "@/components/platform/Pager";
+import Pager, { PerPageField } from "@/components/ui/Pager";
 import {
   listPaging,
   pageGroups,
@@ -381,7 +382,7 @@ export default async function ReportsPage({
                               vad den tiden gick till. */}
                           <Link
                             href={`/admin/kunder/${group.key}`}
-                            className="font-medium text-tick-deep hover:underline"
+                            className="font-medium text-link hover:underline"
                           >
                             {group.label}
                           </Link>
@@ -415,7 +416,7 @@ export default async function ReportsPage({
                       <Td>
                         <span className="font-medium">{group.label}</span>
                         {group.sublabel && (
-                          <span className="ml-2 text-neutral-400">
+                          <span className="ml-2 text-neutral-500">
                             {group.sublabel}
                           </span>
                         )}
@@ -528,16 +529,14 @@ export default async function ReportsPage({
 function Summary({ title, groups }: { title: string; groups: ReportGroup[] }) {
   return (
     <Card className="p-5">
-      <h3 className="mb-3 text-sm font-semibold uppercase tracking-wide text-neutral-500">
-        {title}
-      </h3>
-      <ul className="space-y-2">
+      <SectionTitle>{title}</SectionTitle>
+      <ul className="space-y-2 text-[13px]">
         {groups.slice(0, 8).map((group) => (
           <li key={group.key} className="flex items-baseline justify-between gap-4">
             <span className="min-w-0 truncate">
               {group.label}
               {group.sublabel && (
-                <span className="ml-2 text-sm text-neutral-500">
+                <span className="ml-2 text-neutral-500">
                   {group.sublabel}
                 </span>
               )}
@@ -548,7 +547,7 @@ function Summary({ title, groups }: { title: string; groups: ReportGroup[] }) {
           </li>
         ))}
         {groups.length > 8 && (
-          <li className="pt-1 text-sm text-neutral-500">
+          <li className="pt-1 text-neutral-500">
             och {groups.length - 8} till. Samtliga finns i Excel-exporten
           </li>
         )}
@@ -579,7 +578,7 @@ function EntryRow({
         <Td>
           {row.employeeName}
           {row.employeeNumber && (
-            <span className="ml-2 text-neutral-400">{row.employeeNumber}</span>
+            <span className="ml-2 text-neutral-500">{row.employeeNumber}</span>
           )}
         </Td>
       )}

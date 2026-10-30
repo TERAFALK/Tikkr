@@ -1,9 +1,10 @@
 "use client";
 
-import { useActionState, type ReactNode } from "react";
+import { useActionState, useRef, type ReactNode } from "react";
 import { useFormStatus } from "react-dom";
 import { Alert, Button } from "@/components/ui";
 import type { SaveState } from "@/lib/save-state";
+import { useFieldError, useKeptSubmit } from "@/components/ui/useFieldError";
 
 /**
  * ETT FORMULÄR SOM SÄGER ATT DET SPARADE.
@@ -38,10 +39,13 @@ export default function SaveForm({
   className?: string;
 }) {
   const [state, submit] = useActionState<SaveState, FormData>(action, {});
+  const form = useRef<HTMLFormElement>(null);
+  const errorId = useFieldError(form, state);
+  const { pending, onSubmit } = useKeptSubmit(submit);
 
   return (
-    <form action={submit} className={className}>
-      {state.error && <Alert>{state.error}</Alert>}
+    <form ref={form} onSubmit={onSubmit} className={className}>
+      {state.error && <Alert id={errorId}>{state.error}</Alert>}
 
       {children}
 
@@ -50,9 +54,14 @@ export default function SaveForm({
           tone={tone}
           label={submitLabel}
           pendingLabel={pendingLabel}
+          pending={pending}
         />
 
-        {state.savedAt && <SavedNote>{state.ok ?? savedLabel}</SavedNote>}
+        {/* Döljs medan formuläret skickas. Annars står samma text kvar, och det
+            går inte att se att en andra sparning tog. */}
+        {state.savedAt && !pending && (
+          <SavedNote>{state.ok ?? savedLabel}</SavedNote>
+        )}
       </div>
     </form>
   );
@@ -62,13 +71,13 @@ function SubmitButton({
   tone,
   label,
   pendingLabel,
+  pending,
 }: {
   tone: "primary" | "secondary" | "danger";
   label: string;
   pendingLabel: string;
+  pending: boolean;
 }) {
-  const { pending } = useFormStatus();
-
   return (
     <Button type="submit" tone={tone} disabled={pending}>
       {pending ? pendingLabel : label}

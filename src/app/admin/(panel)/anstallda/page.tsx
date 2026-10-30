@@ -7,7 +7,7 @@ import { findAgreement } from "@/lib/collective-agreements";
 import { listPaging } from "@/lib/paging";
 import EmployeeDialog from "@/components/admin/EmployeeDialog";
 import SearchForm from "@/components/admin/SearchForm";
-import Pager from "@/components/platform/Pager";
+import Pager from "@/components/ui/Pager";
 import EmployeeAvatar from "@/components/ui/EmployeeAvatar";
 import type { ScheduleDayValue } from "@/components/admin/ScheduleDays";
 import {
@@ -236,7 +236,7 @@ export default async function EmployeesPage({
                       <div className="flex justify-end gap-2">
                         <EmployeeDialog
                           trigger="Ändra"
-                          triggerTone="ghost"
+                          triggerTone="secondary"
                           title="Ändra anställd"
                           action={updateEmployee}
                           submitLabel="Spara"
@@ -266,7 +266,7 @@ export default async function EmployeesPage({
                             name="active"
                             value={String(employee.active)}
                           />
-                          <Button type="submit" tone="secondary">
+                          <Button type="submit" tone="ghost">
                             {employee.active ? "Avaktivera" : "Återaktivera"}
                           </Button>
                         </form>

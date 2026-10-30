@@ -21,6 +21,7 @@ import { ExportGroup, ExportLink } from "./ExportButtons";
 import OrderFields from "./OrderFields";
 import PrintButton from "./PrintButton";
 import AskDialog from "@/components/ui/AskDialog";
+import { useFieldError, useKeptSubmit } from "@/components/ui/useFieldError";
 import type { OrderBudgetRow } from "@/lib/orders";
 import type { SearchSelectOption } from "./SearchSelect";
 
@@ -105,6 +106,10 @@ export default function OrderActions({
   useEffect(() => {
     if (editState.savedAt) edit.current?.close();
   }, [editState.savedAt]);
+
+  const editForm = useRef<HTMLFormElement>(null);
+  const editErrorId = useFieldError(editForm, editState);
+  const { pending: saving, onSubmit: saveEdit } = useKeptSubmit(submitEdit);
 
   const blockers = toggleState.blockers ?? [];
 
@@ -231,6 +236,7 @@ export default function OrderActions({
       {/* Ändra uppgifter */}
       <dialog
         ref={edit}
+        onClose={() => editForm.current?.reset()}
         className={`w-[min(40rem,calc(100vw-2rem))] ${dialogSurface}`}
       >
         <div className={`${dialogEdge} border-b border-neutral-200 px-5 py-4`}>
@@ -239,9 +245,9 @@ export default function OrderActions({
           </h2>
         </div>
 
-        <form action={submitEdit} className="flex min-h-0 flex-1 flex-col">
+        <form ref={editForm} onSubmit={saveEdit} className="flex min-h-0 flex-1 flex-col">
           <div className={`${dialogBody} space-y-4 px-5 py-5`}>
-            {editState.error && <Alert>{editState.error}</Alert>}
+            {editState.error && <Alert id={editErrorId}>{editState.error}</Alert>}
             <input type="hidden" name="id" value={order.id} />
             <OrderFields
               customers={customers}
@@ -271,7 +277,7 @@ export default function OrderActions({
             >
               Avbryt
             </Button>
-            <SaveOrderButton />
+            <SaveOrderButton pending={saving} />
           </div>
         </form>
       </dialog>
@@ -364,9 +370,7 @@ function ToggleOrderButton({ isOpen }: { isOpen: boolean }) {
   );
 }
 
-function SaveOrderButton() {
-  const { pending } = useFormStatus();
-
+function SaveOrderButton({ pending }: { pending: boolean }) {
   return (
     <Button type="submit" disabled={pending}>
       {pending ? "Sparar…" : "Spara"}

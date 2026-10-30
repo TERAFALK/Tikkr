@@ -32,7 +32,7 @@ import { datePresets } from "@/lib/date-presets";
 import { weekStep } from "@/lib/week-nav";
 import WeekStepper from "@/components/admin/WeekStepper";
 import ConfirmButton from "@/components/admin/ConfirmButton";
-import Pager, { PerPageField } from "@/components/platform/Pager";
+import Pager, { PerPageField } from "@/components/ui/Pager";
 import { listPaging, presetHref } from "@/lib/paging";
 import { deleteEntry } from "./actions";
 
@@ -367,7 +367,7 @@ export default async function EntriesPage({
                     <Td muted>
                       {describeEntry(entry).text}
                       {entry.order?.customer && (
-                        <span className="mt-0.5 block text-xs text-neutral-400">
+                        <span className="mt-0.5 block text-xs text-neutral-500">
                           {entry.order.customer.name}
                         </span>
                       )}
@@ -394,7 +394,7 @@ export default async function EntriesPage({
                           sluttid på ett jobb som fortfarande pågår skulle
                           stänga det bakom ryggen på den som står vid skärmen. */}
                       {ongoing ? (
-                        <span className="block text-right text-xs text-neutral-400">
+                        <span className="block text-right text-xs text-neutral-500">
                           Ändras när den avslutats
                         </span>
                       ) : (
@@ -405,7 +405,7 @@ export default async function EntriesPage({
                           {withHistory.has(entry.id) && (
                             <Link
                               href={`/admin/installningar/logg?post=${entry.id}`}
-                              className="px-2 text-[13px] font-medium text-tick-deep hover:underline"
+                              className="px-2 text-[13px] font-medium text-link hover:underline"
                             >
                               Historik
                             </Link>

@@ -72,7 +72,7 @@ export default function FeedbackButton({
               href="/support"
               target="_blank"
               rel="noopener"
-              className="font-medium text-tick-deep hover:underline"
+              className="font-medium text-link hover:underline"
             >
               supporten
             </a>

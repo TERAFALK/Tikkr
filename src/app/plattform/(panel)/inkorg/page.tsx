@@ -9,7 +9,7 @@ import {
   listInbox,
 } from "@/lib/feedback";
 import { PER_PAGE } from "@/lib/paging";
-import Pager from "@/components/platform/Pager";
+import Pager from "@/components/ui/Pager";
 import ActionDialog from "@/components/ui/ActionDialog";
 import { Card, EmptyState, Field, PageHeader, Textarea } from "@/components/ui";
 import { formatDateTime } from "@/lib/format";
@@ -110,7 +110,7 @@ export default async function InboxPage({
           Bara {company.name} ·{" "}
           <Link
             href={hrefWith({ kund: null })}
-            className="font-medium text-tick-deep hover:underline"
+            className="font-medium text-link hover:underline"
           >
             Visa alla kunder
           </Link>
@@ -136,7 +136,7 @@ export default async function InboxPage({
                 <p className="mt-1 text-[13px] text-neutral-500">
                   <Link
                     href={`/plattform/kunder/${message.company.id}`}
-                    className="font-medium text-tick-deep hover:underline"
+                    className="font-medium text-link hover:underline"
                   >
                     {message.company.name}
                   </Link>{" "}

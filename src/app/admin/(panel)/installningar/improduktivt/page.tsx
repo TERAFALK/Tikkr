@@ -112,7 +112,7 @@ export default async function IndirectMomentsPage() {
                     <div className="flex justify-end gap-2">
                       <ActionDialog
                         trigger="Ändra"
-                        triggerTone="ghost"
+                        triggerTone="secondary"
                         title="Ändra improduktivt moment"
                         action={renameIndirectMoment}
                         initial={{}}
@@ -136,7 +136,7 @@ export default async function IndirectMomentsPage() {
                           name="active"
                           value={String(moment.active)}
                         />
-                        <Button type="submit" tone="secondary">
+                        <Button type="submit" tone="ghost">
                           {moment.active ? "Avaktivera" : "Återaktivera"}
                         </Button>
                       </form>

@@ -88,7 +88,7 @@ export default async function DevicesPage() {
       {devices.length > licenses.total ? (
         <Alert tone="warning">
           {devices.length} skärmar är upplagda men ni har {licenses.total}{" "}
-          {licenses.total === 1 ? "licens" : "licenser"}. Radera{" "}
+          {licenses.total === 1 ? "licens" : "licenser"}. Ta bort{" "}
           {devices.length - licenses.total}{" "}
           {devices.length - licenses.total === 1 ? "skärm" : "skärmar"} nedan,
           eller utöka antalet licenser under{" "}
@@ -148,7 +148,7 @@ export default async function DevicesPage() {
                   <Tr key={device.id} dimmed={state !== "kopplad"}>
                     <Td>
                       <span className="font-medium">{device.name}</span>
-                      <span className="mt-0.5 block text-xs text-neutral-400">
+                      <span className="mt-0.5 block text-xs text-neutral-500">
                         Upplagd {formatDateTime(device.createdAt)}
                       </span>
                     </Td>
@@ -228,11 +228,11 @@ export default async function DevicesPage() {
                             tone="ghost"
                             question={
                               device._count.timeEntries > 0
-                                ? `Radera skärmen ${device.name}? De ${device._count.timeEntries} stämplingar som gjorts på den finns kvar med sin tid, men tappar noteringen om vilken skärm de kom från. Licensen frigörs.`
-                                : `Radera skärmen ${device.name}? Licensen frigörs.`
+                                ? `Ta bort skärmen ${device.name}? De ${device._count.timeEntries} stämplingar som gjorts på den finns kvar med sin tid, men tappar noteringen om vilken skärm de kom från. Licensen frigörs.`
+                                : `Ta bort skärmen ${device.name}? Licensen frigörs.`
                             }
                           >
-                            Radera
+                            Ta bort
                           </ConfirmButton>
                         </form>
                       </div>
@@ -252,7 +252,7 @@ export default async function DevicesPage() {
         Stämplingsskärm i stativ, uppsatt för Tikkr.{" "}
         <Link
           href={checkoutHrefFor("stamplingsskarm")}
-          className="font-medium text-tick-deep hover:underline"
+          className="font-medium text-link hover:underline"
         >
           Beställ i butiken
         </Link>

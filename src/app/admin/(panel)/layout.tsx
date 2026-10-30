@@ -137,6 +137,13 @@ export default async function PanelLayout({
           en sida som stått öppen "Failed to find Server Action". */}
       <ReloadOnDeploy />
 
+      <a
+        href="#innehall"
+        className="sr-only focus:not-sr-only focus:absolute focus:left-2 focus:top-2 focus:z-50 focus:rounded-md focus:bg-fjord focus:px-3 focus:py-2 focus:text-[13px] focus:font-medium focus:text-white"
+      >
+        Hoppa till innehållet
+      </a>
+
       <AdminSidebar
         companyName={session.companyName}
         email={session.email}
@@ -212,7 +219,11 @@ export default async function PanelLayout({
           </div>
         )}
 
-        <main className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
+        <main
+          id="innehall"
+          tabIndex={-1}
+          className="mx-auto max-w-7xl px-4 py-6 focus:outline-hidden sm:px-6 lg:px-8 lg:py-8"
+        >
           {/* Driftmeddelanden ligger överst och över allt annat innehåll.
               Ett pågående avbrott förklarar varför sidan under beter sig
               konstigt, och den förklaringen kommer för sent längre ned. */}

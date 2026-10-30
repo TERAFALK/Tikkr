@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { auditLog, requirePlatformAdmin } from "@/lib/platform-admin";
 import { unsafeGlobalPrisma } from "@/lib/db";
 import ActivityTable from "@/components/platform/ActivityTable";
-import Pager from "@/components/platform/Pager";
+import Pager from "@/components/ui/Pager";
 import { Card, CardHeader, EmptyState, PageHeader } from "@/components/ui";
 
 export const metadata = { title: "Historik · Tikkr" };
@@ -40,7 +40,7 @@ export default async function CompanyHistoryPage({
     <>
       <Link
         href={`/plattform/kunder/${companyId}`}
-        className="text-[13px] font-medium text-tick-deep hover:underline"
+        className="text-[13px] font-medium text-link hover:underline"
       >
         ← {company.name}
       </Link>

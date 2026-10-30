@@ -19,14 +19,14 @@ export async function createMoment(
   const { db, companyId } = session;
 
   const name = String(formData.get("name") ?? "").trim();
-  if (!name) return { error: "Ange ett namn." };
+  if (!name) return { error: "Ange ett namn.", field: "name" };
 
   try {
     await db.workMoment.create({
       data: { companyId, name, costRateOre: parseOre(formData.get("costRate")) },
     });
   } catch (error) {
-    if (isUniqueViolation(error)) return { error: DUPLICATE };
+    if (isUniqueViolation(error)) return { error: DUPLICATE, field: "name" };
     throw error;
   }
 
@@ -52,7 +52,7 @@ export async function renameMoment(
 
   const id = String(formData.get("id") ?? "");
   const name = String(formData.get("name") ?? "").trim();
-  if (!id || !name) return { error: "Ange ett namn." };
+  if (!id || !name) return { error: "Ange ett namn.", field: "name" };
 
   try {
     await db.workMoment.update({
@@ -60,7 +60,7 @@ export async function renameMoment(
       data: { name, costRateOre: parseOre(formData.get("costRate")) },
     });
   } catch (error) {
-    if (isUniqueViolation(error)) return { error: DUPLICATE };
+    if (isUniqueViolation(error)) return { error: DUPLICATE, field: "name" };
     throw error;
   }
 

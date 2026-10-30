@@ -286,7 +286,7 @@ function Stepper({ step }: { step: Step }) {
             />
             <span
               className={`mt-2 block text-[11px] font-medium uppercase tracking-wider transition-colors ${
-                here ? "text-neutral-700" : "text-neutral-400"
+                here ? "text-neutral-700" : "text-neutral-500"
               }`}
             >
               {STEPS[number]}

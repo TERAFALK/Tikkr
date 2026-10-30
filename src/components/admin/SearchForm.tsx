@@ -1,4 +1,4 @@
-import { PerPageField } from "@/components/platform/Pager";
+import { PerPageField } from "@/components/ui/Pager";
 import { Button, ButtonLink } from "@/components/ui";
 import { PER_PAGE } from "@/lib/paging";
 

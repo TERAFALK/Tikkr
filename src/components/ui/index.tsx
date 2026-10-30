@@ -30,7 +30,8 @@ import type { GuideSlug } from "@/lib/help/guides";
  * därför Fjord och inte grönt bär knapparna.
  *
  * Länkad text är det enda undantaget. Fjord ligger för nära brödtexten för att
- * en länk skulle gå att se, så inline-länkar får accentgrönt (`text-tick-deep`).
+ * en länk skulle gå att se, så inline-länkar får grönt (`text-link`, ett steg
+ * mörkare än Tick Deep för att nå 4,5:1).
  */
 
 /* -------------------------------------------------------------------------- */
@@ -118,7 +119,7 @@ export function SectionTitle({
 }) {
   return (
     <div className="mb-3">
-      <h2 className="text-[13px] font-semibold uppercase tracking-wider text-neutral-400">
+      <h2 className="text-[13px] font-semibold uppercase tracking-wider text-neutral-500">
         {children}
       </h2>
       {hint && <p className="mt-1 text-[13px] text-neutral-500">{hint}</p>}
@@ -143,7 +144,8 @@ const buttonStyles: Record<ButtonTone, string> = {
 
 const buttonBase =
   "inline-flex items-center justify-center gap-1.5 rounded-md px-3 py-1.5 " +
-  "text-[13px] font-medium transition-colors disabled:cursor-not-allowed " +
+  "text-[13px] font-medium transition-colors pointer-coarse:min-h-10 " +
+  "disabled:cursor-not-allowed " +
   "disabled:opacity-50 focus-visible:outline focus-visible:outline-2 " +
   "focus-visible:outline-offset-1 focus-visible:outline-blue-600";
 
@@ -234,8 +236,8 @@ export function Stat({
 }) {
   const valueTone = {
     neutral: "text-neutral-900",
-    active: "text-emerald-600",
-    warning: "text-amber-600",
+    active: "text-emerald-700",
+    warning: "text-amber-700",
   }[tone];
 
   const card = (
@@ -244,7 +246,7 @@ export function Stat({
         href ? "h-full transition-colors group-hover:border-neutral-400" : ""
       }`}
     >
-      <div className="flex items-center gap-2 text-neutral-400">
+      <div className="flex items-center gap-2 text-neutral-500">
         {icon}
         <p className="text-[13px] font-medium text-neutral-500">{label}</p>
       </div>
@@ -253,7 +255,7 @@ export function Stat({
       <p className={`mt-1.5 text-2xl font-semibold tabular-nums ${valueTone}`}>
         {value}
       </p>
-      {hint && <p className="mt-0.5 text-xs text-neutral-400">{hint}</p>}
+      {hint && <p className="mt-0.5 text-xs text-neutral-500">{hint}</p>}
     </Card>
   );
 
@@ -303,7 +305,8 @@ export function Stat({
 const fieldBase =
   "rounded-md border-0 bg-white px-2.5 py-1.5 text-base sm:text-[13px] " +
   "text-neutral-900 ring-1 ring-inset ring-neutral-400 " +
-  "placeholder:text-neutral-400 focus:outline-hidden focus:ring-2 focus:ring-inset focus:ring-blue-600";
+  "placeholder:text-neutral-400 focus:outline-hidden focus:ring-2 focus:ring-inset focus:ring-blue-600 " +
+  "aria-[invalid=true]:bg-red-50 aria-[invalid=true]:ring-red-400";
 
 const fieldStyles = `block w-full ${fieldBase}`;
 
@@ -442,18 +445,32 @@ export function Td({
   );
 }
 
+/**
+ * Länken i en rad som leder till en sida. Dess träffyta täcker hela raden, se
+ * `linked` på `Tr`. En knapp i samma rad behöver `relative z-10`.
+ */
+export const rowLink =
+  "font-medium text-link hover:underline after:absolute after:inset-0 after:content-['']";
+
 export function Tr({
   children,
   dimmed,
+  linked,
 }: {
   children: ReactNode;
   dimmed?: boolean;
+  /**
+   * Raden leder till en sida. Bara då ändrar den färg under pekaren: en rad som
+   * lyser upp lovar att ett klick gör något, och i en vanlig tabell gör det inte
+   * det.
+   */
+  linked?: boolean;
 }) {
   return (
     <tr
-      className={`border-b border-neutral-100 last:border-0 hover:bg-neutral-50/70 ${
-        dimmed ? "bg-neutral-50/50 text-neutral-400" : ""
-      }`}
+      className={`border-b border-neutral-100 last:border-0 ${
+        linked ? "relative hover:bg-neutral-50/70" : ""
+      } ${dimmed ? "bg-neutral-50/50 text-neutral-500" : ""}`}
     >
       {children}
     </tr>
@@ -477,7 +494,7 @@ export function Badge({
     neutral: "bg-neutral-100 text-neutral-600 ring-neutral-200",
     active: "bg-emerald-50 text-emerald-700 ring-emerald-200",
     warning: "bg-amber-50 text-amber-700 ring-amber-200",
-    muted: "bg-neutral-50 text-neutral-400 ring-neutral-200",
+    muted: "bg-neutral-50 text-neutral-500 ring-neutral-200",
   };
 
   return (
@@ -520,9 +537,12 @@ export function EmptyState({
 
 export function Alert({
   tone = "error",
+  id,
   children,
 }: {
   tone?: "error" | "info" | "warning";
+  /** För ett fält som pekar på felet, se useFieldError. */
+  id?: string;
   children: ReactNode;
 }) {
   const tones = {
@@ -533,6 +553,8 @@ export function Alert({
 
   return (
     <div
+      id={id}
+      role={tone === "error" ? "alert" : undefined}
       className={`rounded-md border px-3 py-2.5 text-[13px] leading-relaxed ${tones[tone]}`}
     >
       {children}

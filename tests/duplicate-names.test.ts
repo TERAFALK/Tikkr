@@ -75,6 +75,7 @@ describe("arbetsmoment", () => {
     const second = await createMoment({}, form({ name: "Svetsning" }));
 
     expect(second.error).toContain("redan");
+    expect(second.field).toBe("name");
     expect(second.ok).toBeUndefined();
   });
 

@@ -141,7 +141,7 @@ function OrderItem({ order, open }: { order: CustomerOrder; open: boolean }) {
                       href={order.trackingUrl}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="text-tick-deep underline-offset-2 hover:underline"
+                      className="text-link underline-offset-2 hover:underline"
                     >
                       Följ leveransen
                     </a>

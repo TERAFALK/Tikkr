@@ -85,7 +85,7 @@ export default async function ShopOrderPage({
         action={
           <Link
             href={`/plattform/kunder/${order.companyId}`}
-            className="text-[13px] font-medium text-tick-deep hover:underline"
+            className="text-[13px] font-medium text-link hover:underline"
           >
             Till kunden
           </Link>
@@ -244,7 +244,7 @@ export default async function ShopOrderPage({
                       href={order.trackingUrl}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="font-medium text-tick-deep hover:underline"
+                      className="font-medium text-link hover:underline"
                     >
                       Öppna
                     </a>
@@ -415,7 +415,7 @@ function Customer({ order }: { order: ShopOrderDetail }) {
         <Row
           label="E-post"
           value={
-            <a href={`mailto:${order.email}`} className="text-tick-deep hover:underline">
+            <a href={`mailto:${order.email}`} className="text-link hover:underline">
               {order.email}
             </a>
           }

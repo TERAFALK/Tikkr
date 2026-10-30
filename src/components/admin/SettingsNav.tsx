@@ -223,7 +223,7 @@ export default function SettingsNav({ modules }: { modules: ModuleKey[] }) {
       <div className="hidden space-y-5 lg:block">
         {visible.map((section) => (
           <div key={section.label}>
-            <p className="mb-1 px-3 text-[11px] font-semibold uppercase tracking-wider text-neutral-400">
+            <p className="mb-1 px-3 text-[11px] font-semibold uppercase tracking-wider text-neutral-500">
               {section.label}
             </p>
             <ul className="space-y-0.5">
@@ -270,7 +270,7 @@ function NavItem({
       <span className="min-w-0">
         <span className="block text-[13px] font-medium">{page.label}</span>
         {!compact && (
-          <span className="block text-xs text-neutral-400">
+          <span className="block text-xs text-neutral-500">
             {page.description}
           </span>
         )}

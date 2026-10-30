@@ -1,7 +1,6 @@
 "use client";
 
 import { useActionState, useEffect, useRef, useState } from "react";
-import { useFormStatus } from "react-dom";
 import type { EmployeeState } from "@/app/admin/(panel)/anstallda/actions";
 import {
   Alert,
@@ -14,6 +13,7 @@ import {
   Select,
 } from "@/components/ui";
 import EmployeeAvatar from "@/components/ui/EmployeeAvatar";
+import { useFieldError, useKeptSubmit } from "@/components/ui/useFieldError";
 import ScheduleDays, {
   type ScheduleDayValue,
 } from "@/components/admin/ScheduleDays";
@@ -106,6 +106,9 @@ export default function EmployeeDialog({
 }) {
   const dialog = useRef<HTMLDialogElement>(null);
   const [state, submit] = useActionState<EmployeeState, FormData>(action, {});
+  const form = useRef<HTMLFormElement>(null);
+  const errorId = useFieldError(form, state);
+  const { pending, onSubmit } = useKeptSubmit(submit);
   const [preview, setPreview] = useState<string | null>(null);
   const [removePhoto, setRemovePhoto] = useState(false);
   const [ownHours, setOwnHours] = useState(Boolean(scheduleDays?.length));
@@ -143,6 +146,7 @@ export default function EmployeeDialog({
           varandra, och de ska inte behöva radbrytas. */}
       <dialog
         ref={dialog}
+        onClose={() => form.current?.reset()}
         className={`w-[min(42rem,calc(100vw-2rem))] ${dialogSurface}`}
       >
         <div className={`${dialogEdge} border-b border-neutral-200 px-5 py-4`}>
@@ -154,9 +158,9 @@ export default function EmployeeDialog({
           )}
         </div>
 
-        <form action={submit} className="flex min-h-0 flex-1 flex-col">
+        <form ref={form} onSubmit={onSubmit} className="flex min-h-0 flex-1 flex-col">
           <div className={`${dialogBody} space-y-4 px-5 py-5`}>
-            {state.error && <Alert>{state.error}</Alert>}
+            {state.error && <Alert id={errorId}>{state.error}</Alert>}
 
             {employee && (
               <input type="hidden" name="id" value={employee.id} />
@@ -397,7 +401,7 @@ export default function EmployeeDialog({
             >
               Avbryt
             </Button>
-            <SubmitButton label={submitLabel} />
+            <SubmitButton label={submitLabel} pending={pending} />
           </div>
         </form>
       </dialog>
@@ -405,9 +409,7 @@ export default function EmployeeDialog({
   );
 }
 
-function SubmitButton({ label }: { label: string }) {
-  const { pending } = useFormStatus();
-
+function SubmitButton({ label, pending }: { label: string; pending: boolean }) {
   return (
     <Button type="submit" disabled={pending}>
       {pending ? "Sparar…" : label}

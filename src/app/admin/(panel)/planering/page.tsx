@@ -238,7 +238,7 @@ export default async function PlanningPage({
               Personalen har inga arbetstider.{" "}
               <Link
                 href="/admin/installningar/arbetstider"
-                className="font-medium text-tick-deep hover:underline"
+                className="font-medium text-link hover:underline"
               >
                 Lägg in arbetstider
               </Link>

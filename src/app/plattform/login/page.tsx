@@ -44,7 +44,7 @@ export default async function PlatformLoginPage() {
           Är du kund?{" "}
           <Link
             href="/admin/login"
-            className="font-medium text-tick-deep hover:underline"
+            className="font-medium text-link hover:underline"
           >
             Logga in här
           </Link>

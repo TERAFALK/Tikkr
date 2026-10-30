@@ -73,10 +73,10 @@ export default async function AdminUsersPage() {
                     {fullName(user) ?? user.email}
                   </span>
                   {user.id === session.userId && (
-                    <span className="ml-2 text-neutral-400">(du)</span>
+                    <span className="ml-2 text-neutral-500">(du)</span>
                   )}
                   {fullName(user) && (
-                    <span className="mt-0.5 block text-xs text-neutral-400">
+                    <span className="mt-0.5 block text-xs text-neutral-500">
                       {user.email}
                     </span>
                   )}

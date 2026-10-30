@@ -1378,7 +1378,7 @@ export default function PlanBoard({
               </button>
               <span
                 className={`min-w-[8.5rem] text-center text-[13px] font-medium ${
-                  focusIndex === todayIndex ? "text-tick-deep" : "text-neutral-900"
+                  focusIndex === todayIndex ? "text-link" : "text-neutral-900"
                 }`}
               >
                 {DAY_LONG[focusIndex]} {dayLabel(days[focusIndex], timeZone)}
@@ -1468,7 +1468,7 @@ export default function PlanBoard({
             <div className="flex border-b border-neutral-200 bg-neutral-50 [&>*:nth-child(2)]:border-l-transparent">
               <div
                 style={{ width: STATION_COLUMN }}
-                className="sticky left-0 z-20 shrink-0 border-r border-neutral-200 bg-neutral-50 px-3 py-2 text-[11px] font-semibold uppercase tracking-wider text-neutral-400"
+                className="sticky left-0 z-20 shrink-0 border-r border-neutral-200 bg-neutral-50 px-3 py-2 text-[11px] font-semibold uppercase tracking-wider text-neutral-500"
               >
                 {isStaff ? "Anställd" : "Station"}
               </div>
@@ -1490,7 +1490,7 @@ export default function PlanBoard({
                       onClick={() => show(dayKeys[column.index])}
                       disabled={isDay}
                       className={`block max-w-full truncate px-2 text-left text-[13px] font-medium enabled:hover:underline ${
-                        isToday ? "text-tick-deep" : "text-neutral-900"
+                        isToday ? "text-link" : "text-neutral-900"
                       }`}
                     >
                       {column.width > 160
@@ -1498,7 +1498,7 @@ export default function PlanBoard({
                         : DAY_SHORT[column.index]}{" "}
                       <span
                         className={`font-normal ${
-                          isToday ? "text-tick-deep" : "text-neutral-400"
+                          isToday ? "text-link" : "text-neutral-500"
                         }`}
                       >
                         {dayLabel(days[column.index], timeZone)}
@@ -1554,7 +1554,7 @@ export default function PlanBoard({
                       strokeWidth={1.5}
                       markerEnd="url(#plan-arrow)"
                       className={
-                        arrow.backwards ? "text-amber-600" : "text-skiffer"
+                        arrow.backwards ? "text-amber-700" : "text-skiffer"
                       }
                       stroke="currentColor"
                       strokeDasharray={arrow.backwards ? "4 3" : undefined}
@@ -1586,7 +1586,7 @@ export default function PlanBoard({
                         {lane.name}
                       </p>
                       {lane.detail && (
-                        <p className="truncate text-[11px] text-neutral-400">
+                        <p className="truncate text-[11px] text-neutral-500">
                           {lane.detail}
                         </p>
                       )}
@@ -1747,7 +1747,7 @@ function UnplacedStrip({
         )}
 
         {armed && (
-          <span className="ml-auto truncate text-[12px] font-medium text-tick-deep">
+          <span className="ml-auto truncate text-[12px] font-medium text-link">
             Tryck på {kind === "staff" ? "en anställd" : "en station"} för att
             placera {armed.orderNumber}
           </span>
@@ -1850,7 +1850,7 @@ function Chip({
 
       <p className="truncate text-[11px] text-neutral-500">{row.momentName}</p>
 
-      <p className="truncate text-[11px] text-neutral-400">
+      <p className="truncate text-[11px] text-neutral-500">
         {blocked
           ? kind === "staff"
             ? "Ingen anställd"
@@ -2140,7 +2140,7 @@ function Axis({
       {axisLabels(axis, pxPerMinute).map((label) => (
         <span
           key={label.minute}
-          className="absolute top-0 -translate-x-1/2 text-[10px] tabular-nums text-neutral-400"
+          className="absolute top-0 -translate-x-1/2 text-[10px] tabular-nums text-neutral-500"
           style={{ left: label.x }}
         >
           {String(Math.floor(label.minute / 60)).padStart(2, "0")}
@@ -2178,7 +2178,7 @@ function Legend({
       </span>
 
       {placing && (
-        <span className="ml-auto text-neutral-400">
+        <span className="ml-auto text-neutral-500">
           {armed
             ? `Tryck på ${target}, eller Esc för att avbryta`
             : `Tryck på ett jobb i Oplacerat, sedan på ${target}`}

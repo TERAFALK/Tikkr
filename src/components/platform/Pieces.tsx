@@ -60,7 +60,7 @@ export function Section({
     <section className="mt-8 first:mt-0">
       <div className="mb-3 flex flex-wrap items-end justify-between gap-3">
         <div className="min-w-0">
-          <h2 className="text-[13px] font-semibold uppercase tracking-wider text-neutral-400">
+          <h2 className="text-[13px] font-semibold uppercase tracking-wider text-neutral-500">
             {title}
           </h2>
           {description && (

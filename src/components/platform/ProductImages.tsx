@@ -7,6 +7,7 @@ import {
   moveImageAction,
   updateImageAction,
 } from "@/app/plattform/(panel)/produkter/actions";
+import ConfirmButton from "@/components/admin/ConfirmButton";
 import { Alert, Button, Card, CardHeader, Field, Input } from "@/components/ui";
 
 export interface ImageRow {
@@ -120,16 +121,15 @@ export default function ProductImages({
                     ↓
                   </Button>
                 </form>
-                <form
-                  action={deleteImageAction}
-                  onSubmit={(event) => {
-                    if (!window.confirm("Ta bort bilden?")) event.preventDefault();
-                  }}
-                >
+                <form action={deleteImageAction}>
                   <input type="hidden" name="imageId" value={image.id} />
-                  <Button type="submit" tone="danger">
+                  <ConfirmButton
+                    type="submit"
+                    tone="danger"
+                    question="Ta bort bilden?"
+                  >
                     Ta bort
-                  </Button>
+                  </ConfirmButton>
                 </form>
               </div>
             </li>

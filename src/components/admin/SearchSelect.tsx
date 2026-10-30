@@ -87,6 +87,9 @@ export default function SearchSelect({
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState(false);
 
+  /** Raden piltangenterna står på. -1 är ingen. */
+  const [active, setActive] = useState(-1);
+
   const chosen = options.find((option) => option.id === selected) ?? null;
 
   const matches = useMemo(() => {
@@ -135,6 +138,16 @@ export default function SearchSelect({
     hidden.current?.dispatchEvent(new Event("change", { bubbles: true }));
   }, [selected]);
 
+  // Sökningen byter raderna, och då pekar positionen på något annat.
+  useEffect(() => setActive(-1), [query, open]);
+
+  useEffect(() => {
+    if (active < 0) return;
+    document
+      .getElementById(`${listId}-${active}`)
+      ?.scrollIntoView({ block: "nearest" });
+  }, [active, listId]);
+
   const pick = (id: string | null) => {
     setSelected(id);
     setQuery("");
@@ -151,7 +164,7 @@ export default function SearchSelect({
       {variant === "search" && (
         <span
           aria-hidden="true"
-          className="pointer-events-none absolute left-2.5 top-1/2 z-10 -translate-y-1/2 text-neutral-400"
+          className="pointer-events-none absolute left-2.5 top-1/2 z-10 -translate-y-1/2 text-neutral-500"
         >
           <svg
             viewBox="0 0 24 24"
@@ -175,15 +188,26 @@ export default function SearchSelect({
           role="combobox"
           aria-expanded="true"
           aria-controls={listId}
+          aria-autocomplete="list"
+          aria-activedescendant={active >= 0 ? `${listId}-${active}` : undefined}
           value={query}
           onChange={(event) => setQuery(event.target.value)}
           onKeyDown={(event) => {
             if (event.key === "Escape") setOpen(false);
+            if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+              event.preventDefault();
+              const step = event.key === "ArrowDown" ? 1 : -1;
+              setActive((current) =>
+                Math.min(matches.length - 1, Math.max(0, current + step))
+              );
+            }
             // Enter i ett sökfält inuti ett formulär skickar annars hela
             // formuläret, vilket sparar med det val som råkade vara gjort.
             if (event.key === "Enter") {
               event.preventDefault();
-              if (matches.length === 1) pick(matches[0].id);
+              const row = active >= 0 ? matches[active] : undefined;
+              if (row) pick(row.id);
+              else if (matches.length === 1) pick(matches[0].id);
             }
           }}
           placeholder={placeholder}
@@ -197,9 +221,9 @@ export default function SearchSelect({
         <button
           type="button"
           onClick={() => setOpen(true)}
-          className={`flex w-full items-center justify-between rounded-md bg-white py-1.5 pr-3 text-left text-[13px] ring-1 ring-inset ring-neutral-200 hover:bg-neutral-50 ${
+          className={`flex w-full items-center justify-between rounded-md bg-white py-1.5 pr-3 text-left text-[13px] ring-1 ring-inset ring-neutral-400 hover:bg-neutral-50 ${
             variant === "search" ? "pl-8" : "pl-3"
-          } ${chosen ? "text-neutral-900" : "text-neutral-400"}`}
+          } ${chosen ? "text-neutral-900" : "text-neutral-500"}`}
         >
           <span className="truncate">
             {chosen?.label ??
@@ -239,26 +263,30 @@ export default function SearchSelect({
           )}
 
           {matches.length === 0 ? (
-            <li className="px-3 py-2 text-[13px] text-neutral-400">
+            <li className="px-3 py-2 text-[13px] text-neutral-500">
               Ingen träff på ”{query.trim()}”.
             </li>
           ) : (
-            matches.map((option) => (
-              <li key={option.id}>
+            matches.map((option, index) => (
+              <li key={option.id} role="none">
                 <button
                   type="button"
                   role="option"
+                  id={`${listId}-${index}`}
+                  tabIndex={-1}
                   aria-selected={option.id === selected}
                   onClick={() => pick(option.id)}
                   className={`w-full px-3 py-2 text-left text-[13px] hover:bg-neutral-50 ${
+                    index === active ? "bg-neutral-100" : ""
+                  } ${
                     option.id === selected
-                      ? "font-medium text-tick-deep"
+                      ? "font-medium text-link"
                       : "text-neutral-900"
                   }`}
                 >
                   {option.label}
                   {option.hint && (
-                    <span className="ml-2 text-neutral-400">{option.hint}</span>
+                    <span className="ml-2 text-neutral-500">{option.hint}</span>
                   )}
                 </button>
               </li>

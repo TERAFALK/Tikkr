@@ -56,6 +56,13 @@
   --color-skiffer: #5b6573;
   --color-lav: #d9ddd6;
 
+  /*
+   * LÄNKAD TEXT (beslutat 2026-10-30, produktägarens val). Tick Deep ger 3,44:1
+   * mot vitt, och länkar är text som ska läsas. Skalans mörkare steg ger 5,09:1.
+   * Tick Deep står kvar på ikoner och ytor.
+   */
+  --color-link: var(--color-emerald-700);
+
   /* ---------------------------------------------------------------------- */
   /* GRÅSKALAN: Snö → Lav → Skiffer → Fjord.                                */
   /*                                                                         */

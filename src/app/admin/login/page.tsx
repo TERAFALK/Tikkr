@@ -52,7 +52,7 @@ const OUTCOME: Record<
   },
 };
 
-const linkClass = "font-medium text-tick-deep hover:underline";
+const linkClass = "font-medium text-link hover:underline";
 
 export default async function LoginPage({
   searchParams,

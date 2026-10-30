@@ -141,7 +141,7 @@ export default function TimesheetTable({
                   {/* Före startdatumet räknas ingen flex. Ett streck och inte
                       0:00, som hade sett ut som en dag i jämvikt. */}
                   {day.beforeStart ? (
-                    <span className="text-neutral-400">—</span>
+                    <span className="text-neutral-500">—</span>
                   ) : (
                     <Flex minutes={day.flexMinutes} />
                   )}
@@ -270,7 +270,7 @@ function DetailRow({
 /** Flexvärde med tecken. Plus är grönt, minus gult — aldrig rött. */
 function Flex({ minutes }: { minutes: number }) {
   if (Math.round(minutes) === 0) {
-    return <span className="text-neutral-400">0</span>;
+    return <span className="text-neutral-500">0</span>;
   }
 
   const positive = minutes > 0;

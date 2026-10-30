@@ -55,11 +55,11 @@ export default async function ProductsPage() {
                   <Td>
                     <Link
                       href={`/plattform/produkter/${product.id}`}
-                      className="font-medium text-tick-deep"
+                      className="font-medium text-link"
                     >
                       {product.name}
                     </Link>
-                    <span className="mt-0.5 block text-xs text-neutral-400">
+                    <span className="mt-0.5 block text-xs text-neutral-500">
                       /tillbehor/{product.slug}
                     </span>
                   </Td>

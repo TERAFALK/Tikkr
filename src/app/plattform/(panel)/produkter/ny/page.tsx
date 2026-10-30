@@ -18,7 +18,7 @@ export default async function NewProductPage() {
         action={
           <Link
             href="/plattform/produkter"
-            className="text-[13px] font-medium text-tick-deep hover:underline"
+            className="text-[13px] font-medium text-link hover:underline"
           >
             Till produkterna
           </Link>

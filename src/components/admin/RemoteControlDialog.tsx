@@ -196,7 +196,7 @@ function Answer({ state }: { state: RemoteControlState }) {
   if (state.error) return <Alert>{state.error}</Alert>;
   if (state.ok) {
     return (
-      <p role="status" className="text-[13px] font-medium text-tick-deep">
+      <p role="status" className="text-[13px] font-medium text-link">
         {state.ok}
       </p>
     );

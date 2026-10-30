@@ -206,7 +206,7 @@ export default function AdminSidebar({
       <div className="min-h-0 flex-1 space-y-6 overflow-y-auto">
         {visibleSections.map((section) => (
           <div key={section.label}>
-            <p className="mb-1 px-2 text-[11px] font-semibold uppercase tracking-wider text-neutral-400">
+            <p className="mb-1 px-2 text-[11px] font-semibold uppercase tracking-wider text-neutral-500">
               {section.label}
             </p>
             <ul className="space-y-0.5">
@@ -272,7 +272,7 @@ export default function AdminSidebar({
               <span className="block text-[13px] font-medium leading-tight">
                 Ditt konto
               </span>
-              <span className="block truncate text-[11px] leading-tight text-neutral-400">
+              <span className="block truncate text-[11px] leading-tight text-neutral-500">
                 {email}
               </span>
             </span>
@@ -437,7 +437,7 @@ function CompanyHeader({
         <span className="block truncate text-[13px] font-semibold leading-tight text-neutral-900">
           {companyName}
         </span>
-        <span className="block text-[11px] leading-tight text-neutral-400">
+        <span className="block text-[11px] leading-tight text-neutral-500">
           Arbetsyta
         </span>
       </span>

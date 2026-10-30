@@ -500,7 +500,7 @@ async function OrdersInProgress({ db }: { db: CompanyDb }) {
                     rapporten ligger ett tryck bort. */}
                 <Link
                   href={`/admin/ordrar/${order.id}`}
-                  className="font-medium text-tick-deep hover:underline"
+                  className="font-medium text-link hover:underline"
                 >
                   {order.orderNumber}
                 </Link>
@@ -518,7 +518,7 @@ async function OrdersInProgress({ db }: { db: CompanyDb }) {
                     usedMinutes={order.minutes}
                   />
                 ) : (
-                  <span className="text-xs text-neutral-400">
+                  <span className="text-xs text-neutral-500">
                     Ingen beräknad tid
                   </span>
                 )}
@@ -569,7 +569,7 @@ async function PlannedToday({
         action={
           <Link
             href="/admin/planering"
-            className="text-[13px] font-medium text-tick-deep hover:underline"
+            className="text-[13px] font-medium text-link hover:underline"
           >
             Planering
           </Link>

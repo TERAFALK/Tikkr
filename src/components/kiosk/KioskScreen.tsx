@@ -1614,7 +1614,7 @@ function Header({
         <p className="truncate text-[15px] font-semibold text-neutral-900">
           {companyName}
         </p>
-        <p className="truncate text-[13px] text-neutral-400">{deviceName}</p>
+        <p className="truncate text-[13px] text-neutral-500">{deviceName}</p>
       </div>
 
       {step && (
@@ -1894,7 +1894,7 @@ function EmployeeGrid({
                 Senast: {last.label}
               </span>
             ) : (
-              <span className="mt-3 block text-sm text-neutral-400">
+              <span className="mt-3 block text-sm text-neutral-500">
                 Ej instämplad
               </span>
             )}

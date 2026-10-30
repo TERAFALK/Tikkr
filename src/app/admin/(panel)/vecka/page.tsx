@@ -116,7 +116,7 @@ export default async function WeekPage({
                 {DAYS.map((day, index) => (
                   <Th key={day} numeric>
                     <span className="block">{day}</span>
-                    <span className="block text-[10px] font-normal text-neutral-400">
+                    <span className="block text-[10px] font-normal text-neutral-500">
                       {wallTimeIn(dayDates[index], timeZone).day}
                     </span>
                   </Th>
@@ -141,7 +141,7 @@ export default async function WeekPage({
                           {row.employeeName}
                         </span>
                         {row.employeeNumber && (
-                          <span className="block text-xs text-neutral-400">
+                          <span className="block text-xs text-neutral-500">
                             {row.employeeNumber}
                           </span>
                         )}

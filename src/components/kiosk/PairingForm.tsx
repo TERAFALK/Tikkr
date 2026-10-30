@@ -202,7 +202,7 @@ export default function PairingForm() {
         <Submit complete={complete} />
       </form>
 
-      <p className="mt-10 text-sm text-neutral-400">
+      <p className="mt-10 text-sm text-neutral-500">
         Koden gäller i fem minuter och kan bara användas en gång.
       </p>
     </Frame>

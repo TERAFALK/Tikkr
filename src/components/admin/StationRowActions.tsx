@@ -141,7 +141,7 @@ export default function StationRowActions({
         </form>
       )}
 
-      <Button type="button" tone="ghost" onClick={() => edit.current?.showModal()}>
+      <Button type="button" tone="secondary" onClick={() => edit.current?.showModal()}>
         Ändra
       </Button>
 
@@ -300,7 +300,7 @@ function Arrow({
       disabled={disabled}
       aria-label={label}
       title={label}
-      className="rounded px-1.5 text-[11px] leading-none text-neutral-400 hover:bg-neutral-100 hover:text-neutral-900 disabled:text-neutral-200 disabled:hover:bg-transparent disabled:hover:text-neutral-200"
+      className="rounded px-1.5 text-[11px] leading-none text-neutral-500 hover:bg-neutral-100 hover:text-neutral-900 disabled:text-neutral-200 disabled:hover:bg-transparent disabled:hover:text-neutral-200"
     >
       {name === "up" ? "▲" : "▼"}
     </button>

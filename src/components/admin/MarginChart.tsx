@@ -54,7 +54,7 @@ export default function MarginChart({ months }: { months: CustomerMonth[] }) {
               key={`${month.label}-${index}`}
               className="group flex min-w-0 flex-1 flex-col items-center"
             >
-              <span className="mb-1 h-4 text-[10px] tabular-nums text-neutral-400 opacity-0 transition-opacity group-hover:opacity-100">
+              <span className="mb-1 h-4 text-[10px] tabular-nums text-neutral-500 opacity-0 transition-opacity group-hover:opacity-100">
                 {month.marginOre === 0 ? "" : formatCurrency(month.marginOre)}
               </span>
 
@@ -92,7 +92,7 @@ export default function MarginChart({ months }: { months: CustomerMonth[] }) {
                 </div>
               )}
 
-              <span className="mt-1.5 truncate text-[10px] text-neutral-400">
+              <span className="mt-1.5 truncate text-[10px] text-neutral-500">
                 {month.label}
               </span>
             </div>

@@ -72,7 +72,7 @@ export default function ShopCatalog({
           <section key={kind} aria-labelledby={`kind-${kind}`}>
             <h2
               id={`kind-${kind}`}
-              className="mb-4 text-[11px] font-semibold uppercase tracking-wider text-neutral-400"
+              className="mb-4 text-[11px] font-semibold uppercase tracking-wider text-neutral-500"
             >
               {KIND_LABEL[kind]}
             </h2>
@@ -123,7 +123,7 @@ export default function ShopCatalog({
                               href={`/tillbehor/${product.slug}`}
                               target="_blank"
                               rel="noopener"
-                              className="text-[13px] text-tick-deep underline-offset-2 hover:underline"
+                              className="text-[13px] text-link underline-offset-2 hover:underline"
                             >
                               Om produkten
                             </a>
@@ -238,7 +238,7 @@ export function BackToShop({
   return (
     <Link
       href={`/admin/butik${query ? `?${query}` : ""}`}
-      className="text-[13px] font-medium text-tick-deep hover:underline"
+      className="text-[13px] font-medium text-link hover:underline"
     >
       Ändra
     </Link>

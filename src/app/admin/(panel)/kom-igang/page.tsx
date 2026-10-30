@@ -232,7 +232,7 @@ export default async function OnboardingPage() {
           {!state.steps[3].done && (
             <Link
               href={checkoutHrefFor("stamplingsskarm")}
-              className="text-[13px] font-medium text-tick-deep hover:underline"
+              className="text-[13px] font-medium text-link hover:underline"
             >
               Beställ en stämplingsskärm
             </Link>
@@ -368,7 +368,7 @@ function ChipList({
 }) {
   return (
     <div className="border-t border-neutral-100 pt-4">
-      <p className="mb-2 text-xs font-medium uppercase tracking-wider text-neutral-400">
+      <p className="mb-2 text-xs font-medium uppercase tracking-wider text-neutral-500">
         {label}
       </p>
       <div className="flex flex-wrap gap-1.5">
@@ -381,14 +381,14 @@ function ChipList({
           </span>
         ))}
         {items.length > 12 && (
-          <span className="px-2 py-1 text-xs text-neutral-400">
+          <span className="px-2 py-1 text-xs text-neutral-500">
             och {items.length - 12} till
           </span>
         )}
       </div>
       <Link
         href={href}
-        className="mt-2 inline-block text-[13px] font-medium text-tick-deep"
+        className="mt-2 inline-block text-[13px] font-medium text-link"
       >
         Hantera
       </Link>

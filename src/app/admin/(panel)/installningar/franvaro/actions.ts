@@ -28,6 +28,7 @@ const PATH = "/admin/installningar/franvaro";
  */
 export interface ReasonState {
   error?: string;
+  field?: string;
   ok?: string;
 }
 
@@ -41,7 +42,7 @@ export async function addAbsenceReason(
   const { db, companyId } = session;
 
   const name = String(formData.get("name") ?? "").trim();
-  if (!name) return { error: "Ange ett namn." };
+  if (!name) return { error: "Ange ett namn.", field: "name" };
 
   // Sist i listan. Ordningen ändras med pilarna, och en ny orsak ska inte
   // hamna överst bara för att den är ny.
@@ -60,7 +61,7 @@ export async function addAbsenceReason(
   } catch (error) {
     // P2002: namnet är unikt per företag.
     if ((error as { code?: string } | null)?.code === "P2002") {
-      return { error: "Det finns redan en orsak med det namnet." };
+      return { error: "Det finns redan en orsak med det namnet.", field: "name" };
     }
     throw error;
   }
@@ -109,7 +110,7 @@ export async function renameAbsenceReason(
   const name = String(formData.get("name") ?? "").trim();
 
   if (!id) return { error: "Ingen orsak vald." };
-  if (!name) return { error: "Ange ett namn." };
+  if (!name) return { error: "Ange ett namn.", field: "name" };
 
   try {
     // Krysset för ATF rörs bara när rutan visades. Utan valt avtal finns den
@@ -128,7 +129,7 @@ export async function renameAbsenceReason(
   } catch (error) {
     // P2002: namnet är unikt per företag.
     if ((error as { code?: string } | null)?.code === "P2002") {
-      return { error: "Det finns redan en orsak med det namnet." };
+      return { error: "Det finns redan en orsak med det namnet.", field: "name" };
     }
     throw error;
   }

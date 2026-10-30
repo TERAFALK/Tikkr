@@ -27,7 +27,7 @@ export default function BudgetBar({
   showText?: boolean;
 }) {
   if (!budgetMinutes) {
-    return <span className="text-[13px] text-neutral-400">—</span>;
+    return <span className="text-[13px] text-neutral-500">—</span>;
   }
 
   const share = usedMinutes / budgetMinutes;

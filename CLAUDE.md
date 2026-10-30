@@ -2070,10 +2070,18 @@ kopiorna i `public/` kopieras om.
 |---|---|---|
 | Fjord | `#0E1A2B` | Primär. Text, logotyp, mörka ytor, knappar |
 | Tick | `#2ED196` | Accent på mörkt |
-| Tick Deep | `#0F9E68` | Accent på ljust: länkar, markerat läge |
+| Tick Deep | `#0F9E68` | Accent på ljust: ikoner, markerat läge |
 | Snö | `#F5F6F2` | Ljus bakgrund |
 | Skiffer | `#5B6573` | Sekundär text |
 | Lav | `#D9DDD6` | Linjer, ramar, tysta ytor |
+
+**Länkad text är `text-link`, ett steg mörkare än Tick Deep** (beslutat
+2026-10-30, produktägarens val, UX-granskningen). Tick Deep ger 3,44:1 mot vitt
+och `neutral-400` 3,37:1, och båda stod på text som ska läsas. WCAG begär 4,5:1.
+Länkar ligger nu på `emerald-700` (5,09:1) och läsbar sekundär text på Skiffer.
+Tick Deep och `neutral-400` står kvar på ikoner, ytor och linjer. Det är ett
+litet avsteg från guiden, som anger Tick Deep för länkar. Bevisas av
+`tests/contrast.test.ts`.
 
 Fjord och Snö bär de flesta ytorna. **Grönt är accent och aldrig huvudfärg** —
 det är den enda regeln i guiden som står utskriven som ett förbud, och skälet

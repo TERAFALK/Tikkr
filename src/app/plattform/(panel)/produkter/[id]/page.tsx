@@ -48,14 +48,14 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
                 href={`/tillbehor/${product.slug}`}
                 target="_blank"
                 rel="noopener"
-                className="text-[13px] font-medium text-tick-deep hover:underline"
+                className="text-[13px] font-medium text-link hover:underline"
               >
                 Visa på säljsidan
               </a>
             )}
             <Link
               href="/plattform/produkter"
-              className="text-[13px] font-medium text-tick-deep hover:underline"
+              className="text-[13px] font-medium text-link hover:underline"
             >
               Till produkterna
             </Link>

@@ -14,7 +14,7 @@ import {
 } from "@/components/ui";
 import { formatDate, formatDateTime } from "@/lib/format";
 import { listPaging, pageRows } from "@/lib/paging";
-import Pager, { PerPageField } from "@/components/platform/Pager";
+import Pager, { PerPageField } from "@/components/ui/Pager";
 import { SubscriptionBadge } from "@/components/platform/Pieces";
 
 export const dynamic = "force-dynamic";
@@ -115,7 +115,7 @@ export default async function CompaniesPage({
                   <Td>
                     <Link
                       href={`/plattform/kunder/${company.id}`}
-                      className="font-medium text-tick-deep"
+                      className="font-medium text-link"
                     >
                       {company.name}
                     </Link>
@@ -136,7 +136,7 @@ export default async function CompaniesPage({
                   </Td>
                   <Td numeric>
                     {company.entriesLast30Days === 0 ? (
-                      <span className="text-neutral-400">0</span>
+                      <span className="text-neutral-500">0</span>
                     ) : (
                       company.entriesLast30Days
                     )}
@@ -155,7 +155,7 @@ export default async function CompaniesPage({
           {matches.length === 0 && (
             <p className="px-5 py-6 text-center text-[13px] text-neutral-500">
               Ingen kund matchar ”{query}”.{" "}
-              <Link href="/plattform/kunder" className="text-tick-deep">
+              <Link href="/plattform/kunder" className="text-link">
                 Visa alla
               </Link>
             </p>
