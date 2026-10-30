@@ -3,6 +3,7 @@ import { unsafeGlobalPrisma } from "./db";
 import type { CompanyDb } from "./tenant";
 import { HELP_AREAS, isHelpAreaKey } from "./help/areas";
 import { FEEDBACK_KIND_LABEL, FEEDBACK_KINDS, MAX_BODY_LENGTH } from "./feedback-form";
+import { listPaging, type PageRequest } from "./paging";
 
 /**
  * FEL, FÖRSLAG OCH SYNPUNKTER FRÅN KUNDEN (issue #8, steg 2).
@@ -138,35 +139,35 @@ export async function sendFeedback(
 /* Plattformens inkorg                                                        */
 /* -------------------------------------------------------------------------- */
 
-export const INBOX_PAGE_SIZE = 25;
-
-export async function listInbox(filter: {
-  /** true är arkivet, false inkorgen. */
-  archived: boolean;
-  kind?: FeedbackKind;
-  companyId?: string;
-  page: number;
-}) {
+export async function listInbox(
+  filter: {
+    /** true är arkivet, false inkorgen. */
+    archived: boolean;
+    kind?: FeedbackKind;
+    companyId?: string;
+  } & PageRequest
+) {
   const where = {
     doneAt: filter.archived ? { not: null } : null,
     ...(filter.kind && { kind: filter.kind }),
     ...(filter.companyId && { companyId: filter.companyId }),
   };
 
-  const [rows, total] = await Promise.all([
-    unsafeGlobalPrisma.feedbackMessage.findMany({
-      where,
-      // Arkivet i den ordning det klarmarkerades, inkorgen i den ordning det
-      // kom in.
-      orderBy: filter.archived ? { doneAt: "desc" } : { createdAt: "desc" },
-      skip: (filter.page - 1) * INBOX_PAGE_SIZE,
-      take: INBOX_PAGE_SIZE,
-      include: { company: { select: { id: true, name: true } } },
-    }),
-    unsafeGlobalPrisma.feedbackMessage.count({ where }),
-  ]);
+  // Antalet först, så att ett sidnummer bortom slutet kan visa sista sidan.
+  const total = await unsafeGlobalPrisma.feedbackMessage.count({ where });
+  const paging = listPaging(total, filter);
 
-  return { rows, total };
+  const rows = await unsafeGlobalPrisma.feedbackMessage.findMany({
+    where,
+    // Arkivet i den ordning det klarmarkerades, inkorgen i den ordning det
+    // kom in.
+    orderBy: filter.archived ? { doneAt: "desc" } : { createdAt: "desc" },
+    skip: paging.skip,
+    take: paging.take,
+    include: { company: { select: { id: true, name: true } } },
+  });
+
+  return { rows, total, paging };
 }
 
 /** Siffran vid Inkorg i plattformens meny: det som inte är klarmarkerat. */

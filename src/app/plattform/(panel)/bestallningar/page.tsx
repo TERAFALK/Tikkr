@@ -5,8 +5,9 @@ import { listShopOrders } from "@/lib/shop/admin";
 import { needsAttention, PAYMENT_LABEL, STATUS_LABEL } from "@/lib/shop/status";
 import { formatDate } from "@/lib/format";
 import { formatCurrency } from "@/lib/money";
+import { listHref } from "@/lib/paging";
 import { addDaysInZone, parseLocalDate, startOfDayIn } from "@/lib/time-zone";
-import Pager from "@/components/platform/Pager";
+import Pager, { PerPageField } from "@/components/platform/Pager";
 import {
   Badge,
   Button,
@@ -44,6 +45,7 @@ export default async function ShopOrdersPage({
     fran?: string;
     till?: string;
     sida?: string;
+    antal?: string;
   }>;
 }) {
   await requirePlatformAdmin();
@@ -59,35 +61,39 @@ export default async function ShopOrdersPage({
   const anyFilter = Boolean(q || status || payment || from || to);
   const attention = params.vy !== "alla" && !anyFilter;
 
-  const { rows, total, page, pages } = await listShopOrders({
+  const { rows, total, paging } = await listShopOrders({
     q,
     status,
     payment,
     attention,
     from: from ? startOfDay(from) : undefined,
     to: to ? addDaysInZone(startOfDay(to), 1, ZONE) : undefined,
-    page: Number(params.sida) || 1,
+    sida: params.sida,
+    antal: params.antal,
   });
-
-  const hrefFor = (next: number) => {
-    const query = new URLSearchParams();
-    for (const [key, value] of Object.entries(params)) {
-      if (value && key !== "sida") query.set(key, value);
-    }
-    if (next > 1) query.set("sida", String(next));
-    const text = query.toString();
-    return `/plattform/bestallningar${text ? `?${text}` : ""}`;
-  };
 
   return (
     <>
       <PageHeader title="Beställningar" />
 
       <div className="mb-4 flex flex-wrap gap-1">
-        <ViewLink href="/plattform/bestallningar" active={attention}>
+        <ViewLink
+          href={listHref("/plattform/bestallningar", {
+            page: 1,
+            perPage: paging.take,
+          })}
+          active={attention}
+        >
           Att hantera
         </ViewLink>
-        <ViewLink href="/plattform/bestallningar?vy=alla" active={!attention}>
+        <ViewLink
+          href={listHref("/plattform/bestallningar", {
+            keep: { vy: "alla" },
+            page: 1,
+            perPage: paging.take,
+          })}
+          active={!attention}
+        >
           Alla
         </ViewLink>
       </div>
@@ -95,6 +101,7 @@ export default async function ShopOrdersPage({
       {/* Formulär utan JavaScript, som kundlistan. Urvalet hamnar i adressen. */}
       <form className="mb-4 flex flex-wrap items-end gap-3">
         <input type="hidden" name="vy" value="alla" />
+        <PerPageField perPage={paging.take} />
         <Labelled label="Sök">
           <input
             type="search"
@@ -193,11 +200,11 @@ export default async function ShopOrdersPage({
             </tbody>
           </Table>
           <Pager
-            page={page}
-            pageCount={pages}
+            paging={paging}
             total={total}
             unit="beställningar"
-            hrefFor={hrefFor}
+            path="/plattform/bestallningar"
+            keep={params}
           />
         </Card>
       )}

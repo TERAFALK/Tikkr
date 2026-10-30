@@ -1,3 +1,4 @@
+import { PerPageField } from "@/components/platform/Pager";
 import { Button, ButtonLink } from "@/components/ui";
 import { PER_PAGE } from "@/lib/paging";
 
@@ -6,9 +7,6 @@ import { PER_PAGE } from "@/lib/paging";
  *
  * Vanligt GET-formulär, utan JavaScript. Sökningen hamnar i adressen som `q`
  * och går därmed att spara som bokmärke och skicka vidare.
- *
- * Valet av rader per sida följer med, men inte sidnumret: en ny sökning är en
- * ny lista.
  */
 export default function SearchForm({
   query,
@@ -21,14 +19,12 @@ export default function SearchForm({
   placeholder: string;
   /** Sidan utan sökning. */
   clearHref: string;
-  /** Rader per sida just nu. Se ListPager. */
+  /** Rader per sida just nu. Se Pager. */
   perPage?: number;
 }) {
   return (
     <form className="flex gap-2">
-      {perPage !== PER_PAGE && (
-        <input type="hidden" name="antal" value={perPage} />
-      )}
+      <PerPageField perPage={perPage} />
       <input
         type="search"
         name="q"

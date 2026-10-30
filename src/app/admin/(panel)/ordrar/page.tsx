@@ -1,9 +1,9 @@
 import { requireAdmin } from "@/lib/admin-session";
 import { hasModule } from "@/lib/company-modules";
 import NewOrderDialog from "@/components/admin/NewOrderDialog";
-import ListPager from "@/components/admin/ListPager";
 import OrdersTable from "@/components/admin/OrdersTable";
 import SearchForm from "@/components/admin/SearchForm";
+import Pager from "@/components/platform/Pager";
 import { Alert, EmptyState, PageHeader } from "@/components/ui";
 import { orderCount, orderRows } from "@/lib/orders";
 import { customerOptions } from "@/lib/customers";
@@ -108,12 +108,12 @@ export default async function OrdersPage({
             />
           }
           pager={
-            <ListPager
+            <Pager
               paging={page}
               total={total}
               unit="ordrar"
               path="/admin/ordrar"
-              query={query}
+              keep={{ q: query }}
             />
           }
         />

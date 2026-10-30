@@ -4,11 +4,11 @@ import { requirePlatformAdmin } from "@/lib/platform-admin";
 import { unsafeGlobalPrisma } from "@/lib/db";
 import {
   FEEDBACK_KIND_LABEL,
-  INBOX_PAGE_SIZE,
   MAX_BODY_LENGTH,
   areaLabel,
   listInbox,
 } from "@/lib/feedback";
+import { PER_PAGE } from "@/lib/paging";
 import Pager from "@/components/platform/Pager";
 import ActionDialog from "@/components/ui/ActionDialog";
 import { Card, EmptyState, Field, PageHeader, Textarea } from "@/components/ui";
@@ -39,14 +39,19 @@ const KIND_FILTERS: Record<string, FeedbackKind> = {
 export default async function InboxPage({
   searchParams,
 }: {
-  searchParams: Promise<{ vy?: string; typ?: string; kund?: string; sida?: string }>;
+  searchParams: Promise<{
+    vy?: string;
+    typ?: string;
+    kund?: string;
+    sida?: string;
+    antal?: string;
+  }>;
 }) {
   await requirePlatformAdmin();
   const params = await searchParams;
 
   const view: View = params.vy === "arkiv" ? "arkiv" : "inkorg";
   const kindKey = params.typ && KIND_FILTERS[params.typ] ? params.typ : undefined;
-  const page = Math.max(1, Number(params.sida) || 1);
 
   const company = params.kund
     ? await unsafeGlobalPrisma.company.findUnique({
@@ -55,27 +60,23 @@ export default async function InboxPage({
       })
     : null;
 
-  const { rows, total } = await listInbox({
+  const { rows, total, paging } = await listInbox({
     archived: view === "arkiv",
     kind: kindKey ? KIND_FILTERS[kindKey] : undefined,
     companyId: company?.id,
-    page,
+    sida: params.sida,
+    antal: params.antal,
   });
 
   // Filtren bygger på varandra: ett byte av vy behåller typ och kund.
-  const hrefWith = (change: {
-    vy?: View;
-    typ?: string | null;
-    kund?: null;
-    sida?: number;
-  }) => {
+  const hrefWith = (change: { vy?: View; typ?: string | null; kund?: null }) => {
     const query = new URLSearchParams();
     const vy = change.vy ?? view;
     if (vy !== "inkorg") query.set("vy", vy);
     const typ = change.typ === null ? undefined : (change.typ ?? kindKey);
     if (typ) query.set("typ", typ);
     if (company && change.kund !== null) query.set("kund", company.id);
-    if (change.sida && change.sida > 1) query.set("sida", String(change.sida));
+    if (paging.take !== PER_PAGE) query.set("antal", String(paging.take));
     const text = query.toString();
     return `/plattform/inkorg${text ? `?${text}` : ""}`;
   };
@@ -190,14 +191,18 @@ export default async function InboxPage({
             </Card>
           ))}
 
-          {total > INBOX_PAGE_SIZE && (
+          {total > PER_PAGE && (
             <Card>
               <Pager
-                page={page}
-                pageCount={Math.ceil(total / INBOX_PAGE_SIZE)}
+                paging={paging}
                 total={total}
                 unit="meddelanden"
-                hrefFor={(next) => hrefWith({ sida: next })}
+                path="/plattform/inkorg"
+                keep={{
+                  vy: view === "arkiv" ? view : undefined,
+                  typ: kindKey,
+                  kund: company?.id,
+                }}
               />
             </Card>
           )}

@@ -30,8 +30,14 @@ import { formatDateTime, formatDuration } from "@/lib/format";
 import { datePresets } from "@/lib/date-presets";
 import { weekStep } from "@/lib/week-nav";
 import WeekStepper from "@/components/admin/WeekStepper";
-import Pager from "@/components/platform/Pager";
-import { pageGroups, pageRows, paging } from "@/lib/paging";
+import Pager, { PerPageField } from "@/components/platform/Pager";
+import {
+  listHref,
+  listPaging,
+  pageGroups,
+  pageRows,
+  PER_PAGE,
+} from "@/lib/paging";
 import { customerOptions } from "@/lib/customers";
 import type { ReportResult, ReportRow } from "@/lib/report";
 import type { ReportView } from "@/lib/report-pdf";
@@ -50,6 +56,7 @@ interface SearchParams {
   /** "detalj" (standard) eller "person". */
   visning?: string;
   sida?: string;
+  antal?: string;
 }
 
 export default async function ReportsPage({
@@ -138,30 +145,19 @@ export default async function ReportsPage({
   // uttaget räknas på alla rader precis som förut: en summa som ändrades av
   // att man bläddrade vore ett fakturaunderlag ingen kunde lita på. Därför
   // sker bläddringen här och inte i frågan i report.ts.
-  const page = paging(report.rows.length, params.sida);
+  const page = listPaging(report.rows.length, params);
   const pageOfRows = pageRows(report.rows, page);
   const pageOfGroups = pageGroups(employeeGroups, page);
-
-  const pageHref = (target: number) => {
-    const search = new URLSearchParams(
-      Object.entries(params).filter(
-        ([key, value]) => value && key !== "sida"
-      ) as [string, string][]
-    );
-    if (target > 1) search.set("sida", String(target));
-    const query = search.toString();
-    return query ? `/admin/rapporter?${query}` : "/admin/rapporter";
-  };
 
   // Uttaget ska innehålla det skärmen visar. Valet skrivs därför alltid ut,
   // även när det inte står i adressen — annars hade en export gjord på en
   // orörd sida saknat den improduktiva tiden som syns i tabellen.
   //
-  // Sidnumret följer INTE med. Uttaget är hela rapporten, inte sidan man
-  // råkade stå på.
+  // Sidnumret och radantalet följer INTE med. Uttaget är hela rapporten, inte
+  // sidan man råkade stå på.
   const exportParams = new URLSearchParams(
     Object.entries(params).filter(
-      ([key, value]) => value && key !== "sida"
+      ([key, value]) => value && key !== "sida" && key !== "antal"
     ) as [string, string][]
   );
   exportParams.set("kind", kind);
@@ -211,7 +207,11 @@ export default async function ReportsPage({
                   return (
                     <Link
                       key={preset.label}
-                      href={`/admin/rapporter?from=${preset.from}&to=${preset.to}`}
+                      href={listHref("/admin/rapporter", {
+                        keep: { from: preset.from, to: preset.to },
+                        page: 1,
+                        perPage: page.take,
+                      })}
                       className={`rounded-md px-2.5 py-1 text-xs font-medium transition-colors ${
                         active
                           ? "bg-neutral-900 text-white"
@@ -230,6 +230,8 @@ export default async function ReportsPage({
             spara som bokmärke eller skicka vidare till någon annan. Det
             tillämpas direkt när ett fält ändras — se FilterForm. */}
         <FilterForm className="grid gap-4 p-5 sm:grid-cols-2 lg:grid-cols-6">
+          <PerPageField perPage={page.take} />
+
           <Field label="Från">
             <Input type="date" name="from" defaultValue={params.from ?? ""} />
           </Field>
@@ -464,14 +466,14 @@ export default async function ReportsPage({
                 </Card>
               ))}
 
-              {page.pageCount > 1 && (
+              {report.rows.length > PER_PAGE && (
                 <Card>
                   <Pager
-                    page={page.page}
-                    pageCount={page.pageCount}
+                    paging={page}
                     total={report.rows.length}
                     unit="stämplingar"
-                    hrefFor={pageHref}
+                    path="/admin/rapporter"
+                    keep={{ ...params }}
                   />
                 </Card>
               )}
@@ -505,11 +507,11 @@ export default async function ReportsPage({
             </Table>
 
             <Pager
-              page={page.page}
-              pageCount={page.pageCount}
+              paging={page}
               total={report.rows.length}
               unit="stämplingar"
-              hrefFor={pageHref}
+              path="/admin/rapporter"
+              keep={{ ...params }}
             />
           </Card>
           )}

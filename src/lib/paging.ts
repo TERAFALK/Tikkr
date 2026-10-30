@@ -11,10 +11,9 @@
  * `pageGroups` finns för att grupperna ska behålla sina egna summor även när
  * en grupp delas mellan två sidor.
  *
- * REGISTREN (Ordrar, Kunder, Anställda) väljer dessutom hur många rader en sida
- * bär, med `?antal=` i adressen, se `listPaging`. Valet ligger i adressen av
- * samma skäl som `helg=visa` på tavlan: ett visningsval hör inte hemma i en
- * kaka.
+ * VARJE LISTA väljer dessutom hur många rader en sida bär, med `?antal=` i
+ * adressen, se `listPaging`. Valet ligger i adressen av samma skäl som
+ * `helg=visa` på tavlan: ett visningsval hör inte hemma i en kaka.
  *
  * Filen har inga importer. Den läses av fakturasidans rapportvy och skulle
  * kunna läsas av lönesidan, och ska därför inte dra in något från någondera.
@@ -22,8 +21,14 @@
 
 export const PER_PAGE = 50;
 
-/** Valen under listan i registren. `PER_PAGE` är förvalet. */
+/** Valen under varje lista. `PER_PAGE` är förvalet. */
 export const PER_PAGE_CHOICES = [25, 50, 100, 200];
+
+/** Sidan och radantalet, som de står i adressen. */
+export interface PageRequest {
+  sida?: string;
+  antal?: string;
+}
 
 export interface Paging {
   /** Sidan som visas, från 1. */
@@ -57,7 +62,7 @@ export function paging(
 }
 
 /**
- * Vilken sida ett register visar, ur `?sida=` och `?antal=`.
+ * Vilken sida en lista visar, ur `?sida=` och `?antal=`.
  *
  * Får allt plats i förvalet gäller förvalet, vad adressen än säger: då visas
  * ingen bläddring, och ett gammalt `antal=25` på en lista med fyrtio rader hade
@@ -65,7 +70,7 @@ export function paging(
  */
 export function listPaging(
   total: number,
-  { sida, antal }: { sida?: string; antal?: string }
+  { sida, antal }: PageRequest
 ): Paging {
   const wanted = Number(antal);
   const perPage =
@@ -75,8 +80,11 @@ export function listPaging(
 }
 
 /**
- * Adressen till en sida i ett register. Sidan ett och förvalet står inte i
- * adressen, så att den orörda listan har samma adress som förut.
+ * Adressen till en sida i en lista. Sidan ett och förvalet står inte i adressen,
+ * så att den orörda listan har samma adress som förut.
+ *
+ * `keep` är filtren som följer med. `sida` och `antal` i den bortses från, så
+ * att en sida kan skicka in hela sin adress.
  *
  * `anchor` är för en lista långt ner på en sida. Utan den hamnar man högst upp
  * vid varje bläddring och får skrolla ner igen.
@@ -84,14 +92,21 @@ export function listPaging(
 export function listHref(
   path: string,
   {
-    query,
+    keep = {},
     page,
     perPage,
     anchor,
-  }: { query?: string; page: number; perPage: number; anchor?: string }
+  }: {
+    keep?: Record<string, string | undefined>;
+    page: number;
+    perPage: number;
+    anchor?: string;
+  }
 ): string {
   const search = new URLSearchParams();
-  if (query) search.set("q", query);
+  for (const [key, value] of Object.entries(keep)) {
+    if (value && key !== "sida" && key !== "antal") search.set(key, value);
+  }
   if (page > 1) search.set("sida", String(page));
   if (perPage !== PER_PAGE) search.set("antal", String(perPage));
 

@@ -145,7 +145,7 @@ describe("att skicka", () => {
 
 describe("inkorgen och arkivet", () => {
   const inbox = (archived: boolean) =>
-    listInbox({ archived, companyId: companyA, page: 1 });
+    listInbox({ archived, companyId: companyA });
 
   it("klarmarkering flyttar till arkivet med anteckning, och loggas", async () => {
     const sent = await sendFeedback(author(), message);

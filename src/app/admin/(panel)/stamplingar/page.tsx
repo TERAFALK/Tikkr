@@ -32,8 +32,8 @@ import { datePresets } from "@/lib/date-presets";
 import { weekStep } from "@/lib/week-nav";
 import WeekStepper from "@/components/admin/WeekStepper";
 import ConfirmButton from "@/components/admin/ConfirmButton";
-import Pager from "@/components/platform/Pager";
-import { paging } from "@/lib/paging";
+import Pager, { PerPageField } from "@/components/platform/Pager";
+import { listHref, listPaging } from "@/lib/paging";
 import { deleteEntry } from "./actions";
 
 export const dynamic = "force-dynamic";
@@ -54,6 +54,7 @@ interface SearchParams {
   from?: string;
   to?: string;
   sida?: string;
+  antal?: string;
   /** Öppnar Ny stämpling direkt. Genvägen på översikten. */
   ny?: string;
 }
@@ -140,7 +141,7 @@ export default async function EntriesPage({
 
   // Antalet först, så att ett sidnummer bortom slutet kan visa sista sidan.
   const finishedTotal = await db.timeEntry.count({ where: finishedFilter });
-  const page = paging(finishedTotal, params.sida);
+  const page = listPaging(finishedTotal, params);
 
   const [employees, orders, moments, indirectMoments, ongoing, finished] =
     await Promise.all([
@@ -190,18 +191,6 @@ export default async function EntriesPage({
   // sorterade med senaste först.
   const entries = page.page === 1 ? [...ongoing, ...finished] : finished;
   const total = ongoing.length + finishedTotal;
-
-  // Filtren följer med mellan sidorna. Sidan ett står inte i adressen, så att
-  // den orörda listan har samma adress som förut.
-  const pageHref = (target: number) => {
-    const search = new URLSearchParams();
-    if (params.from) search.set("from", params.from);
-    if (params.to) search.set("to", params.to);
-    if (params.employeeId) search.set("employeeId", params.employeeId);
-    if (target > 1) search.set("sida", String(target));
-    const query = search.toString();
-    return query ? `/admin/stamplingar?${query}` : "/admin/stamplingar";
-  };
 
   // Vilka av raderna som har ändrats. De får en länk till sin historik; en
   // länk på varje rad vore brus, eftersom de flesta aldrig rörts.
@@ -275,11 +264,15 @@ export default async function EntriesPage({
                   return (
                     <Link
                       key={preset.label}
-                      href={`/admin/stamplingar?from=${preset.from}&to=${preset.to}${
-                        params.employeeId
-                          ? `&employeeId=${params.employeeId}`
-                          : ""
-                      }`}
+                      href={listHref("/admin/stamplingar", {
+                        keep: {
+                          from: preset.from,
+                          to: preset.to,
+                          employeeId: params.employeeId,
+                        },
+                        page: 1,
+                        perPage: page.take,
+                      })}
                       className={`rounded-md px-2.5 py-1 text-xs font-medium transition-colors ${
                         active
                           ? "bg-neutral-900 text-white"
@@ -295,6 +288,8 @@ export default async function EntriesPage({
           }
         />
         <FilterForm className="grid gap-4 p-5 sm:grid-cols-2 lg:grid-cols-4">
+          <PerPageField perPage={page.take} />
+
           <Field label="Från och med">
             <Input type="date" name="from" defaultValue={params.from ?? ""} />
           </Field>
@@ -462,11 +457,15 @@ export default async function EntriesPage({
           </Table>
 
           <Pager
-            page={page.page}
-            pageCount={page.pageCount}
+            paging={page}
             total={finishedTotal}
             unit="avslutade"
-            hrefFor={pageHref}
+            path="/admin/stamplingar"
+            keep={{
+              from: params.from,
+              to: params.to,
+              employeeId: params.employeeId,
+            }}
           />
         </Card>
         </EntryEditor>

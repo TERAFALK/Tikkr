@@ -23,13 +23,13 @@ export const metadata = { title: "Händelser · Tikkr" };
 export default async function ActivityPage({
   searchParams,
 }: {
-  searchParams: Promise<{ sida?: string }>;
+  searchParams: Promise<{ sida?: string; antal?: string }>;
 }) {
   await requirePlatformAdmin();
-  const page = Number((await searchParams).sida) || 1;
+  const { sida, antal } = await searchParams;
 
   const [log, names] = await Promise.all([
-    auditLog({ page }),
+    auditLog({ sida, antal }),
     companyNameById(),
   ]);
 
@@ -52,11 +52,10 @@ export default async function ActivityPage({
           />
           <ActivityTable rows={log.rows} companyNames={names} />
           <Pager
-            page={log.page}
-            pageCount={log.pageCount}
+            paging={log.paging}
             total={log.total}
             unit="händelser"
-            hrefFor={(next) => `/plattform/handelser?sida=${next}`}
+            path="/plattform/handelser"
           />
         </Card>
       )}

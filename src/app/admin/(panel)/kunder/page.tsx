@@ -3,8 +3,8 @@ import { requireAdmin } from "@/lib/admin-session";
 import { searchCustomers } from "@/lib/customers";
 import { listPaging, pageRows } from "@/lib/paging";
 import CustomerDialog from "@/components/admin/CustomerDialog";
-import ListPager from "@/components/admin/ListPager";
 import SearchForm from "@/components/admin/SearchForm";
+import Pager from "@/components/platform/Pager";
 import {
   Badge,
   Button,
@@ -180,12 +180,12 @@ export default async function CustomersPage({
             </Table>
           )}
 
-          <ListPager
+          <Pager
             paging={page}
             total={customers.length}
             unit="kunder"
             path="/admin/kunder"
-            query={query}
+            keep={{ q: query }}
           />
         </Card>
       )}
