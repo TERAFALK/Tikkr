@@ -15,10 +15,10 @@
  * filen, och den svarar null när appen inte finns. Ingen annan fil nämner
  * Fully vid namn.
  *
- * Fjärrstyrningen ligger i adminpanelen, aldrig på stämplingsskärmen.
- * Kiosken har ingen inloggning — ett reglage där hade låtit vem som helst
- * släcka stämpelklockan, och då går arbetstid förlorad. Se CLAUDE.md § 7.1:
- * gränssnitt som inte behöver finnas ska inte finnas.
+ * Fjärrstyrningen ligger i adminpanelen. På stämplingsskärmen finns bara
+ * omstarten, under kugghjulet och bakom en fråga. Kiosken har ingen
+ * inloggning, så ljusstyrkan stannar i panelen: ett reglage där hade låtit
+ * vem som helst släcka stämpelklockan, och då går arbetstid förlorad.
  *
  * FUNKTIONSNAMNEN är de i Fullys egen dokumentation av JavaScript-gränssnittet
  * (fully-kiosk.com, avsnittet JavaScript Interface). Första versionen av filen

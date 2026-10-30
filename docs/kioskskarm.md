@@ -411,6 +411,7 @@ JavaScript-gränssnittet:
 | `fully.setScreenBrightness(int)` | ljusstyrka, `-1` för enhetens standard |
 | `fully.restartApp()` | starta om appen |
 | `fully.reboot()` | starta om hela enheten, kräver device owner |
+| `fully.shutdown()` | stänga av enheten. Kräver root och används inte: skärmarna är inte rotade |
 
 Första versionen byggde på `fully.getDeviceInfo()`. Den finns bara i Fullys
 fjärr-API, inte för webbsidan, och den första fysiska skärmen rapporterade

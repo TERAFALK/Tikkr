@@ -253,10 +253,17 @@ bild av översikten (`AdminMockup`) ändras i samma PR som översikten.
 version, sitt nät och sitt serienummer, och får då knappen Fjärrstyrning
 under Stämplingsskärmar: ljusstyrka och omstart. En kunds egen dator eller
 surfplatta rapporterar ingenting och får ingen knapp. Det är en förmåga
-skärmen intygar och inte en bock, så den kan inte vara fel. Ingenting av det
-syns på stämplingsskärmen, som saknar inloggning: ett reglage där hade låtit
+skärmen intygar och inte en bock, så den kan inte vara fel. Ljusstyrkan syns
+inte på stämplingsskärmen, som saknar inloggning: ett reglage där hade låtit
 vem som helst släcka stämpelklockan. `src/lib/fully.ts` är enda filen som
 känner appen, och hårdvaran står i `docs/kioskskarm.md`.
+
+**Omstarten finns också på skärmen** (ändrat 2026-10-30, produktägarens val).
+En ikon överst i rutan under kugghjulet, bara på skärmar som kör appen, och
+bakom en fråga. Den som står vid en skärm som krånglar ska inte behöva ringa
+någon med panelen. Vem som helst kan alltså starta om, men inte med tryck i
+kön, och skärmen är tillbaka efter en minut. **Stänga av finns inte:**
+`fully.shutdown()` kräver en rotad enhet, och våra skärmar är inte rotade.
 
 **Starta om startar om hela skärmen** (ändrat 2026-10-26), med
 `fully.reboot()`, och appen om enheten inte går att starta om. Skärmen är
