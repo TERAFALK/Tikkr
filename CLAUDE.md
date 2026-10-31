@@ -361,6 +361,22 @@ startar allt.
 är i praktiken 10+ separata containrar (databas, auth-server, API-lager, realtid,
 admin-UI m.m.). Kraftfullt, men det motsäger målet om *ett* enkelt paket.
 
+**Det generella ligger i `tf-framework`** (beslutat 2026-10-31, produktägarens
+val). Gemensam grund för TERAFALK nya appar, med Tikkr som referens: paketen
+`@terafalk/core`, `@terafalk/auth` och `@terafalk/ui`, gemensamma workflows och ett
+driftkit. Standardstacken för nya appar är Next.js, Prisma och Postgres. Äldre repon
+i organisationen tas inte i beaktande.
+
+Filerna i `src/lib` och `src/components` som flyttat står kvar som tunna omvägar,
+så att importerna inte ändras och gränstesterna ser samma sökvägar. Det som är
+Tikkrs ligger kvar här: cookienamn, utfärdaren i autentiseringsappen, modellistan i
+`tenant.ts`, hjälplänkarna och varumärket. Formatet `v1` på tvåstegsnycklarna får
+aldrig sluta gå att läsa.
+
+`blue-*` i paketet heter `primary-*`, och `globals.css` pekar den skalan på Tikkrs,
+så att ingenting ändras visuellt. Vitest läser paketen genom Vite
+(`server.deps.inline`), eftersom de inte går att läsa som ren ESM i Node.
+
 ## 3. Datamodell
 
 ```

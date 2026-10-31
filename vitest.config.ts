@@ -13,6 +13,9 @@ export default defineConfig({
     // om de kördes samtidigt.
     fileParallelism: false,
     testTimeout: 20000,
+    // Paketen läses av Next i appen, och av Vite här. Som ren ESM i Node hittas
+    // varken importer utan filändelse eller next/headers.
+    server: { deps: { inline: [/@terafalk/] } },
   },
   // JSX översätts av testerna själva. tsconfig säger "preserve", eftersom
   // Next vill ha JSX orörd, och vitest 4 följer den inställningen. Ett test som

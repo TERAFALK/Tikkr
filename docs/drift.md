@@ -462,3 +462,35 @@ sessioner avslutas.
 
 Nycklarna lagras krypterade med `AUTH_SECRET`. **Byts `AUTH_SECRET`** går de
 inte längre att läsa, och alla måste sätta upp appen på nytt.
+
+---
+
+## 11. Paketen @terafalk/*
+
+Tikkr bygger på paket ur `tf-framework`, som ligger i GitHub Packages. Registret
+kräver inloggning även för att läsa. Nyckeln behövs bara när imagen byggs, och
+hamnar aldrig i imagen.
+
+**På servern**, labbet och produktionen, en gång:
+
+1. Skapa en personlig token, classic, med **bara** `read:packages` och en utgångstid.
+2. Lägg den i `.env`:
+
+```bash
+echo 'NODE_AUTH_TOKEN=<din-token>' >> .env
+```
+
+Docker Compose behöver vara 2.24 eller nyare, se punkt 8.
+
+**På laptopen**, med behörigheten `read:packages` i `gh`:
+
+```powershell
+$env:NODE_AUTH_TOKEN = gh auth token
+```
+
+**I GitHub.** Tikkr-repot behöver läsrätt till varje paket: paketets sida, **Package
+settings**, **Manage Actions access**, **Add repository**, rollen **Read**. Utan den
+faller `npm ci` i CI.
+
+Går nyckeln ut misslyckas bara bygget, och den gamla versionen kör vidare.
+

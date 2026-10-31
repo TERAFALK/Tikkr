@@ -7,10 +7,19 @@
 
 version: 2
 
+# Paketen @terafalk/*. Tikkrs repo har läsrätt till dem i GitHub Packages.
+registries:
+  terafalk:
+    type: npm-registry
+    url: https://npm.pkg.github.com
+    token: ${{ secrets.GITHUB_TOKEN }}
+
 updates:
   - package-ecosystem: npm
     directory: "/"
     target-branch: dev
+    registries:
+      - terafalk
     schedule:
       interval: weekly
       day: monday
