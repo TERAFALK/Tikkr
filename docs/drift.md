@@ -3,7 +3,7 @@
 Kör driftkontrollen när du undrar hur det står till. Den ändrar ingenting.
 
 ```bash
-./scripts/status.sh
+./ops/status.sh
 ```
 
 Nedan står hur varje punkt åtgärdas, i den ordning de spelar roll.
@@ -24,7 +24,7 @@ Migrationerna ligger i `prisma/migrations/` och körs i tur och ordning av
 `migrate`-containern vid varje start. Den första, `0_init`, är baslinjen: hela
 databasen som den såg ut när migrationerna infördes.
 
-`scripts/migrate.sh` bygger aldrig databasen ur schemat. Saknas
+`ops/migrate.sh` bygger aldrig databasen ur schemat. Saknas
 migrationerna stoppar den, och appen startar inte.
 
 ### En schemaändring
@@ -32,7 +32,7 @@ migrationerna stoppar den, och appen startar inte.
 På laptopen, i samma gren och före commit:
 
 ```powershell
-node scripts/new-migration.mjs lagg-till-foto-pa-anstalld
+node ops/new-migration.mjs lagg-till-foto-pa-anstalld
 ```
 
 Skriptet jämför schemat mot senaste commit och skriver skillnaden som SQL. Det
@@ -145,7 +145,7 @@ Uteblir pingen larmar tjänsten — det är så ett jobb som slutat köra upptä
 Testa att det fungerar, och schemalägg:
 
 ```bash
-./scripts/backup.sh
+./ops/backup.sh
 ```
 
 
@@ -166,8 +166,8 @@ enda nattlig kopia kunde en hel arbetsdags stämplingar gå förlorade; nu som
 mest en halv. Databasen är liten, och kopiorna kostar i praktiken ingenting.
 
 ```
-0 3,12 * * * /home/administrator/Tikkr/scripts/backup.sh >> /var/log/tikkr-backup.log 2>&1
-30 16 * * * /home/administrator/Tikkr/scripts/backup.sh >> /var/log/tikkr-backup.log 2>&1
+0 3,12 * * * /home/administrator/Tikkr/ops/backup.sh >> /var/log/tikkr-backup.log 2>&1
+30 16 * * * /home/administrator/Tikkr/ops/backup.sh >> /var/log/tikkr-backup.log 2>&1
 ```
 
 Före en driftsättning tas dessutom en kopia av `release.sh`.
@@ -179,7 +179,7 @@ En backup ingen provat att läsa tillbaka är bara en förhoppning. Övningen g�
 Kunddata lämnar aldrig servern, och den skarpa databasen rörs inte:
 
 ```bash
-./scripts/restore-test.sh
+./ops/restore-test.sh
 ```
 
 Skriptet visar hur många företag, anställda och stämplingar kopian innehöll
@@ -191,7 +191,7 @@ du vet att lösenorden i lösenordshanteraren fungerar:
 rclone copy tikkr-krypterad: ./backups --include 'tikkr_*.sql.gz' --max-age 2d
 ```
 
-`./scripts/restore.sh` är skarp återläsning och **skriver över** databasen.
+`./ops/restore.sh` är skarp återläsning och **skriver över** databasen.
 Den används bara på riktigt, se [release.md](release.md).
 
 ---
@@ -313,7 +313,7 @@ SPF, DKIM och DMARC måste vara satta för `tikkr.se`, annars hamnar
       ([release.md](release.md))
 - [ ] Kontrollkunden upplagd i produktionen, med en egen skärm
 - [ ] Tvåstegsinloggning uppsatt för varje plattformskonto (punkt 10)
-- [ ] `./scripts/status.sh` utan röda punkter
+- [ ] `./ops/status.sh` utan röda punkter
 
 ---
 
@@ -364,7 +364,7 @@ docker network create npm_proxy
 5. Driftsätt den första versionen, se [release.md](release.md):
 
 ```bash
-./scripts/release.sh v1.0.0
+./ops/release.sh v1.0.0
 ```
 
 Caddy hämtar certifikaten själv första gången. **Kör aldrig seed här.**
@@ -411,14 +411,14 @@ Ett nytt fynd som inte står här ska bedömas innan nästa release.
 
 | Vad | Kommando |
 |---|---|
-| Driftkontroll | `./scripts/status.sh` |
-| Driftsätta en version | `./scripts/release.sh v1.2.0` — se [release.md](release.md) |
-| Labbet till senaste dev | `./scripts/release.sh dev` |
+| Driftkontroll | `./ops/status.sh` |
+| Driftsätta en version | `./ops/release.sh v1.2.0` — se [release.md](release.md) |
+| Labbet till senaste dev | `./ops/release.sh dev` |
 | Loggar | `docker compose logs -f app` |
 | Kör testerna | `./scripts/test.sh` |
-| Ny migration (laptopen) | `node scripts/new-migration.mjs <namn>` |
-| Säkerhetskopia nu | `./scripts/backup.sh` |
-| Öva återläsning | `./scripts/restore-test.sh` |
+| Ny migration (laptopen) | `node ops/new-migration.mjs <namn>` |
+| Säkerhetskopia nu | `./ops/backup.sh` |
+| Öva återläsning | `./ops/restore-test.sh` |
 
 ---
 

@@ -17,7 +17,7 @@ set -e
 
 if [ ! -d "prisma/migrations" ]; then
   echo "STOPP: prisma/migrations saknas i den här versionen."
-  echo "Databasen ändras bara med migrationer. Se docs/drift.md punkt 1."
+  echo "Databasen ändras bara med migrationer. Se docs/standards/migrationer.md i tf-framework."
   exit 1
 fi
 
