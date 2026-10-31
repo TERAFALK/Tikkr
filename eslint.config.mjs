@@ -11,6 +11,7 @@ export default tseslint.config(
   { ignores: [".next/**", "node_modules/**", "public/**", "next-env.d.ts"] },
   {
     files: ["src/**/*.{ts,tsx}"],
+    linterOptions: { reportUnusedDisableDirectives: "off" },
     languageOptions: {
       parser: tseslint.parser,
       parserOptions: { projectService: true },
