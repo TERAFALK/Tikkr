@@ -113,11 +113,14 @@ echo "  Kör nu:    ${RUNNING:-okänt (svarar inte)}"
 echo "  Ny:        $VERSION  (commit $(git rev-parse --short=7 "$COMMIT"))"
 
 if [ -n "${PRE_RELEASE_HOOK:-}" ]; then
-  # Från den version som ska ut, inte den som ligger i mappen.
-  git show "$COMMIT:$PRE_RELEASE_HOOK" > "$OPS_RELEASE_COPY.hook" 2>/dev/null \
-    || fail "$PRE_RELEASE_HOOK saknas i $VERSION."
-  bash "$OPS_RELEASE_COPY.hook" "$COMMIT" "$VERSION" "$ENVIRONMENT" \
-    || { rm -f "$OPS_RELEASE_COPY.hook"; fail "Kroken $PRE_RELEASE_HOOK stoppade driftsättningen. Ingenting har ändrats."; }
+  # Från den version som ska ut, inte den som ligger i mappen. En äldre version
+  # saknar kroken, och det får aldrig hindra att man backar till den.
+  if git show "$COMMIT:$PRE_RELEASE_HOOK" > "$OPS_RELEASE_COPY.hook" 2>/dev/null; then
+    bash "$OPS_RELEASE_COPY.hook" "$COMMIT" "$VERSION" "$ENVIRONMENT" \
+      || { rm -f "$OPS_RELEASE_COPY.hook"; fail "Kroken $PRE_RELEASE_HOOK stoppade driftsättningen. Ingenting har ändrats."; }
+  else
+    echo "  Krok:      $PRE_RELEASE_HOOK saknas i $VERSION, hoppar över den."
+  fi
   rm -f "$OPS_RELEASE_COPY.hook"
 fi
 
