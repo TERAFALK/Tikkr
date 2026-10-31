@@ -1,0 +1,28 @@
+# Det enda en app ställer in i driftkitet. Kopiera till ops/app.conf.
+# Filen ligger i appens git och innehåller inga hemligheter.
+
+# Appens korta namn: containrar, backupfiler och förval för databasen.
+APP_SLUG=minapp
+
+# Prefixet på miljö- och versionsvariablerna i .env. Med APP läses APP_ENV och
+# skrivs APP_VERSION. Tikkr har TIKKR.
+ENV_PREFIX=APP
+
+# Hälsokontrollen. Ska svara "status":"ok" och versionen.
+HEALTH_PATH=/api/health
+
+# Satt: release.sh hämtar färdiga images härifrån. Tomt: bygger på servern.
+# IMAGE_REPO=ghcr.io/terafalk/minapp
+
+# Valfria krokar, sökvägar i appen.
+#
+# PRE_RELEASE_HOOK   körs före backupen med commit, version och miljö. En krok
+#                    som fäller stoppar driftsättningen.
+# POST_RELEASE_HOOK  körs sist och skriver ut appens egna kontrollpunkter.
+# STATUS_HOOK        körs av status.sh och får använda ok, warn, bad och head_.
+# RESTORE_TEST_HOOK  körs av restore-test.sh och får använda count och sql.
+#
+# PRE_RELEASE_HOOK=ops/hooks/pre-release.sh
+# POST_RELEASE_HOOK=ops/hooks/post-release.sh
+# STATUS_HOOK=ops/hooks/status.sh
+# RESTORE_TEST_HOOK=ops/hooks/restore-test.sh

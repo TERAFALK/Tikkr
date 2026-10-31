@@ -92,7 +92,7 @@ jobs:
             echo "schema.prisma och migrationerna säger olika saker. Skillnaden:"
             cat drift.sql
             echo
-            echo "Skapa migrationen med: node scripts/new-migration.mjs <namn>"
+            echo "Skapa migrationen med: node ops/new-migration.mjs <namn>"
             exit 1
           fi
 
@@ -143,4 +143,6 @@ jobs:
           [ "$BIND" = "127.0.0.1" ]
 
       - name: Kontrollera skripten
-        run: bash -n scripts/*.sh
+        run: |
+          bash -n scripts/*.sh ops/*.sh ops/hooks/*.sh
+          node ops/verify.mjs

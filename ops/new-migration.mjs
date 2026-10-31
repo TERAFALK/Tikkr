@@ -3,18 +3,18 @@
 //
 // Körs på LAPTOPEN, i samma gren som schemaändringen och före commit:
 //
-//   node scripts/new-migration.mjs lagg-till-foto-pa-anstalld
+//   node ops/new-migration.mjs lagg-till-foto-pa-anstalld
 //
 // Ingen databas behövs. Skriptet jämför schemat som det såg ut vid senaste
 // commit med schemat som det ser ut nu, och skriver skillnaden som SQL i
 // prisma/migrations/<tid>_<namn>/migration.sql. Är schemaändringen redan
 // committad, jämför mot dev i stället:
 //
-//   node scripts/new-migration.mjs lagg-till-foto-pa-anstalld --fran origin/dev
+//   node ops/new-migration.mjs lagg-till-foto-pa-anstalld --fran origin/dev
 //
 // Varför inte "prisma migrate dev": den kräver en databas att prova mot, och
 // laptopen har ingen. Servern skulle kunna, men den skriver aldrig till
-// GitHub (CLAUDE.md § 9). CI kontrollerar efteråt att migrationerna och
+// GitHub (servern pushar aldrig). CI kontrollerar efteråt att migrationerna och
 // schemat stämmer, så en migration som blivit fel fälls där och inte i
 // produktionen.
 
@@ -42,7 +42,7 @@ const slug = (name ?? "")
   .replace(/^_|_$/g, "");
 
 if (!slug || !fromRef) {
-  console.error("Användning: node scripts/new-migration.mjs <namn> [--fran <ref>]");
+  console.error("Användning: node ops/new-migration.mjs <namn> [--fran <ref>]");
   process.exit(1);
 }
 
@@ -65,7 +65,7 @@ function run(cmd, cmdArgs) {
 
 // Schemat som det var vid jämförelsepunkten.
 const before = run("git", ["show", `${fromRef}:prisma/schema.prisma`]);
-const tmp = mkdtempSync(path.join(tmpdir(), "tikkr-migration-"));
+const tmp = mkdtempSync(path.join(tmpdir(), "ops-migration-"));
 const beforeFile = path.join(tmp, "schema.prisma");
 writeFileSync(beforeFile, before);
 
@@ -100,7 +100,7 @@ writeFileSync(path.join(dir, "migration.sql"), sql);
 
 console.log(`Skapad: prisma/migrations/${stamp}_${slug}/migration.sql`);
 
-// Regeln i CLAUDE.md § 0: en migration ska fungera med FÖREGÅENDE version av
+// Regeln i docs/standards/migrationer.md: en migration ska fungera med FÖREGÅENDE version av
 // appen. Det här är de satser som bryter mot den, eller som rör befintliga
 // rader, och som därför ska stå i PR-beskrivningen.
 const risky = sql
