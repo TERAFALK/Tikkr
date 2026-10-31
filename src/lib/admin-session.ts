@@ -5,7 +5,7 @@ import { unsafeGlobalPrisma } from "./db";
 import { forCompany, type CompanyDb } from "./tenant";
 import { readSupportSession } from "./support-session";
 import { isPlatformAdmin } from "./platform-access";
-import { SESSION_MAX_AGE_SECONDS } from "./session-lifetime";
+import { sessionIsValid } from "@terafalk/auth/session";
 import { evaluateAccess } from "./subscription";
 
 /**
@@ -232,17 +232,13 @@ export async function currentAdmin(): Promise<AdminSession | null> {
   // Tiden räknas i hela sekunder. En marginal på en sekund gör att den som
   // byter sitt eget lösenord och loggas in på nytt i samma ögonblick inte
   // råkar kastas ut av sin egen ändring.
-  const authTime = session.user.authTime;
-  if (typeof authTime !== "number") return null;
-
-  const authenticated = authTime * 1000;
-
-  // Taket gäller från inloggningen. Cookien förlängs av Auth.js vid varje
-  // förnyelse, och utan taket levde en session så länge någon använde den.
-  if (Date.now() - authenticated > SESSION_MAX_AGE_SECONDS * 1000) return null;
-
-  for (const cutoff of [account.passwordChangedAt, account.sessionsRevokedAt]) {
-    if (cutoff && authenticated < cutoff.getTime() - 1000) return null;
+  if (
+    !sessionIsValid({
+      authTime: session.user.authTime,
+      revokedAt: [account.passwordChangedAt, account.sessionsRevokedAt],
+    })
+  ) {
+    return null;
   }
 
   const locked =

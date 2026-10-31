@@ -1,39 +1,19 @@
 import { Prisma } from "@prisma/client";
+import { tenantExtension } from "@terafalk/core/tenant";
 import { unsafeGlobalPrisma } from "./db";
 
+export { ReadOnlyError, TenantIsolationError } from "@terafalk/core/tenant";
+
 /**
- * MULTI-TENANT-LAGRET — systemets viktigaste säkerhetskod.
+ * MULTI-TENANT-LAGRET. Reglerna ligger i @terafalk/core, se tf-framework. Här står
+ * vad som är Tikkrs: vilka modeller som är kunddata.
  *
- * Problemet: alla kundföretag delar samma databas. Om en enda kodrad någonstans
- * glömmer att filtrera på company_id kan kund A se kund B:s tidrapporter. Det
- * är den värsta bugg det här systemet kan ha.
- *
- * Lösningen: ingen kod i appen får prata med databasen direkt. All åtkomst går
- * via `forCompany(companyId)`, som lämnar tillbaka en databasklient där
- * filtreringen redan är inbakad. Den som skriver `db.employee.findMany()` får
- * automatiskt bara det inloggade företagets anställda — även om hen inte tänkte
- * på det. Filtret går inte att glömma, eftersom det inte är något man skriver.
- *
- * Konkret sker två saker automatiskt:
- *   1. Läsningar och ändringar får `WHERE company_id = ...` påtvingat
- *   2. Anrop som pekar ut ett ANNAT företag avvisas med ett fel
- *
- * Vid `create` måste companyId anges uttryckligen — Prismas typer kräver det,
- * och det är bra: TypeScript ser till att du inte glömmer, och det här lagret
- * ser till att du inte anger fel. Kompilatorn och säkerheten drar åt samma håll.
- *
- * Bevisas av tests/tenant-isolation.test.ts.
- *
- * LÄSLÄGE. Klienten kan också begäras utan skrivrätt, se `readOnly` nedan. Det
- * används av supportläget, där leverantören ser en kunds panel. Spärren ligger
- * här och inte i gränssnittet av samma skäl som företagsfiltret: en gömd knapp
- * är ingen spärr, och den som skriver en ny sida ska inte kunna öppna ett hål
- * genom att glömma en kontroll.
+ * Bevisas av tests/tenant-isolation.test.ts och tests/tenant-writes.test.ts.
  */
 
 /**
- * Alla modeller som innehåller kunddata. `Company` står avsiktligt inte med —
- * den ÄR tenanten och har ingen egen company_id-kolumn.
+ * Alla modeller som innehåller kunddata. `Company` står avsiktligt inte med: den
+ * ÄR tenanten och har ingen egen company_id-kolumn.
  *
  * Lägger du till en ny tabell i schema.prisma måste den läggas till här.
  * Testet `alla kundnära modeller är skyddade` går sönder om du glömmer.
@@ -92,209 +72,8 @@ export const TENANT_SCOPED_MODELS = [
   "ShopOrderEvent",
 ] as const;
 
-const TENANT_MODEL_SET: ReadonlySet<string> = new Set(TENANT_SCOPED_MODELS);
-
-/** Kastas när något försöker kringgå filtreringen. */
-export class TenantIsolationError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = "TenantIsolationError";
-  }
-}
-
-type AnyArgs = Record<string, unknown>;
-
-/**
- * Vägrar om koden uttryckligen pekar ut ett annat företag.
- *
- * Att göra det är alltid ett fel — antingen en bugg eller ett angreppsförsök.
- * Vi skulle kunna byta ut värdet tyst och returnera det egna företagets data,
- * men då göms buggen. Bättre att säga ifrån direkt.
- */
-function rejectForeignCompanyId(value: unknown, companyId: string, where: string) {
-  if (value !== undefined && value !== companyId) {
-    throw new TenantIsolationError(
-      `Försök att ${where} med companyId "${String(value)}" från en klient låst ` +
-        `till "${companyId}". Ta bort companyId ur anropet — filtreringen sköts ` +
-        `automatiskt av forCompany().`
-    );
-  }
-}
-
-function mergeWhere(args: AnyArgs | undefined, companyId: string): AnyArgs {
-  const next = { ...(args ?? {}) };
-  const existing = (next.where ?? {}) as Record<string, unknown>;
-
-  rejectForeignCompanyId(existing.companyId, companyId, "söka");
-
-  next.where = { ...existing, companyId };
-  return next;
-}
-
-function stampCompanyOnData(data: unknown, companyId: string): unknown {
-  if (Array.isArray(data)) {
-    return data.map((row) => {
-      rejectForeignCompanyId(
-        (row as Record<string, unknown>)?.companyId,
-        companyId,
-        "skriva"
-      );
-      return { ...(row as object), companyId };
-    });
-  }
-  if (data && typeof data === "object") {
-    rejectForeignCompanyId(
-      (data as Record<string, unknown>).companyId,
-      companyId,
-      "skriva"
-    );
-    return { ...(data as object), companyId };
-  }
-  return data;
-}
-
-/**
- * Relationsfälten per modell, ur Prismas egen beskrivning av schemat, med
- * modellen varje fält pekar på.
- *
- * Behövs för att känna igen en NÄSTLAD skrivning: `employee: { connect: { id
- * } }` eller `breaks: { create: [...] }`. Lagret stämplar bara den yttersta
- * raden, så en nästlad skrivning kunde annars koppla en rad till ett annat
- * företags anställd, eller skapa rader som aldrig prövats.
- */
-const RELATION_FIELDS: ReadonlyMap<string, ReadonlyMap<string, string>> = new Map(
-  Prisma.dmmf.datamodel.models.map((model) => [
-    model.name,
-    new Map(
-      model.fields
-        .filter((field) => field.kind === "object")
-        .map((field) => [field.name, field.type])
-    ),
-  ])
-);
-
-/** Det enda som får stå i en nästlad skrivning: nya rader. */
-const NESTED_CREATE_KEYS = new Set(["create", "createMany"]);
-
-function rowsOf(value: unknown): Record<string, unknown>[] {
-  return (Array.isArray(value) ? value : [value]).filter(
-    (row): row is Record<string, unknown> => Boolean(row) && typeof row === "object"
-  );
-}
-
-function nestedError(model: string, key: string, why: string): TenantIsolationError {
-  return new TenantIsolationError(
-    `Nästlad skrivning via "${model}.${key}" genom en klient låst till ett ` +
-      `företag: ${why}`
-  );
-}
-
-/**
- * PRÖVAR NÄSTLADE SKRIVNINGAR PÅ KUNDDATA (tillagt 2026-10-18,
- * säkerhetsgranskningen).
- *
- * Vid `create` får en relation bara bära NYA rader, och varje sådan rad ska
- * uttryckligen ha samma `companyId`, eftersom lagret inte stämplar nästlade
- * rader själv. Det är så stationernas och schemats raster skapas. Kopplingar
- * till befintliga rader (`connect`, `connectOrCreate`) och nästlade
- * ändringar vägras: varje koppling sätts som ett id-fält, efter att raden
- * slagits upp genom den här klienten.
- *
- * Vid en ändring (`update`) vägras varje nästlad skrivning. Ingen kod behöver
- * dem, och en ny ska prövas här först.
- */
-function checkNestedWrites(
-  model: string,
-  data: unknown,
-  companyId: string,
-  allowCreate: boolean
-) {
-  const relations = RELATION_FIELDS.get(model);
-  if (!relations || relations.size === 0) return;
-
-  for (const row of rowsOf(data)) {
-    for (const [key, target] of relations) {
-      const value = row[key];
-      if (value === undefined) continue;
-
-      if (!allowCreate) throw nestedError(model, key, "inte tillåtet vid en ändring.");
-
-      if (!value || typeof value !== "object" || Array.isArray(value)) {
-        throw nestedError(model, key, "okänd form.");
-      }
-
-      for (const [operation, payload] of Object.entries(value)) {
-        if (!NESTED_CREATE_KEYS.has(operation)) {
-          throw nestedError(
-            model,
-            key,
-            `"${operation}" är inte tillåtet. Sätt id-fältet i stället, efter att ` +
-              "raden slagits upp genom forCompany()."
-          );
-        }
-
-        const children =
-          operation === "createMany"
-            ? rowsOf((payload as { data?: unknown } | null)?.data)
-            : rowsOf(payload);
-
-        for (const child of children) {
-          if (TENANT_MODEL_SET.has(target) && child.companyId !== companyId) {
-            throw nestedError(model, key, "varje ny rad ska bära samma companyId.");
-          }
-          checkNestedWrites(target, child, companyId, true);
-        }
-      }
-    }
-  }
-}
-
-/**
- * Prövar det som skrivs vid en ändring: företaget får inte bytas, och inga
- * nästlade skrivningar. Utan prövningen kunde `update({ data: { companyId } })`
- * flytta en rad till ett annat företag, fast frågan bara hittade egna rader.
- */
-function checkUpdateData(model: string, data: unknown, companyId: string) {
-  checkNestedWrites(model, data, companyId, false);
-
-  for (const row of rowsOf(data)) {
-    rejectForeignCompanyId(row.companyId, companyId, "flytta en rad");
-  }
-}
-
-/** Kastas när något försöker skriva genom en klient som bara får läsa. */
-export class ReadOnlyError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = "ReadOnlyError";
-  }
-}
-
-/**
- * Operationer som ändrar data. Listan är uttrycklig och inte en gissning ur
- * namnet: en ny Prisma-operation ska behöva läggas till här med flit, inte
- * släppas igenom för att den råkade heta något som inte matchade ett mönster.
- */
-const WRITE_OPERATIONS = new Set([
-  "create",
-  "createMany",
-  "createManyAndReturn",
-  "update",
-  "updateMany",
-  "updateManyAndReturn",
-  "upsert",
-  "delete",
-  "deleteMany",
-]);
-
 export interface CompanyDbOptions {
-  /**
-   * true ger en klient som vägrar skriva. Används av supportläget.
-   *
-   * Gäller ALLA modeller klienten når, inte bara de företagsfiltrerade —
-   * `Company` är inte tenant-scopad men ska inte heller gå att ändra av en
-   * supportsession.
-   */
+  /** true ger en klient som vägrar skriva. Används av supportläget. */
   readOnly?: boolean;
 }
 
@@ -305,133 +84,18 @@ export interface CompanyDbOptions {
  * @param options `readOnly` ger en klient utan skrivrätt
  */
 export function forCompany(companyId: string, options: CompanyDbOptions = {}) {
-  if (!companyId || typeof companyId !== "string") {
-    throw new TenantIsolationError(
-      "forCompany() anropades utan giltigt companyId. Detta är alltid en bugg — " +
-        "utan företags-id går det inte att avgöra vems data som får läsas."
-    );
-  }
-
-  const readOnly = options.readOnly === true;
-
-  return unsafeGlobalPrisma.$extends({
-    name: readOnly ? `tenant:${companyId}:ro` : `tenant:${companyId}`,
-
-    client: {
-      /** Företaget den här klienten är låst till. Bra vid felsökning. */
-      $companyId: companyId,
-      /** true när klienten bara får läsa. Bra vid felsökning. */
-      $readOnly: readOnly,
-    },
-
-    // OBS: Prisma tillåter inte att inbyggda metoder skrivs över i en
-    // extension, så $queryRaw och $executeRaw går INTE att blockera här.
-    // Rå SQL kringgår därmed företagsfiltreringen helt.
-    //
-    // Regel: skriv aldrig rå SQL mot kunddata. Behövs det ändå — t.ex. för en
-    // tung rapportfråga i Fas 2 — måste "WHERE company_id = ..." skrivas ut
-    // för hand och granskas extra noga.
-
-    query: {
-      $allModels: {
-        async $allOperations({ model, operation, args, query }) {
-          // LÄSLÄGET PRÖVAS FÖRST, före allt annat och för varje modell.
-          //
-          // Kastar i stället för att tysta ner skrivningen. En åtgärd som
-          // verkar spara men inte gör det är värre än ett fel: den som sitter
-          // i supportläget skulle tro att kundens problem var åtgärdat.
-          if (readOnly && WRITE_OPERATIONS.has(operation)) {
-            throw new ReadOnlyError(
-              `Supportläget får bara läsa. Försökte köra "${operation}" på ` +
-                `modellen "${model}". Be kunden göra ändringen, eller logga in ` +
-                `som dem själva med deras medgivande.`
-            );
-          }
-
-          // Company-tabellen och allt utanför listan lämnas orört.
-          if (!TENANT_MODEL_SET.has(model)) {
-            return query(args);
-          }
-
-          const a = (args ?? {}) as AnyArgs;
-          // Prismas typ för query() är snävare än de argument vi bygger om
-          // dynamiskt. Omvägen via unknown gör att TypeScript släpper igenom
-          // det utan att vi tappar kontrollen — vi vet vad vi skickar in.
-          const run = query as unknown as (args: unknown) => Promise<unknown>;
-
-          switch (operation) {
-            // findUnique letar bara på unika kolumner (som id) och accepterar
-            // inget extra company_id-filter i frågan. Därför kontrollerar vi
-            // efteråt istället: hämta raden, och lämna bara ut den om den
-            // tillhör rätt företag. Raden lämnar aldrig det här lagret annars,
-            // så ingen data kan läcka.
-            case "findUnique":
-            case "findUniqueOrThrow": {
-              // Om anroparen bett om utvalda kolumner måste vi se till att
-              // companyId följer med, annars går den inte att kontrollera.
-              // Den plockas bort igen innan svaret lämnas tillbaka, så
-              // anroparen får exakt det den bad om.
-              const select = a.select as Record<string, unknown> | undefined;
-              const addedCompanyId = Boolean(select) && !select!.companyId;
-
-              const row = (await run(
-                addedCompanyId ? { ...a, select: { ...select, companyId: true } } : a
-              )) as Record<string, unknown> | null;
-
-              if (!row || row.companyId !== companyId) {
-                if (operation === "findUniqueOrThrow") {
-                  throw new TenantIsolationError(
-                    `Ingen rad i ${model} med de angivna villkoren för det här företaget.`
-                  );
-                }
-                return null;
-              }
-
-              if (addedCompanyId) delete row.companyId;
-              return row;
-            }
-
-            case "findFirst":
-            case "findFirstOrThrow":
-            case "findMany":
-            case "count":
-            case "aggregate":
-            case "groupBy":
-            case "deleteMany":
-            case "delete":
-              return run(mergeWhere(a, companyId));
-
-            case "updateMany":
-            case "update":
-              checkUpdateData(model, a.data, companyId);
-              return run(mergeWhere(a, companyId));
-
-            case "create":
-            case "createMany":
-            case "createManyAndReturn":
-              checkNestedWrites(model, a.data, companyId, true);
-              return run({ ...a, data: stampCompanyOnData(a.data, companyId) });
-
-            case "upsert":
-              checkNestedWrites(model, a.create, companyId, true);
-              checkUpdateData(model, a.update, companyId);
-              return run({
-                ...mergeWhere(a, companyId),
-                create: stampCompanyOnData(a.create, companyId),
-              });
-
-            default:
-              // Okänd operation → vi vet inte hur den filtreras. Vägra hellre
-              // än att råka släppa igenom en ofiltrerad fråga.
-              throw new TenantIsolationError(
-                `Okänd databasoperation "${operation}" på modellen "${model}". ` +
-                  "Den måste hanteras uttryckligen i src/lib/tenant.ts innan den kan användas."
-              );
-          }
-        },
-      },
-    },
-  });
+  return unsafeGlobalPrisma.$extends(
+    tenantExtension({
+      tenantId: companyId,
+      models: TENANT_SCOPED_MODELS,
+      datamodel: Prisma.dmmf.datamodel,
+      readOnly: options.readOnly,
+      readOnlyMessage:
+        "Supportläget får bara läsa. Be kunden göra ändringen, eller logga in " +
+        "som dem själva med deras medgivande.",
+      client: { $companyId: companyId },
+    })
+  );
 }
 
 /** Typen för en företagslåst databasklient. Använd i funktionssignaturer. */

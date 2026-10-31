@@ -134,13 +134,11 @@ describe("märket sätts bara av registreringen", () => {
   const SRC = path.resolve(__dirname, "..", "src");
 
   /**
-   * De två filer som får nämna märket i kod, och ingen annan.
+   * Den enda fil som får nämna märket i kod.
    *
-   * Den ena DEFINIERAR det och den andra ANVÄNDER det. Att definitionen står
-   * med är inte en lucka: ändras den filen ändras märkets innebörd, och det
-   * är ett beslut, inte en rad man råkar skriva.
+   * Definitionen ligger sedan 2026-10-31 i @terafalk/auth, så listan blev kortare
+   * och regeln strängare: ingen fil i Tikkr utom registreringen får be om märket.
    */
-  const DEFINITION = path.join("lib", "login-ticket.ts");
   const CALLER = path.join("app", "registrera", "actions.ts");
 
   function filesIn(dir: string): string[] {
@@ -167,7 +165,7 @@ describe("märket sätts bara av registreringen", () => {
     });
 
     expect(callers.map((file) => path.relative(SRC, file)).sort()).toEqual(
-      [CALLER, DEFINITION].sort()
+      [CALLER]
     );
   });
 

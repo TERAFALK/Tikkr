@@ -34,12 +34,16 @@ concurrency:
 
 permissions:
   contents: read
+  packages: read
 
 jobs:
   beroenden:
     name: Beroenden (npm audit)
     runs-on: ubuntu-latest
     timeout-minutes: 10
+
+    env:
+      NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
     steps:
       - uses: actions/checkout@v7
@@ -123,6 +127,7 @@ jobs:
 
     env:
       TRIVY_IMAGE: aquasec/trivy:0.75.0
+      NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
     steps:
       - uses: actions/checkout@v7
@@ -130,6 +135,7 @@ jobs:
       - name: Bygg Docker-imagen
         run: >-
           docker build --target runner --tag tikkr-app:skanning
+          --secret id=npm_token,env=NODE_AUTH_TOKEN
           --build-arg TIKKR_VERSION=skanning-${{ github.sha }} .
 
       # Fäller vid KRITISK som har en rättelse. HÖG skrivs ut men fäller inte:
