@@ -367,6 +367,10 @@ val). Gemensam grund för TERAFALK nya appar, med Tikkr som referens: paketen
 driftkit. Standardstacken för nya appar är Next.js, Prisma och Postgres. Äldre repon
 i organisationen tas inte i beaktande.
 
+Inloggningsflödena ligger också där (2026-10-31): `admin-mfa.ts`, `password-reset.ts`,
+`email-verification.ts` och `account.ts` bär bara Tikkrs tabeller, adresser och
+mejl. Räknarnas namn `admin`, `admin-ip` och `admin-code-ip` är oförändrade.
+
 Filerna i `src/lib` och `src/components` som flyttat står kvar som tunna omvägar,
 så att importerna inte ändras och gränstesterna ser samma sökvägar. Det som är
 Tikkrs ligger kvar här: cookienamn, utfärdaren i autentiseringsappen, modellistan i
@@ -1713,6 +1717,11 @@ kundens arbetsorder, det allt annat i Tikkr hänger på. I koden heter det
    klienten och en återställningslänk annars kunde peka till en angripare.
    Klientens IP är SISTA värdet i `X-Forwarded-For`, det vår egen proxy satte.
    Se `app-url.ts` och `client-ip.ts`.
+
+   **Glömt lösenord gör arbetet efter svaret** (ändrat 2026-10-31). Svaret väntade
+   på utskicket, men bara när kontot fanns, så svarstiden avslöjade vilka adresser
+   som är kunder. Formuläret bromsas också per IP-adress: tio begäranden per kvart.
+   Se `password-reset.ts`, där Next kör arbetet med `after`.
 
    **Sessionen gäller sju dagar** (ändrat 2026-10-06, var trettio dagar). Ett
    lösenordsbyte eller "Logga ut på alla enheter" under Ditt konto gör äldre
