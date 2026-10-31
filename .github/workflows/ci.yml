@@ -126,7 +126,7 @@ jobs:
       # inte går att köra i containern. Alla värden är påhittade.
       - name: Starttest
         run: |
-          docker build --target builder --tag tikkr-migrate:ci             --secret id=npm_token,env=NODE_AUTH_TOKEN .
+          docker build --target builder --tag tikkr-migrate:ci --secret id=npm_token,env=NODE_AUTH_TOKEN .
 
           URL="postgresql://tikkr:tikkr@start-db:5432/tikkr?schema=public"
           cat > start.env <<EOF_ENV
@@ -138,7 +138,9 @@ jobs:
           sed -i 's/^ *//' start.env
 
           docker network create start
-          docker run -d --name start-db --network start             -e POSTGRES_USER=tikkr -e POSTGRES_PASSWORD=tikkr -e POSTGRES_DB=tikkr             postgres:17-alpine
+          docker run -d --name start-db --network start \
+            -e POSTGRES_USER=tikkr -e POSTGRES_PASSWORD=tikkr -e POSTGRES_DB=tikkr \
+            postgres:17-alpine
 
           for _ in $(seq 1 30); do
             docker exec start-db pg_isready -U tikkr -d tikkr -q && break
@@ -146,9 +148,11 @@ jobs:
           done
           sleep 3
 
-          docker run --rm --network start --env-file start.env             tikkr-migrate:ci sh ./ops/migrate.sh
+          docker run --rm --network start --env-file start.env \
+            tikkr-migrate:ci sh ./ops/migrate.sh
 
-          docker run -d --name start-app --network start --env-file start.env             -p 3000:3000 tikkr-app:ci
+          docker run -d --name start-app --network start --env-file start.env \
+            -p 3000:3000 tikkr-app:ci
 
           for _ in $(seq 1 45); do
             if curl -fsS --max-time 3 http://127.0.0.1:3000/api/health; then
