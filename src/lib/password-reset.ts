@@ -1,197 +1,129 @@
-import { createHash, randomBytes } from "node:crypto";
-import bcrypt from "bcryptjs";
+import { createPasswordReset } from "@terafalk/auth/password-reset";
+import { after } from "next/server";
 import { unsafeGlobalPrisma } from "./db";
 import { sendEmail } from "./email";
 import { passwordChangedEmail, passwordResetEmail } from "./emails";
-import { normalizeEmail } from "./signup";
+import { clearFailedLogins, isLockedOut, noteFailedLogin } from "./login-throttle";
+
+export { PasswordResetError, RESET_MINUTES } from "@terafalk/auth/password-reset";
 
 /**
  * ÅTERSTÄLLNING AV GLÖMT LÖSENORD.
  *
- * Byggd som inbjudningarna i admin-users.ts: bara fingeravtrycket av länken
- * sparas, den har en utgångstid, och den går att lösa in exakt en gång.
+ * Reglerna ligger i @terafalk/auth, se tf-framework: länken går att lösa in en
+ * gång, den gäller en timme, och bytet loggar ut alla enheter. Här står Tikkrs
+ * tabeller, adress och mejl.
  *
- * Tre saker skiljer den från en inbjudan, och alla tre är avsiktliga:
- *
- * 1. **En timme, inte en vecka.** Den som glömt sitt lösenord sitter framför
- *    datorn just nu. En länk som ligger kvar i en inkorg i en vecka är en väg
- *    in för den som kommer åt inkorgen senare.
- *
- * 2. **Svaret avslöjar aldrig om adressen finns.** Formuläret svarar likadant
- *    oavsett. Ett formulär som säger "adressen finns inte" är ett sätt att
- *    kartlägga vilka företag som är kunder, gratis och utan inloggning.
- *
- * 3. **Bytet loggar ut alla enheter.** Byter man lösenord för att man
- *    misstänker att någon annan kommit åt kontot vore det meningslöst om den
- *    andra sessionen fick fortsätta.
+ * ARBETET GÖRS EFTER SVARET (ändrat 2026-10-31). Svaret väntade på utskicket till
+ * Microsoft, men bara när kontot fanns, så svarstiden avslöjade vilka adresser som
+ * är kunder. Utanför ett anrop finns inget svar att vänta in, och då görs arbetet
+ * direkt.
  */
-
-export class PasswordResetError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = "PasswordResetError";
+function deferred(work: () => Promise<void>): void | Promise<void> {
+  try {
+    after(work);
+  } catch {
+    return work();
   }
 }
 
-/** Hur länge en länk gäller. */
-export const RESET_MINUTES = 60;
+function flow(baseUrl: string) {
+  return createPasswordReset({
+    defer: deferred,
+    throttle: { isLockedOut, noteFailedLogin, clearFailedLogins },
+    linkFor: (token) => `${baseUrl}/admin/aterstall/${token}`,
 
-/**
- * Hur ofta en ny länk får begäras för samma konto.
- *
- * Utan spärren blir formuläret ett sätt att fylla någon annans inkorg: den som
- * kan en kunds adress kan skicka hur många mejl som helst dit, i vårt namn.
- */
-const RESEND_COOLDOWN_MS = 2 * 60 * 1000;
+    async sendResetEmail({ to, link, minutesValid }) {
+      const result = await sendEmail(passwordResetEmail({ to, link, minutesValid }));
 
-const MIN_PASSWORD_LENGTH = 10;
+      // Ett driftfel, inte ett användarfel. Det syns i loggen, och kvittensen till
+      // besökaren ändras inte.
+      if (!result.delivered && result.provider !== "log") {
+        console.error(
+          `[losenordsaterstallning] Mejlet till ${to} gick inte fram: ` +
+            `${result.problem ?? "okänd orsak"}`
+        );
+      }
+    },
 
-function hashToken(token: string): string {
-  return createHash("sha256").update(token).digest("hex");
+    async sendChangedEmail({ to }) {
+      await sendEmail(passwordChangedEmail({ to }));
+    },
+
+    store: {
+      findUserByEmail: (email) =>
+        unsafeGlobalPrisma.adminUser.findUnique({
+          where: { email },
+          select: { id: true, email: true },
+        }),
+
+      async hasRecentRequest(userId, since) {
+        const recent = await unsafeGlobalPrisma.passwordReset.findFirst({
+          where: { userId, usedAt: null, createdAt: { gt: since } },
+          select: { id: true },
+        });
+
+        return recent !== null;
+      },
+
+      async createRequest({ userId, tokenHash, expiresAt, ip }) {
+        await unsafeGlobalPrisma.passwordReset.create({
+          data: { userId, tokenHash, expiresAt, requestedFromIp: ip },
+        });
+      },
+
+      findRequest: (tokenHash) =>
+        unsafeGlobalPrisma.passwordReset.findUnique({
+          where: { tokenHash },
+          select: {
+            id: true,
+            usedAt: true,
+            expiresAt: true,
+            user: { select: { id: true, email: true } },
+          },
+        }),
+
+      redeem: ({ requestId, userId, passwordHash, now }) =>
+        unsafeGlobalPrisma.$transaction(async (tx) => {
+          const claimed = await tx.passwordReset.updateMany({
+            where: { id: requestId, usedAt: null },
+            data: { usedAt: now },
+          });
+
+          // Hann någon annan lösa in den mellan uppslaget och nu blir count noll.
+          if (claimed.count === 0) return false;
+
+          await tx.adminUser.update({
+            where: { id: userId },
+            // Länken kom till adressen, alltså fungerar den.
+            data: { passwordHash, passwordChangedAt: now, emailVerifiedAt: now },
+          });
+
+          // Bad någon om två i rad ska den äldre inte gå att använda efteråt.
+          await tx.passwordReset.deleteMany({ where: { userId, usedAt: null } });
+
+          return true;
+        }),
+    },
+  });
 }
 
-/**
- * Begär en återställning.
- *
- * Returnerar ingenting som skiljer sig beroende på om kontot fanns. Anroparen
- * visar samma kvittens oavsett.
- */
-export async function requestPasswordReset(params: {
+/** Begär en återställning. Svaret är detsamma oavsett om kontot fanns. */
+export function requestPasswordReset(params: {
   email: string;
-  /** Adressen bygger länken, så att den pekar dit anropet kom ifrån. */
+  /** Ur inställningen, aldrig ur anropet. Se app-url.ts. */
   baseUrl: string;
   ip?: string | null;
 }): Promise<void> {
-  const email = normalizeEmail(params.email);
-  if (!email) return;
-
-  const user = await unsafeGlobalPrisma.adminUser.findUnique({
-    where: { email },
-    select: { id: true, email: true },
-  });
-
-  // Tyst avslut. Ur anroparens synvinkel gick det lika bra som annars.
-  if (!user) return;
-
-  const recent = await unsafeGlobalPrisma.passwordReset.findFirst({
-    where: {
-      userId: user.id,
-      usedAt: null,
-      createdAt: { gt: new Date(Date.now() - RESEND_COOLDOWN_MS) },
-    },
-    select: { id: true },
-  });
-
-  if (recent) return;
-
-  const token = randomBytes(32).toString("base64url");
-
-  const expiresAt = new Date(Date.now() + RESET_MINUTES * 60 * 1000);
-
-  await unsafeGlobalPrisma.passwordReset.create({
-    data: {
-      userId: user.id,
-      tokenHash: hashToken(token),
-      expiresAt,
-      requestedFromIp: params.ip ?? null,
-    },
-  });
-
-  const link = `${params.baseUrl}/admin/aterstall/${token}`;
-
-  const result = await sendEmail(
-    passwordResetEmail({ to: user.email, link, minutesValid: RESET_MINUTES })
-  );
-
-  // Går utskicket inte fram är det ett driftfel, inte ett användarfel. Det ska
-  // synas i loggen — men kvittensen till besökaren ändras inte, eftersom den
-  // annars skulle avslöja att adressen finns.
-  if (!result.delivered && result.provider !== "log") {
-    console.error(
-      `[losenordsaterstallning] Mejlet till ${user.email} gick inte fram: ` +
-        `${result.problem ?? "okänd orsak"}`
-    );
-  }
-}
-
-export interface PendingReset {
-  email: string;
+  return flow(params.baseUrl).requestPasswordReset(params);
 }
 
 /** Slår upp en länk utan att förbruka den. Används för att visa formuläret. */
-export async function findPasswordReset(
-  token: string
-): Promise<PendingReset | null> {
-  if (!token) return null;
-
-  const reset = await unsafeGlobalPrisma.passwordReset.findUnique({
-    where: { tokenHash: hashToken(token) },
-    include: { user: { select: { email: true } } },
-  });
-
-  if (!reset || reset.usedAt || reset.expiresAt < new Date()) return null;
-
-  return { email: reset.user.email };
+export function findPasswordReset(token: string) {
+  return flow("").findPasswordReset(token);
 }
 
-/**
- * Sätter det nya lösenordet.
- *
- * Allt sker i en transaktion: länken förbrukas, lösenordet byts, övriga
- * väntande länkar för kontot slängs, och tidpunkten skrivs ned så att gamla
- * sessioner slutar gälla. Halvvägs är inget godtagbart läge för något av det.
- */
-export async function redeemPasswordReset(
-  token: string,
-  password: string
-): Promise<{ email: string; userId: string }> {
-  if (password.length < MIN_PASSWORD_LENGTH) {
-    throw new PasswordResetError(
-      `Lösenordet måste vara minst ${MIN_PASSWORD_LENGTH} tecken.`
-    );
-  }
-
-  const reset = await unsafeGlobalPrisma.passwordReset.findUnique({
-    where: { tokenHash: hashToken(token) },
-    include: { user: { select: { id: true, email: true } } },
-  });
-
-  if (!reset || reset.usedAt || reset.expiresAt < new Date()) {
-    throw new PasswordResetError(
-      "Länken är ogiltig eller har upphört att gälla. Begär en ny."
-    );
-  }
-
-  const passwordHash = await bcrypt.hash(password, 12);
-  const now = new Date();
-
-  await unsafeGlobalPrisma.$transaction(async (tx) => {
-    const claimed = await tx.passwordReset.updateMany({
-      where: { id: reset.id, usedAt: null },
-      data: { usedAt: now },
-    });
-
-    // Hann någon annan lösa in den mellan uppslaget och nu blir count noll.
-    if (claimed.count === 0) {
-      throw new PasswordResetError("Länken är redan använd.");
-    }
-
-    await tx.adminUser.update({
-      where: { id: reset.user.id },
-      // Länken kom till adressen, alltså fungerar den. Se email-verification.ts.
-      data: { passwordHash, passwordChangedAt: now, emailVerifiedAt: now },
-    });
-
-    // Övriga väntande länkar för kontot slängs. Bad någon om två i rad ska den
-    // äldre inte gå att använda efteråt.
-    await tx.passwordReset.deleteMany({
-      where: { userId: reset.user.id, usedAt: null },
-    });
-  });
-
-  // Skickas efter bytet och är den enda signal en person får om någon annan
-  // bytt lösenord på deras konto.
-  await sendEmail(passwordChangedEmail({ to: reset.user.email }));
-
-  return { email: reset.user.email, userId: reset.user.id };
+/** Sätter det nya lösenordet. */
+export function redeemPasswordReset(token: string, password: string) {
+  return flow("").redeemPasswordReset(token, password);
 }

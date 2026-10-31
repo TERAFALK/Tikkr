@@ -1,5 +1,5 @@
-import { createHash, randomBytes } from "node:crypto";
 import bcrypt from "bcryptjs";
+import { createEmailVerification } from "@terafalk/auth/email-verification";
 import { unsafeGlobalPrisma } from "./db";
 import { resolveAppUrl } from "./app-url";
 import { sendEmail } from "./email";
@@ -12,20 +12,17 @@ import {
   noteFailedLogin,
 } from "./login-throttle";
 
+export { VERIFY_DAYS } from "@terafalk/auth/email-verification";
+export type { SendOutcome } from "@terafalk/auth/email-verification";
+
 /**
- * BEKRÄFTELSE AV E-POSTADRESSEN (infört 2026-10-06).
+ * BEKRÄFTELSE AV E-POSTADRESSEN.
  *
- * Registreringen tog emot vilken adress som helst och loggade in direkt. En
- * adress med ett stavfel märktes därför inte förrän lösenordet glömts — och
- * då gick återställningslänken till någon annans inkorg, eller ingenstans.
+ * Reglerna för länken ligger i @terafalk/auth, se tf-framework. Här står Tikkrs
+ * tabeller, adress och mejl, och rättningen av en felskriven adress.
  *
- * Nu skickas en länk vid registreringen. Bekräftelsen SPÄRRAR INGENTING: den
- * som registrerat sig kommer in och kan arbeta, men panelen visar en remsa
- * tills länken använts. Felet syns därmed första dagen, och adressen går att
- * rätta så länge den inte är bekräftad.
- *
- * Byggd som lösenordsåterställningen: bara fingeravtrycket sparas, länken har
- * en utgångstid och går att använda en gång.
+ * Bekräftelsen spärrar den nyregistrerade tills länken använts, se CLAUDE.md § 4
+ * punkt 5.
  */
 
 export class EmailVerificationError extends Error {
@@ -35,132 +32,92 @@ export class EmailVerificationError extends Error {
   }
 }
 
-/** Hur länge en länk gäller. Längre än en återställning: ingen väntar på den. */
-export const VERIFY_DAYS = 7;
+export const { sendEmailVerification, confirmEmail } = createEmailVerification({
+  onError: (error) => console.error("[bekräftelse]", error),
 
-/** Hur ofta en ny länk får skickas. Samma skäl som för återställningen. */
-const RESEND_COOLDOWN_MS = 2 * 60 * 1000;
-
-function hashToken(token: string): string {
-  return createHash("sha256").update(token).digest("hex");
-}
-
-export type SendOutcome = "sent" | "already-verified" | "cooldown" | "failed";
-
-/**
- * Skickar en bekräftelselänk till kontots nuvarande adress.
- *
- * Kastar aldrig. Registreringen och remsan i panelen ska fungera även när
- * mejlet inte går att skicka; utfallet säger vad som hände.
- */
-export async function sendEmailVerification(userId: string): Promise<SendOutcome> {
-  try {
-    const user = await unsafeGlobalPrisma.adminUser.findUnique({
-      where: { id: userId },
-      select: {
-        id: true,
-        email: true,
-        emailVerifiedAt: true,
-        company: { select: { name: true } },
-      },
-    });
-
-    if (!user) return "failed";
-    if (user.emailVerifiedAt) return "already-verified";
-
-    const recent = await unsafeGlobalPrisma.emailVerification.findFirst({
-      where: {
-        userId,
-        usedAt: null,
-        createdAt: { gt: new Date(Date.now() - RESEND_COOLDOWN_MS) },
-      },
-      select: { id: true },
-    });
-    if (recent) return "cooldown";
-
+  linkFor(token) {
     // Länken byggs ur inställningen, aldrig ur anropet. Se app-url.ts.
     const base = resolveAppUrl(process.env);
-    if (!base) {
-      console.error("[bekräftelse] APP_URL saknas i .env, inget mejl skickat.");
-      return "failed";
-    }
+    return base ? `${base}/admin/bekrafta/${token}` : null;
+  },
 
-    const token = randomBytes(32).toString("base64url");
-
-    await unsafeGlobalPrisma.emailVerification.create({
-      data: {
-        userId,
-        email: user.email,
-        tokenHash: hashToken(token),
-        expiresAt: new Date(Date.now() + VERIFY_DAYS * 24 * 60 * 60 * 1000),
-      },
+  async sendEmail({ to, link, userId, daysValid }) {
+    const user = await unsafeGlobalPrisma.adminUser.findUnique({
+      where: { id: userId },
+      select: { company: { select: { name: true } } },
     });
 
     const result = await sendEmail(
       emailVerificationEmail({
-        to: user.email,
-        link: `${base}/admin/bekrafta/${token}`,
-        companyName: user.company.name,
-        daysValid: VERIFY_DAYS,
+        to,
+        link,
+        companyName: user?.company.name ?? "",
+        daysValid,
       })
     );
 
     if (!result.delivered && result.provider !== "log") {
       console.error(
-        `[bekräftelse] Mejlet till ${user.email} gick inte fram: ` +
+        `[bekräftelse] Mejlet till ${to} gick inte fram: ` +
           `${result.problem ?? "okänd orsak"}`
       );
-      return "failed";
+      return false;
     }
 
-    return "sent";
-  } catch (error) {
-    console.error("[bekräftelse] Kunde inte skicka länken", error);
-    return "failed";
-  }
-}
-
-/**
- * Löser in en länk. Svarar med adressen som bekräftades, eller null.
- *
- * En länk gäller bara den adress den skickades till. Har adressen bytts sedan
- * dess bekräftar den gamla länken ingenting.
- */
-export async function confirmEmail(token: string): Promise<string | null> {
-  if (!token) return null;
-
-  const verification = await unsafeGlobalPrisma.emailVerification.findUnique({
-    where: { tokenHash: hashToken(token) },
-    include: { user: { select: { id: true, email: true } } },
-  });
-
-  if (
-    !verification ||
-    verification.usedAt ||
-    verification.expiresAt < new Date() ||
-    verification.email !== verification.user.email
-  ) {
-    return null;
-  }
-
-  const now = new Date();
-
-  const confirmed = await unsafeGlobalPrisma.$transaction(async (tx) => {
-    const claimed = await tx.emailVerification.updateMany({
-      where: { id: verification.id, usedAt: null },
-      data: { usedAt: now },
-    });
-    if (claimed.count === 0) return false;
-
-    await tx.adminUser.update({
-      where: { id: verification.user.id },
-      data: { emailVerifiedAt: now },
-    });
     return true;
-  });
+  },
 
-  return confirmed ? verification.user.email : null;
-}
+  store: {
+    async findUser(userId) {
+      const user = await unsafeGlobalPrisma.adminUser.findUnique({
+        where: { id: userId },
+        select: { email: true, emailVerifiedAt: true },
+      });
+
+      return user && { email: user.email, verifiedAt: user.emailVerifiedAt };
+    },
+
+    async hasRecentRequest(userId, since) {
+      const recent = await unsafeGlobalPrisma.emailVerification.findFirst({
+        where: { userId, usedAt: null, createdAt: { gt: since } },
+        select: { id: true },
+      });
+
+      return recent !== null;
+    },
+
+    async createRequest(row) {
+      await unsafeGlobalPrisma.emailVerification.create({ data: row });
+    },
+
+    findRequest: (tokenHash) =>
+      unsafeGlobalPrisma.emailVerification.findUnique({
+        where: { tokenHash },
+        select: {
+          id: true,
+          email: true,
+          usedAt: true,
+          expiresAt: true,
+          user: { select: { id: true, email: true } },
+        },
+      }),
+
+    confirm: (requestId, userId, now) =>
+      unsafeGlobalPrisma.$transaction(async (tx) => {
+        const claimed = await tx.emailVerification.updateMany({
+          where: { id: requestId, usedAt: null },
+          data: { usedAt: now },
+        });
+        if (claimed.count === 0) return false;
+
+        await tx.adminUser.update({
+          where: { id: userId },
+          data: { emailVerifiedAt: now },
+        });
+        return true;
+      }),
+  },
+});
 
 /**
  * Byter adress på ett konto vars adress ännu inte är bekräftad.

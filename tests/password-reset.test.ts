@@ -23,6 +23,20 @@ vi.mock("@/lib/email", () => ({
   },
 }));
 
+/**
+ * `after` i Next kör arbetet efter svaret, och kastar utanför ett anrop. Är listan
+ * satt samlas arbetet upp här, som när svaret redan gått iväg.
+ */
+let afterResponse: (() => Promise<void>)[] | null = null;
+
+vi.mock("next/server", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("next/server")>()),
+  after: (work: () => Promise<void>) => {
+    if (!afterResponse) throw new Error("utanför ett anrop");
+    afterResponse.push(work);
+  },
+}));
+
 const {
   findPasswordReset,
   redeemPasswordReset,
@@ -75,6 +89,41 @@ afterEach(async () => {
 
 afterAll(async () => {
   await unsafeGlobalPrisma.$disconnect();
+});
+
+describe("svarstiden och bromsen", () => {
+  afterEach(() => {
+    afterResponse = null;
+  });
+
+  /**
+   * Väntade svaret på utskicket tog ett känt konto sekunder och ett okänt inget
+   * alls, och tiden visade vilka adresser som är kunder.
+   */
+  it("svarar innan något mejl skickas", async () => {
+    afterResponse = [];
+
+    await requestPasswordReset({ email, baseUrl: BASE });
+    expect(sent).toHaveLength(0);
+
+    await Promise.all(afterResponse.map((work) => work()));
+    expect(sent).toHaveLength(1);
+  });
+
+  it("slutar skicka när en IP-adress begärt för många länkar", async () => {
+    const ip = `10.${Math.floor(Math.random() * 200)}.${Math.floor(Math.random() * 200)}.1`;
+
+    for (let i = 0; i < 10; i += 1) {
+      await requestPasswordReset({
+        email: `okand-${i}-${unique}@example.com`,
+        baseUrl: BASE,
+        ip,
+      });
+    }
+
+    await requestPasswordReset({ email, baseUrl: BASE, ip });
+    expect(sent).toHaveLength(0);
+  });
 });
 
 describe("begära en länk", () => {
