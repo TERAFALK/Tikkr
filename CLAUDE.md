@@ -29,7 +29,7 @@ Rutinen står i `docs/release.md`, skälen i § 5.
    fungerar med FÖREGÅENDE version av appen: lägg till, ta inte bort.
    Borttagning och namnbyte sker i en senare release. Migrationer som raderar
    eller skriver om data anges i PR-beskrivningen med hur man backar.
-   Migrationen skapas med `node scripts/new-migration.mjs <namn>`, se § 9.
+   Migrationen skapas med `node ops/new-migration.mjs <namn>`, se § 9.
 8. Ny miljövariabel läggs i `.env.example` och `docker-compose.yml` och anges
    i PR-beskrivningen under "Driftändringar".
 
@@ -376,6 +376,11 @@ så att importerna inte ändras och gränstesterna ser samma sökvägar. Det som
 Tikkrs ligger kvar här: cookienamn, utfärdaren i autentiseringsappen, modellistan i
 `tenant.ts`, hjälplänkarna och varumärket. Formatet `v1` på tvåstegsnycklarna får
 aldrig sluta gå att läsa.
+
+Driftskripten ligger i `ops/` (2026-10-31), som är en kopia av driftkitet i
+`tf-framework`. Kopian ändras bara med `node ops/sync.mjs <version>`, och CI fäller
+lokala ändringar. Det som är Tikkrs står i `ops/app.conf` och `ops/hooks/`. Filerna
+i `scripts/` med samma namn är omvägar, så att serverns crontab fungerar som förut.
 
 `blue-*` i paketet heter `primary-*`, och `globals.css` pekar den skalan på Tikkrs,
 så att ingenting ändras visuellt. Vitest läser paketen genom Vite
@@ -2488,7 +2493,7 @@ servern — Claude har **ingen** SSH-åtkomst och ska alltid leverera kommandon 
 färdiga kodblock, ett i taget, med förklaring av vad de gör.
 
 ```
-Laptop (gren, commit)  →  GitHub (PR, CI, dev, prod, tagg)  →  Server: ./scripts/release.sh <version>
+Laptop (gren, commit)  →  GitHub (PR, CI, dev, prod, tagg)  →  Server: ./ops/release.sh <version>
 ```
 
 ### Utvecklingsdator
@@ -2574,11 +2579,11 @@ testdata, men raderar det som ändrats — med kunddata vore det ett fel som int
 går att ångra.
 
 Nu ligger migrationerna i `prisma/migrations/`, med baslinjen `0_init`, och
-`scripts/migrate.sh` kör bara `prisma migrate deploy`. **Vägen med `db push` är
+`ops/migrate.sh` kör bara `prisma migrate deploy`. **Vägen med `db push` är
 borttagen ur migrate.sh, inte avstängd**, och saknas mappen stoppar den.
 `release.sh` vägrar dessutom en produktionsversion utan migrationer.
 
-Migrationer skapas på LAPTOPEN med `node scripts/new-migration.mjs <namn>`,
+Migrationer skapas på LAPTOPEN med `node ops/new-migration.mjs <namn>`,
 som jämför schemat mot senaste commit utan att behöva en databas. Servern
 skriver fortfarande aldrig till GitHub. CI kör alla migrationer mot en tom
 databas och fäller en PR där de inte ger samma databas som schemat.
@@ -2592,4 +2597,4 @@ databasen raderas av testerna själva och innehåller aldrig något att förlora
 
 **Spärrar innan skarp drift** (se `docs/drift.md` punkt 7): offsite-backup
 satt, repot privat, seed aldrig körd i produktionen, en release övad i labbet,
-och `./scripts/status.sh` utan röda punkter.
+och `./ops/status.sh` utan röda punkter.

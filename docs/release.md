@@ -1,7 +1,7 @@
 # Release — från dev till produktion
 
 Hur en version går ut, och hur den tas tillbaka. Samma skript gör jobbet i
-labbet och i produktionen: [`scripts/release.sh`](../scripts/release.sh).
+labbet och i produktionen: [`ops/release.sh`](../ops/release.sh).
 
 ```
 gren → PR → CI grön → dev → labbet → nyheterna → PR dev → prod → tagg vX.Y.Z → produktionen
@@ -67,7 +67,7 @@ Labbet kör `dev`. När en PR är ihopslagen och CI grön på `dev`, på
 labbservern:
 
 ```bash
-./scripts/release.sh dev
+./ops/release.sh dev
 ```
 
 Prova det som ändrats, och kärnflödet: stämpla in, byt jobb, stämpla ut, ta ut
@@ -111,7 +111,7 @@ kunden läser är nyheterna i steg 1.
 arbetsdagen i månaden — då tar kunderna ut tidrapporter till lönen.
 
 ```bash
-./scripts/release.sh v1.4.0
+./ops/release.sh v1.4.0
 ```
 
 Skriptet visar vad som kör och vad som kommer, och frågar efter versionen
@@ -136,7 +136,7 @@ Skriptet vägrar i produktionen:
 
 ## 5. Kontrollera — fem minuter
 
-- [ ] `./scripts/status.sh` utan röda punkter
+- [ ] `./ops/status.sh` utan röda punkter
 - [ ] Logga in i adminpanelen
 - [ ] På **kontrollkunden**: stämpla in, byt jobb, stämpla ut. Posterna syns i
       Stämplingar
@@ -154,7 +154,7 @@ deras faktura- och löneunderlag.
 ### Den nya versionen fungerar inte → backa koden
 
 ```bash
-./scripts/release.sh v1.3.2
+./ops/release.sh v1.3.2
 ```
 
 Den förra imagen ligger kvar, så det tar under en minut. Tre äldre versioner
@@ -181,7 +181,7 @@ Sista utvägen. **Allt som registrerats efter backupen försvinner**, och därf�
 görs driftsättningar på kvällen.
 
 ```bash
-./scripts/restore.sh backups/tikkr_2026-10-14_1903.sql.gz
+./ops/restore.sh backups/tikkr_2026-10-14_1903.sql.gz
 ```
 
 Backa därefter koden till versionen som hörde till backupen.
@@ -199,7 +199,7 @@ fix/...-gren från prod → PR mot prod → CI → labbet (release.sh prod) → 
 
 Hoppa aldrig över labbet; det tar fem minuter, och en rättelse som gör det
 värre slår mot alla kunder på en gång. Labbet står därefter på `prod` tills
-nästa `./scripts/release.sh dev`.
+nästa `./ops/release.sh dev`.
 
 **Slå sedan ihop `prod` i `dev`**, med en PR från `prod` till `dev`. Annars
 försvinner rättelsen vid nästa release, när `dev` går till `prod`.

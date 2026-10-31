@@ -53,7 +53,7 @@ COPY --from=builder /app/node_modules/pdfkit ./node_modules/pdfkit
 COPY --from=builder /app/node_modules/fontkit ./node_modules/fontkit
 
 # Vilken version imagen är byggd ur, t.ex. "v1.2.0". Sätts av
-# scripts/release.sh och visas i /api/health, så att det går att se vad som
+# ops/release.sh och visas i /api/health, så att det går att se vad som
 # kör utan att logga in på servern. Ligger sist, så att en ny version inte
 # gör stegen ovan ogiltiga i byggets cache.
 ARG TIKKR_VERSION=dev

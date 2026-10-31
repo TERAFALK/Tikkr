@@ -209,8 +209,8 @@ skärm kopplas om med en ny kod.
 ## Driftsätta en version
 
 ```bash
-./scripts/release.sh dev       # labbet: senaste dev
-./scripts/release.sh v1.2.0    # produktionen: bara släppta versioner
+./ops/release.sh dev       # labbet: senaste dev
+./ops/release.sh v1.2.0    # produktionen: bara släppta versioner
 ```
 
 Skriptet tar en backup, bygger medan den gamla versionen kör vidare, kör
@@ -233,13 +233,13 @@ migration startar inte den nya appen, och den gamla står kvar.
 | Öppna databasen | `docker compose exec db psql -U tikkr -d tikkr` |
 | Köra testerna | `./scripts/test.sh` |
 | Köra vissa tester | `./scripts/test.sh payroll` |
-| Driftkontroll | `./scripts/status.sh` |
-| Driftsätta | `./scripts/release.sh <version>` |
-| Öva återläsning | `./scripts/restore-test.sh` |
+| Driftkontroll | `./ops/status.sh` |
+| Driftsätta | `./ops/release.sh <version>` |
+| Öva återläsning | `./ops/restore-test.sh` |
 | Lägga in testdata (bara labbet) | `docker compose run --rm migrate node prisma/seed.mjs` |
 | Lägga upp ett plattformskonto | `./scripts/platform-user.sh` |
 | Stänga glömda stämplingar | `./scripts/auto-close.sh` |
-| Säkerhetskopiera | `./scripts/backup.sh` |
+| Säkerhetskopiera | `./ops/backup.sh` |
 
 ---
 
@@ -253,7 +253,7 @@ baslinjen. Byggs databasen någonsin ur schemat i stället raderas det som
 En schemaändring får sin migration på laptopen, i samma gren och före commit:
 
 ```powershell
-node scripts/new-migration.mjs lagg-till-foto-pa-anstalld
+node ops/new-migration.mjs lagg-till-foto-pa-anstalld
 ```
 
 CI kör alla migrationer mot en tom databas och fäller PR:en om de inte ger
@@ -261,7 +261,7 @@ samma databas som schemat. Se [docs/drift.md](docs/drift.md) punkt 1.
 
 `./scripts/test.sh` i labbet monterar in `src/`, `tests/` och `prisma/`, så
 testerna ser koden i mappen utan nytt bygge. Allt annat når labbet genom
-`./scripts/release.sh`.
+`./ops/release.sh`.
 
 ---
 
@@ -311,7 +311,7 @@ offsite-backup, HTTPS och övervakning — står i [docs/drift.md](docs/drift.md
 Se läget just nu:
 
 ```bash
-./scripts/status.sh
+./ops/status.sh
 ```
 
 | Dokument | Innehåll |
