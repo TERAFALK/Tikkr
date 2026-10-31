@@ -73,6 +73,9 @@ jobs:
       - name: Typkontroll
         run: npm run typecheck
 
+      - name: Lint
+        run: npm run lint
+
       # Testdatabasen byggs med MIGRATIONERNA, i tur och ordning från en tom
       # databas — precis som en ny produktionsserver. En migration som inte
       # går att köra faller här, inte mot kunddata.
