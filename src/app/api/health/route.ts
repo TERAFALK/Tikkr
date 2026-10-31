@@ -5,7 +5,7 @@ import { unsafeGlobalPrisma } from "@/lib/db";
 // healthcheck. Den svarar 200 bara om appen OCH databasen svarar — en app som
 // lever men inte når databasen är lika trasig ur kundens synvinkel.
 //
-// Versionen är den imagen byggdes ur (se Dockerfile). scripts/release.sh
+// Versionen är den imagen byggdes ur (se Dockerfile). ops/release.sh
 // väntar på att den stämmer innan en driftsättning räknas som klar.
 
 export const dynamic = "force-dynamic";
