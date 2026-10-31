@@ -121,6 +121,53 @@ jobs:
           --secret id=npm_token,env=NODE_AUTH_TOKEN
           --build-arg TIKKR_VERSION=ci-${{ github.sha }} .
 
+      # Startar imagen mot en riktig databas. Fångar det som bara går sönder i den
+      # färdiga imagen: filer som inte följt med, fel vid start och migrationer som
+      # inte går att köra i containern. Alla värden är påhittade.
+      - name: Starttest
+        run: |
+          docker build --target builder --tag tikkr-migrate:ci --secret id=npm_token,env=NODE_AUTH_TOKEN .
+
+          URL="postgresql://tikkr:tikkr@start-db:5432/tikkr?schema=public"
+          cat > start.env <<EOF_ENV
+          DATABASE_URL=$URL
+          AUTH_SECRET=starttest-ingen-hemlighet-alls-1234567890
+          AUTH_TRUST_HOST=true
+          APP_URL=http://localhost:3000
+          EOF_ENV
+          sed -i 's/^ *//' start.env
+
+          docker network create start
+          docker run -d --name start-db --network start \
+            -e POSTGRES_USER=tikkr -e POSTGRES_PASSWORD=tikkr -e POSTGRES_DB=tikkr \
+            postgres:17-alpine
+
+          for _ in $(seq 1 30); do
+            docker exec start-db pg_isready -U tikkr -d tikkr -q && break
+            sleep 1
+          done
+          sleep 3
+
+          docker run --rm --network start --env-file start.env \
+            tikkr-migrate:ci sh ./ops/migrate.sh
+
+          docker run -d --name start-app --network start --env-file start.env \
+            -p 3000:3000 tikkr-app:ci
+
+          for _ in $(seq 1 45); do
+            if curl -fsS --max-time 3 http://127.0.0.1:3000/api/health; then
+              echo
+              curl -fsS -o /dev/null --max-time 5 http://127.0.0.1:3000/admin/login
+              echo "Appen svarar."
+              exit 0
+            fi
+            sleep 2
+          done
+
+          docker logs --tail 60 start-app
+          echo "Appen svarar inte på /api/health efter 90 sekunder."
+          exit 1
+
       # Compose-filerna läses som produktionen läser dem. Ett skrivfel i
       # docker-compose.prod.yml syns annars först på lanseringskvällen.
       #
