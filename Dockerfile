@@ -8,11 +8,14 @@ WORKDIR /app
 
 # --- Steg 1: installera beroenden -------------------------------------------
 FROM base AS deps
-COPY package.json package-lock.json* ./
-# npm ci kräver en lockfil och ger exakt samma versioner varje bygge — det vill
-# vi ha. Finns ingen lockfil ännu (allra första bygget) faller vi tillbaka på
-# npm install. Se README om hur lockfilen skapas och checkas in.
-RUN if [ -f package-lock.json ]; then npm ci; else npm install; fi
+COPY package.json package-lock.json .npmrc ./
+# npm ci ger exakt samma versioner varje bygge.
+#
+# NYCKELN TILL PAKETREGISTRET ÄR EN BYGGSECRET. Den monteras bara under det här
+# steget och hamnar varken i ett lager eller i imagens historik, vilket den hade
+# gjort som ARG eller ENV. Se docs/drift.md punkt 11.
+RUN --mount=type=secret,id=npm_token,required=true \
+    NODE_AUTH_TOKEN="$(cat /run/secrets/npm_token)" npm ci
 
 # --- Steg 2: bygg appen ------------------------------------------------------
 FROM base AS builder

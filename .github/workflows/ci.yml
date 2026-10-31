@@ -23,8 +23,10 @@ concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
+# packages: paketen @terafalk/* ligger i GitHub Packages.
 permissions:
   contents: read
+  packages: read
 
 jobs:
   test:
@@ -51,6 +53,7 @@ jobs:
 
     env:
       DATABASE_URL: postgresql://tikkr:tikkr@localhost:5432/tikkr_test?schema=public
+      NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
     steps:
       - uses: actions/checkout@v7
@@ -102,6 +105,9 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
 
+    env:
+      NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
     steps:
       - uses: actions/checkout@v7
 
@@ -112,6 +118,7 @@ jobs:
       - name: Bygg Docker-imagen
         run: >-
           docker build --target runner --tag tikkr-app:ci
+          --secret id=npm_token,env=NODE_AUTH_TOKEN
           --build-arg TIKKR_VERSION=ci-${{ github.sha }} .
 
       # Compose-filerna läses som produktionen läser dem. Ett skrivfel i
