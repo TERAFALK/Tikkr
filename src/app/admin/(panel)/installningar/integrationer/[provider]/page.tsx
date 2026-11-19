@@ -204,11 +204,11 @@ function Overview({ detail, timeZone, base }: { detail: IntegrationDetail; timeZ
                 }`}
           </p>
         )}
-        <div className="flex flex-wrap items-start gap-3 border-t border-neutral-200 px-5 py-4">
-          <SaveForm action={requestSync} submitLabel="Synka nu" savedLabel="Begärd" tone="primary">
+        <div className="flex flex-wrap items-center gap-3 border-t border-neutral-200 px-5 py-4">
+          <SaveForm action={requestSync} submitLabel="Synka nu" savedLabel="Begärd" tone="primary" className="">
             <input type="hidden" name="provider" value={provider.id} />
           </SaveForm>
-          <SaveForm action={requestSync} submitLabel="Läs om allt" savedLabel="Begärd" tone="secondary">
+          <SaveForm action={requestSync} submitLabel="Läs om allt" savedLabel="Begärd" tone="secondary" className="">
             <input type="hidden" name="provider" value={provider.id} />
             <input type="hidden" name="full" value="1" />
           </SaveForm>
@@ -350,21 +350,23 @@ async function Mappings({
   return (
     <Card>
       <CardHeader title="Kopplingar" help="integrationer" />
-      <MappingSwitch detail={detail} base={base} type="kunder" view={view} />
-      <div className="flex gap-1 border-b border-neutral-200 px-5 pb-3">
-        {VIEWS.map((v) => (
-          <Link
-            key={v.key}
-            href={`${base}?flik=kopplingar&vy=${v.key}${query.antal ? `&antal=${query.antal}` : ""}`}
-            aria-current={v.key === view ? "page" : undefined}
-            className={`rounded-md px-2.5 py-1 text-[13px] font-medium ${
-              v.key === view ? "bg-neutral-100 text-neutral-900" : "text-neutral-500 hover:text-neutral-900"
-            }`}
-          >
-            {v.label}
-            {v.key === "inkorg" && detail.counts.CUSTOMER.pending > 0 && ` ${detail.counts.CUSTOMER.pending}`}
-          </Link>
-        ))}
+      <div className="space-y-2 border-b border-neutral-200 px-5 pt-4 pb-3">
+        <MappingSwitch detail={detail} base={base} type="kunder" view={view} />
+        <div className="flex gap-1">
+          {VIEWS.map((v) => (
+            <Link
+              key={v.key}
+              href={`${base}?flik=kopplingar&vy=${v.key}${query.antal ? `&antal=${query.antal}` : ""}`}
+              aria-current={v.key === view ? "page" : undefined}
+              className={`rounded-md px-2.5 py-1 text-[13px] font-medium ${
+                v.key === view ? "bg-neutral-100 text-neutral-900" : "text-neutral-500 hover:text-neutral-900"
+              }`}
+            >
+              {v.label}
+              {v.key === "inkorg" && detail.counts.CUSTOMER.pending > 0 && ` ${detail.counts.CUSTOMER.pending}`}
+            </Link>
+          ))}
+        </div>
       </div>
 
       {rows.length === 0 ? (
@@ -518,7 +520,7 @@ function MappingSwitch({
     { key: "ordrar", label: "Ordrar", pending: detail.counts.ORDER.pending },
   ] as const;
   return (
-    <div className="flex gap-1 px-5 pb-2">
+    <div className="flex gap-1">
       {tabs.map((t) => (
         <Link
           key={t.key}
@@ -567,20 +569,22 @@ async function OrderMappings({
   return (
     <Card>
       <CardHeader title="Kopplingar" help="integrationer" />
-      <MappingSwitch detail={detail} base={base} type="ordrar" view={view} />
-      <div className="flex gap-1 border-b border-neutral-200 px-5 pb-3">
-        {VIEWS.map((v) => (
-          <Link
-            key={v.key}
-            href={`${base}?flik=kopplingar&typ=ordrar&vy=${v.key}${query.antal ? `&antal=${query.antal}` : ""}`}
-            aria-current={v.key === view ? "page" : undefined}
-            className={`rounded-md px-2.5 py-1 text-[13px] font-medium ${
-              v.key === view ? "bg-neutral-100 text-neutral-900" : "text-neutral-500 hover:text-neutral-900"
-            }`}
-          >
-            {v.label}
-          </Link>
-        ))}
+      <div className="space-y-2 border-b border-neutral-200 px-5 pt-4 pb-3">
+        <MappingSwitch detail={detail} base={base} type="ordrar" view={view} />
+        <div className="flex gap-1">
+          {VIEWS.map((v) => (
+            <Link
+              key={v.key}
+              href={`${base}?flik=kopplingar&typ=ordrar&vy=${v.key}${query.antal ? `&antal=${query.antal}` : ""}`}
+              aria-current={v.key === view ? "page" : undefined}
+              className={`rounded-md px-2.5 py-1 text-[13px] font-medium ${
+                v.key === view ? "bg-neutral-100 text-neutral-900" : "text-neutral-500 hover:text-neutral-900"
+              }`}
+            >
+              {v.label}
+            </Link>
+          ))}
+        </div>
       </div>
 
       {rows.length === 0 ? (
@@ -833,7 +837,7 @@ async function Connection({ detail, timeZone }: { detail: IntegrationDetail; tim
                     <Badge tone={g.state === "connected" ? "active" : "warning"}>{GATEWAY_STATE_LABEL[g.state]}</Badge>
                   </div>
                   <p className="text-[13px] text-neutral-500">
-                    På {g.machineName ?? "okänd dator"} · senast hörd{" "}
+                    På {g.machineName ?? "okänd dator"} · senaste kontakt{" "}
                     {g.lastHeartbeatAt ? formatDateTime(g.lastHeartbeatAt, timeZone) : "aldrig"}
                   </p>
                   {g.lastError && <p className="mt-1 text-[13px] text-neutral-600">{g.lastError}</p>}
