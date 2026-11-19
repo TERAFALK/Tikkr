@@ -491,6 +491,27 @@ shop_products     — id, key, slug, kind, name, summary, description,
 shop_product_images — id, product_id, data?, mime_type?, static_path?, alt,
                     illustration, sort_order
 shop_prices       — död, ersatt av shop_products.price_ore (se § 3.4)
+
+  — integrationerna, se § 3.5 —
+integrations      — id, company_id, provider, connection_type, gateway_id?,
+                    settings, last_sync_at?, last_error?, last_error_at?,
+                    created_by_email
+integration_credentials — id, company_id, integration_id, access_token_sealed,
+                    refresh_token_sealed?, expires_at?, scope?
+gateways          — id, company_id, key_hash, machine_name?, version?,
+                    sources, last_heartbeat_at?, last_error?, last_error_at?,
+                    registered_at
+gateway_registration_tokens — id, company_id, token_hash, expires_at,
+                    used_at?, created_by_email
+gateway_commands  — id, company_id, gateway_id, integration_id?, type,
+                    payload?, status, result?, created_by_email?, acked_at?
+integration_mappings — id, company_id, integration_id, source, entity_type,
+                    external_id, customer_id?, order_id?, status,
+                    pending_reason?, data_hash?, last_synced_at?
+integration_records — id, company_id, integration_id, entity_type,
+                    external_id, data, data_hash, source_updated_at?
+integration_events — id, company_id, integration_id?, gateway_id?, level,
+                    message, details?
 ```
 
 ### Beslutade regler för stämpling (bestämt 2026-08-10)
@@ -1675,6 +1696,56 @@ kundens arbetsorder, det allt annat i Tikkr hänger på. I koden heter det
   kräver omvänd skattskyldighet och är inte byggt.
 - Ett företag med en beställning som inte är levererad eller avbruten går
   inte att radera.
+
+### 3.5 Integrationer (beslutat 2026-11-19, produktägarens val)
+
+Kunden ansluter Tikkr till sina egna system, och kunder och ordrar synkas
+därifrån, **envägs, källsystemet → Tikkr**. Första kundbehovet är Visma
+Administration (500/1000/2000) på kundens egen server. Nästa är Fortnox.
+
+**Begreppen, och de används likadant i kod, panel och dokumentation:**
+
+- **Integration**: ett externt system arbetsytan ansluter Tikkr till.
+- **Gateway**: Tikkr Gateway, en Windows-tjänst som installeras hos kunden
+  med en MSI och läser ett LOKALT system. Behövs bara för lokala system. Egen
+  kod i repot `TERAFALK/tikkr-gateway` (C#/.NET), med samma flöde som här:
+  gren, PR, `dev`, `prod`, tagg.
+- **Anslutningstyp**: `gateway` (data kommer via gatewayen) eller `oauth`
+  (Tikkrs server hämtar själv från systemets moln-API).
+
+**Gatewayen är dum.** Den läser poster och skickar dem med källsystemets id,
+utgående över HTTPS och utan öppna portar hos kunden. All matchning och
+koppling sker här, så att en regel kan ändras utan att en ny MSI skickas ut.
+
+**Båda anslutningstyperna matar SAMMA väg in**: normalisering, matchning,
+kopplingstabell, inkorg och logg. En ny integration är en ny provider i
+registret, inte nya sidor.
+
+**Status lagras inte, den härleds** ur gatewayens senaste kontakt och det
+senaste felet, av samma skäl som ett saldo aldrig lagras bredvid sina poster.
+
+**Matchningen av kunder**, i ordning: befintlig koppling uppdateras; samma
+organisationsnummer efter normalisering kopplas automatiskt, men bara vid
+exakt en träff; namn, e-post, telefon och kundnummer blir bara FÖRSLAG i
+inkorgen; ingen träff ger en ny kund eller en post i inkorgen, efter
+inställningen. Kundnumret är unikt per arbetsyta, så en ny kund vars nummer
+redan finns hamnar i inkorgen.
+
+**Ordrar** matchas på ordernumret och kopplas till kund via kundens koppling.
+Saknar kunden koppling väntar ordern tills den finns. Systemet gissar aldrig.
+En order stängs aldrig automatiskt för att den försvunnit ur källan: någon
+kan stå instämplad på den.
+
+**Källan äger sina fält**, alltså namn, nummer, organisationsnummer, kontakt
+och adress, och skriver över dem på kopplade poster. **Tikkr äger sina**:
+påslag, rabatt, anteckningar, aktiv, fast pris, beräkningar och allt som rör
+tid. Ingest är idempotent: samma post två gånger ger aldrig en dubblett.
+
+**Integrationerna rör bara kunder och ordrar**, aldrig stämplingar,
+löneunderlaget eller planeringen.
+
+**Bas tills vidare.** Om integrationer blir ett tillval (§ 3.1) avgörs
+senare. En grind går att lägga på utan att någon data ändras.
 
 ## 4. Kritiska säkerhetskrav
 
