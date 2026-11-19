@@ -133,6 +133,20 @@ export async function requestSync(_previous: SaveState, formData: FormData): Pro
   if (!integration) return { error: "Integrationen finns inte." };
   if (!integration.gatewayId) return { error: "Ingen gateway är ansluten. Installera Tikkr Gateway under Anslutning." };
 
+  // Ett uppdrag som redan väntar räcker. Tio tryck på knappen ska inte ge tio
+  // synkar när gatewayen hör av sig.
+  const waiting = await db.gatewayCommand.count({
+    // Bara den nuvarande gatewayens uppdrag. Ett uppdrag kvar på en gateway
+    // som bytts ut hämtas aldrig, och får inte spärra knappen.
+    where: {
+      integrationId: integration.id,
+      gatewayId: integration.gatewayId,
+      status: "PENDING",
+      type: full ? "FULL_RESYNC" : "SYNC_NOW",
+    },
+  });
+  if (waiting > 0) return saved(full ? "Omläsningen är redan begärd." : "Synken är redan begärd.");
+
   await db.gatewayCommand.create({
     data: {
       companyId,

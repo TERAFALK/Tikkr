@@ -193,6 +193,16 @@ function Overview({ detail, timeZone, base }: { detail: IntegrationDetail; timeZ
             )}
           </tbody>
         </Table>
+        {detail.lastCommand && (
+          <p className="border-t border-neutral-200 px-5 py-3 text-[13px] text-neutral-600">
+            {(detail.lastCommand.type === "FULL_RESYNC" ? "Läs om allt" : "Synka nu") + ": "}
+            {detail.lastCommand.status === "PENDING"
+              ? `väntar på gatewayen sedan ${formatDateTime(detail.lastCommand.createdAt, timeZone)}.`
+              : `${detail.lastCommand.result ?? (detail.lastCommand.status === "DONE" ? "klart." : "misslyckades.")} ${
+                  detail.lastCommand.ackedAt ? formatDateTime(detail.lastCommand.ackedAt, timeZone) : ""
+                }`}
+          </p>
+        )}
         <div className="flex flex-wrap items-start gap-3 border-t border-neutral-200 px-5 py-4">
           <SaveForm action={requestSync} submitLabel="Synka nu" savedLabel="Begärd" tone="primary">
             <input type="hidden" name="provider" value={provider.id} />
