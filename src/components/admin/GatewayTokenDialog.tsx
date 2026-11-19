@@ -18,8 +18,11 @@ import { Alert, Button } from "@/components/ui";
  */
 export default function GatewayTokenDialog({
   action,
+  msiFile,
 }: {
   action: (previous: TokenState, formData: FormData) => Promise<TokenState>;
+  /** MSI:ns filnamn. Utan publicerad version finns inget kommando. */
+  msiFile: string | null;
 }) {
   const dialog = useRef<HTMLDialogElement>(null);
   const [opening, setOpening] = useState(0);
@@ -40,7 +43,7 @@ export default function GatewayTokenDialog({
         ref={dialog}
         className="w-[min(42rem,calc(100vw-2rem))] rounded-xl border border-neutral-200 bg-white p-0 shadow-xl backdrop:bg-neutral-900/40"
       >
-        <Body key={opening} action={action} onClose={() => dialog.current?.close()} />
+        <Body key={opening} action={action} msiFile={msiFile} onClose={() => dialog.current?.close()} />
       </dialog>
     </>
   );
@@ -48,15 +51,16 @@ export default function GatewayTokenDialog({
 
 function Body({
   action,
+  msiFile,
   onClose,
 }: {
   action: (previous: TokenState, formData: FormData) => Promise<TokenState>;
+  msiFile: string | null;
   onClose: () => void;
 }) {
   const [state, submit] = useActionState<TokenState, FormData>(action, {});
 
   if (state.token) {
-    const command = `msiexec /i TikkrGateway.msi /qn TOKEN=${state.token}`;
     return (
       <>
         <div className="border-b border-neutral-200 px-5 py-4">
@@ -68,7 +72,7 @@ function Body({
 
         <div className="space-y-4 px-5 py-5">
           <Copyable label="Token" value={state.token} />
-          <Copyable label="Tyst installation" value={command} />
+          {msiFile && <Copyable label="Tyst installation" value={`msiexec /i ${msiFile} /qn TOKEN=${state.token}`} />}
           <Copyable label="Eller på en server där gatewayen redan finns" value={`tikkr-gateway register ${state.token}`} />
         </div>
 
@@ -85,9 +89,6 @@ function Body({
     <>
       <div className="border-b border-neutral-200 px-5 py-4">
         <h2 className="text-sm font-semibold text-neutral-900">Ny registreringstoken</h2>
-        <p className="mt-0.5 text-[13px] leading-relaxed text-neutral-500">
-          Kopplar en installation av Tikkr Gateway till arbetsytan.
-        </p>
       </div>
       <form action={submit}>
         <div className="space-y-4 px-5 py-5">{state.error && <Alert>{state.error}</Alert>}</div>

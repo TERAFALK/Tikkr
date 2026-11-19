@@ -428,7 +428,7 @@ export const GUIDES = [
       },
       {
         title: "Installera Tikkr Gateway på servern där Visma Administration finns",
-        body: "Klistra in token när installationen frågar efter den. Gatewayen ansluter bara utgående, och inga portar behöver öppnas.",
+        body: "Ladda ner Tikkr Gateway under Anslutning och klistra in token när installationen frågar efter den.",
       },
       {
         title: "Välj företag i Visma under Inställningar",

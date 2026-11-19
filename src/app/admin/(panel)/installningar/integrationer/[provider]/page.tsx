@@ -19,6 +19,7 @@ import {
 } from "@/lib/integrations/panel";
 import { GATEWAY_STATE_LABEL } from "@/lib/integrations/status";
 import { GATEWAY_RELEASE } from "@/lib/integrations/gateway-release";
+import { msiFileName } from "@/lib/integrations/gateway-download";
 import IntegrationStatusBadge from "@/components/admin/IntegrationStatusBadge";
 import GatewayTokenDialog from "@/components/admin/GatewayTokenDialog";
 import { LogoMark } from "@/components/ui/Logo";
@@ -802,8 +803,13 @@ async function Connection({ detail, timeZone }: { detail: IntegrationDetail; tim
         <CardHeader
           title="Tikkr Gateway"
           help="integrationer"
-          description={`Installeras på servern där ${detail.provider.name} finns. Ansluter bara utgående, inga portar öppnas.`}
-          action={<GatewayTokenDialog action={createGatewayToken} />}
+          description={`Installeras på servern där ${detail.provider.name} finns.`}
+          action={
+            <GatewayTokenDialog
+              action={createGatewayToken}
+              msiFile={GATEWAY_RELEASE ? msiFileName(GATEWAY_RELEASE.version) : null}
+            />
+          }
         />
         <div className="border-t border-neutral-200 px-5 py-4 text-[13px] text-neutral-600">
           {GATEWAY_RELEASE ? (
