@@ -53,8 +53,8 @@ export async function readBody<S extends z.ZodType>(
 /** Kräver en giltig gatewaynyckel och håller anropen under taket. */
 export async function withGateway(
   request: NextRequest,
-  handler: (session: GatewaySession) => Promise<NextResponse>
-): Promise<NextResponse> {
+  handler: (session: GatewaySession) => Promise<Response>
+): Promise<Response> {
   const session = await resolveGatewayKey(request.headers.get("authorization"));
   if (!session) {
     return apiError(401, "invalid_key", "Gatewayens nyckel är ogiltig eller borttagen. Registrera gatewayen igen.");
