@@ -1804,7 +1804,13 @@ och skriver om den med `UPDATE_OPENAPI=1`.
   skickas vidare utan att läsas in i minnet: till administratören
   (`/api/admin/gateway/download`) och till gatewayen
   (`/api/gateway/v1/updates/download`), som bara får den version Tikkr pekar
-  ut. Gatewayen kontrollerar SHA-256 och signaturen själv.
+  ut. Gatewayen kontrollerar SHA-256 och signaturen själv. Releasen har också
+  en setup.exe med Tikkrs ikon, men Tikkr lämnar ut MSI:n (beslutat
+  2026-11-19, produktägarens val): det är vad IT-avdelningar, GPO och Intune
+  förväntar sig, och en dator ska bara installeras på ett sätt.
+- **Panelen förklarar inte gatewayen.** Ingen text om hur den ansluter, enligt
+  TONE-OF-VOICE.md. Registreringstoken avgör vilken integration den kopplas
+  till.
 
 **Panelen** (tillagt 2026-11-19) ligger under Inställningar, i avsnittet
 **Kopplingar**, eftersom en integration sätts upp en gång och sedan står.
