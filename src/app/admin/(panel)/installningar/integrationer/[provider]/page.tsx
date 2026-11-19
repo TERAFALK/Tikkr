@@ -21,6 +21,7 @@ import { GATEWAY_STATE_LABEL } from "@/lib/integrations/status";
 import { GATEWAY_RELEASE } from "@/lib/integrations/gateway-release";
 import IntegrationStatusBadge from "@/components/admin/IntegrationStatusBadge";
 import GatewayTokenDialog from "@/components/admin/GatewayTokenDialog";
+import { LogoMark } from "@/components/ui/Logo";
 import ConfirmButton from "@/components/admin/ConfirmButton";
 import SaveForm from "@/components/admin/SaveForm";
 import ActionDialog from "@/components/ui/ActionDialog";
@@ -820,60 +821,50 @@ async function Connection({ detail, timeZone }: { detail: IntegrationDetail; tim
         {gateways.length === 0 ? (
           <EmptyState title="Ingen gateway ansluten" />
         ) : (
-          <Table>
-            <thead>
-              <tr>
-                <Th>Dator</Th>
-                <Th>Status</Th>
-                <Th>Senast hörd</Th>
-                <Th>Källor</Th>
-                <Th>
-                  <span className="sr-only">Åtgärder</span>
-                </Th>
-              </tr>
-            </thead>
-            <tbody>
-              {gateways.map((g) => (
-                <Tr key={g.id}>
-                  <Td>
-                    <span className="font-medium">{g.machineName ?? "Okänd"}</span>
-                    <span className="mt-0.5 block text-xs text-neutral-500">Version {g.version ?? "okänd"}</span>
-                  </Td>
-                  <Td>
+          <ul className="divide-y divide-neutral-200">
+            {gateways.map((g) => (
+              <li key={g.id} className="flex flex-wrap items-start gap-4 px-5 py-4">
+                <LogoMark size={40} />
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <p className="font-medium text-neutral-900">
+                      Tikkr Gateway {g.version ?? ""}
+                    </p>
                     <Badge tone={g.state === "connected" ? "active" : "warning"}>{GATEWAY_STATE_LABEL[g.state]}</Badge>
-                    {g.lastError && <span className="mt-1 block text-xs text-neutral-500">{g.lastError}</span>}
-                  </Td>
-                  <Td muted>{g.lastHeartbeatAt ? formatDateTime(g.lastHeartbeatAt, timeZone) : "Aldrig"}</Td>
-                  <Td muted>
-                    {g.sources.length === 0 ? (
-                      "Inga"
-                    ) : (
-                      <ul className="space-y-0.5">
-                        {g.sources.map((s) => (
-                          <li key={s.id}>
-                            {s.name}: {s.healthy ? `${s.instances?.length ?? 0} företag` : (s.error ?? "fel")}
-                          </li>
-                        ))}
-                      </ul>
-                    )}
-                  </Td>
-                  <Td>
-                    <form action={disconnectGateway} className="flex justify-end">
-                      <input type="hidden" name="id" value={g.id} />
-                      <input type="hidden" name="provider" value={detail.provider.id} />
-                      <ConfirmButton
-                        type="submit"
-                        tone="ghost"
-                        question={`Koppla från gatewayen på ${g.machineName ?? "datorn"}? Den slutar skicka data direkt och måste registreras igen.`}
-                      >
-                        Koppla från
-                      </ConfirmButton>
-                    </form>
-                  </Td>
-                </Tr>
-              ))}
-            </tbody>
-          </Table>
+                  </div>
+                  <p className="text-[13px] text-neutral-500">
+                    På {g.machineName ?? "okänd dator"} · senast hörd{" "}
+                    {g.lastHeartbeatAt ? formatDateTime(g.lastHeartbeatAt, timeZone) : "aldrig"}
+                  </p>
+                  {g.lastError && <p className="mt-1 text-[13px] text-neutral-600">{g.lastError}</p>}
+                  {g.sources.length > 0 && (
+                    <ul className="mt-2 space-y-0.5 text-[13px] text-neutral-600">
+                      {g.sources.map((s) => (
+                        <li key={s.id}>
+                          <span className="font-medium text-neutral-900">{s.name}</span>
+                          {": "}
+                          {s.healthy
+                            ? (s.instances ?? []).map((i) => i.name).join(", ") || "inga att välja"
+                            : (s.error ?? "går inte att läsa")}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+                <form action={disconnectGateway}>
+                  <input type="hidden" name="id" value={g.id} />
+                  <input type="hidden" name="provider" value={detail.provider.id} />
+                  <ConfirmButton
+                    type="submit"
+                    tone="ghost"
+                    question={`Koppla från gatewayen på ${g.machineName ?? "datorn"}? Den slutar skicka data direkt och måste registreras igen.`}
+                  >
+                    Koppla från
+                  </ConfirmButton>
+                </form>
+              </li>
+            ))}
+          </ul>
         )}
       </Card>
     </>
