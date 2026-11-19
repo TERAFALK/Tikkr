@@ -231,6 +231,7 @@ const OWN_LOCK_CHECK = [
   "app/api/admin/export/route.ts",
   "app/api/admin/export/orders/route.ts",
   "app/api/admin/export/timesheet/route.ts",
+  "app/api/admin/gateway/download/route.ts",
 ];
 
 /** Bara en åtgärd i filen är undantagen, se testet för anonymiseringen. */
