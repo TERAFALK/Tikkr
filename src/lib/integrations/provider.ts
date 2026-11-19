@@ -82,8 +82,11 @@ export interface IntegrationProvider<
   name: string;
   /** Kort beskrivning på kortet i översikten. */
   description: string;
-  /** Sökväg till logotypen under public/. */
-  logo: string;
+  /**
+   * Två bokstäver på kortet. Inte systemets logotyp: den är en annans
+   * varumärke, och kortet ska inte se ut som att Visma står bakom det.
+   */
+  mark: string;
   connectionType: ConnectionType;
   /** Gatewayens källa, för 'gateway'. Samma id som ISource i gatewayen. */
   gatewaySource?: string;

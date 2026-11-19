@@ -11,6 +11,7 @@ import {
   IconDevice,
   IconHistory,
   IconMoment,
+  IconPackage,
   IconPeople,
   IconReport,
   IconShield,
@@ -162,6 +163,18 @@ const sections: SettingsSection[] = [
         label: "Arbetstidsförkortning",
         description: "ATF enligt kollektivavtal",
         icon: IconReport,
+      },
+    ],
+  },
+  {
+    // Externa system kunden ansluter Tikkr till. CLAUDE.md § 3.5.
+    label: "Kopplingar",
+    pages: [
+      {
+        href: "/admin/installningar/integrationer",
+        label: "Integrationer",
+        description: "Visma och andra system",
+        icon: IconPackage,
       },
     ],
   },

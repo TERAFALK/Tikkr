@@ -1782,6 +1782,22 @@ och skriver om den med `UPDATE_OPENAPI=1`.
 - **Nya gatewayversioner** står i `gateway-release.ts` och når kunderna genom
   en PR, så att de provas i labbet först.
 
+**Panelen** (tillagt 2026-11-19) ligger under Inställningar, i avsnittet
+**Kopplingar**, eftersom en integration sätts upp en gång och sedan står.
+Översikten har ett kort per provider, och varje integration har samma flikar:
+Översikt, Inställningar, Kopplingar (inkorgen, kopplade, ignorerade), Logg och
+Anslutning. Inställningarna ritas ur providerns fältlista, så en ny provider
+behöver inga nya sidor.
+
+- **Systemets logotyp visas inte**, bara två bokstäver. Logotypen är en annans
+  varumärke, och kortet ska inte se ut som att Visma står bakom det.
+- **En gateway räknas som tyst** efter `GATEWAY_SILENT_AFTER_MINUTES`, med 15
+  minuter som förval. Statusen räknas i `status.ts` och prövas av
+  `tests/integration-status.test.ts`.
+- **Förslagen i inkorgen** räknas för hela sidan på en gång, mot kunderna som
+  hämtas en gång, och lagras aldrig.
+- **Registreringstoken visas en gång**, med kommandot för tyst installation.
+
 **Bas tills vidare.** Om integrationer blir ett tillval (§ 3.1) avgörs
 senare. En grind går att lägga på utan att någon data ändras.
 
