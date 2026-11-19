@@ -344,6 +344,7 @@ via `company_id`-filtrering i koden.
 | Styling | Tailwind CSS | Snabbt, snyggt, konsekvent |
 | Databas | Vanlig Postgres-container (bara databasen) | Enklast möjliga — ingen plattform ovanpå att sköta |
 | Databaskoppling | Prisma (ORM) | Enkelt och säkert sätt att prata med databasen |
+| Validering av API | zod (tillagt 2026-11-19, produktägarens val) | Kontrollerar det gatewayen skickar, och samma scheman ger OpenAPI-specen, utan fler bibliotek |
 | Reverse proxy / HTTPS | **Labb:** Nginx Proxy Manager (fanns redan). **Produktion:** Caddy. | NPM äger redan port 80/443 i labbet — rör det inte. I produktion väljs Caddy för att konfigurationen då ligger som textfil i git och servern kan återskapas identiskt, vilket NPM:s webbgränssnitt inte tillåter. |
 | Server | Egen VPS hos **Glesys** (Falkenberg/Stockholm) | Enda löpande kostnaden. Svensk drift krävs — integritetspolicyn och biträdesavtalet anger servrar i Sverige |
 | Betalning | Stripe (Billing/Subscriptions) | Ingen fast avgift, styr åtkomst automatiskt, självbetjäning |
@@ -1743,6 +1744,26 @@ tid. Ingest är idempotent: samma post två gånger ger aldrig en dubblett.
 
 **Integrationerna rör bara kunder och ordrar**, aldrig stämplingar,
 löneunderlaget eller planeringen.
+
+**Gateway-API:t ligger under `/api/gateway/v1`** och är ett kontrakt med
+installationer vi inte styr över. Inom v1 läggs fält till men tas aldrig
+bort. Schemana står i `src/lib/integrations/gateway-schema.ts` (zod), och
+rutterna validerar mot dem. OpenAPI-specen byggs av samma scheman och sparas i
+`openapi/gateway-v1.json`. Gatewayens C#-klient genereras ur specen.
+`tests/gateway-openapi.test.ts` fäller en sparad spec som glidit från koden,
+och skriver om den med `UPDATE_OPENAPI=1`.
+
+- **Nyckeln** (`tgk_…`) löses in mot en engångstoken (`tgr_…`) som gäller
+  ett dygn. Båda sparas bara som SHA-256, som kioskens token. Varje rutt utom
+  registreringen går genom `withGateway()`, vilket bevisas av
+  `tests/gateway-coverage.test.ts`. Företaget tas ur nyckeln, aldrig ur
+  begäran.
+- **Poster från fel instans avvisas.** Ingest prövar att posterna kommer från
+  det Visma-företag som är valt i Tikkr. Annars hade fel företags kunder
+  kopplats mot de riktiga.
+- **Prenumerationslåset stoppar inte gatewayen**, lika lite som skärmarna.
+- **Nya gatewayversioner** står i `gateway-release.ts` och når kunderna genom
+  en PR, så att de provas i labbet först.
 
 **Bas tills vidare.** Om integrationer blir ett tillval (§ 3.1) avgörs
 senare. En grind går att lägga på utan att någon data ändras.

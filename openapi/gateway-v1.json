@@ -1,0 +1,1014 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Tikkr Gateway API",
+    "version": "1",
+    "description": "API:t som Tikkr Gateway använder. Inom v1 läggs fält till men tas aldrig bort."
+  },
+  "servers": [
+    {
+      "url": "/api/gateway/v1"
+    }
+  ],
+  "security": [
+    {
+      "gatewayKey": []
+    }
+  ],
+  "components": {
+    "securitySchemes": {
+      "gatewayKey": {
+        "type": "http",
+        "scheme": "bearer",
+        "description": "Gatewayens nyckel, tgk_…"
+      }
+    },
+    "schemas": {
+      "ErrorResponse": {
+        "type": "object",
+        "properties": {
+          "error": {
+            "type": "object",
+            "properties": {
+              "code": {
+                "type": "string",
+                "description": "Maskinläsbar kod, t.ex. invalid_token."
+              },
+              "message": {
+                "type": "string",
+                "description": "Svensk text att visa eller logga."
+              }
+            },
+            "required": [
+              "code",
+              "message"
+            ]
+          }
+        },
+        "required": [
+          "error"
+        ]
+      },
+      "RegisterRequest": {
+        "type": "object",
+        "properties": {
+          "token": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200,
+            "description": "Engångstoken från Inställningar, Integrationer."
+          },
+          "machineName": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "version": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 50
+          }
+        },
+        "required": [
+          "token",
+          "machineName",
+          "version"
+        ]
+      },
+      "RegisterResponse": {
+        "type": "object",
+        "properties": {
+          "gatewayId": {
+            "type": "string"
+          },
+          "gatewayKey": {
+            "type": "string",
+            "description": "Permanent nyckel. Visas bara här. Skickas som Bearer i varje anrop."
+          }
+        },
+        "required": [
+          "gatewayId",
+          "gatewayKey"
+        ]
+      },
+      "SourceInstance": {
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200,
+            "description": "Stabil nyckel, t.ex. Visma-företagets mappnamn."
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          }
+        },
+        "required": [
+          "key",
+          "name"
+        ]
+      },
+      "SourceStatus": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100,
+            "description": "Källans id, t.ex. visma-administration."
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "version": {
+            "nullable": true,
+            "type": "string",
+            "maxLength": 50
+          },
+          "healthy": {
+            "type": "boolean"
+          },
+          "error": {
+            "description": "Senaste fel från källans hälsokontroll.",
+            "nullable": true,
+            "type": "string",
+            "maxLength": 2000
+          },
+          "instances": {
+            "default": [],
+            "maxItems": 100,
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SourceInstance"
+            }
+          },
+          "lastSuccessfulSyncAt": {
+            "nullable": true,
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "healthy"
+        ]
+      },
+      "HeartbeatRequest": {
+        "type": "object",
+        "properties": {
+          "version": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 50
+          },
+          "machineName": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "sources": {
+            "maxItems": 50,
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SourceStatus"
+            }
+          },
+          "error": {
+            "description": "Gatewayens senaste fel, null om inget.",
+            "nullable": true,
+            "type": "string",
+            "maxLength": 2000
+          }
+        },
+        "required": [
+          "version",
+          "machineName",
+          "sources"
+        ]
+      },
+      "HeartbeatResponse": {
+        "type": "object",
+        "properties": {
+          "serverTime": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+          },
+          "pendingCommands": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": [
+          "serverTime",
+          "pendingCommands"
+        ]
+      },
+      "EntityKey": {
+        "type": "string",
+        "enum": [
+          "customers",
+          "orders"
+        ]
+      },
+      "ConfigIntegration": {
+        "type": "object",
+        "properties": {
+          "integrationId": {
+            "type": "string"
+          },
+          "provider": {
+            "type": "string"
+          },
+          "source": {
+            "type": "string",
+            "description": "Källan som ska läsas, samma som ISource.Id."
+          },
+          "instanceKey": {
+            "nullable": true,
+            "description": "Vilken instans, t.ex. Visma-företag. Null = inte vald än.",
+            "type": "string"
+          },
+          "entities": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/EntityKey"
+            },
+            "description": "I den ordning de ska synkas."
+          },
+          "syncIntervalMinutes": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991
+          },
+          "options": {
+            "type": "object",
+            "additionalProperties": {},
+            "description": "Källspecifika inställningar."
+          }
+        },
+        "required": [
+          "integrationId",
+          "provider",
+          "source",
+          "instanceKey",
+          "entities",
+          "syncIntervalMinutes",
+          "options"
+        ]
+      },
+      "ConfigResponse": {
+        "type": "object",
+        "properties": {
+          "heartbeatSeconds": {
+            "type": "integer",
+            "minimum": 10,
+            "maximum": 9007199254740991
+          },
+          "commandsSeconds": {
+            "type": "integer",
+            "minimum": 10,
+            "maximum": 9007199254740991
+          },
+          "configSeconds": {
+            "type": "integer",
+            "minimum": 10,
+            "maximum": 9007199254740991
+          },
+          "autoUpdate": {
+            "type": "boolean"
+          },
+          "integrations": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ConfigIntegration"
+            }
+          }
+        },
+        "required": [
+          "heartbeatSeconds",
+          "commandsSeconds",
+          "configSeconds",
+          "autoUpdate",
+          "integrations"
+        ]
+      },
+      "CommandType": {
+        "type": "string",
+        "enum": [
+          "sync-now",
+          "full-resync"
+        ]
+      },
+      "GatewayCommand": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "type": {
+            "$ref": "#/components/schemas/CommandType"
+          },
+          "integrationId": {
+            "nullable": true,
+            "type": "string"
+          },
+          "payload": {
+            "nullable": true,
+            "type": "object",
+            "additionalProperties": {}
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+          }
+        },
+        "required": [
+          "id",
+          "type",
+          "integrationId",
+          "payload",
+          "createdAt"
+        ]
+      },
+      "CommandsResponse": {
+        "type": "object",
+        "properties": {
+          "commands": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/GatewayCommand"
+            }
+          }
+        },
+        "required": [
+          "commands"
+        ]
+      },
+      "AckRequest": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "done",
+              "failed"
+            ]
+          },
+          "message": {
+            "nullable": true,
+            "type": "string",
+            "maxLength": 2000
+          }
+        },
+        "required": [
+          "status"
+        ]
+      },
+      "AckResponse": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "enum": [
+              true
+            ]
+          }
+        },
+        "required": [
+          "ok"
+        ]
+      },
+      "IngestRecord": {
+        "type": "object",
+        "properties": {
+          "externalId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200,
+            "description": "Postens id i källan. Samma post har alltid samma id."
+          },
+          "updatedAt": {
+            "description": "När posten ändrades i källan.",
+            "nullable": true,
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+          },
+          "data": {
+            "type": "object",
+            "additionalProperties": {},
+            "description": "Posten i källans form, se källans schema."
+          }
+        },
+        "required": [
+          "externalId",
+          "data"
+        ]
+      },
+      "IngestRequest": {
+        "type": "object",
+        "properties": {
+          "instanceKey": {
+            "nullable": true,
+            "type": "string",
+            "maxLength": 200
+          },
+          "records": {
+            "minItems": 1,
+            "maxItems": 500,
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/IngestRecord"
+            }
+          }
+        },
+        "required": [
+          "records"
+        ]
+      },
+      "IngestStatus": {
+        "type": "string",
+        "enum": [
+          "received",
+          "unchanged",
+          "created",
+          "updated",
+          "linked",
+          "pending",
+          "ignored",
+          "error"
+        ]
+      },
+      "IngestResult": {
+        "type": "object",
+        "properties": {
+          "externalId": {
+            "type": "string"
+          },
+          "status": {
+            "$ref": "#/components/schemas/IngestStatus"
+          },
+          "message": {
+            "nullable": true,
+            "type": "string"
+          }
+        },
+        "required": [
+          "externalId",
+          "status"
+        ]
+      },
+      "IngestResponse": {
+        "type": "object",
+        "properties": {
+          "results": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/IngestResult"
+            }
+          }
+        },
+        "required": [
+          "results"
+        ]
+      },
+      "UpdateResponse": {
+        "type": "object",
+        "properties": {
+          "available": {
+            "type": "boolean"
+          },
+          "version": {
+            "nullable": true,
+            "type": "string"
+          },
+          "downloadUrl": {
+            "nullable": true,
+            "description": "Kräver gatewayens nyckel.",
+            "type": "string"
+          },
+          "sha256": {
+            "nullable": true,
+            "type": "string"
+          }
+        },
+        "required": [
+          "available",
+          "version",
+          "downloadUrl",
+          "sha256"
+        ]
+      },
+      "VismaAdministrationCustomer": {
+        "type": "object",
+        "properties": {
+          "customerNumber": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 50
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "orgNumber": {
+            "nullable": true,
+            "type": "string",
+            "maxLength": 50
+          },
+          "contactName": {
+            "nullable": true,
+            "type": "string",
+            "maxLength": 200
+          },
+          "email": {
+            "nullable": true,
+            "type": "string",
+            "maxLength": 200
+          },
+          "phone": {
+            "nullable": true,
+            "type": "string",
+            "maxLength": 50
+          },
+          "addressLine": {
+            "nullable": true,
+            "type": "string",
+            "maxLength": 200
+          },
+          "postalCode": {
+            "nullable": true,
+            "type": "string",
+            "maxLength": 20
+          },
+          "city": {
+            "nullable": true,
+            "type": "string",
+            "maxLength": 100
+          }
+        },
+        "required": [
+          "customerNumber",
+          "name"
+        ]
+      },
+      "VismaAdministrationOrder": {
+        "type": "object",
+        "properties": {
+          "orderNumber": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 50
+          },
+          "customerNumber": {
+            "nullable": true,
+            "type": "string",
+            "maxLength": 50
+          },
+          "status": {
+            "nullable": true,
+            "type": "string",
+            "maxLength": 50
+          },
+          "orderDate": {
+            "nullable": true,
+            "type": "string",
+            "format": "date",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+          },
+          "deliveryDate": {
+            "nullable": true,
+            "type": "string",
+            "format": "date",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+          }
+        },
+        "required": [
+          "orderNumber"
+        ]
+      }
+    }
+  },
+  "paths": {
+    "/register": {
+      "post": {
+        "operationId": "Register",
+        "summary": "Löser in en engångstoken mot gatewayens permanenta nyckel.",
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegisterRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Registrerad.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RegisterResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Ogiltig begäran.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Token är ogiltig, använd eller har gått ut.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "För många misslyckade försök.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/heartbeat": {
+      "post": {
+        "operationId": "Heartbeat",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/HeartbeatRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HeartbeatResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Ogiltig begäran.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Nyckeln är ogiltig eller borttagen.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "För många anrop. Se Retry-After.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/config": {
+      "get": {
+        "operationId": "GetConfig",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConfigResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Nyckeln är ogiltig eller borttagen.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "För många anrop. Se Retry-After.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/commands": {
+      "get": {
+        "operationId": "GetCommands",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommandsResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Nyckeln är ogiltig eller borttagen.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "För många anrop. Se Retry-After.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/commands/{id}/ack": {
+      "post": {
+        "operationId": "AckCommand",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AckRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AckResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Ogiltig begäran.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Nyckeln är ogiltig eller borttagen.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Uppdraget finns inte.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "För många anrop. Se Retry-After.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/ingest/{source}/{entity}": {
+      "post": {
+        "operationId": "Ingest",
+        "parameters": [
+          {
+            "name": "source",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "entity",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/EntityKey"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/IngestRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Utfallet per post.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IngestResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Ogiltig begäran.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Nyckeln är ogiltig eller borttagen.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Källan eller entiteten finns inte.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Integrationen är inte aktiv, entiteten är avstängd eller instansen fel.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Begäran är för stor.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "För många anrop. Se Retry-After.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/updates/latest": {
+      "get": {
+        "operationId": "GetLatestUpdate",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UpdateResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Nyckeln är ogiltig eller borttagen.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "För många anrop. Se Retry-After.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
