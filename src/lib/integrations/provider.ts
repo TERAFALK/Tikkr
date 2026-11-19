@@ -104,6 +104,12 @@ export interface IntegrationProvider<
   };
   /** Om en ny kund utan träff skapas direkt (true) eller hamnar i inkorgen. */
   createCustomers(settings: z.infer<Settings>): boolean;
+  /**
+   * Om en order ska föras in, efter dess status i källan. En order utanför
+   * filtret läggs inte i inkorgen. En redan kopplad order uppdateras ändå,
+   * men stängs aldrig automatiskt: någon kan stå instämplad på den.
+   */
+  includeOrder(settings: z.infer<Settings>, order: NormalizedOrder): boolean;
   /** Källans kund i Tikkrs form, eller ett fel på svenska. */
   mapCustomer(data: unknown): { ok: true; value: NormalizedCustomer } | { ok: false; error: string };
   /** Källans order i Tikkrs form, eller ett fel på svenska. */

@@ -1754,6 +1754,24 @@ Saknar kunden koppling väntar ordern tills den finns. Systemet gissar aldrig.
 En order stängs aldrig automatiskt för att den försvunnit ur källan: någon
 kan stå instämplad på den.
 
+Ordrarna i detalj (beslutat 2026-11-19), i `order-sync.ts`, prövade av
+`tests/order-sync.test.ts`:
+
+- **Bara öppna ordrar tas med som standard** (produktägarens val). Visma
+  skickar `open`, `delivered`, `invoiced` eller `cancelled`. En levererad
+  order är klar att faktureras och ska inte få ny tid.
+- **En order utanför filtret hamnar inte i inkorgen.** Rådatan sparas ändå,
+  så att en order som öppnas igen kommer in.
+- **En kopplad order som faktureras eller makuleras i källan står kvar som
+  öppen** i Tikkr. Panelen märker den "Avslutad i Visma Administration", och
+  administratören stänger den som vanligt.
+- **En väntande order släpps när kunden kopplas**, oavsett om kopplingen
+  kommer från en synk eller från inkorgen. Den körs om ur rådatan.
+- **En order i Tikkr med samma nummer är samma order.** Ett snabbjobb från
+  skärmen kopplas, får kunden och räknas som granskat. Har den en annan kund
+  hamnar den i inkorgen.
+- **En order utan kund i källan** skapas utan kund, som i Tikkr i övrigt.
+
 **Källan äger sina fält**, alltså namn, nummer, organisationsnummer, kontakt
 och adress, och skriver över dem på kopplade poster. **Tikkr äger sina**:
 påslag, rabatt, anteckningar, aktiv, fast pris, beräkningar och allt som rör

@@ -6,7 +6,10 @@ import { formatDateTime } from "@/lib/format";
 import { listPaging } from "@/lib/paging";
 import {
   countMappings,
+  countOrderMappings,
   customerMappingPage,
+  orderMappingPage,
+  ORDER_STATUS_TEXT,
   gatewayRows,
   integrationDetail,
   PENDING_REASON_TEXT,
@@ -43,6 +46,7 @@ import {
   disconnectGateway,
   ignoreMappingAction,
   linkMapping,
+  linkOrderMapping,
   removeIntegration,
   requestSync,
   saveIntegrationSettings,
@@ -61,7 +65,7 @@ const TABS = [
 
 type TabKey = (typeof TABS)[number]["key"];
 
-type Params = { flik?: string; vy?: string; sida?: string; antal?: string };
+type Params = { flik?: string; vy?: string; typ?: string; sida?: string; antal?: string };
 
 export const metadata = { title: "Integration · Tikkr" };
 
@@ -171,6 +175,22 @@ function Overview({ detail, timeZone, base }: { detail: IntegrationDetail; timeZ
               </Td>
               <Td numeric>{counts.CUSTOMER.ignored}</Td>
             </Tr>
+            {provider.entities.includes("orders") && (
+              <Tr>
+                <Td>Ordrar</Td>
+                <Td numeric>{counts.ORDER.linked}</Td>
+                <Td numeric>
+                  {counts.ORDER.pending > 0 ? (
+                    <Link href={`${base}?flik=kopplingar&typ=ordrar`} className="font-medium text-link hover:underline">
+                      {counts.ORDER.pending}
+                    </Link>
+                  ) : (
+                    0
+                  )}
+                </Td>
+                <Td numeric>{counts.ORDER.ignored}</Td>
+              </Tr>
+            )}
           </tbody>
         </Table>
         <div className="flex flex-wrap items-start gap-3 border-t border-neutral-200 px-5 py-4">
@@ -299,6 +319,9 @@ async function Mappings({
 }) {
   const { db } = await requireAdmin();
   const view: MappingView = VIEWS.some((v) => v.key === query.vy) ? (query.vy as MappingView) : "inkorg";
+  if (query.typ === "ordrar" && detail.provider.entities.includes("orders")) {
+    return <OrderMappings detail={detail} query={query} base={base} view={view} timeZone={timeZone} />;
+  }
   const total = await countMappings(db, detail.integration.id, view);
   const paging = listPaging(total, query);
   const rows = await customerMappingPage(db, detail.integration.id, detail.provider, view, paging);
@@ -316,6 +339,7 @@ async function Mappings({
   return (
     <Card>
       <CardHeader title="Kopplingar" help="integrationer" />
+      <MappingSwitch detail={detail} base={base} type="kunder" view={view} />
       <div className="flex gap-1 border-b border-neutral-200 px-5 pb-3">
         {VIEWS.map((v) => (
           <Link
@@ -459,6 +483,200 @@ async function Mappings({
             </tbody>
           </Table>
           <Pager paging={paging} total={total} unit="kunder" path={base} keep={{ flik: "kopplingar", vy: view }} />
+        </>
+      )}
+    </Card>
+  );
+}
+
+/** Kunder eller ordrar, när integrationen har båda. */
+function MappingSwitch({
+  detail,
+  base,
+  type,
+  view,
+}: {
+  detail: IntegrationDetail;
+  base: string;
+  type: "kunder" | "ordrar";
+  view: MappingView;
+}) {
+  if (!detail.provider.entities.includes("orders")) return null;
+  const tabs = [
+    { key: "kunder", label: "Kunder", pending: detail.counts.CUSTOMER.pending },
+    { key: "ordrar", label: "Ordrar", pending: detail.counts.ORDER.pending },
+  ] as const;
+  return (
+    <div className="flex gap-1 px-5 pb-2">
+      {tabs.map((t) => (
+        <Link
+          key={t.key}
+          href={`${base}?flik=kopplingar&typ=${t.key}&vy=${view}`}
+          aria-current={t.key === type ? "page" : undefined}
+          className={`rounded-md px-2.5 py-1 text-[13px] font-semibold ${
+            t.key === type ? "bg-fjord text-white" : "text-neutral-600 hover:text-neutral-900"
+          }`}
+        >
+          {t.label}
+          {t.pending > 0 && ` ${t.pending}`}
+        </Link>
+      ))}
+    </div>
+  );
+}
+
+async function OrderMappings({
+  detail,
+  query,
+  base,
+  view,
+  timeZone,
+}: {
+  detail: IntegrationDetail;
+  query: Params;
+  base: string;
+  view: MappingView;
+  timeZone: string;
+}) {
+  const { db } = await requireAdmin();
+  const total = await countOrderMappings(db, detail.integration.id, view);
+  const paging = listPaging(total, query);
+  const rows = await orderMappingPage(db, detail.integration.id, detail.provider, detail.integration.settings, view, paging);
+  const openOrders =
+    view === "inkorg" && rows.length > 0
+      ? await db.order.findMany({
+          where: { status: "OPEN" },
+          select: { id: true, orderNumber: true, customer: { select: { name: true } } },
+          orderBy: { orderNumber: "desc" },
+        })
+      : [];
+  const options = openOrders.map((o) => ({ id: o.id, label: o.orderNumber, hint: o.customer?.name }));
+  const provider = detail.provider.id;
+
+  return (
+    <Card>
+      <CardHeader title="Kopplingar" help="integrationer" />
+      <MappingSwitch detail={detail} base={base} type="ordrar" view={view} />
+      <div className="flex gap-1 border-b border-neutral-200 px-5 pb-3">
+        {VIEWS.map((v) => (
+          <Link
+            key={v.key}
+            href={`${base}?flik=kopplingar&typ=ordrar&vy=${v.key}${query.antal ? `&antal=${query.antal}` : ""}`}
+            aria-current={v.key === view ? "page" : undefined}
+            className={`rounded-md px-2.5 py-1 text-[13px] font-medium ${
+              v.key === view ? "bg-neutral-100 text-neutral-900" : "text-neutral-500 hover:text-neutral-900"
+            }`}
+          >
+            {v.label}
+          </Link>
+        ))}
+      </div>
+
+      {rows.length === 0 ? (
+        <EmptyState title={view === "inkorg" ? "Inkorgen är tom" : view === "kopplade" ? "Inga kopplade ordrar" : "Inga ignorerade ordrar"} />
+      ) : (
+        <>
+          <Table>
+            <thead>
+              <tr>
+                <Th>Order i {detail.provider.name}</Th>
+                <Th>{view === "kopplade" ? "Order i Tikkr" : "Status"}</Th>
+                <Th>
+                  <span className="sr-only">Åtgärder</span>
+                </Th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((row) => {
+                const sourceStatus = row.incoming?.sourceStatus ?? "open";
+                return (
+                  <Tr key={row.mappingId}>
+                    <Td>
+                      <span className="font-medium">{row.incoming?.orderNumber ?? row.externalId}</span>
+                      <span className="mt-0.5 block text-xs text-neutral-500">
+                        {[row.customerName, row.incoming?.customerExternalId].filter(Boolean).join(" · ")}
+                      </span>
+                      {row.status === "PENDING" && row.pendingReason && (
+                        <span className="mt-1 block">
+                          <Badge tone="warning">{PENDING_REASON_TEXT[row.pendingReason] ?? row.pendingReason}</Badge>
+                        </span>
+                      )}
+                    </Td>
+                    <Td muted>
+                      {view === "kopplade" && row.linked && (
+                        <Link href={`/admin/ordrar/${row.linked.id}`} className="font-medium text-link hover:underline">
+                          {row.linked.orderNumber}
+                        </Link>
+                      )}
+                      {view === "kopplade" && row.closedInSource && (
+                        <span className="mt-1 block">
+                          <Badge tone="muted">Avslutad i {detail.provider.name}</Badge>
+                        </span>
+                      )}
+                      {view !== "kopplade" && (ORDER_STATUS_TEXT[sourceStatus] ?? sourceStatus)}
+                      {view === "ignorerade" && row.lastSyncedAt && (
+                        <span className="mt-0.5 block text-xs">{formatDateTime(row.lastSyncedAt, timeZone)}</span>
+                      )}
+                    </Td>
+                    <Td>
+                      <div className="flex flex-wrap justify-end gap-2 [&_button]:whitespace-nowrap">
+                        {row.status === "PENDING" && (
+                          <>
+                            {row.pendingReason !== "customer-unlinked" && (
+                              <ActionDialog
+                                trigger="Koppla till befintlig"
+                                triggerTone="secondary"
+                                title={`Koppla order ${row.incoming?.orderNumber ?? row.externalId}`}
+                                action={linkOrderMapping}
+                                initial={{}}
+                                submitLabel="Koppla"
+                              >
+                                <input type="hidden" name="mappingId" value={row.mappingId} />
+                                <input type="hidden" name="provider" value={provider} />
+                                <Field label="Order i Tikkr">
+                                  <SearchSelect name="orderId" options={options} placeholder="Sök order" required inDialog />
+                                </Field>
+                              </ActionDialog>
+                            )}
+                            <form action={ignoreMappingAction}>
+                              <input type="hidden" name="mappingId" value={row.mappingId} />
+                              <input type="hidden" name="provider" value={provider} />
+                              <Button type="submit" tone="ghost">
+                                Ignorera
+                              </Button>
+                            </form>
+                          </>
+                        )}
+                        {row.status === "LINKED" && (
+                          <form action={unlinkMappingAction}>
+                            <input type="hidden" name="mappingId" value={row.mappingId} />
+                            <input type="hidden" name="provider" value={provider} />
+                            <ConfirmButton
+                              type="submit"
+                              tone="ghost"
+                              question={`Koppla loss order ${row.incoming?.orderNumber ?? row.externalId}? Ordern i Tikkr står kvar, med sin tid.`}
+                            >
+                              Koppla loss
+                            </ConfirmButton>
+                          </form>
+                        )}
+                        {row.status === "IGNORED" && (
+                          <form action={unlinkMappingAction}>
+                            <input type="hidden" name="mappingId" value={row.mappingId} />
+                            <input type="hidden" name="provider" value={provider} />
+                            <Button type="submit" tone="ghost">
+                              Till inkorgen
+                            </Button>
+                          </form>
+                        )}
+                      </div>
+                    </Td>
+                  </Tr>
+                );
+              })}
+            </tbody>
+          </Table>
+          <Pager paging={paging} total={total} unit="ordrar" path={base} keep={{ flik: "kopplingar", typ: "ordrar", vy: view }} />
         </>
       )}
     </Card>

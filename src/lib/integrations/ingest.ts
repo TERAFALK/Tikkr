@@ -4,6 +4,7 @@ import type { EntityKey, IntegrationProvider } from "./provider";
 import type { IngestResult, IngestStatus } from "./gateway-schema";
 import { stableHash } from "./stable-hash";
 import { applyCustomer, customerBatchContext } from "./customer-sync";
+import { applyOrder, orderContext, releaseWaitingOrders } from "./order-sync";
 import { readSettings } from "./settings";
 
 /**
@@ -55,6 +56,15 @@ export async function ingestRecords(input: IngestInput, now = new Date()): Promi
     input.entity === "customers"
       ? await customerContext(db, input, now)
       : null;
+  const orders = await orderContext({
+    db,
+    companyId: input.companyId,
+    integrationId: input.integrationId,
+    source: input.provider.gatewaySource ?? input.provider.id,
+    provider: input.provider,
+    now,
+  });
+  const newlyLinkedCustomers = new Set<string>();
 
   const results: IngestResult[] = [];
   for (const record of input.records) {
@@ -80,6 +90,9 @@ export async function ingestRecords(input: IngestInput, now = new Date()): Promi
     try {
       if (customers && "name" in mapped.value) {
         outcome = await applyCustomer(customers, record.externalId, mapped.value, hash);
+        if (outcome.status === "linked" || outcome.status === "created") newlyLinkedCustomers.add(record.externalId);
+      } else if ("orderNumber" in mapped.value) {
+        outcome = await applyOrder(orders, record.externalId, mapped.value, hash);
       }
     } catch (error) {
       console.error("Ingest av post misslyckades", { integrationId: input.integrationId, externalId: record.externalId, error });
@@ -116,6 +129,9 @@ export async function ingestRecords(input: IngestInput, now = new Date()): Promi
     knownHash.set(record.externalId, hash);
     results.push({ externalId: record.externalId, ...outcome });
   }
+
+  // Ordrar som väntat på kunderna i batchen förs in nu, ur rådatan.
+  await releaseWaitingOrders(orders, newlyLinkedCustomers);
 
   await db.integration.update({
     where: { id: input.integrationId },

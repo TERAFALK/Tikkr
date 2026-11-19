@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   decideCustomer,
+  decideOrder,
   normalizeName,
   normalizeOrgNumber,
   orgNumberMatches,
@@ -146,5 +147,50 @@ describe("fälten källan äger", () => {
     for (const own of ["markupPercent", "discountPercent", "notes", "active"]) {
       expect(fields).not.toHaveProperty(own);
     }
+  });
+});
+
+describe("beslutet för en okopplad order", () => {
+  const linked = { state: "linked" as const, customerId: "k1" };
+
+  it("en order utanför filtret läggs inte i inkorgen", () => {
+    expect(decideOrder({ included: false, customer: linked, existing: null })).toEqual({ action: "skip" });
+  });
+
+  it("en ny order med kopplad kund skapas med kunden", () => {
+    expect(decideOrder({ included: true, customer: linked, existing: null })).toEqual({ action: "create", customerId: "k1" });
+  });
+
+  it("en order vars kund inte är kopplad väntar, systemet gissar aldrig", () => {
+    expect(decideOrder({ included: true, customer: { state: "pending" }, existing: null })).toEqual({
+      action: "pending",
+      reason: "customer-unlinked",
+    });
+    expect(decideOrder({ included: true, customer: { state: "ignored" }, existing: null })).toEqual({
+      action: "pending",
+      reason: "customer-ignored",
+    });
+  });
+
+  it("en order utan kund i källan skapas utan kund", () => {
+    expect(decideOrder({ included: true, customer: { state: "none" }, existing: null })).toEqual({ action: "create", customerId: null });
+  });
+
+  it("samma nummer i Tikkr, t.ex. ett snabbjobb, kopplas och får kunden", () => {
+    expect(
+      decideOrder({ included: true, customer: linked, existing: { id: "o1", customerId: null, linkedHere: false } })
+    ).toEqual({ action: "link", orderId: "o1", customerId: "k1" });
+  });
+
+  it("samma nummer med en annan kund i Tikkr väntar", () => {
+    expect(
+      decideOrder({ included: true, customer: linked, existing: { id: "o1", customerId: "k2", linkedHere: false } })
+    ).toEqual({ action: "pending", reason: "order-customer-conflict" });
+  });
+
+  it("en order i Tikkr som redan är kopplad kopplas inte en gång till", () => {
+    expect(
+      decideOrder({ included: true, customer: linked, existing: { id: "o1", customerId: "k1", linkedHere: true } })
+    ).toEqual({ action: "pending", reason: "order-taken" });
   });
 });
