@@ -3,6 +3,7 @@ import type { CompanyDb } from "../tenant";
 import type { NormalizedCustomer } from "./provider";
 import { providerById } from "./providers";
 import { writeCustomerFields } from "./customer-sync";
+import { orderContext, releaseWaitingOrders } from "./order-sync";
 import { sourceOwnedCustomerFields, suggestCustomers, type Suggestion } from "./matching";
 
 /**
@@ -91,6 +92,7 @@ export async function linkToExistingCustomer(
   });
   await log(db, db.$companyId, loaded.mapping.integrationId,
     `${loaded.incoming.name} (${loaded.mapping.externalId}) kopplad till ${customer.name}.`, input.actorEmail);
+  await releaseFor(db, loaded.mapping.integrationId, loaded.mapping.externalId);
   return { ok: true };
 }
 
@@ -131,6 +133,7 @@ export async function createCustomerFromMapping(
   }
   await log(db, db.$companyId, loaded.mapping.integrationId,
     `${loaded.incoming.name} (${loaded.mapping.externalId}) skapad som ny kund.`, input.actorEmail);
+  await releaseFor(db, loaded.mapping.integrationId, loaded.mapping.externalId);
   return { ok: true };
 }
 
@@ -167,6 +170,22 @@ export async function unlinkMapping(
   return { ok: true };
 }
 
+/** Ordrarna som väntat på kunden förs in när den kopplas. */
+async function releaseFor(db: CompanyDb, integrationId: string, customerExternalId: string) {
+  const integration = await db.integration.findFirst({ where: { id: integrationId }, select: { provider: true } });
+  const provider = integration && providerById(integration.provider);
+  if (!provider) return;
+  const ctx = await orderContext({
+    db,
+    companyId: db.$companyId,
+    integrationId,
+    source: provider.gatewaySource ?? provider.id,
+    provider,
+    now: new Date(),
+  });
+  await releaseWaitingOrders(ctx, new Set([customerExternalId]));
+}
+
 /** Förslagen för en post i inkorgen, räknade nu och aldrig lagrade. */
 export async function suggestionsForMapping(db: CompanyDb, mappingId: string): Promise<Suggestion[]> {
   const loaded = await loadCustomerMapping(db, mappingId);
@@ -180,4 +199,34 @@ export async function suggestionsForMapping(db: CompanyDb, mappingId: string): P
     select: { id: true, name: true, customerNumber: true, orgNumber: true, email: true, phone: true },
   });
   return suggestCustomers(loaded.incoming, candidates.filter((c) => !taken.has(c.id)));
+}
+
+/**
+ * Kopplar en order ur inkorgen till en befintlig order i Tikkr. Ordernumret
+ * står kvar som det är i Tikkr tills nästa synk; kunden sätts om kundens
+ * koppling finns.
+ */
+export async function linkToExistingOrder(
+  db: CompanyDb,
+  input: { mappingId: string; orderId: string; actorEmail: string; now?: Date }
+): Promise<MappingActionResult> {
+  const mapping = await db.integrationMapping.findFirst({ where: { id: input.mappingId } });
+  if (!mapping) return { ok: false, error: "Posten finns inte." };
+  if (mapping.entityType !== "ORDER") return { ok: false, error: "Posten är ingen order." };
+
+  const order = await db.order.findFirst({ where: { id: input.orderId }, select: { id: true, orderNumber: true } });
+  if (!order) return { ok: false, error: "Ordern finns inte." };
+
+  const taken = await db.integrationMapping.findFirst({
+    where: { integrationId: mapping.integrationId, orderId: order.id, id: { not: mapping.id } },
+    select: { externalId: true },
+  });
+  if (taken) return { ok: false, error: `Order ${order.orderNumber} är redan kopplad till ${taken.externalId}. Koppla loss den först.` };
+
+  await db.integrationMapping.update({
+    where: { id: mapping.id },
+    data: { status: "LINKED", orderId: order.id, pendingReason: null, lastSyncedAt: input.now ?? new Date() },
+  });
+  await log(db, db.$companyId, mapping.integrationId, `Order ${mapping.externalId} kopplad till order ${order.orderNumber}.`, input.actorEmail);
+  return { ok: true };
 }

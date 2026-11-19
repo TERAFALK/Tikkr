@@ -10,6 +10,7 @@ import {
   createCustomerFromMapping,
   ignoreMapping,
   linkToExistingCustomer,
+  linkToExistingOrder,
   unlinkMapping,
 } from "@/lib/integrations/mappings";
 import type { DialogState } from "@/components/ui/ActionDialog";
@@ -196,6 +197,22 @@ export async function linkMapping(_previous: DialogState, formData: FormData): P
   if (!result.ok) return { error: result.error };
   refresh(String(formData.get("provider") ?? "") || undefined);
   return { ok: "Kunden är kopplad." };
+}
+
+export async function linkOrderMapping(_previous: DialogState, formData: FormData): Promise<DialogState> {
+  const session = await requireAdmin();
+  await assertWritable(session);
+  const orderId = String(formData.get("orderId") ?? "");
+  if (!orderId) return { error: "Välj en order.", field: "orderId" };
+
+  const result = await linkToExistingOrder(session.db, {
+    mappingId: String(formData.get("mappingId") ?? ""),
+    orderId,
+    actorEmail: session.email,
+  });
+  if (!result.ok) return { error: result.error };
+  refresh(String(formData.get("provider") ?? "") || undefined);
+  return { ok: "Ordern är kopplad." };
 }
 
 export async function createFromMapping(_previous: DialogState, formData: FormData): Promise<DialogState> {

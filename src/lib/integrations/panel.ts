@@ -1,5 +1,5 @@
 import type { CompanyDb } from "../tenant";
-import type { IntegrationProvider, NormalizedCustomer } from "./provider";
+import type { IntegrationProvider, NormalizedCustomer, NormalizedOrder } from "./provider";
 import { suggestCustomers } from "./matching";
 import { PROVIDERS, providerById } from "./providers";
 import { readSettings } from "./settings";
@@ -161,9 +161,11 @@ export const PENDING_REASON_TEXT: Record<string, string> = {
   "org-ambiguous": "Flera kunder har samma organisationsnummer",
   "org-taken": "Kunden med samma organisationsnummer är redan kopplad",
   "number-taken": "Kundnumret finns redan",
-  "customer-unlinked": "Kunden är inte kopplad",
+  "customer-unlinked": "Väntar på att kunden kopplas",
   "customer-ignored": "Kunden är ignorerad",
   unlinked: "Kopplad loss",
+  "order-taken": "Ordern i Tikkr är redan kopplad",
+  "order-customer-conflict": "Ordern i Tikkr har en annan kund",
 };
 
 export const SUGGESTION_REASON_TEXT: Record<string, string> = {
@@ -260,4 +262,85 @@ export async function countMappings(db: CompanyDb, integrationId: string, view: 
   return db.integrationMapping.count({
     where: { integrationId, entityType: "CUSTOMER", status: VIEW_STATUS[view] },
   });
+}
+
+/** Källans orderstatus i klartext. Koderna kommer från gatewayen. */
+export const ORDER_STATUS_TEXT: Record<string, string> = {
+  open: "Öppen",
+  delivered: "Levererad",
+  invoiced: "Fakturerad",
+  cancelled: "Makulerad",
+};
+
+export interface OrderRow {
+  mappingId: string;
+  externalId: string;
+  status: "LINKED" | "PENDING" | "IGNORED";
+  pendingReason: string | null;
+  incoming: NormalizedOrder | null;
+  /** Kundens namn i källan, ur kundens rådata, när den finns. */
+  customerName: string | null;
+  linked: { id: string; orderNumber: string } | null;
+  /** Orderns status i källan är utanför filtret, t.ex. fakturerad. */
+  closedInSource: boolean;
+  lastSyncedAt: Date | null;
+}
+
+export async function orderMappingPage(
+  db: CompanyDb,
+  integrationId: string,
+  provider: IntegrationProvider,
+  settings: unknown,
+  view: MappingView,
+  page: { skip: number; take: number }
+): Promise<OrderRow[]> {
+  const mappings = await db.integrationMapping.findMany({
+    where: { integrationId, entityType: "ORDER", status: VIEW_STATUS[view] },
+    orderBy: [{ updatedAt: "desc" }, { externalId: "asc" }],
+    skip: page.skip,
+    take: page.take,
+    include: { order: { select: { id: true, orderNumber: true } } },
+  });
+  const records = await db.integrationRecord.findMany({
+    where: { integrationId, entityType: "ORDER", externalId: { in: mappings.map((m) => m.externalId) } },
+    select: { externalId: true, data: true },
+  });
+  const orderData = new Map(records.map((r) => [r.externalId, r.data]));
+
+  const incoming = new Map(
+    mappings.map((m) => {
+      const mapped = orderData.has(m.externalId) ? provider.mapOrder(orderData.get(m.externalId)) : null;
+      return [m.externalId, mapped?.ok ? mapped.value : null] as const;
+    })
+  );
+  const customerIds = [...new Set([...incoming.values()].map((o) => o?.customerExternalId).filter((x): x is string => Boolean(x)))];
+  const customerRecords = await db.integrationRecord.findMany({
+    where: { integrationId, entityType: "CUSTOMER", externalId: { in: customerIds } },
+    select: { externalId: true, data: true },
+  });
+  const customerName = new Map(
+    customerRecords.map((r) => {
+      const c = provider.mapCustomer(r.data);
+      return [r.externalId, c.ok ? c.value.name : null] as const;
+    })
+  );
+
+  return mappings.map((m) => {
+    const order = incoming.get(m.externalId) ?? null;
+    return {
+      mappingId: m.id,
+      externalId: m.externalId,
+      status: m.status,
+      pendingReason: m.pendingReason,
+      incoming: order,
+      customerName: order?.customerExternalId ? (customerName.get(order.customerExternalId) ?? null) : null,
+      linked: m.order,
+      closedInSource: order ? !provider.includeOrder(settings as never, order) : false,
+      lastSyncedAt: m.lastSyncedAt,
+    };
+  });
+}
+
+export async function countOrderMappings(db: CompanyDb, integrationId: string, view: MappingView): Promise<number> {
+  return db.integrationMapping.count({ where: { integrationId, entityType: "ORDER", status: VIEW_STATUS[view] } });
 }

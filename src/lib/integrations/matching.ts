@@ -202,3 +202,65 @@ export function sourceOwnedCustomerFields(c: NormalizedCustomer) {
     city: c.city,
   };
 }
+
+/* -------------------------------------------------------------------------- */
+/* Ordrar                                                                      */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Varför en order ligger i inkorgen, utöver kundernas koder ovan.
+ */
+export type OrderPendingReason =
+  | "customer-unlinked"
+  | "customer-ignored"
+  | "order-taken"
+  | "order-customer-conflict"
+  | "unlinked";
+
+/** Kunden ordern hör till, som kopplingen ser ut i den här integrationen. */
+export type OrderCustomer =
+  | { state: "none" }
+  | { state: "linked"; customerId: string }
+  | { state: "pending" }
+  | { state: "ignored" };
+
+export type OrderDecision =
+  | { action: "link"; orderId: string; customerId: string | null }
+  | { action: "create"; customerId: string | null }
+  | { action: "pending"; reason: OrderPendingReason }
+  | { action: "skip" };
+
+/**
+ * Beslutet för en order som INTE redan är kopplad.
+ *
+ * Ordrar matchas på ordernumret och kopplas till kund via kundens koppling.
+ * Saknar kunden koppling väntar ordern. Systemet gissar aldrig.
+ *
+ * @param included Orderns status i källan är bland dem inställningen tar med.
+ *   En order utanför filtret läggs inte i inkorgen alls.
+ * @param existing En order i Tikkr med samma nummer. Numret är unikt per
+ *   arbetsyta, så den ordern ÄR samma order (ofta ett snabbjobb från skärmen),
+ *   om kunden inte säger emot.
+ */
+export function decideOrder(input: {
+  included: boolean;
+  customer: OrderCustomer;
+  existing: { id: string; customerId: string | null; linkedHere: boolean } | null;
+  automatic?: boolean;
+}): OrderDecision {
+  if (!input.included) return { action: "skip" };
+  if (input.automatic === false) return { action: "pending", reason: "unlinked" };
+  if (input.customer.state === "pending") return { action: "pending", reason: "customer-unlinked" };
+  if (input.customer.state === "ignored") return { action: "pending", reason: "customer-ignored" };
+
+  const customerId = input.customer.state === "linked" ? input.customer.customerId : null;
+  const existing = input.existing;
+  if (existing) {
+    if (existing.linkedHere) return { action: "pending", reason: "order-taken" };
+    if (existing.customerId && customerId && existing.customerId !== customerId) {
+      return { action: "pending", reason: "order-customer-conflict" };
+    }
+    return { action: "link", orderId: existing.id, customerId: customerId ?? existing.customerId };
+  }
+  return { action: "create", customerId };
+}

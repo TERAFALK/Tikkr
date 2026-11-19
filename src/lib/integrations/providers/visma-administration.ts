@@ -34,7 +34,7 @@ export const vismaOrderSchema = z
   .object({
     orderNumber: text(50).min(1),
     customerNumber: optionalText(50),
-    /** Orderns status i Visma, som gatewayen läste den. */
+    /** open, delivered (levererad, ej fakturerad), invoiced eller cancelled (makulerad). */
     status: optionalText(50),
     orderDate: z.iso.date().nullish(),
     deliveryDate: z.iso.date().nullish(),
@@ -45,7 +45,11 @@ export const vismaSettingsSchema = z.object({
   /** Visma-företaget att läsa, som gatewayen rapporterade det. */
   companyKey: z.string().min(1).nullable().default(null),
   entities: z.array(z.enum(["customers", "orders"])).default(["customers", "orders"]),
-  /** Orderstatusar som tas med. Öppna ordrar som standard. */
+  /**
+   * Orderstatusar som tas med: open, delivered, invoiced, cancelled. Bara
+   * öppna som standard (produktägarens val 2026-11-19): en levererad order är
+   * klar att faktureras och ska inte få ny tid.
+   */
   orderStatuses: z.array(z.string()).default(["open"]),
   /** true: ny kund utan träff skapas direkt. false: den hamnar i inkorgen. */
   createCustomers: z.boolean().default(false),
@@ -95,6 +99,11 @@ export const vismaAdministration: IntegrationProvider<typeof vismaSettingsSchema
       entities: settings.entities,
       options: { orderStatuses: settings.orderStatuses },
     };
+  },
+  includeOrder(settings, order) {
+    // Gatewayen skickar open, delivered, invoiced eller cancelled. Saknas
+    // statusen räknas ordern som öppen.
+    return settings.orderStatuses.includes(order.sourceStatus ?? "open");
   },
   createCustomers(settings) {
     return settings.createCustomers;
