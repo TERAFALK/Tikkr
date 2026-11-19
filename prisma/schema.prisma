@@ -235,6 +235,16 @@ model Company {
   shopOrderLines  ShopOrderLine[]
   shopOrderEvents ShopOrderEvent[]
 
+  /// Integrationerna. Se Integration.
+  integrations              Integration[]
+  integrationCredentials    IntegrationCredential[]
+  gateways                  Gateway[]
+  gatewayRegistrationTokens GatewayRegistrationToken[]
+  gatewayCommands           GatewayCommand[]
+  integrationMappings       IntegrationMapping[]
+  integrationRecords        IntegrationRecord[]
+  integrationEvents         IntegrationEvent[]
+
   @@map("companies")
 }
 
@@ -413,6 +423,9 @@ model Customer {
   company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
   orders  Order[]
 
+  /// Kopplingar till poster i externa system. Se IntegrationMapping.
+  integrationMappings IntegrationMapping[]
+
   // Numret är unikt per företag, inte globalt. Två kunder till Tikkr ska kunna
   // ha varsin kund nummer 1. Flera utan nummer är tillåtet — Postgres räknar
   // inte tomma värden som dubbletter.
@@ -496,6 +509,9 @@ model Order {
 
   /// Planerade personalpass. Se StaffBlock.
   staffBlocks StaffBlock[]
+
+  /// Kopplingar till poster i externa system. Se IntegrationMapping.
+  integrationMappings IntegrationMapping[]
 
   // Restrict och inte Cascade: en kund med ordrar ska inte gå att radera, bara
   // avaktiveras. Samma regel som redan gäller ordrar och arbetsmoment med
@@ -2594,4 +2610,285 @@ model ShopProductImage {
 
   @@index([productId, sortOrder])
   @@map("shop_product_images")
+}
+
+// ---------------------------------------------------------------------------
+// INTEGRATIONERNA
+//
+// Externa system som arbetsytan ansluter Tikkr till. Se src/lib/integrations
+// och CLAUDE.md § 3.5.
+// ---------------------------------------------------------------------------
+
+/// Hur data från ett externt system når Tikkr.
+///
+/// GATEWAY: Tikkr Gateway, en tjänst hos kunden, läser ett lokalt system och
+/// skickar posterna hit. OAUTH: Tikkrs server hämtar dem själv från systemets
+/// moln-API. Båda matar samma ingest, matchning och logg.
+enum IntegrationConnectionType {
+  GATEWAY
+  OAUTH
+}
+
+enum IntegrationEntityType {
+  CUSTOMER
+  ORDER
+}
+
+/// LINKED: posten är kopplad till en kund eller order i Tikkr.
+/// PENDING: ligger i inkorgen och väntar på ett beslut, eller på att kunden
+/// den hör till kopplas. IGNORED: administratören har valt bort den.
+enum IntegrationMappingStatus {
+  LINKED
+  PENDING
+  IGNORED
+}
+
+enum GatewayCommandType {
+  SYNC_NOW
+  FULL_RESYNC
+}
+
+/// PENDING tills gatewayen kvitterat. DONE och FAILED är gatewayens svar.
+enum GatewayCommandStatus {
+  PENDING
+  DONE
+  FAILED
+}
+
+enum IntegrationEventLevel {
+  INFO
+  WARNING
+  ERROR
+}
+
+/// ETT EXTERNT SYSTEM SOM ARBETSYTAN ANSLUTIT TIKKR TILL.
+///
+/// Raden finns när integrationen är tillagd. Statusen som visas (Ansluten,
+/// Fel, Väntar på gateway) LAGRAS INTE: den härleds ur gatewayens senaste
+/// kontakt och det senaste felet, av samma skäl som ett saldo aldrig lagras
+/// bredvid sina poster.
+///
+/// `provider` är en sträng och inte en enum: den slås upp i registret i
+/// src/lib/integrations/providers.ts, och en ny integration ska inte kräva en
+/// migration.
+model Integration {
+  id             String                    @id @default(cuid())
+  companyId      String                    @map("company_id")
+  provider       String
+  connectionType IntegrationConnectionType @map("connection_type")
+
+  /// Gatewayen som betjänar integrationen. Bara för GATEWAY, och tom tills en
+  /// gateway registrerats.
+  gatewayId String? @map("gateway_id")
+
+  /// Providerns inställningar, validerade mot dess schema vid varje läsning.
+  settings Json @default("{}")
+
+  lastSyncAt     DateTime? @map("last_sync_at")
+  lastError      String?   @map("last_error")
+  lastErrorAt    DateTime? @map("last_error_at")
+  createdByEmail String    @map("created_by_email")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+
+  company    Company                @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  gateway    Gateway?               @relation(fields: [gatewayId], references: [id], onDelete: SetNull)
+  credential IntegrationCredential?
+  mappings   IntegrationMapping[]
+  records    IntegrationRecord[]
+  events     IntegrationEvent[]
+  commands   GatewayCommand[]
+
+  @@unique([companyId, provider])
+  @@map("integrations")
+}
+
+/// Nycklarna till ett moln-API, för OAUTH. Används först med Fortnox.
+///
+/// Krypterade med seal() och AUTH_SECRET, som tvåstegsnycklarna. En
+/// databaskopia ska inte ge åtkomst till kundens bokföring.
+model IntegrationCredential {
+  id                 String    @id @default(cuid())
+  companyId          String    @map("company_id")
+  integrationId      String    @unique @map("integration_id")
+  accessTokenSealed  String    @map("access_token_sealed")
+  refreshTokenSealed String?   @map("refresh_token_sealed")
+  expiresAt          DateTime? @map("expires_at")
+  scope              String?
+  createdAt          DateTime  @default(now()) @map("created_at")
+  updatedAt          DateTime  @updatedAt @map("updated_at")
+
+  company     Company     @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  integration Integration @relation(fields: [integrationId], references: [id], onDelete: Cascade)
+
+  @@index([companyId])
+  @@map("integration_credentials")
+}
+
+/// EN INSTALLERAD TIKKR GATEWAY.
+///
+/// Nyckeln sparas som SHA-256, aldrig i klartext, av samma skäl som kioskens
+/// token: den är 32 slumpade byte och går inte att gissa, och en databaskopia
+/// ska inte gå att använda. Att ta bort raden kopplar från gatewayen.
+///
+/// Maskinnamn, version och källor är vad gatewayen själv rapporterat. Status
+/// (Ansluten, Tyst) härleds ur `lastHeartbeatAt`.
+model Gateway {
+  id              String    @id @default(cuid())
+  companyId       String    @map("company_id")
+  keyHash         String    @unique @map("key_hash")
+  machineName     String?   @map("machine_name")
+  version         String?
+  /// Källorna gatewayen hittat, med deras instanser (t.ex. Visma-företag).
+  sources         Json      @default("[]")
+  lastHeartbeatAt DateTime? @map("last_heartbeat_at")
+  lastError       String?   @map("last_error")
+  lastErrorAt     DateTime? @map("last_error_at")
+  registeredAt    DateTime  @default(now()) @map("registered_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  company      Company            @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  integrations Integration[]
+  commands     GatewayCommand[]
+  events       IntegrationEvent[]
+
+  @@index([companyId])
+  @@map("gateways")
+}
+
+/// ENGÅNGSTOKEN SOM REGISTRERAR EN GATEWAY.
+///
+/// Visas en gång i panelen och skrivs in i installationen. Förbrukad vid
+/// första användningen och ogiltig efter `expiresAt`.
+model GatewayRegistrationToken {
+  id             String    @id @default(cuid())
+  companyId      String    @map("company_id")
+  tokenHash      String    @unique @map("token_hash")
+  expiresAt      DateTime  @map("expires_at")
+  usedAt         DateTime? @map("used_at")
+  createdByEmail String    @map("created_by_email")
+  createdAt      DateTime  @default(now()) @map("created_at")
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@index([companyId])
+  @@map("gateway_registration_tokens")
+}
+
+/// ETT UPPDRAG TILL EN GATEWAY, t.ex. Synka nu.
+///
+/// Gatewayen har inga öppna portar, så den hämtar uppdragen själv och
+/// kvitterar dem.
+model GatewayCommand {
+  id             String               @id @default(cuid())
+  companyId      String               @map("company_id")
+  gatewayId      String               @map("gateway_id")
+  integrationId  String?              @map("integration_id")
+  type           GatewayCommandType
+  payload        Json?
+  status         GatewayCommandStatus @default(PENDING)
+  result         String?
+  createdByEmail String?              @map("created_by_email")
+  createdAt      DateTime             @default(now()) @map("created_at")
+  ackedAt        DateTime?            @map("acked_at")
+
+  company     Company      @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  gateway     Gateway      @relation(fields: [gatewayId], references: [id], onDelete: Cascade)
+  integration Integration? @relation(fields: [integrationId], references: [id], onDelete: Cascade)
+
+  @@index([gatewayId, status])
+  @@index([companyId])
+  @@map("gateway_commands")
+}
+
+/// KOPPLINGEN MELLAN EN POST I KÄLLSYSTEMET OCH EN KUND ELLER ORDER I TIKKR.
+///
+/// En rad per (integration, entitet, källans id), och det är den som gör
+/// ingest idempotent: samma post två gånger hittar samma rad.
+///
+/// Två kolumner, `customerId` och `orderId`, och inte ett generellt
+/// entitets-id: då kan databasen själv vägra en koppling som pekar på något
+/// som inte finns. Att en LINKED rad har rätt kolumn ifylld kan inte uttryckas
+/// i databasen och vaktas i src/lib/integrations, som är enda vägen in.
+///
+/// En Tikkr-kund kopplas högst en gång per integration, men får vara kopplad i
+/// flera integrationer samtidigt (Visma och Fortnox).
+model IntegrationMapping {
+  id            String                   @id @default(cuid())
+  companyId     String                   @map("company_id")
+  integrationId String                   @map("integration_id")
+  /// Källan posten kom från, t.ex. visma-administration.
+  source        String
+  entityType    IntegrationEntityType    @map("entity_type")
+  externalId    String                   @map("external_id")
+  customerId    String?                  @map("customer_id")
+  orderId       String?                  @map("order_id")
+  status        IntegrationMappingStatus @default(PENDING)
+  /// Varför posten väntar, som en kod gränssnittet översätter.
+  pendingReason String?                  @map("pending_reason")
+  /// Hashen av den data som senast skrevs till Tikkr.
+  dataHash      String?                  @map("data_hash")
+  lastSyncedAt  DateTime?                @map("last_synced_at")
+  createdAt     DateTime                 @default(now()) @map("created_at")
+  updatedAt     DateTime                 @updatedAt @map("updated_at")
+
+  company     Company     @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  integration Integration @relation(fields: [integrationId], references: [id], onDelete: Cascade)
+  // Kunder och ordrar raderas inte i Tikkr, de avaktiveras och stängs. Raderas
+  // ändå en (med företaget) följer kopplingen med.
+  customer    Customer?   @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  order       Order?      @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@unique([integrationId, entityType, externalId])
+  @@unique([integrationId, customerId])
+  @@unique([integrationId, orderId])
+  @@index([companyId, integrationId, entityType, status])
+  @@index([customerId])
+  @@index([orderId])
+  @@map("integration_mappings")
+}
+
+/// SENASTE RÅDATA PER POST, som källan skickade den.
+///
+/// Inkorgen visas härifrån, och en väntande order körs om härifrån när dess
+/// kund kopplats, utan att något hämtas från källan igen.
+model IntegrationRecord {
+  id              String                @id @default(cuid())
+  companyId       String                @map("company_id")
+  integrationId   String                @map("integration_id")
+  entityType      IntegrationEntityType @map("entity_type")
+  externalId      String                @map("external_id")
+  data            Json
+  dataHash        String                @map("data_hash")
+  /// När posten senast ändrades i källan, enligt källan.
+  sourceUpdatedAt DateTime?             @map("source_updated_at")
+  receivedAt      DateTime              @default(now()) @map("received_at")
+  updatedAt       DateTime              @updatedAt @map("updated_at")
+
+  company     Company     @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  integration Integration @relation(fields: [integrationId], references: [id], onDelete: Cascade)
+
+  @@unique([integrationId, entityType, externalId])
+  @@index([companyId])
+  @@map("integration_records")
+}
+
+/// LOGGEN: synkkörningar och fel, i begriplig text.
+model IntegrationEvent {
+  id            String                @id @default(cuid())
+  companyId     String                @map("company_id")
+  integrationId String?               @map("integration_id")
+  gatewayId     String?               @map("gateway_id")
+  level         IntegrationEventLevel @default(INFO)
+  message       String
+  details       Json?
+  createdAt     DateTime              @default(now()) @map("created_at")
+
+  company     Company      @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  integration Integration? @relation(fields: [integrationId], references: [id], onDelete: Cascade)
+  gateway     Gateway?     @relation(fields: [gatewayId], references: [id], onDelete: SetNull)
+
+  @@index([companyId, integrationId, createdAt])
+  @@index([companyId, createdAt])
+  @@map("integration_events")
 }

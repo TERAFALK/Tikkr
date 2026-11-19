@@ -70,6 +70,16 @@ export const TENANT_SCOPED_MODELS = [
   "ShopOrder",
   "ShopOrderLine",
   "ShopOrderEvent",
+  // Integrationerna. Gatewayens nyckel och registreringstoken slås upp via
+  // unsafeGlobalPrisma, som kioskens token, och därefter går allt hit.
+  "Integration",
+  "IntegrationCredential",
+  "Gateway",
+  "GatewayRegistrationToken",
+  "GatewayCommand",
+  "IntegrationMapping",
+  "IntegrationRecord",
+  "IntegrationEvent",
 ] as const;
 
 export interface CompanyDbOptions {
