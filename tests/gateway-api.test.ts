@@ -245,6 +245,32 @@ describe("uppdragen", () => {
     expect(await ackCommand(session, "finns-inte", { status: "done" })).toBe("not-found");
   });
 
+  it("kvittensen står i integrationens logg med gatewayens besked", async () => {
+    const integration = await addVisma(companyId);
+    const { gatewayId } = await registerGateway(companyId);
+    const session = { gatewayId, companyId };
+    const ok = await unsafeGlobalPrisma.gatewayCommand.create({
+      data: { companyId, gatewayId, integrationId: integration.id, type: "SYNC_NOW" },
+    });
+    const failed = await unsafeGlobalPrisma.gatewayCommand.create({
+      data: { companyId, gatewayId, integrationId: integration.id, type: "FULL_RESYNC" },
+    });
+
+    await ackCommand(session, ok.id, { status: "done", message: "Synken är klar." });
+    await ackCommand(session, failed.id, { status: "failed", message: "Licensen saknas." });
+    // En upprepad kvittens loggas inte igen.
+    await ackCommand(session, ok.id, { status: "done", message: "Synken är klar." });
+
+    const events = await unsafeGlobalPrisma.integrationEvent.findMany({
+      where: { integrationId: integration.id, message: { startsWith: "Synka nu" } },
+    });
+    expect(events.map((e) => e.message)).toEqual(["Synka nu: Synken är klar."]);
+    const warning = await unsafeGlobalPrisma.integrationEvent.findFirstOrThrow({
+      where: { integrationId: integration.id, message: { startsWith: "Läs om allt" } },
+    });
+    expect(warning).toMatchObject({ level: "WARNING", message: "Läs om allt: Licensen saknas." });
+  });
+
   it("en annan gateways uppdrag syns inte och går inte att kvittera", async () => {
     const mine = await registerGateway(companyId);
     const other = await registerGateway(companyId);

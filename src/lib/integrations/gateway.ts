@@ -202,7 +202,24 @@ export async function ackCommand(
       ackedAt: now,
     },
   });
-  if (updated.count === 1) return "ok";
+  if (updated.count === 1) {
+    // Kvittensen syns i integrationens logg, med gatewayens eget besked.
+    const command = await db.gatewayCommand.findFirst({
+      where: { id: commandId },
+      select: { type: true, integrationId: true },
+    });
+    const what = command?.type === "FULL_RESYNC" ? "Läs om allt" : "Synka nu";
+    await db.integrationEvent.create({
+      data: {
+        companyId: session.companyId,
+        integrationId: command?.integrationId ?? null,
+        gatewayId: session.gatewayId,
+        level: ack.status === "done" ? "INFO" : "WARNING",
+        message: `${what}: ${ack.message?.trim() || (ack.status === "done" ? "klart." : "misslyckades.")}`,
+      },
+    });
+    return "ok";
+  }
 
   const exists = await db.gatewayCommand.count({
     where: { id: commandId, gatewayId: session.gatewayId },

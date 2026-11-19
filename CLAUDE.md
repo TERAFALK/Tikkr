@@ -1815,6 +1815,10 @@ behöver inga nya sidor.
 - **Förslagen i inkorgen** räknas för hela sidan på en gång, mot kunderna som
   hämtas en gång, och lagras aldrig.
 - **Registreringstoken visas en gång**, med kommandot för tyst installation.
+- **Synka nu och Läs om allt är uppdrag** i `gateway_commands`, som gatewayen
+  hämtar, utför och kvitterar med ett besked. Beskedet står i loggen och på
+  Översikt. Ett uppdrag som redan väntar på integrationens gateway ger inget
+  nytt, och ett uppdrag kvar på en utbytt gateway spärrar ingenting.
 
 **Bas tills vidare.** Om integrationer blir ett tillval (§ 3.1) avgörs
 senare. En grind går att lägga på utan att någon data ändras.

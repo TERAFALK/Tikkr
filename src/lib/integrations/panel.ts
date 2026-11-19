@@ -99,6 +99,14 @@ export interface IntegrationDetail {
   counts: Record<"CUSTOMER" | "ORDER", MappingCounts>;
   /** Instanserna gatewayen rapporterat för källan, t.ex. Visma-företagen. */
   instances: { key: string; name: string }[];
+  /** Senaste uppdraget (Synka nu, Läs om allt) och hur det gick. */
+  lastCommand: {
+    type: "SYNC_NOW" | "FULL_RESYNC";
+    status: "PENDING" | "DONE" | "FAILED";
+    result: string | null;
+    createdAt: Date;
+    ackedAt: Date | null;
+  } | null;
 }
 
 export async function integrationDetail(
@@ -129,6 +137,11 @@ export async function integrationDetail(
   }
 
   const source = reportedSources(row.gateway?.sources).find((s) => s.id === provider.gatewaySource);
+  const lastCommand = await db.gatewayCommand.findFirst({
+    where: { integrationId: row.id, gatewayId: row.gatewayId ?? "" },
+    orderBy: { createdAt: "desc" },
+    select: { type: true, status: true, result: true, createdAt: true, ackedAt: true },
+  });
 
   return {
     provider,
@@ -151,6 +164,7 @@ export async function integrationDetail(
     }),
     counts,
     instances: source?.instances ?? [],
+    lastCommand,
   };
 }
 
