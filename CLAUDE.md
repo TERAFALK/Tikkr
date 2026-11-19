@@ -1732,6 +1732,23 @@ inkorgen; ingen träff ger en ny kund eller en post i inkorgen, efter
 inställningen. Kundnumret är unikt per arbetsyta, så en ny kund vars nummer
 redan finns hamnar i inkorgen.
 
+Reglerna står i `src/lib/integrations/matching.ts` som rena funktioner och
+prövas av `tests/integration-matching.test.ts`. Att de görs i databasen
+prövas av `tests/customer-sync.test.ts`. Tre följder som inte är självklara:
+
+- **En kund kopplas högst en gång per integration.** Två Visma-kunder på samma
+  Tikkr-kund vore två källor som skriver över varandra. Därför hamnar en
+  organisationsnummerträff på en redan kopplad kund i inkorgen.
+- **En post som kopplats loss kopplas inte automatiskt igen**, inte ens på
+  organisationsnummer (`pending_reason = 'unlinked'`). Någon har sagt att
+  träffen var fel, och beslutet ligger kvar hos dem.
+- **Ett kundnummer som en annan kund redan har skrivs inte över.** Resten av
+  fälten uppdateras, och loggen säger varför numret står kvar.
+
+En post förs in i Tikkr innan rådatan sparas. Faller den sparas inte heller
+fingeravtrycket, och nästa synk försöker igen i stället för att se posten som
+oförändrad.
+
 **Ordrar** matchas på ordernumret och kopplas till kund via kundens koppling.
 Saknar kunden koppling väntar ordern tills den finns. Systemet gissar aldrig.
 En order stängs aldrig automatiskt för att den försvunnit ur källan: någon

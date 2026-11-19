@@ -263,7 +263,8 @@ describe("ingest", () => {
     const input = { companyId, integrationId: integration.id, provider: vismaAdministration, entity: "customers" as const };
 
     const first = await ingestRecords({ ...input, records: [customer("1"), customer("2")] });
-    expect(first.map((r) => r.status)).toEqual(["received", "received"]);
+    // Utan träff och utan "skapa direkt" hamnar kunderna i inkorgen.
+    expect(first.map((r) => r.status)).toEqual(["pending", "pending"]);
 
     // Fälten i en annan ordning är samma post.
     const second = await ingestRecords({
@@ -280,7 +281,7 @@ describe("ingest", () => {
     const input = { companyId, integrationId: integration.id, provider: vismaAdministration, entity: "customers" as const };
     await ingestRecords({ ...input, records: [customer("1")] });
     const result = await ingestRecords({ ...input, records: [customer("1", "Nytt namn AB")] });
-    expect(result[0].status).toBe("received");
+    expect(result[0].status).toBe("pending");
 
     const row = await unsafeGlobalPrisma.integrationRecord.findFirstOrThrow({ where: { integrationId: integration.id } });
     expect(row.dataHash).toBe(stableHash(customer("1", "Nytt namn AB").data));
@@ -295,14 +296,14 @@ describe("ingest", () => {
       entity: "customers",
       records: [customer("1"), { externalId: "2", data: { customerNumber: "2" } }, customer("3")],
     });
-    expect(results.map((r) => r.status)).toEqual(["received", "error", "received"]);
+    expect(results.map((r) => r.status)).toEqual(["pending", "error", "pending"]);
     expect(results[1].message).toContain("name");
 
     const event = await unsafeGlobalPrisma.integrationEvent.findFirstOrThrow({
       where: { integrationId: integration.id },
     });
     expect(event.level).toBe("WARNING");
-    expect(event.message).toBe("Tog emot 3 kunder: 2 mottagna, 1 med fel.");
+    expect(event.message).toBe("Tog emot 3 kunder: 2 i inkorgen, 1 med fel.");
   });
 
   it("poster från fel Visma-företag avvisas", async () => {

@@ -96,6 +96,9 @@ export const vismaAdministration: IntegrationProvider<typeof vismaSettingsSchema
       options: { orderStatuses: settings.orderStatuses },
     };
   },
+  createCustomers(settings) {
+    return settings.createCustomers;
+  },
   mapCustomer(data) {
     const parsed = vismaCustomerSchema.safeParse(data);
     if (!parsed.success) return { ok: false, error: firstIssue(parsed.error) };
