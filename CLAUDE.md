@@ -1799,6 +1799,12 @@ och skriver om den med `UPDATE_OPENAPI=1`.
 - **Prenumerationslåset stoppar inte gatewayen**, lika lite som skärmarna.
 - **Nya gatewayversioner** står i `gateway-release.ts` och når kunderna genom
   en PR, så att de provas i labbet först.
+- **MSI:n hämtas av Tikkr** från releasen i det privata repot
+  `TERAFALK/tikkr-gateway`, med läsnyckeln `GATEWAY_RELEASES_TOKEN`, och
+  skickas vidare utan att läsas in i minnet: till administratören
+  (`/api/admin/gateway/download`) och till gatewayen
+  (`/api/gateway/v1/updates/download`), som bara får den version Tikkr pekar
+  ut. Gatewayen kontrollerar SHA-256 och signaturen själv.
 
 **Panelen** (tillagt 2026-11-19) ligger under Inställningar, i avsnittet
 **Kopplingar**, eftersom en integration sätts upp en gång och sedan står.
