@@ -4,6 +4,7 @@ import { forCompany } from "../tenant";
 import { ENTITY_KEYS, type EntityKey, type IntegrationProvider } from "./provider";
 import { providerById, providerForGatewaySource } from "./providers";
 import type { GatewaySession } from "./gateway-auth";
+import { readSettings } from "./settings";
 import type {
   ackRequest,
   commandsResponse,
@@ -104,16 +105,6 @@ export async function gatewayConfig(
     autoUpdate: true,
     integrations: list,
   };
-}
-
-/**
- * Integrationens inställningar, validerade. Ogiltiga eller saknade värden
- * ger schemats standard, så att en gammal rad aldrig stoppar en synk.
- */
-export function readSettings<S extends z.ZodType>(schema: S, stored: unknown): z.infer<S> {
-  const parsed = schema.safeParse(stored ?? {});
-  if (parsed.success) return parsed.data;
-  return schema.parse({});
 }
 
 export type IngestTarget =

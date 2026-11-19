@@ -99,6 +99,8 @@ export interface IntegrationProvider<
     entities: EntityKey[];
     options: Record<string, unknown>;
   };
+  /** Om en ny kund utan träff skapas direkt (true) eller hamnar i inkorgen. */
+  createCustomers(settings: z.infer<Settings>): boolean;
   /** Källans kund i Tikkrs form, eller ett fel på svenska. */
   mapCustomer(data: unknown): { ok: true; value: NormalizedCustomer } | { ok: false; error: string };
   /** Källans order i Tikkrs form, eller ett fel på svenska. */

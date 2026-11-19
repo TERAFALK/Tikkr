@@ -3,6 +3,8 @@ import { forCompany } from "../tenant";
 import type { EntityKey, IntegrationProvider } from "./provider";
 import type { IngestResult, IngestStatus } from "./gateway-schema";
 import { stableHash } from "./stable-hash";
+import { applyCustomer, customerBatchContext } from "./customer-sync";
+import { readSettings } from "./settings";
 
 /**
  * DEN GEMENSAMMA VÄGEN IN för poster från externa system.
@@ -49,6 +51,11 @@ export async function ingestRecords(input: IngestInput, now = new Date()): Promi
   });
   const knownHash = new Map(existing.map((r) => [r.externalId, r.dataHash]));
 
+  const customers =
+    input.entity === "customers"
+      ? await customerContext(db, input, now)
+      : null;
+
   const results: IngestResult[] = [];
   for (const record of input.records) {
     const hash = stableHash(record.data);
@@ -63,6 +70,20 @@ export async function ingestRecords(input: IngestInput, now = new Date()): Promi
         : input.provider.mapOrder(record.data);
     if (!mapped.ok) {
       results.push({ externalId: record.externalId, status: "error", message: mapped.error });
+      continue;
+    }
+
+    // Posten förs in i Tikkr FÖRE rådatan sparas. Faller den sparas inte heller
+    // fingeravtrycket, och nästa synk försöker igen i stället för att se den
+    // som oförändrad.
+    let outcome: { status: IngestStatus; message?: string } = { status: "received" };
+    try {
+      if (customers && "name" in mapped.value) {
+        outcome = await applyCustomer(customers, record.externalId, mapped.value, hash);
+      }
+    } catch (error) {
+      console.error("Ingest av post misslyckades", { integrationId: input.integrationId, externalId: record.externalId, error });
+      results.push({ externalId: record.externalId, status: "error", message: "Posten kunde inte sparas. Den skickas igen vid nästa synk." });
       continue;
     }
 
@@ -93,7 +114,7 @@ export async function ingestRecords(input: IngestInput, now = new Date()): Promi
       },
     });
     knownHash.set(record.externalId, hash);
-    results.push({ externalId: record.externalId, status: "received" });
+    results.push({ externalId: record.externalId, ...outcome });
   }
 
   await db.integration.update({
@@ -122,6 +143,23 @@ export async function ingestRecords(input: IngestInput, now = new Date()): Promi
   });
 
   return results;
+}
+
+async function customerContext(db: ReturnType<typeof forCompany>, input: IngestInput, now: Date) {
+  const integration = await db.integration.findFirstOrThrow({
+    where: { id: input.integrationId },
+    select: { settings: true },
+  });
+  const settings = readSettings(input.provider.settingsSchema, integration.settings);
+  return customerBatchContext({
+    db,
+    companyId: input.companyId,
+    integrationId: input.integrationId,
+    source: input.provider.gatewaySource ?? input.provider.id,
+    createCustomers: input.provider.createCustomers(settings),
+    externalIds: input.records.map((r) => r.externalId),
+    now,
+  });
 }
 
 function countBy(results: IngestResult[]): Partial<Record<IngestStatus, number>> {
