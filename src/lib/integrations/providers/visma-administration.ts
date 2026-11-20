@@ -71,7 +71,7 @@ export const vismaAdministration: IntegrationProvider<typeof vismaSettingsSchema
   name: "Visma Administration",
   description: "Kunder från 500, 1000 och 2000. Ordrar från 1000 och 2000.",
   mark: "VA",
-  logo: "/integrationer/visma.svg",
+  logo: "/integrationer/spiris.svg",
   connectionType: "gateway",
   gatewaySource: "visma-administration",
   entities: ["customers", "orders"],

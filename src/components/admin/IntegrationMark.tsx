@@ -8,7 +8,7 @@ import type { IntegrationProvider } from "@/lib/integrations/provider";
 export default function IntegrationMark({ provider }: { provider: Pick<IntegrationProvider, "mark" | "logo"> }) {
   if (provider.logo) {
     return (
-      <span aria-hidden className="flex h-10 w-16 shrink-0 items-center justify-center rounded-lg border border-neutral-200 bg-white px-2">
+      <span aria-hidden className="flex h-10 w-20 shrink-0 items-center justify-center rounded-lg border border-neutral-200 bg-white px-2">
         <img src={provider.logo} alt="" className="max-h-6 max-w-full object-contain" />
       </span>
     );
