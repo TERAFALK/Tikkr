@@ -22,6 +22,7 @@ import { GATEWAY_RELEASE } from "@/lib/integrations/gateway-release";
 import { msiFileName } from "@/lib/integrations/gateway-download";
 import IntegrationStatusBadge from "@/components/admin/IntegrationStatusBadge";
 import GatewayTokenDialog from "@/components/admin/GatewayTokenDialog";
+import IntegrationMark from "@/components/admin/IntegrationMark";
 import { LogoMark } from "@/components/ui/Logo";
 import ConfirmButton from "@/components/admin/ConfirmButton";
 import SaveForm from "@/components/admin/SaveForm";
@@ -96,11 +97,14 @@ export default async function IntegrationPage({
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-3">
-        <div>
-          <Link href="/admin/installningar/integrationer" className="text-[13px] font-medium text-link hover:underline">
-            Integrationer
-          </Link>
-          <h2 className="text-base font-semibold text-neutral-900">{detail.provider.name}</h2>
+        <div className="flex items-center gap-3">
+          <IntegrationMark provider={detail.provider} />
+          <div>
+            <Link href="/admin/installningar/integrationer" className="text-[13px] font-medium text-link hover:underline">
+              Integrationer
+            </Link>
+            <h2 className="text-base font-semibold text-neutral-900">{detail.provider.name}</h2>
+          </div>
         </div>
         <IntegrationStatusBadge state={detail.status.state} />
       </div>
@@ -451,7 +455,6 @@ async function Mappings({
                             trigger="Skapa ny"
                             triggerTone="secondary"
                             title={`Skapa ${row.incoming?.name ?? row.externalId}`}
-                            description="En ny kund skapas i Tikkr med uppgifterna från källan."
                             action={createFromMapping}
                             initial={{}}
                             submitLabel="Skapa kund"
@@ -821,7 +824,7 @@ async function Connection({ detail, timeZone }: { detail: IntegrationDetail; tim
               Ladda ner Tikkr Gateway {GATEWAY_RELEASE.version}
             </a>
           ) : (
-            "Installationsfilen publiceras här med den första versionen av Tikkr Gateway."
+            "Ingen version av Tikkr Gateway är publicerad."
           )}
         </div>
       </Card>
