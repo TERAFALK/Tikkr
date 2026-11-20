@@ -414,9 +414,9 @@ export const GUIDES = [
   {
     slug: "integrationer",
     area: "REGISTERS",
-    title: "Kunder från Visma Administration",
+    title: "Integrationer",
     summary:
-      "Tikkr Gateway läser kunderna i Visma Administration på er server och skickar dem till Tikkr, där de kopplas till era kunder.",
+      "Kunder och ordrar från affärssystemet förs in i Tikkr och kopplas till de kunder och ordrar som redan finns. Visma Administration ansluts med Tikkr Gateway, som installeras på servern där systemet finns.",
     keywords: ["visma", "integration", "gateway", "synk", "koppla", "import", "affärssystem", "spcs"],
     steps: [
       {
@@ -441,9 +441,10 @@ export const GUIDES = [
     ],
     notes: [
       "En kund med samma organisationsnummer som en kund i Tikkr kopplas automatiskt. Liknande namn, e-post och telefon blir bara förslag.",
-      "Visma skriver över namn, nummer, adress och kontaktuppgifter på kopplade kunder. Påslag, rabatt och anteckningar ändras aldrig.",
-      "Visma Integration är en licens hos Visma. Den behövs för att gatewayen ska kunna läsa Visma.",
-      "Är behörighetskontroll aktiverad i Visma anges en Visma-användare på servern med tikkr-gateway set-credential.",
+      "Affärssystemet skriver över namn, nummer, adress och kontaktuppgifter på kopplade kunder. Påslag, rabatt och anteckningar ändras aldrig.",
+      "Bara öppna ordrar förs in. En order som avslutas i affärssystemet står kvar som öppen i Tikkr tills den stängs här.",
+      "Visma Administration kräver licensen Visma Integration för att gatewayen ska kunna läsa systemet.",
+      "Är behörighetskontroll aktiverad i Visma Administration anges en användare på servern med tikkr-gateway set-credential.",
     ],
     related: ["kunder", "ordrar"],
   },

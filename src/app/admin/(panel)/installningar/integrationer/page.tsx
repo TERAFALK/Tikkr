@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { requireAdmin } from "@/lib/admin-session";
-import { integrationCards, type IntegrationCard } from "@/lib/integrations/panel";
+import { integrationCards } from "@/lib/integrations/panel";
+import IntegrationMark from "@/components/admin/IntegrationMark";
 import IntegrationStatusBadge from "@/components/admin/IntegrationStatusBadge";
 import { formatDateTime } from "@/lib/format";
 import { companyTimeZone } from "@/lib/company";
@@ -38,7 +39,7 @@ export default async function IntegrationsPage() {
                   href={`/admin/installningar/integrationer/${card.provider.id}`}
                   className="flex items-center gap-4 px-5 py-4 hover:bg-neutral-50"
                 >
-                  <Mark card={card} />
+                  <IntegrationMark provider={card.provider} />
                   <div className="min-w-0 flex-1">
                     <p className="font-medium text-neutral-900">{card.provider.name}</p>
                     <p className="text-[13px] text-neutral-500">
@@ -60,7 +61,7 @@ export default async function IntegrationsPage() {
           <ul className="divide-y divide-neutral-200">
             {available.map((card) => (
               <li key={card.provider.id} className="flex items-center gap-4 px-5 py-4">
-                <Mark card={card} />
+                <IntegrationMark provider={card.provider} />
                 <div className="min-w-0 flex-1">
                   <p className="font-medium text-neutral-900">{card.provider.name}</p>
                   <p className="text-[13px] text-neutral-500">{card.provider.description}</p>
@@ -77,16 +78,5 @@ export default async function IntegrationsPage() {
         </Card>
       )}
     </div>
-  );
-}
-
-function Mark({ card }: { card: IntegrationCard }) {
-  return (
-    <span
-      aria-hidden
-      className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-fjord text-[13px] font-semibold text-white"
-    >
-      {card.provider.mark}
-    </span>
   );
 }

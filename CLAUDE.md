@@ -1819,8 +1819,14 @@ och skriver om den med `UPDATE_OPENAPI=1`.
 Anslutning. Inställningarna ritas ur providerns fältlista, så en ny provider
 behöver inga nya sidor.
 
-- **Systemets logotyp visas inte**, bara två bokstäver. Logotypen är en annans
-  varumärke, och kortet ska inte se ut som att Visma står bakom det.
+- **Systemets logotyp visas** (ändrat 2026-11-20, produktägarens val; var två
+  bokstäver) på kortet i översikten och i integrationens sidhuvud, så att
+  integrationen känns igen. Filen ligger under `public/integrationer/` och
+  pekas ut med `logo` på providern. Saknas den visas två bokstäver.
+- **Texterna nämner inte källsystemet där de gäller alla integrationer**
+  (beslutat 2026-11-20, produktägarens krav). Menyn säger "Kunder och ordrar
+  från affärssystem", och statusar och fel säger "systemet". Systemets namn
+  står bara på dess egen sida och i hjälpguidens steg som gäller det.
 - **En gateway räknas som tyst** efter `GATEWAY_SILENT_AFTER_MINUTES`, med 15
   minuter som förval. Statusen räknas i `status.ts` och prövas av
   `tests/integration-status.test.ts`.

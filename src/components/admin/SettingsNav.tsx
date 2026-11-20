@@ -173,7 +173,7 @@ const sections: SettingsSection[] = [
       {
         href: "/admin/installningar/integrationer",
         label: "Integrationer",
-        description: "Visma och andra system",
+        description: "Kunder och ordrar från affärssystem",
         icon: IconPackage,
       },
     ],
