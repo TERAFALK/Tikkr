@@ -108,8 +108,8 @@ export default async function OverviewPage() {
       },
     }),
     // Samma räkning som Veckovy, så att dagens och veckans tal är samma tal
-    // som där: bara huvudstämplingen, per person och dag. Ett sidojobb är
-    // inte en extra timme någon varit på plats. Rapporten för samma dag
+    // som där: tiden då minst ett jobb pågick, per person och dag. Ett
+    // dubbeljobb är inte en extra timme någon varit på plats. Rapporten för samma dag
     // visar mer, och ska göra det — se spans.ts.
     buildWeek(db, startOfWeekIn(now, timeZone), timeZone),
     db.timeEntry.count({ where: { needsReview: true } }),
