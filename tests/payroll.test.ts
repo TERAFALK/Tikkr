@@ -380,7 +380,7 @@ describe("flexformeln", () => {
   });
 });
 
-describe("arbetad tid är huvudstämplingen", () => {
+describe("arbetad tid är tiden då minst ett jobb pågick", () => {
   it("två maskiner samtidigt ger en timme närvaro, inte två", async () => {
     const company = await unsafeGlobalPrisma.company.create({
       data: { name: "Lönetest parallell", timezone: TZ },
@@ -424,6 +424,63 @@ describe("arbetad tid är huvudstämplingen", () => {
     // Åtta maskintimmar att fakturera, fyra timmar på plats.
     expect(hours(period!.totals.productive)).toBe(8);
     expect(hours(period!.totals.worked)).toBe(4);
+
+    await unsafeGlobalPrisma.company.delete({ where: { id: company.id } });
+  });
+  /**
+   * PILOTKUNDENS DAG (2026-11-23). In, ut, in igen och ett dubbeljobb.
+   * Varken det andra passet eller dubbeljobbet syntes i arbetad tid, eftersom
+   * dubbeljobbet inte räknades alls när det fortsatte efter passet under det.
+   */
+  it("in, ut, in igen och ett dubbeljobb som fortsätter efter passet", async () => {
+    const company = await unsafeGlobalPrisma.company.create({
+      data: { name: "Lönetest dubbeljobb", timezone: TZ },
+    });
+
+    const anna = await unsafeGlobalPrisma.employee.create({
+      data: { companyId: company.id, name: "Anna" },
+    });
+    const fras = await unsafeGlobalPrisma.workMoment.create({
+      data: { companyId: company.id, name: "Fräsning" },
+    });
+    const svets = await unsafeGlobalPrisma.workMoment.create({
+      data: { companyId: company.id, name: "Svetsning" },
+    });
+    const ordern = await unsafeGlobalPrisma.order.create({
+      data: { companyId: company.id, orderNumber: "1" },
+    });
+
+    const passes: [string, string, string][] = [
+      [svets.id, "07:00", "08:00"],
+      [svets.id, "09:00", "12:00"],
+      [fras.id, "10:00", "14:00"],
+    ];
+    for (const [momentId, from, to] of passes) {
+      await unsafeGlobalPrisma.timeEntry.create({
+        data: {
+          companyId: company.id,
+          employeeId: anna.id,
+          kind: "ORDER",
+          orderId: ordern.id,
+          momentId,
+          clockInAt: at(15, from),
+          clockOutAt: at(15, to),
+        },
+      });
+    }
+
+    const period = await buildPayrollPeriod(
+      forCompany(company.id),
+      TZ,
+      anna.id,
+      dayStart(15),
+      dayStart(15)
+    );
+
+    // Fakturan får varje pass för sig: 1 + 3 + 4 timmar.
+    expect(hours(period!.totals.productive)).toBe(8);
+    // Lönen får 07–08 och 09–14, överlappet en gång.
+    expect(hours(period!.totals.worked)).toBe(6);
 
     await unsafeGlobalPrisma.company.delete({ where: { id: company.id } });
   });

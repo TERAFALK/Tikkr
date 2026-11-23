@@ -19,7 +19,7 @@ import {
  * timmar där en utstämpling glömts, eller en person vars hela vecka ligger på
  * en enda order.
  *
- * BARA HUVUDSTÄMPLINGEN RÄKNAS — se `spans.ts`, som äger den regeln och
+ * TIDEN DÅ MINST ETT JOBB PÅGICK RÄKNAS — se `spans.ts`, som äger regeln och
  * förklaringen till varför rapporterna räknar annorlunda. Översikten använder
  * samma modul, så att båda vyerna svarar likadant på samma dag.
  *
@@ -39,8 +39,8 @@ export interface DayCell {
   /** Datumet, vid dygnets början i företagets tidszon. */
   date: Date;
   /**
-   * Huvudstämplingarnas tid den dagen. Sidojobb räknas inte — se
-   * toppkommentaren.
+   * Tiden då minst ett jobb pågick den dagen. Ett dubbeljobb räknas en
+   * gång — se spans.ts.
    */
   minutes: number;
   /** true när någon post den dagen stängts av systemet och inte granskats. */

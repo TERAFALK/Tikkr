@@ -506,6 +506,7 @@ export const GUIDES = [
     ],
     notes: [
       "Två stämplingar på samma anställd och arbetsmoment får inte överlappa.",
+      "Två stämplingar samtidigt på olika arbetsmoment går bra, som två maskiner på stämplingsskärmen. Båda ordrarna får sin tid, och tidrapporten räknar tiden en gång.",
       "En pågående stämpling går varken att ändra eller ta bort förrän den avslutats.",
       "Ska en persons tid bort helt används raderingen under Inställningar, Dataskydd.",
     ],

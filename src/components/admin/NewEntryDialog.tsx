@@ -37,6 +37,10 @@ interface Option {
  * eftersom det avgör vilka fält som finns: en improduktiv post har varken
  * order eller arbetsmoment. Fälten för den sort som inte är vald ritas inte
  * alls, så att de aldrig skickas med.
+ *
+ * DUBBELJOBB GÅR ATT LÄGGA IN HÄR (texten tillagd 2026-11-23). Två poster på
+ * olika arbetsmoment får överlappa, som två maskiner på stämplingsskärmen.
+ * Pilotkunden visste inte att det gick, och underrubriken säger det nu.
  */
 export default function NewEntryDialog({
   employees,
@@ -101,7 +105,9 @@ export default function NewEntryDialog({
             Lägg till stämpling
           </h2>
           <p className="mt-0.5 text-[13px] leading-relaxed text-neutral-500">
-            För tid som aldrig blev stämplad. Posten märks som manuell.
+            För tid som aldrig blev stämplad. Posten märks som manuell. Två
+            stämplingar samtidigt för samma anställd läggs på olika
+            arbetsmoment.
           </p>
         </div>
 
