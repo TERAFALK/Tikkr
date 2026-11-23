@@ -45,7 +45,15 @@ interface Option {
  * den första raden när raden läggs till. Allt sparas i ett svep, eller
  * ingenting, se createManualEntries.
  *
- * Bara ordertid på de tillagda raderna: det är två maskiner som är fallet.
+ * VARJE RAD VÄLJER SIN SORT (ändrat 2026-11-23, produktägarens val). De
+ * tillagda raderna var bara ordertid, så ett dubbeljobb gick att lägga in med
+ * improduktiv tid först men inte sist. Stämplingsskärmen gör ingen sådan
+ * skillnad: Lägg till jobb tar vilket jobb som helst, och bara samma moment
+ * två gånger samtidigt stoppas.
+ *
+ * Fälten bär radens plats i namnet (`extra-0-kind` och så vidare), eftersom
+ * raderna har olika fält beroende på sort. Med samma namn på varje rad och
+ * `getAll` hade en rad med ordertid och en med improduktiv tid hamnat i otakt.
  */
 export default function NewEntryDialog({
   employees,
@@ -66,17 +74,17 @@ export default function NewEntryDialog({
   openOnMount?: boolean;
 }) {
   const [state, action] = useActionState<EntryFormState, FormData>(addEntry, {});
-  const [kind, setKind] = useState<"ORDER" | "INDIRECT">("ORDER");
+  const [kind, setKind] = useState<Kind>("ORDER");
   const dialog = useRef<HTMLDialogElement>(null);
   const form = useRef<HTMLFormElement>(null);
   const errorId = useFieldError(form, state);
   const { pending, onSubmit } = useKeptSubmit(action);
 
-  // De tillagda jobben. Bara nycklar: fälten är okontrollerade, som resten av
-  // formuläret, och läses av servern med getAll.
-  const [extra, setExtra] = useState<{ key: number; from: string; to: string }[]>(
-    []
-  );
+  // De tillagda raderna. Sorten styr vilka fält som ritas; resten är
+  // okontrollerat, som formuläret i övrigt.
+  const [extra, setExtra] = useState<
+    { key: number; kind: Kind; from: string; to: string }[]
+  >([]);
   const nextKey = useRef(0);
 
   function addParallel() {
@@ -87,7 +95,12 @@ export default function NewEntryDialog({
     };
     setExtra((rows) => [
       ...rows,
-      { key: nextKey.current++, from: value("clockInAt"), to: value("clockOutAt") },
+      {
+        key: nextKey.current++,
+        kind: "ORDER",
+        from: value("clockInAt"),
+        to: value("clockOutAt"),
+      },
     ]);
   }
 
@@ -135,8 +148,7 @@ export default function NewEntryDialog({
           </h2>
           <p className="mt-0.5 text-[13px] leading-relaxed text-neutral-500">
             För tid som aldrig blev stämplad. Posten märks som manuell. Två
-            stämplingar samtidigt för samma anställd läggs på olika
-            arbetsmoment.
+            stämplingar samtidigt för samma anställd läggs på olika moment.
           </p>
         </div>
 
@@ -160,30 +172,7 @@ export default function NewEntryDialog({
             {/* Utan improduktiva moment finns inget att välja, och valet
                 visas inte. */}
             {indirectMoments.length > 0 && (
-              <fieldset className="flex flex-wrap gap-4 text-[13px]">
-                <legend className="sr-only">Sort</legend>
-                {(
-                  [
-                    ["ORDER", "Ordertid"],
-                    ["INDIRECT", "Improduktiv tid"],
-                  ] as const
-                ).map(([value, label]) => (
-                  <label
-                    key={value}
-                    className="flex cursor-pointer items-center gap-2 font-medium text-neutral-900"
-                  >
-                    <input
-                      type="radio"
-                      name="kind"
-                      value={value}
-                      checked={kind === value}
-                      onChange={() => setKind(value)}
-                      className="h-3.5 w-3.5 border-neutral-300 text-blue-600 focus:ring-blue-600"
-                    />
-                    {label}
-                  </label>
-                ))}
-              </fieldset>
+              <KindChoice name="kind" value={kind} onChange={setKind} />
             )}
 
             <div className="grid gap-4 sm:grid-cols-2">
@@ -244,72 +233,117 @@ export default function NewEntryDialog({
               </Field>
             </div>
 
-            {extra.map((row, index) => (
-              <section
-                key={row.key}
-                aria-label={`Samtidig stämpling ${index + 1}`}
-                className="space-y-4 border-t border-neutral-200 pt-4"
-              >
-                <div className="flex items-center justify-between gap-3">
-                  <h3 className="text-[13px] font-semibold text-neutral-900">
-                    Samtidig stämpling{extra.length > 1 ? ` ${index + 1}` : ""}
-                  </h3>
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setExtra((rows) => rows.filter((r) => r.key !== row.key))
-                    }
-                    className="text-[13px] font-medium text-link hover:underline"
-                  >
-                    Ta bort
-                  </button>
-                </div>
+            <input type="hidden" name="extraCount" value={extra.length} />
 
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <Field label="Order">
-                    <SearchSelect
-                      name="extraOrderId"
-                      inDialog
-                      options={orders}
-                      placeholder="Sök order…"
-                      emptyLabel="Välj order…"
-                      required
+            {extra.map((row, index) => {
+              const field = (name: string) => `extra-${index}-${name}`;
+
+              return (
+                <section
+                  key={row.key}
+                  aria-label={`Samtidig stämpling ${index + 1}`}
+                  className="space-y-4 border-t border-neutral-200 pt-4"
+                >
+                  <div className="flex items-center justify-between gap-3">
+                    <h3 className="text-[13px] font-semibold text-neutral-900">
+                      Samtidig stämpling{extra.length > 1 ? ` ${index + 1}` : ""}
+                    </h3>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setExtra((rows) => rows.filter((r) => r.key !== row.key))
+                      }
+                      className="text-[13px] font-medium text-link hover:underline"
+                    >
+                      Ta bort
+                    </button>
+                  </div>
+
+                  {indirectMoments.length > 0 ? (
+                    <KindChoice
+                      name={field("kind")}
+                      value={row.kind}
+                      onChange={(next) =>
+                        setExtra((rows) =>
+                          rows.map((r) =>
+                            r.key === row.key ? { ...r, kind: next } : r
+                          )
+                        )
+                      }
                     />
-                  </Field>
+                  ) : (
+                    <input type="hidden" name={field("kind")} value="ORDER" />
+                  )}
 
-                  <Field label="Arbetsmoment">
-                    <Select name="extraMomentId" required defaultValue="">
-                      <option value="" disabled>
-                        Välj…
-                      </option>
-                      {moments.map((option) => (
-                        <option key={option.id} value={option.id}>
-                          {option.label}
-                        </option>
-                      ))}
-                    </Select>
-                  </Field>
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    {row.kind === "INDIRECT" ? (
+                      <div className="sm:col-span-2">
+                        <Field label="Improduktivt moment">
+                          <Select
+                            name={field("indirectMomentId")}
+                            required
+                            defaultValue=""
+                          >
+                            <option value="" disabled>
+                              Välj…
+                            </option>
+                            {indirectMoments.map((option) => (
+                              <option key={option.id} value={option.id}>
+                                {option.label}
+                              </option>
+                            ))}
+                          </Select>
+                        </Field>
+                      </div>
+                    ) : (
+                      <>
+                        <Field label="Order">
+                          <SearchSelect
+                            name={field("orderId")}
+                            inDialog
+                            options={orders}
+                            placeholder="Sök order…"
+                            emptyLabel="Välj order…"
+                            required
+                          />
+                        </Field>
 
-                  <Field label="Instämplad">
-                    <Input
-                      type="datetime-local"
-                      name="extraClockInAt"
-                      defaultValue={row.from}
-                      required
-                    />
-                  </Field>
+                        <Field label="Arbetsmoment">
+                          <Select name={field("momentId")} required defaultValue="">
+                            <option value="" disabled>
+                              Välj…
+                            </option>
+                            {moments.map((option) => (
+                              <option key={option.id} value={option.id}>
+                                {option.label}
+                              </option>
+                            ))}
+                          </Select>
+                        </Field>
+                      </>
+                    )}
 
-                  <Field label="Utstämplad">
-                    <Input
-                      type="datetime-local"
-                      name="extraClockOutAt"
-                      defaultValue={row.to}
-                      required
-                    />
-                  </Field>
-                </div>
-              </section>
-            ))}
+                    <Field label="Instämplad">
+                      <Input
+                        type="datetime-local"
+                        name={field("clockInAt")}
+                        defaultValue={row.from}
+                        required
+                      />
+                    </Field>
+
+                    <Field label="Utstämplad">
+                      <Input
+                        type="datetime-local"
+                        name={field("clockOutAt")}
+                        defaultValue={row.to}
+                        required
+                      />
+                    </Field>
+                  </div>
+                </section>
+              );
+            })}
 
             <Button type="button" tone="secondary" onClick={addParallel}>
               Lägg till samtidig stämpling
@@ -331,6 +365,46 @@ export default function NewEntryDialog({
         </form>
       </dialog>
     </>
+  );
+}
+
+type Kind = "ORDER" | "INDIRECT";
+
+/** Ordertid eller improduktiv tid. Samma val på första raden och de tillagda. */
+function KindChoice({
+  name,
+  value,
+  onChange,
+}: {
+  name: string;
+  value: Kind;
+  onChange: (kind: Kind) => void;
+}) {
+  return (
+    <fieldset className="flex flex-wrap gap-4 text-[13px]">
+      <legend className="sr-only">Sort</legend>
+      {(
+        [
+          ["ORDER", "Ordertid"],
+          ["INDIRECT", "Improduktiv tid"],
+        ] as const
+      ).map(([option, label]) => (
+        <label
+          key={option}
+          className="flex cursor-pointer items-center gap-2 font-medium text-neutral-900"
+        >
+          <input
+            type="radio"
+            name={name}
+            value={option}
+            checked={value === option}
+            onChange={() => onChange(option)}
+            className="h-3.5 w-3.5 border-neutral-300 text-blue-600 focus:ring-blue-600"
+          />
+          {label}
+        </label>
+      ))}
+    </fieldset>
   );
 }
 

@@ -1518,7 +1518,10 @@ pilotkundens begäran). Ny stämpling har Lägg till samtidig stämpling, som g�
 det Lägg till jobb gör på stämplingsskärmen: samma person, ett annat
 arbetsmoment och egna tider, eftersom jobben på skärmen stämplas ut var för
 sig. Tiderna fylls i från första raden. Allt sparas eller ingenting
-(`createManualEntries` i `clock.ts`). De tillagda raderna är ordertid.
+(`createManualEntries` i `clock.ts`). **Varje rad väljer ordertid eller
+improduktiv tid** (ändrat 2026-11-23, produktägarens val), som skärmen, där
+Lägg till jobb tar vilket jobb som helst. Bara samma moment två gånger
+samtidigt stoppas. Improduktiv tid når aldrig fakturan, även bredvid en order.
 
 **Improduktiv tid går att lägga in för hand** (ändrat 2026-10-13). Ny
 stämpling lade bara in ordertid, med skälet att glömd improduktiv tid hellre

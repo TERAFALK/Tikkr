@@ -992,7 +992,7 @@ export async function createManualEntry(
  *
  * Vägen för ett DUBBELJOBB i panelen, samma sak som Lägg till jobb på
  * stämplingsskärmen: ett jobb och ett eller flera som löpte samtidigt, på
- * andra arbetsmoment och med egna tider. Pilotkunden ville lägga in dem som
+ * andra moment och med egna tider, ordertid eller improduktiv tid. Pilotkunden ville lägga in dem som
  * på skärmen och inte en i taget.
  *
  * Varje post prövas som en ensam post, och dessutom mot de andra i samma
@@ -1029,7 +1029,9 @@ export async function createManualEntries(
         other.input.clockOutAt > clockInAt
       ) {
         throw new ClockError(
-          "Två jobb på samma arbetsmoment kan inte ligga samtidigt. Välj ett annat arbetsmoment."
+          input.kind === "INDIRECT"
+            ? "Två pass på samma improduktiva moment kan inte ligga samtidigt. Välj ett annat moment."
+            : "Två stämplingar på samma arbetsmoment kan inte ligga samtidigt. Välj ett annat arbetsmoment."
         );
       }
     }

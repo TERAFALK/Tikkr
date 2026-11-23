@@ -497,7 +497,7 @@ export const GUIDES = [
       },
       {
         title: "Tryck Ny stämpling för tid som aldrig stämplades",
-        body: "Välj Ordertid eller Improduktiv tid, sedan anställd, jobb och tider. Lägg till samtidig stämpling lägger in ett jobb till på ett annat arbetsmoment, med egna tider.",
+        body: "Välj Ordertid eller Improduktiv tid, sedan anställd, jobb och tider. Lägg till samtidig stämpling lägger in ett jobb till, ordertid eller improduktiv tid, på ett annat moment och med egna tider.",
       },
       {
         title: "Tryck Ta bort på en stämpling som inte skulle ha funnits",
