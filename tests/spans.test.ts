@@ -2,16 +2,19 @@ import { describe, it, expect } from "vitest";
 import { mainMinutes } from "@/lib/spans";
 
 /**
- * Huvudstämplingen.
+ * Arbetad tid när flera jobb löper samtidigt.
  *
  * Rapporterna summerar rakt av: två maskiner en timme är två maskintimmar, och
- * båda ordrarna betalar sin. Översikten och veckovyn räknar i stället bara det
- * jobb personen faktiskt började på, och hoppar över sidojobben helt.
+ * båda ordrarna betalar sin. Tidrapporten, översikten och veckovyn räknar i
+ * stället tiden då MINST ETT jobb pågick. Ett dubbeljobb lägger ingenting till
+ * medan det underliggande jobbet pågår, men tiden efter räknas.
  *
- * Regeln: en stämpling räknas bara om ingenting annat pågick när den började.
+ * Regeln ändrades 2026-11-23. Till dess räknades ett dubbeljobb inte alls,
+ * inte ens timmarna efter att det första jobbet stämplats ut, och pilotkunden
+ * såg arbetad tid försvinna ur löneunderlaget.
  *
- * Går den här filen sönder börjar de två vyerna säga olika saker om samma dag
- * utan att någon förstår varför.
+ * Går den här filen sönder börjar vyerna säga olika saker om samma dag utan
+ * att någon förstår varför.
  */
 
 const HOUR = 60 * 60 * 1000;
@@ -51,12 +54,20 @@ describe("ett jobb i taget", () => {
   });
 });
 
-describe("sidojobb räknas inte", () => {
-  it("fräsen som startas mitt i svetsningen räknas inte alls", () => {
-    // Svets 08–12 och fräs 11–15. Dagen är fyra timmar, inte sju och inte
-    // åtta: varken den överlappande timmen eller 12–15 räknas, eftersom fräsen
-    // aldrig blev huvudjobbet.
-    expect(mainMinutes([span(8, 12), span(11, 15)])).toBe(240);
+describe("dubbeljobb räknas en gång", () => {
+  it("fräsen som startas mitt i svetsningen räknas efter att svetsen slutat", () => {
+    // Svets 08–12 och fräs 11–15. Dagen är sju timmar, inte åtta: den
+    // överlappande timmen räknas en gång. Personen var på plats till 15.
+    //
+    // Svarade 240 till 2026-11-23, alltså bara svetsen.
+    expect(mainMinutes([span(8, 12), span(11, 15)])).toBe(420);
+  });
+
+  it("pilotkundens dag: in, ut, in igen och ett dubbeljobb", () => {
+    // 07–08, ut, in 09–12 och dubbeljobbet 10–14. Det andra passet stämplas
+    // ut först, och dubbeljobbet fortsätter. Allt utom överlappet räknas:
+    // 1 + 5 timmar.
+    expect(mainMinutes([span(7, 8), span(9, 12), span(10, 14)])).toBe(360);
   });
 
   it("ett jobb helt inuti ett annat lägger ingenting till", () => {
@@ -68,8 +79,7 @@ describe("sidojobb räknas inte", () => {
   });
 
   it("två jobb som startar samtidigt: det längsta räknas", () => {
-    // Ingetdera startade medan det andra pågick, så båda är huvudjobb. Då
-    // avgör längden: personen var på plats till 16, inte till 12.
+    // Personen var på plats till 16, inte till 12.
     //
     // Svarade 240 till 2026-10-05, alltså det pass som råkade stå först i
     // listan. Se nästa test för varför det inte dög.
@@ -99,16 +109,16 @@ describe("sidojobb räknas inte", () => {
     expect(new Set(svar)).toEqual(new Set([480]));
   });
 
-  it("ett jobb som börjar medan ett SIDOJOBB pågår är också ett sidojobb", () => {
-    // Svets 08–12 (huvud), fräs 11–18 (sido), borr 13–14. Borren startade
-    // medan fräsen gick — personen stod redan vid en maskin. Bara svetsen.
-    expect(mainMinutes([span(8, 12), span(11, 18), span(13, 14)])).toBe(240);
+  it("ett jobb inuti ett dubbeljobb lägger ingenting till", () => {
+    // Svets 08–12, fräs 11–18, borr 13–14. Borren gick medan fräsen gick,
+    // så dagen är 08–18.
+    expect(mainMinutes([span(8, 12), span(11, 18), span(13, 14)])).toBe(600);
   });
 
-  it("ett jobb efter att allt tagit slut är ett nytt huvudjobb", () => {
-    // Svets 08–12 (huvud), fräs 11–15 (sido), montering 16–18. Ingenting
-    // pågick klockan 16, alltså räknas monteringen: 4 + 2 timmar.
-    expect(mainMinutes([span(8, 12), span(11, 15), span(16, 18)])).toBe(360);
+  it("ett uppehåll mellan jobben räknas inte", () => {
+    // Svets 08–12, fräs 11–15, montering 16–18. Ingenting pågick 15–16:
+    // 7 + 2 timmar.
+    expect(mainMinutes([span(8, 12), span(11, 15), span(16, 18)])).toBe(540);
   });
 });
 

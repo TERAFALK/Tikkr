@@ -264,7 +264,7 @@ describe("veckorna då klockan ställs om", () => {
   });
 });
 
-describe("bara huvudstämplingen räknas", () => {
+describe("dubbeljobb räknas en gång", () => {
   let fräsning: string;
 
   beforeEach(async () => {
@@ -294,16 +294,16 @@ describe("bara huvudstämplingen räknas", () => {
   const monday = () =>
     buildWeek(forCompany(companyId), new Date("2026-08-03T12:00:00Z"), SE);
 
-  it("fräsen som startas mitt i svetsningen räknas inte alls", async () => {
-    // Svets 08–12 och fräs 11–15 svensk tid. Dagen är fyra timmar: fräsen blev
-    // aldrig huvudjobbet, så varken den överlappande timmen eller 12–15 räknas.
-    // Rapporten säger åtta, och det är också rätt — men på en annan fråga.
+  it("fräsen som startas mitt i svetsningen räknas efter att svetsen slutat", async () => {
+    // Svets 08–12 och fräs 11–15 svensk tid. Dagen är sju timmar: den
+    // överlappande timmen räknas en gång. Rapporten säger åtta, och det är
+    // också rätt — men på en annan fråga.
     await punch("2026-08-03T06:00:00Z", "2026-08-03T10:00:00Z");
     await onFräsning("2026-08-03T09:00:00Z", "2026-08-03T13:00:00Z");
 
     const day = (await monday()).rows[0].days[0];
 
-    expect(day.minutes).toBe(4 * 60);
+    expect(day.minutes).toBe(7 * 60);
   });
 
   it("ett jobb helt inuti ett annat lägger ingenting till", async () => {

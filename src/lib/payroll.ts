@@ -63,11 +63,12 @@ import { holidaysBetween } from "./holidays";
  * Frånvaro utan angivet antal timmar täcker noll en röd dag, av samma skäl
  * som en lördag.
  *
- * ── ARBETAD TID ÄR HUVUDSTÄMPLINGEN ──────────────────────────────────────
+ * ── ARBETAD TID ÄR TIDEN DÅ MINST ETT JOBB PÅGICK ────────────────────────
  *
  * Räknas med `mainMinutes` från `spans.ts`, aldrig som råsumman. En operatör
  * som kör två maskiner 08–12 har åtta maskintimmar att fakturera men har varit
- * på plats i fyra. Fakturaunderlaget vill ha åtta; lönen ska ha fyra.
+ * på plats i fyra. Fakturaunderlaget vill ha åtta; lönen ska ha fyra. Går
+ * dubbeljobbet vidare till 14 räknas även 12–14.
  *
  * ── RASTER ───────────────────────────────────────────────────────────────
  *
@@ -115,7 +116,7 @@ export interface PayrollDay {
    */
   holiday: { name: string; minutes: number } | null;
   plannedMinutes: number;
-  /** Huvudstämplingen. Se `mainMinutes`. */
+  /** Tiden då minst ett jobb pågick. Se `mainMinutes`. */
   workedMinutes: number;
   productiveMinutes: number;
   indirectMinutes: number;
@@ -394,8 +395,8 @@ export async function buildPayrollPeriod(
 
     const plannedMinutes = beforeStart || holiday ? 0 : scheduleMinutes;
 
-    // Huvudstämplingen. Ett sidojobb är inte en extra timme någon varit på
-    // plats — det är samma timme, bokförd på en order till.
+    // Tiden då minst ett jobb pågick. Ett dubbeljobb är inte en extra timme
+    // någon varit på plats — det är samma timme, bokförd på en order till.
     const spans: Span[] = dayEntries
       .filter((entry) => entry.clockOutAt !== null)
       .map((entry) => ({
@@ -405,7 +406,7 @@ export async function buildPayrollPeriod(
 
     const workedMinutes = mainMinutes(spans);
 
-    // Produktiv och improduktiv räknas RAKT AV och inte som huvudstämpling.
+    // Produktiv och improduktiv räknas RAKT AV och inte som tid på plats.
     // De svarar på vad tiden gick till, inte på hur länge personen var här, och
     // ska stämma med rapporten och fakturaunderlaget.
     let productiveMinutes = 0;
@@ -631,7 +632,7 @@ async function openingFlex(
  *
  * Summan av varje dags flex från och med `from` till (inte med) `toExclusive`.
  * Samma formel som dagarna i buildPayrollPeriod — arbetad tid som
- * huvudstämpling, frånvaro som inte drar på flexen, minus planerad tid, och
+ * tid då minst ett jobb pågick, frånvaro som inte drar på flexen, minus planerad tid, och
  * noll planerat en röd dag — men bara med de fält räkningen behöver: in- och
  * utstämplingens tid och frånvarons minuter. Inga namn, inga raster och inga
  * rader att visa.

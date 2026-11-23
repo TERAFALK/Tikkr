@@ -759,8 +759,18 @@ shop_prices       — död, ersatt av shop_products.price_ore (se § 3.4)
    fyrtio timmar. Frånvaro på en orsak som drar på flexen dras sedan bort
    igen: den som är flexledig tar ut timmar hen arbetat in.
 
-   **Arbetad tid är HUVUDSTÄMPLINGEN** (`mainMinutes` i `spans.ts`), aldrig
-   råsumman. Det är här de två underlagen skiljer sig, se avgränsningen överst.
+   **Arbetad tid är tiden då MINST ETT JOBB PÅGICK** (`mainMinutes` i
+   `spans.ts`), aldrig råsumman. Det är här de två underlagen skiljer sig, se
+   avgränsningen överst.
+
+   **Ett dubbeljobb räknas en gång, inte noll gånger** (ändrat 2026-11-23,
+   pilotkundens begäran, ersätter "huvudstämplingen"). Till dess räknades bara
+   jobbet som startade när ingenting annat pågick, och ett dubbeljobb inte
+   alls, inte heller tiden efter att jobbet under det stämplats ut. Svets
+   08–12 och fräs 11–15 gav fyra timmar, fast personen var på plats till 15.
+   Nu ger det sju: överlappet en gång. Fakturan får fortfarande fyra plus
+   fyra. Veckovyn och översikten räknar likadant, eftersom de delar
+   funktionen. `tests/spans.test.ts` fäller det.
 
    **Perioden kapas till hela dygn i `buildPayrollPeriod`** (tillagt
    2026-10-05). `from` och `to` pekar ut DAGAR men kommer in som tidpunkter,
@@ -784,8 +794,7 @@ shop_prices       — död, ersatt av shop_products.price_ore (se § 3.4)
    ena är ett fakturaunderlag.
 
    **Två jobb som startar i exakt samma ögonblick: det LÄNGSTA räknas**
-   (ändrat 2026-10-05). Ingetdera startade medan det andra pågick, så båda är
-   huvudjobb, och då avgör längden.
+   (ändrat 2026-10-05). Följer numera av regeln ovan, men skälet står kvar.
 
    Sorteringen tog tidigare bara hänsyn till starttiden, och vid lika tid
    avgjorde den ordning passen råkade komma i. Den kommer ur en databasfråga
@@ -796,8 +805,7 @@ shop_prices       — död, ersatt av shop_products.price_ore (se § 3.4)
 
    Att det längsta vinner är inte godtyckligt: 08:00–12:00 och 08:00–16:00
    betyder att personen var på plats till 16, och fyra timmar hade dragits
-   från hens flexsaldo. Tiden EFTER ett huvudjobb räknas fortfarande inte,
-   även om ett sidojobb fortsätter — det är avsiktligt och oförändrat.
+   från hens flexsaldo.
 
    Den räknas i HELA MINUTER (tillagt 2026-10-01). En stämpling bär sekunder,
    eftersom den sätts när någon trycker, och det syns ingenstans utom i
