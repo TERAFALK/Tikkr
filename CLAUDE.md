@@ -1513,6 +1513,13 @@ avslutade poster, av samma skäl som de är de enda som går att ändra: en
 pågående stämpling tillhör någon som står vid en skärm. Ska en persons tid
 bort helt finns fortfarande GDPR-raderingen i inställningarna.
 
+**Ett dubbeljobb läggs in för hand i ett steg** (beslutat 2026-11-23,
+pilotkundens begäran). Ny stämpling har Lägg till samtidig stämpling, som gör
+det Lägg till jobb gör på stämplingsskärmen: samma person, ett annat
+arbetsmoment och egna tider, eftersom jobben på skärmen stämplas ut var för
+sig. Tiderna fylls i från första raden. Allt sparas eller ingenting
+(`createManualEntries` i `clock.ts`). De tillagda raderna är ordertid.
+
 **Improduktiv tid går att lägga in för hand** (ändrat 2026-10-13). Ny
 stämpling lade bara in ordertid, med skälet att glömd improduktiv tid hellre
 stämplas på skärmen. Med löneunderlaget är den saknade städtimmen någons

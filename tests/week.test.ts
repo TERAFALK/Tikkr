@@ -333,14 +333,14 @@ describe("dubbeljobb räknas en gång", () => {
     expect(day.minutes).toBe(6 * 60);
   });
 
-  it("veckans summa följer huvudstämplingarna", async () => {
+  it("veckans summa räknar dubbeljobbet en gång", async () => {
     await punch("2026-08-03T06:00:00Z", "2026-08-03T10:00:00Z");
     await onFräsning("2026-08-03T09:00:00Z", "2026-08-03T13:00:00Z");
 
     const week = await monday();
 
-    expect(week.rows[0].totalMinutes).toBe(4 * 60);
-    expect(week.dayTotals[0]).toBe(4 * 60);
-    expect(week.totalMinutes).toBe(4 * 60);
+    expect(week.rows[0].totalMinutes).toBe(7 * 60);
+    expect(week.dayTotals[0]).toBe(7 * 60);
+    expect(week.totalMinutes).toBe(7 * 60);
   });
 });

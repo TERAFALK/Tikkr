@@ -38,9 +38,14 @@ interface Option {
  * order eller arbetsmoment. Fälten för den sort som inte är vald ritas inte
  * alls, så att de aldrig skickas med.
  *
- * DUBBELJOBB GÅR ATT LÄGGA IN HÄR (texten tillagd 2026-11-23). Två poster på
- * olika arbetsmoment får överlappa, som två maskiner på stämplingsskärmen.
- * Pilotkunden visste inte att det gick, och underrubriken säger det nu.
+ * DUBBELJOBB I ETT STEG (tillagt 2026-11-23, pilotkundens begäran). Lägg till
+ * samtidig stämpling gör det Lägg till jobb gör på stämplingsskärmen: ett jobb
+ * till, på ett annat arbetsmoment, för samma person. Varje rad har egna tider,
+ * eftersom jobben på skärmen stämplas ut var för sig, men tiderna fylls i från
+ * den första raden när raden läggs till. Allt sparas i ett svep, eller
+ * ingenting, se createManualEntries.
+ *
+ * Bara ordertid på de tillagda raderna: det är två maskiner som är fallet.
  */
 export default function NewEntryDialog({
   employees,
@@ -67,6 +72,30 @@ export default function NewEntryDialog({
   const errorId = useFieldError(form, state);
   const { pending, onSubmit } = useKeptSubmit(action);
 
+  // De tillagda jobben. Bara nycklar: fälten är okontrollerade, som resten av
+  // formuläret, och läses av servern med getAll.
+  const [extra, setExtra] = useState<{ key: number; from: string; to: string }[]>(
+    []
+  );
+  const nextKey = useRef(0);
+
+  function addParallel() {
+    const elements = form.current?.elements;
+    const value = (name: string) => {
+      const field = elements?.namedItem(name);
+      return field instanceof HTMLInputElement ? field.value : "";
+    };
+    setExtra((rows) => [
+      ...rows,
+      { key: nextKey.current++, from: value("clockInAt"), to: value("clockOutAt") },
+    ]);
+  }
+
+  function resetForm() {
+    form.current?.reset();
+    setExtra([]);
+  }
+
   // En gång, vid uppkopplingen. Stängs rutan ska den stanna stängd.
   useEffect(() => {
     if (openOnMount) dialog.current?.showModal();
@@ -86,7 +115,7 @@ export default function NewEntryDialog({
 
     handled.current = state;
     dialog.current?.close();
-    form.current?.reset();
+    resetForm();
   }, [state]);
 
   return (
@@ -97,7 +126,7 @@ export default function NewEntryDialog({
 
       <dialog
         ref={dialog}
-        onClose={() => form.current?.reset()}
+        onClose={resetForm}
         className={`w-[min(40rem,calc(100vw-2rem))] ${dialogSurface}`}
       >
         <div className={`${dialogEdge} border-b border-neutral-200 px-5 py-4`}>
@@ -214,6 +243,77 @@ export default function NewEntryDialog({
                 <Input type="datetime-local" name="clockOutAt" required />
               </Field>
             </div>
+
+            {extra.map((row, index) => (
+              <section
+                key={row.key}
+                aria-label={`Samtidig stämpling ${index + 1}`}
+                className="space-y-4 border-t border-neutral-200 pt-4"
+              >
+                <div className="flex items-center justify-between gap-3">
+                  <h3 className="text-[13px] font-semibold text-neutral-900">
+                    Samtidig stämpling{extra.length > 1 ? ` ${index + 1}` : ""}
+                  </h3>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setExtra((rows) => rows.filter((r) => r.key !== row.key))
+                    }
+                    className="text-[13px] font-medium text-link hover:underline"
+                  >
+                    Ta bort
+                  </button>
+                </div>
+
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <Field label="Order">
+                    <SearchSelect
+                      name="extraOrderId"
+                      inDialog
+                      options={orders}
+                      placeholder="Sök order…"
+                      emptyLabel="Välj order…"
+                      required
+                    />
+                  </Field>
+
+                  <Field label="Arbetsmoment">
+                    <Select name="extraMomentId" required defaultValue="">
+                      <option value="" disabled>
+                        Välj…
+                      </option>
+                      {moments.map((option) => (
+                        <option key={option.id} value={option.id}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </Select>
+                  </Field>
+
+                  <Field label="Instämplad">
+                    <Input
+                      type="datetime-local"
+                      name="extraClockInAt"
+                      defaultValue={row.from}
+                      required
+                    />
+                  </Field>
+
+                  <Field label="Utstämplad">
+                    <Input
+                      type="datetime-local"
+                      name="extraClockOutAt"
+                      defaultValue={row.to}
+                      required
+                    />
+                  </Field>
+                </div>
+              </section>
+            ))}
+
+            <Button type="button" tone="secondary" onClick={addParallel}>
+              Lägg till samtidig stämpling
+            </Button>
           </div>
 
           <div
