@@ -41,24 +41,29 @@ function readForm(formData: FormData, timeZone: string) {
 
 /**
  * Raderna som lagts till med Lägg till samtidig stämpling i Ny stämpling,
- * alltså ett dubbeljobb. Alltid ordertid, och varje jobb har egna tider, som på
- * stämplingsskärmen där jobben stämplas ut var för sig.
+ * alltså ett dubbeljobb. Varje rad är ordertid eller improduktiv tid, som på
+ * stämplingsskärmen, och har egna tider, eftersom jobben där stämplas ut var
+ * för sig.
  *
- * Fälten heter likadant på varje rad och läses med `getAll`, i den ordning
- * raderna står.
+ * Fälten bär radens plats i namnet, `extra-<n>-<fält>`, och `extraCount`
+ * säger hur många rader det finns. Se NewEntryDialog.
  */
 function readExtraJobs(formData: FormData, timeZone: string) {
-  const orders = formData.getAll("extraOrderId").map(String);
-  const moments = formData.getAll("extraMomentId").map(String);
-  const ins = formData.getAll("extraClockInAt").map(String);
-  const outs = formData.getAll("extraClockOutAt").map(String);
+  const count = Math.min(Number(formData.get("extraCount") ?? 0) || 0, 20);
 
-  return orders.map((orderId, index) => ({
-    orderId,
-    momentId: moments[index] ?? "",
-    clockInAt: parseLocalDateTime(ins[index] ?? "", timeZone),
-    clockOutAt: parseLocalDateTime(outs[index] ?? "", timeZone),
-  }));
+  return Array.from({ length: count }, (_, index) => {
+    const get = (name: string) =>
+      String(formData.get(`extra-${index}-${name}`) ?? "");
+
+    return {
+      kind: get("kind") === "INDIRECT" ? ("INDIRECT" as const) : ("ORDER" as const),
+      orderId: get("orderId"),
+      momentId: get("momentId"),
+      indirectMomentId: get("indirectMomentId"),
+      clockInAt: parseLocalDateTime(get("clockInAt"), timeZone),
+      clockOutAt: parseLocalDateTime(get("clockOutAt"), timeZone),
+    };
+  });
 }
 
 export async function addEntry(
@@ -101,8 +106,13 @@ export async function addEntry(
     // Numret står bara när det finns flera, som rubrikerna i rutan.
     const which =
       extra.length > 1 ? `Samtidig stämpling ${index + 1}` : "Samtidig stämpling";
-    if (!row.orderId || !row.momentId) {
-      return { error: `${which}: välj både order och arbetsmoment.` };
+    if (row.kind === "INDIRECT" ? !row.indirectMomentId : !row.orderId || !row.momentId) {
+      return {
+        error:
+          row.kind === "INDIRECT"
+            ? `${which}: välj ett improduktivt moment.`
+            : `${which}: välj både order och arbetsmoment.`,
+      };
     }
     if (!row.clockInAt || !row.clockOutAt) {
       return { error: `${which}: fyll i både start- och sluttid.` };
@@ -119,9 +129,9 @@ export async function addEntry(
         byEmail: email,
       },
       ...extra.map((row) => ({
-        kind: "ORDER" as const,
-        orderId: row.orderId,
-        momentId: row.momentId,
+        ...(row.kind === "INDIRECT"
+          ? { kind: "INDIRECT" as const, indirectMomentId: row.indirectMomentId }
+          : { kind: "ORDER" as const, orderId: row.orderId, momentId: row.momentId }),
         employeeId: input.employeeId,
         clockInAt: row.clockInAt!,
         clockOutAt: row.clockOutAt!,
