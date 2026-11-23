@@ -147,6 +147,43 @@ describe("samtidiga stämplingar för hand", () => {
     expect(await forCompany(companyId).timeEntry.count()).toBe(0);
   });
 
+  it("ordertid och improduktiv tid samtidigt, åt båda hållen", async () => {
+    const stadningen = {
+      kind: "INDIRECT" as const,
+      indirectMomentId: stadning,
+      employeeId: anna,
+      clockInAt: new Date("2026-09-01T08:00:00Z"),
+      clockOutAt: new Date("2026-09-01T09:00:00Z"),
+      byEmail: "chef@manuelltest.se",
+    };
+
+    const created = await createManualEntries(companyId, [finished(), stadningen]);
+
+    expect(created.map((entry) => entry.kind)).toEqual(["ORDER", "INDIRECT"]);
+    expect(created[1].indirectMomentId).toBe(stadning);
+    expect(created[1].orderId).toBeNull();
+  });
+
+  it("två pass samtidigt på samma improduktiva moment sparar ingenting", async () => {
+    const stadningen = (from: string, to: string) => ({
+      kind: "INDIRECT" as const,
+      indirectMomentId: stadning,
+      employeeId: anna,
+      clockInAt: new Date(from),
+      clockOutAt: new Date(to),
+      byEmail: "chef@manuelltest.se",
+    });
+
+    await expect(
+      createManualEntries(companyId, [
+        stadningen("2026-09-01T08:00:00Z", "2026-09-01T10:00:00Z"),
+        stadningen("2026-09-01T09:00:00Z", "2026-09-01T11:00:00Z"),
+      ])
+    ).rejects.toBeInstanceOf(ClockError);
+
+    expect(await forCompany(companyId).timeEntry.count()).toBe(0);
+  });
+
   it("ett jobb som brister sparar inte heller det andra", async () => {
     const fras = await frasning();
 
