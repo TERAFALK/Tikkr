@@ -17,6 +17,6 @@ export interface GatewayRelease {
 }
 
 export const GATEWAY_RELEASE: GatewayRelease | null = {
-  version: "0.1.2",
-  sha256: "9566b8698b38022cc18ce6a7c217d0fbc58f5cb96512b8a9ffce5f66848c7632",
+  version: "0.1.3",
+  sha256: "9a689a8689bed89297bb8d7a3bd862dc34ff500807af45427cc9128322284616",
 };
