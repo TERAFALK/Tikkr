@@ -5,7 +5,7 @@ import { assertWritable, requireAdmin } from "@/lib/admin-session";
 import { companyTimeZone } from "@/lib/company";
 import {
   ClockError,
-  createManualEntry,
+  createManualEntries,
   deleteEntryManually,
   updateEntryManually,
 } from "@/lib/clock";
@@ -37,6 +37,28 @@ function readForm(formData: FormData, timeZone: string) {
     clockInAt,
     clockOutAt,
   };
+}
+
+/**
+ * Raderna som lagts till med Lägg till samtidig stämpling i Ny stämpling,
+ * alltså ett dubbeljobb. Alltid ordertid, och varje jobb har egna tider, som på
+ * stämplingsskärmen där jobben stämplas ut var för sig.
+ *
+ * Fälten heter likadant på varje rad och läses med `getAll`, i den ordning
+ * raderna står.
+ */
+function readExtraJobs(formData: FormData, timeZone: string) {
+  const orders = formData.getAll("extraOrderId").map(String);
+  const moments = formData.getAll("extraMomentId").map(String);
+  const ins = formData.getAll("extraClockInAt").map(String);
+  const outs = formData.getAll("extraClockOutAt").map(String);
+
+  return orders.map((orderId, index) => ({
+    orderId,
+    momentId: moments[index] ?? "",
+    clockInAt: parseLocalDateTime(ins[index] ?? "", timeZone),
+    clockOutAt: parseLocalDateTime(outs[index] ?? "", timeZone),
+  }));
 }
 
 export async function addEntry(
@@ -73,14 +95,39 @@ export async function addEntry(
     return { error: "Fyll i både start- och sluttid." };
   }
 
+  const extra = readExtraJobs(formData, timeZone);
+
+  for (const [index, row] of extra.entries()) {
+    // Numret står bara när det finns flera, som rubrikerna i rutan.
+    const which =
+      extra.length > 1 ? `Samtidig stämpling ${index + 1}` : "Samtidig stämpling";
+    if (!row.orderId || !row.momentId) {
+      return { error: `${which}: välj både order och arbetsmoment.` };
+    }
+    if (!row.clockInAt || !row.clockOutAt) {
+      return { error: `${which}: fyll i både start- och sluttid.` };
+    }
+  }
+
   try {
-    await createManualEntry(companyId, {
-      ...job,
-      employeeId: input.employeeId,
-      clockInAt: input.clockInAt,
-      clockOutAt: input.clockOutAt,
-      byEmail: email,
-    });
+    await createManualEntries(companyId, [
+      {
+        ...job,
+        employeeId: input.employeeId,
+        clockInAt: input.clockInAt,
+        clockOutAt: input.clockOutAt,
+        byEmail: email,
+      },
+      ...extra.map((row) => ({
+        kind: "ORDER" as const,
+        orderId: row.orderId,
+        momentId: row.momentId,
+        employeeId: input.employeeId,
+        clockInAt: row.clockInAt!,
+        clockOutAt: row.clockOutAt!,
+        byEmail: email,
+      })),
+    ]);
   } catch (error) {
     // ClockError bär ett meddelande skrivet för att läsas av en människa.
     if (error instanceof ClockError) return { error: error.message };
@@ -89,7 +136,9 @@ export async function addEntry(
 
   revalidatePath(PATH);
   revalidatePath("/admin");
-  return { ok: "Stämplingen är inlagd." };
+  return {
+    ok: extra.length > 0 ? "Stämplingarna är inlagda." : "Stämplingen är inlagd.",
+  };
 }
 
 /**

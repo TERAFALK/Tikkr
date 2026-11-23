@@ -983,43 +983,93 @@ export async function createManualEntry(
   companyId: string,
   input: ManualEntryInput
 ): Promise<TimeEntry> {
+  const [created] = await createManualEntries(companyId, [input]);
+  return created;
+}
+
+/**
+ * Lägger in flera stämplingar för hand, allt eller inget (tillagt 2026-11-23).
+ *
+ * Vägen för ett DUBBELJOBB i panelen, samma sak som Lägg till jobb på
+ * stämplingsskärmen: ett jobb och ett eller flera som löpte samtidigt, på
+ * andra arbetsmoment och med egna tider. Pilotkunden ville lägga in dem som
+ * på skärmen och inte en i taget.
+ *
+ * Varje post prövas som en ensam post, och dessutom mot de andra i samma
+ * inlägg: två på samma moment får inte överlappa varandra heller. Faller en
+ * sparas ingen, eftersom ett halvt inlagt dubbeljobb är en lista som ser
+ * färdig ut men saknar en order.
+ */
+export async function createManualEntries(
+  companyId: string,
+  inputs: ManualEntryInput[]
+): Promise<TimeEntry[]> {
   const db = forCompany(companyId);
 
-  const rates = await assertBelongsToCompany(db, input, {
-    historical: true,
-  });
-  assertSaneInterval(input.clockInAt, input.clockOutAt);
-  const clockInAt = await snapStartToPreviousEnd(db, input, input.clockInAt);
-  assertSaneInterval(clockInAt, input.clockOutAt);
-  await assertNoOverlap(db, input, clockInAt, input.clockOutAt);
+  const prepared: {
+    input: ManualEntryInput;
+    clockInAt: Date;
+    rates: Awaited<ReturnType<typeof assertBelongsToCompany>>;
+  }[] = [];
+
+  for (const input of inputs) {
+    const rates = await assertBelongsToCompany(db, input, {
+      historical: true,
+    });
+    assertSaneInterval(input.clockInAt, input.clockOutAt);
+    const clockInAt = await snapStartToPreviousEnd(db, input, input.clockInAt);
+    assertSaneInterval(clockInAt, input.clockOutAt);
+    await assertNoOverlap(db, input, clockInAt, input.clockOutAt);
+
+    for (const other of prepared) {
+      if (
+        other.input.employeeId === input.employeeId &&
+        jobKeyId(other.input) === jobKeyId(input) &&
+        other.clockInAt < input.clockOutAt &&
+        other.input.clockOutAt > clockInAt
+      ) {
+        throw new ClockError(
+          "Två jobb på samma arbetsmoment kan inte ligga samtidigt. Välj ett annat arbetsmoment."
+        );
+      }
+    }
+
+    prepared.push({ input, clockInAt, rates });
+  }
 
   return db.$transaction(async (tx) => {
-    const created = await tx.timeEntry.create({
-      data: {
-        companyId,
-        employeeId: input.employeeId,
-        ...jobFields(input),
-        clockInAt,
-        clockOutAt: input.clockOutAt,
-        // Satserna som de är NU. En tid som skrivs in i efterhand saknar egen
-        // historia — det enda systemet vet är vad personen och momentet
-        // kostar idag, och att anta något annat vore att hitta på.
-        ...rates,
-        source: "ADMIN_MANUAL",
-        needsReview: false,
-        reviewNote: `Inlagd för hand av ${input.byEmail}.`,
-      },
-    });
+    const created: TimeEntry[] = [];
 
-    await recordAudit(tx, {
-      companyId,
-      actorEmail: input.byEmail,
-      entity: "TimeEntry",
-      entityId: created.id,
-      action: "create",
-      after: timeEntrySnapshot(created),
-      subjectEmployeeId: created.employeeId,
-    });
+    for (const { input, clockInAt, rates } of prepared) {
+      const entry = await tx.timeEntry.create({
+        data: {
+          companyId,
+          employeeId: input.employeeId,
+          ...jobFields(input),
+          clockInAt,
+          clockOutAt: input.clockOutAt,
+          // Satserna som de är NU. En tid som skrivs in i efterhand saknar
+          // egen historia — det enda systemet vet är vad personen och
+          // momentet kostar idag, och att anta något annat vore att hitta på.
+          ...rates,
+          source: "ADMIN_MANUAL",
+          needsReview: false,
+          reviewNote: `Inlagd för hand av ${input.byEmail}.`,
+        },
+      });
+
+      await recordAudit(tx, {
+        companyId,
+        actorEmail: input.byEmail,
+        entity: "TimeEntry",
+        entityId: entry.id,
+        action: "create",
+        after: timeEntrySnapshot(entry),
+        subjectEmployeeId: entry.employeeId,
+      });
+
+      created.push(entry);
+    }
 
     return created;
   });
