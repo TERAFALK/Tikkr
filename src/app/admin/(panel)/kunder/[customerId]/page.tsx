@@ -1,7 +1,13 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireAdmin } from "@/lib/admin-session";
-import { customerMoney, customerStats, getCustomer } from "@/lib/customers";
+import {
+  customerMoney,
+  customerOptions,
+  customerStats,
+  getCustomer,
+} from "@/lib/customers";
+import { hasModule } from "@/lib/company-modules";
 import { orderCount, orderRows } from "@/lib/orders";
 import { listPaging } from "@/lib/paging";
 import { companyTimeZone } from "@/lib/company";
@@ -10,10 +16,10 @@ import { formatDuration } from "@/lib/format";
 import { formatCurrency, formatMarkup } from "@/lib/money";
 import MarginChart from "@/components/admin/MarginChart";
 import CustomerDialog from "@/components/admin/CustomerDialog";
+import NewOrderDialog from "@/components/admin/NewOrderDialog";
 import OrdersTable from "@/components/admin/OrdersTable";
 import Pager from "@/components/ui/Pager";
 import {
-  ButtonLink,
   Card,
   CardHeader,
   EmptyState,
@@ -26,7 +32,7 @@ import {
   Tr,
 } from "@/components/ui";
 import { updateCustomer } from "../actions";
-import { closeOrders } from "../../ordrar/actions";
+import { closeOrders, createOrder } from "../../ordrar/actions";
 
 export const metadata = { title: "Kund · Tikkr" };
 
@@ -283,9 +289,22 @@ export default async function CustomerPage({
 
         <div id="ordrar" className="mt-6 scroll-mt-6">
           {orderTotal === 0 ? (
+            /* Samma ruta som under Ordrar, med kunden förvald. Ledde förut
+               bort till orderlistan, där man fick välja kunden en gång till. */
             <EmptyState
               title="Inga ordrar på kunden"
-              action={<ButtonLink href="/admin/ordrar">Till ordrar</ButtonLink>}
+              action={
+                <NewOrderDialog
+                  customers={await customerOptions(db)}
+                  moments={await db.workMoment.findMany({
+                    orderBy: [{ active: "desc" }, { name: "asc" }],
+                    select: { id: true, name: true, active: true },
+                  })}
+                  action={createOrder}
+                  planning={await hasModule(companyId, "PLANNING")}
+                  customerId={customer.id}
+                />
+              }
             />
           ) : (
             /* Samma tabell som under Ordrar, med kundkolumnen borttagen.

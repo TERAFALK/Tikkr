@@ -212,22 +212,69 @@ describe("den nya arbetsytan är tom och isolerad", () => {
       data: { companyId, name: "Verkstaden", tokenHash: `hash-${companyId}` },
     });
 
-    const state = await getOnboardingState(db);
+    const state = await getOnboardingState(db, { extras: true });
 
     expect(state.ready).toBe(true);
     expect(state.total).toBe(4);
+    expect(state.extras.length).toBeGreaterThan(0);
     expect(state.extras.every((step) => step.done)).toBe(false);
   });
 
-  it("arbetstidsschemat är ett steg bara för den som har löneunderlaget", async () => {
+  it("de rekommenderade stegen räknas bara när guiden ber om dem", async () => {
+    // Panelens layout hämtar stegen vid varje sidladdning och behöver bara
+    // de fyra. Se extras i lib/onboarding.ts.
     const { company } = await signup();
     const db = forCompany(company.id);
 
-    const utan = await getOnboardingState(db);
-    const med = await getOnboardingState(db, { payroll: true });
+    expect((await getOnboardingState(db)).extras).toEqual([]);
+  });
 
-    expect(utan.extras.some((step) => step.key === "schedule")).toBe(false);
-    expect(med.extras.some((step) => step.key === "schedule")).toBe(true);
+  it("arbetstiderna är ett steg bara med löneunderlaget eller planeringen", async () => {
+    // Arbetstiderna hör till arbetsytan sedan 2026-10-17 och läses av båda
+    // tillvalen, men står bara en gång.
+    const { company } = await signup();
+    const db = forCompany(company.id);
+    const hours = (extras: { key: string }[]) =>
+      extras.filter((step) => step.key === "work-hours").length;
+
+    const utan = await getOnboardingState(db, { extras: true });
+    const lon = await getOnboardingState(db, { extras: true, payroll: true });
+    const plan = await getOnboardingState(db, { extras: true, planning: true });
+    const bada = await getOnboardingState(db, {
+      extras: true,
+      payroll: true,
+      planning: true,
+    });
+
+    expect(hours(utan.extras)).toBe(0);
+    expect(hours(lon.extras)).toBe(1);
+    expect(hours(plan.extras)).toBe(1);
+    expect(hours(bada.extras)).toBe(1);
+  });
+
+  it("tillvalens steg står under tillvalet, och bara för den som har det", async () => {
+    const { company } = await signup();
+    const db = forCompany(company.id);
+    const groups = (extras: { group?: string }[]) =>
+      new Set(extras.map((step) => step.group));
+
+    const utan = await getOnboardingState(db, { extras: true });
+    const bada = await getOnboardingState(db, {
+      extras: true,
+      payroll: true,
+      planning: true,
+      planningMode: "PRODUCTION",
+    });
+    const tjanst = await getOnboardingState(db, {
+      extras: true,
+      planning: true,
+      planningMode: "SERVICE",
+    });
+
+    expect(groups(utan.extras)).toEqual(new Set(["base"]));
+    expect(groups(bada.extras)).toEqual(new Set(["base", "payroll", "planning"]));
+    // Tjänsteläget planerar personal och har inga stationer.
+    expect(tjanst.extras.some((step) => step.key === "stations")).toBe(false);
   });
 });
 

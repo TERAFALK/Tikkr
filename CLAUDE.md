@@ -195,6 +195,20 @@ Stämplingar, Anställda och Kunder visar varje rad som ett kort under `sm`, med
 `Table cards` och en `label` på cellerna. Det är samma celler som på skrivbordet,
 ritade om i `globals.css`, så att telefonen aldrig kan visa något annat.
 
+**En tom lista visar vägen vidare, likadant överallt** (beslutat 2026-11-27,
+produktägarens krav). Kunder saknade knappen som Anställda hade mitt i den
+tomma listan. Kan man lägga upp något på sidan står samma knapp som i
+sidhuvudet; beror sidan på ett annat register står en knapp dit, med Lägg upp;
+en lista man bara läser har ingen. Regeln står i `TONE-OF-VOICE.md` och
+`tests/empty-states.test.ts` fäller ett tomt läge utan knapp som inte står
+bland undantagen med sitt skäl.
+
+**Kom igång följer tillvalen** (ändrat 2026-11-27). De fyra stegen som krävs
+fälls ihop när de är klara, med formuläret under Lägg till fler. De
+rekommenderade stegen står under Därefter, Löneunderlag och Planering, och bara
+för den som har tillvalet. De räknas bara när guiden visas (`extras: true` i
+`onboarding.ts`), eftersom panelens layout hämtar stegen vid varje sidladdning.
+
 **Osparade ändringar frågar innan de försvinner** (beslutat 2026-10-30,
 UX-granskningen). `UnsavedGuard` står i `SaveForm`, i Arbetstider och i rutorna
 för anställd, kund och order: en länk i panelen och webbläsarens omladdning
@@ -1928,6 +1942,13 @@ senare. En grind går att lägga på utan att någon data ändras.
    det är gjort, och en obekräftad adress går att rätta själv. Registreringen
    tar högst fem nya arbetsytor per kvart och IP-adress. Se `account.ts` och
    `email-verification.ts`.
+
+   **Länken bekräftar med en knapp, inte när sidan visas** (ändrat
+   2026-11-27, v1.0.2). Microsofts Safe Links öppnar varje länk i ett
+   inkommande mejl, och förbrukade länken 14 sekunder efter utskicket. Den
+   som sedan klickade fick "Länken fungerar inte", fast adressen var
+   bekräftad. Sidan säger nu "bekräftad" för en bekräftad adress, vem som än
+   löste in länken. Se `linkState` i `email-verification.ts`.
    **DET EGNA KONTOT LIGGER FÖR SIG** (ändrat 2026-10-08). Namn,
    telefonnummer, e-postadress och lösenord ligger på `/admin/konto`, som nås
    från adressen längst ner i menyn. De låg under Inställningar, Användare,

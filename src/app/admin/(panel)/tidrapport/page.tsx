@@ -171,6 +171,9 @@ export default async function TimesheetPage({
         <PageHeader title="Tidrapport" help="tidrapport" />
         <EmptyState
           title="Inga anställda upplagda"
+          action={
+            <ButtonLink href="/admin/anstallda">Lägg upp anställda</ButtonLink>
+          }
         />
       </>
     );

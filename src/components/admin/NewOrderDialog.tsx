@@ -32,6 +32,7 @@ export default function NewOrderDialog({
   trigger = "Ny order",
   planning = false,
   openOnMount = false,
+  customerId,
 }: {
   customers: SearchSelectOption[];
   moments: BudgetMomentOption[];
@@ -47,6 +48,8 @@ export default function NewOrderDialog({
    * landade man på sidan och fick leta rätt på samma knapp en gång till.
    */
   openOnMount?: boolean;
+  /** Kunden rutan börjar med, från kundens egen sida. Går att byta. */
+  customerId?: string;
 }) {
   const dialog = useRef<HTMLDialogElement>(null);
 
@@ -105,6 +108,18 @@ export default function NewOrderDialog({
               moments={moments}
               autoFocus
               planning={planning}
+              defaults={
+                customerId
+                  ? {
+                      orderNumber: "",
+                      customerId,
+                      budgets: [],
+                      markupPercent: null,
+                      fixedPriceOre: null,
+                      plannedDueDate: null,
+                    }
+                  : undefined
+              }
             />
           </div>
 

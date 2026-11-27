@@ -1,5 +1,6 @@
 import bcrypt from "bcryptjs";
 import { createEmailVerification } from "@terafalk/auth/email-verification";
+import { hashToken } from "@terafalk/auth/password";
 import { unsafeGlobalPrisma } from "./db";
 import { resolveAppUrl } from "./app-url";
 import { sendEmail } from "./email";
@@ -30,6 +31,60 @@ export class EmailVerificationError extends Error {
     super(message);
     this.name = "EmailVerificationError";
   }
+}
+
+/**
+ * Vad länken i mejlet står för just nu, utan att något skrivs.
+ *
+ * SIDAN BAKOM LÄNKEN BEKRÄFTAR INGENTING NÄR DEN VISAS (ändrat 2026-11-27).
+ * Microsofts Safe Links öppnar varje länk i ett inkommande mejl innan
+ * mottagaren ser det, och förbrukade därmed länken. Den som sedan klickade
+ * fick "Länken fungerar inte", fast adressen var bekräftad. Nu bekräftar en
+ * knapp, och en skanner trycker inte på knappar.
+ *
+ * EN BEKRÄFTAD ADRESS ÄR ALDRIG ETT FEL. Har adressen bekräftats, av den här
+ * länken, en annan eller en skanner, säger sidan det, så länge länken gäller
+ * den adress kontot har. Det berättar ingenting för den som har länken som
+ * hen inte redan vet: länken gick till just den adressen.
+ */
+export type LinkState =
+  | { kind: "ready"; email: string }
+  | { kind: "confirmed"; email: string }
+  | { kind: "invalid" };
+
+export function linkState(
+  row: {
+    usedAt: Date | null;
+    expiresAt: Date;
+    email: string;
+    user: { email: string; emailVerifiedAt: Date | null };
+  } | null,
+  now: Date
+): LinkState {
+  // En länk till en adress som sedan bytts gäller inte, bekräftad eller ej.
+  if (!row || row.email !== row.user.email) return { kind: "invalid" };
+
+  if (row.user.emailVerifiedAt) return { kind: "confirmed", email: row.email };
+
+  if (row.usedAt || row.expiresAt < now) return { kind: "invalid" };
+
+  return { kind: "ready", email: row.email };
+}
+
+export async function inspectEmailLink(token: string): Promise<LinkState> {
+  if (!token) return { kind: "invalid" };
+
+  const row = await unsafeGlobalPrisma.emailVerification.findUnique({
+    where: { tokenHash: hashToken(token) },
+    select: {
+      usedAt: true,
+      expiresAt: true,
+      email: true,
+      user: { select: { email: true, emailVerifiedAt: true } },
+    },
+  });
+
+  return linkState(row, new Date());
 }
 
 export const { sendEmailVerification, confirmEmail } = createEmailVerification({
