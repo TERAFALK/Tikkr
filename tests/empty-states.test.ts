@@ -38,6 +38,14 @@ const WITHOUT_ACTION: Record<string, string> = {
   "Inga arkiverade meddelanden": "Arkivet fylls när meddelanden går ut",
   "Inga meddelanden inlagda": "Formuläret Nytt meddelande står ovanför",
   "Ingenting har ändrats": "Kundens historik skrivs av systemet",
+  "Inga integrationer anslutna": "Systemen att ansluta står under Tillgängliga",
+  "Inkorgen är tom": "Integrationens inkorg fylls av synken",
+  "Inga kopplade kunder": "Kopplingarna görs av synken och i inkorgen",
+  "Inga ignorerade kunder": "Fylls när en post ignoreras i inkorgen",
+  "Inga kopplade ordrar": "Kopplingarna görs av synken och i inkorgen",
+  "Inga ignorerade ordrar": "Fylls när en post ignoreras i inkorgen",
+  "Ingenting har hänt än": "Integrationens logg skrivs av systemet",
+  "Ingen gateway ansluten": "Registreringen står i kortet ovanför",
 };
 
 function files(dir: string): string[] {
