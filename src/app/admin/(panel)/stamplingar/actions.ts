@@ -5,7 +5,7 @@ import { assertWritable, requireAdmin } from "@/lib/admin-session";
 import { companyTimeZone } from "@/lib/company";
 import {
   ClockError,
-  createManualEntry,
+  createManualEntries,
   deleteEntryManually,
   updateEntryManually,
 } from "@/lib/clock";
@@ -37,6 +37,33 @@ function readForm(formData: FormData, timeZone: string) {
     clockInAt,
     clockOutAt,
   };
+}
+
+/**
+ * Raderna som lagts till med Lägg till samtidig stämpling i Ny stämpling,
+ * alltså ett dubbeljobb. Varje rad är ordertid eller improduktiv tid, som på
+ * stämplingsskärmen, och har egna tider, eftersom jobben där stämplas ut var
+ * för sig.
+ *
+ * Fälten bär radens plats i namnet, `extra-<n>-<fält>`, och `extraCount`
+ * säger hur många rader det finns. Se NewEntryDialog.
+ */
+function readExtraJobs(formData: FormData, timeZone: string) {
+  const count = Math.min(Number(formData.get("extraCount") ?? 0) || 0, 20);
+
+  return Array.from({ length: count }, (_, index) => {
+    const get = (name: string) =>
+      String(formData.get(`extra-${index}-${name}`) ?? "");
+
+    return {
+      kind: get("kind") === "INDIRECT" ? ("INDIRECT" as const) : ("ORDER" as const),
+      orderId: get("orderId"),
+      momentId: get("momentId"),
+      indirectMomentId: get("indirectMomentId"),
+      clockInAt: parseLocalDateTime(get("clockInAt"), timeZone),
+      clockOutAt: parseLocalDateTime(get("clockOutAt"), timeZone),
+    };
+  });
 }
 
 export async function addEntry(
@@ -73,14 +100,44 @@ export async function addEntry(
     return { error: "Fyll i både start- och sluttid." };
   }
 
+  const extra = readExtraJobs(formData, timeZone);
+
+  for (const [index, row] of extra.entries()) {
+    // Numret står bara när det finns flera, som rubrikerna i rutan.
+    const which =
+      extra.length > 1 ? `Samtidig stämpling ${index + 1}` : "Samtidig stämpling";
+    if (row.kind === "INDIRECT" ? !row.indirectMomentId : !row.orderId || !row.momentId) {
+      return {
+        error:
+          row.kind === "INDIRECT"
+            ? `${which}: välj ett improduktivt moment.`
+            : `${which}: välj både order och arbetsmoment.`,
+      };
+    }
+    if (!row.clockInAt || !row.clockOutAt) {
+      return { error: `${which}: fyll i både start- och sluttid.` };
+    }
+  }
+
   try {
-    await createManualEntry(companyId, {
-      ...job,
-      employeeId: input.employeeId,
-      clockInAt: input.clockInAt,
-      clockOutAt: input.clockOutAt,
-      byEmail: email,
-    });
+    await createManualEntries(companyId, [
+      {
+        ...job,
+        employeeId: input.employeeId,
+        clockInAt: input.clockInAt,
+        clockOutAt: input.clockOutAt,
+        byEmail: email,
+      },
+      ...extra.map((row) => ({
+        ...(row.kind === "INDIRECT"
+          ? { kind: "INDIRECT" as const, indirectMomentId: row.indirectMomentId }
+          : { kind: "ORDER" as const, orderId: row.orderId, momentId: row.momentId }),
+        employeeId: input.employeeId,
+        clockInAt: row.clockInAt!,
+        clockOutAt: row.clockOutAt!,
+        byEmail: email,
+      })),
+    ]);
   } catch (error) {
     // ClockError bär ett meddelande skrivet för att läsas av en människa.
     if (error instanceof ClockError) return { error: error.message };
@@ -89,7 +146,9 @@ export async function addEntry(
 
   revalidatePath(PATH);
   revalidatePath("/admin");
-  return { ok: "Stämplingen är inlagd." };
+  return {
+    ok: extra.length > 0 ? "Stämplingarna är inlagda." : "Stämplingen är inlagd.",
+  };
 }
 
 /**

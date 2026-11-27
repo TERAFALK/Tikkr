@@ -3,6 +3,7 @@ import { unsafeGlobalPrisma } from "@/lib/db";
 import { forCompany } from "@/lib/tenant";
 import {
   ClockError,
+  createManualEntries,
   createManualEntry,
   deleteEntryManually,
 } from "@/lib/clock";
@@ -93,6 +94,112 @@ describe("improduktiv tid för hand", () => {
     expect(entry.orderId).toBeNull();
     expect(entry.momentId).toBeNull();
     expect(entry.source).toBe("ADMIN_MANUAL");
+  });
+});
+
+/**
+ * DUBBELJOBB I ETT STEG (2026-11-23). Ny stämpling lägger in ett jobb och de
+ * som löpte samtidigt, som Lägg till jobb på stämplingsskärmen. Allt eller
+ * inget.
+ */
+describe("samtidiga stämplingar för hand", () => {
+  const frasning = async () =>
+    (
+      await unsafeGlobalPrisma.workMoment.create({
+        data: { companyId, name: "Fräsning", costRateOre: 60000 },
+      })
+    ).id;
+
+  it("lägger in ett dubbeljobb med egna tider", async () => {
+    const fras = await frasning();
+
+    const created = await createManualEntries(companyId, [
+      finished(),
+      {
+        ...finished(),
+        momentId: fras,
+        clockInAt: new Date("2026-09-01T08:00:00Z"),
+        clockOutAt: new Date("2026-09-01T16:00:00Z"),
+      },
+    ]);
+
+    expect(created).toHaveLength(2);
+    expect(created.every((entry) => entry.source === "ADMIN_MANUAL")).toBe(true);
+    expect(
+      await forCompany(companyId).auditEvent.count({
+        where: { entity: "TimeEntry", action: "create" },
+      })
+    ).toBe(2);
+  });
+
+  it("två på samma arbetsmoment samtidigt sparar ingenting", async () => {
+    await expect(
+      createManualEntries(companyId, [
+        finished(),
+        {
+          ...finished(),
+          clockInAt: new Date("2026-09-01T08:00:00Z"),
+          clockOutAt: new Date("2026-09-01T16:00:00Z"),
+        },
+      ])
+    ).rejects.toBeInstanceOf(ClockError);
+
+    expect(await forCompany(companyId).timeEntry.count()).toBe(0);
+  });
+
+  it("ordertid och improduktiv tid samtidigt, åt båda hållen", async () => {
+    const stadningen = {
+      kind: "INDIRECT" as const,
+      indirectMomentId: stadning,
+      employeeId: anna,
+      clockInAt: new Date("2026-09-01T08:00:00Z"),
+      clockOutAt: new Date("2026-09-01T09:00:00Z"),
+      byEmail: "chef@manuelltest.se",
+    };
+
+    const created = await createManualEntries(companyId, [finished(), stadningen]);
+
+    expect(created.map((entry) => entry.kind)).toEqual(["ORDER", "INDIRECT"]);
+    expect(created[1].indirectMomentId).toBe(stadning);
+    expect(created[1].orderId).toBeNull();
+  });
+
+  it("två pass samtidigt på samma improduktiva moment sparar ingenting", async () => {
+    const stadningen = (from: string, to: string) => ({
+      kind: "INDIRECT" as const,
+      indirectMomentId: stadning,
+      employeeId: anna,
+      clockInAt: new Date(from),
+      clockOutAt: new Date(to),
+      byEmail: "chef@manuelltest.se",
+    });
+
+    await expect(
+      createManualEntries(companyId, [
+        stadningen("2026-09-01T08:00:00Z", "2026-09-01T10:00:00Z"),
+        stadningen("2026-09-01T09:00:00Z", "2026-09-01T11:00:00Z"),
+      ])
+    ).rejects.toBeInstanceOf(ClockError);
+
+    expect(await forCompany(companyId).timeEntry.count()).toBe(0);
+  });
+
+  it("ett jobb som brister sparar inte heller det andra", async () => {
+    const fras = await frasning();
+
+    await expect(
+      createManualEntries(companyId, [
+        finished(),
+        {
+          ...finished(),
+          momentId: fras,
+          clockInAt: new Date("2026-09-01T16:00:00Z"),
+          clockOutAt: new Date("2026-09-01T08:00:00Z"),
+        },
+      ])
+    ).rejects.toBeInstanceOf(ClockError);
+
+    expect(await forCompany(companyId).timeEntry.count()).toBe(0);
   });
 });
 

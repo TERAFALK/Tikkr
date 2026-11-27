@@ -460,7 +460,7 @@ export const GUIDES = [
       },
       {
         title: "Tryck Ny stämpling för tid som aldrig stämplades",
-        body: "Välj Ordertid eller Improduktiv tid, sedan anställd, jobb och tider.",
+        body: "Välj Ordertid eller Improduktiv tid, sedan anställd, jobb och tider. Lägg till samtidig stämpling lägger in ett jobb till, ordertid eller improduktiv tid, på ett annat moment och med egna tider.",
       },
       {
         title: "Tryck Ta bort på en stämpling som inte skulle ha funnits",
@@ -469,6 +469,7 @@ export const GUIDES = [
     ],
     notes: [
       "Två stämplingar på samma anställd och arbetsmoment får inte överlappa.",
+      "Två stämplingar samtidigt på olika arbetsmoment går bra, som två maskiner på stämplingsskärmen. Båda ordrarna får sin tid, och tidrapporten räknar tiden en gång.",
       "En pågående stämpling går varken att ändra eller ta bort förrän den avslutats.",
       "Ska en persons tid bort helt används raderingen under Inställningar, Dataskydd.",
     ],

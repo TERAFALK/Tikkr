@@ -759,8 +759,18 @@ shop_prices       — död, ersatt av shop_products.price_ore (se § 3.4)
    fyrtio timmar. Frånvaro på en orsak som drar på flexen dras sedan bort
    igen: den som är flexledig tar ut timmar hen arbetat in.
 
-   **Arbetad tid är HUVUDSTÄMPLINGEN** (`mainMinutes` i `spans.ts`), aldrig
-   råsumman. Det är här de två underlagen skiljer sig, se avgränsningen överst.
+   **Arbetad tid är tiden då MINST ETT JOBB PÅGICK** (`mainMinutes` i
+   `spans.ts`), aldrig råsumman. Det är här de två underlagen skiljer sig, se
+   avgränsningen överst.
+
+   **Ett dubbeljobb räknas en gång, inte noll gånger** (ändrat 2026-11-23,
+   pilotkundens begäran, ersätter "huvudstämplingen"). Till dess räknades bara
+   jobbet som startade när ingenting annat pågick, och ett dubbeljobb inte
+   alls, inte heller tiden efter att jobbet under det stämplats ut. Svets
+   08–12 och fräs 11–15 gav fyra timmar, fast personen var på plats till 15.
+   Nu ger det sju: överlappet en gång. Fakturan får fortfarande fyra plus
+   fyra. Veckovyn och översikten räknar likadant, eftersom de delar
+   funktionen. `tests/spans.test.ts` fäller det.
 
    **Perioden kapas till hela dygn i `buildPayrollPeriod`** (tillagt
    2026-10-05). `from` och `to` pekar ut DAGAR men kommer in som tidpunkter,
@@ -784,8 +794,7 @@ shop_prices       — död, ersatt av shop_products.price_ore (se § 3.4)
    ena är ett fakturaunderlag.
 
    **Två jobb som startar i exakt samma ögonblick: det LÄNGSTA räknas**
-   (ändrat 2026-10-05). Ingetdera startade medan det andra pågick, så båda är
-   huvudjobb, och då avgör längden.
+   (ändrat 2026-10-05). Följer numera av regeln ovan, men skälet står kvar.
 
    Sorteringen tog tidigare bara hänsyn till starttiden, och vid lika tid
    avgjorde den ordning passen råkade komma i. Den kommer ur en databasfråga
@@ -796,8 +805,7 @@ shop_prices       — död, ersatt av shop_products.price_ore (se § 3.4)
 
    Att det längsta vinner är inte godtyckligt: 08:00–12:00 och 08:00–16:00
    betyder att personen var på plats till 16, och fyra timmar hade dragits
-   från hens flexsaldo. Tiden EFTER ett huvudjobb räknas fortfarande inte,
-   även om ett sidojobb fortsätter — det är avsiktligt och oförändrat.
+   från hens flexsaldo.
 
    Den räknas i HELA MINUTER (tillagt 2026-10-01). En stämpling bär sekunder,
    eftersom den sätts när någon trycker, och det syns ingenstans utom i
@@ -1483,6 +1491,16 @@ avslutade poster, av samma skäl som de är de enda som går att ändra: en
 pågående stämpling tillhör någon som står vid en skärm. Ska en persons tid
 bort helt finns fortfarande GDPR-raderingen i inställningarna.
 
+**Ett dubbeljobb läggs in för hand i ett steg** (beslutat 2026-11-23,
+pilotkundens begäran). Ny stämpling har Lägg till samtidig stämpling, som gör
+det Lägg till jobb gör på stämplingsskärmen: samma person, ett annat
+arbetsmoment och egna tider, eftersom jobben på skärmen stämplas ut var för
+sig. Tiderna fylls i från första raden. Allt sparas eller ingenting
+(`createManualEntries` i `clock.ts`). **Varje rad väljer ordertid eller
+improduktiv tid** (ändrat 2026-11-23, produktägarens val), som skärmen, där
+Lägg till jobb tar vilket jobb som helst. Bara samma moment två gånger
+samtidigt stoppas. Improduktiv tid når aldrig fakturan, även bredvid en order.
+
 **Improduktiv tid går att lägga in för hand** (ändrat 2026-10-13). Ny
 stämpling lade bara in ordertid, med skälet att glömd improduktiv tid hellre
 stämplas på skärmen. Med löneunderlaget är den saknade städtimmen någons
@@ -1952,6 +1970,14 @@ som var redo att släppas.
 får inga egna commits utom en akut rättelse, som sedan slås ihop tillbaka i
 `dev`. Då har `prod` exakt det innehåll labbet provat, och taggen sätts utan
 en ny omgång i labbet.
+
+**Första produktionsversionen plockades ur `dev`** (beslutat 2026-11-27,
+produktägarens val). Integrationerna (§ 3.5) låg redan i `dev` men var inte
+klara, och pilotkunden började 2026-12-01. PR 125, 127 och 128 plockades över
+till `prod` med cherry-pick och provades i labbet på `prod`, samma väg som en
+akut rättelse. Taggen `v1.0.0`, satt 2026-10-31 men aldrig driftsatt, flyttades
+till den versionen. Ett engångsfall: nästa version går `dev` till `prod` som
+vanligt, och integrationerna följer då med.
 
 - **CI** (`.github/workflows/ci.yml`) kör typkontroll, alla tester mot en egen
   Postgres, ett bygge av Docker-imagen och en kontroll av compose-filerna på

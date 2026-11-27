@@ -47,7 +47,7 @@ export interface Release {
 export const RELEASES: Release[] = [
   {
     version: "v1.0.0",
-    date: "2026-10-30",
+    date: "2026-11-28",
     title: "Tikkr i drift",
     summary:
       "Det här är den första versionen av Tikkr. Här står vad som ändras i varje ny version.",
