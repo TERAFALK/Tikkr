@@ -30,6 +30,11 @@ export async function resendVerification() {
 
   const outcome = await sendEmailVerification(session.userId);
 
+  // Bekräftad under tiden, ofta av en länkskanner i mejlet. Då ska man rakt
+  // in i panelen. Till v1.0.2 gick vägen tillbaka hit och vidare därifrån,
+  // och från en flik som stått öppen hoppade sidan mellan de två.
+  if (outcome === "already-verified") redirect("/admin");
+
   // Utfallet läses ur adressen. Ett formulär utan svar hade sett ut som en
   // knapp som inte gör något.
   redirect(`${PATH}?utskick=${outcome}`);

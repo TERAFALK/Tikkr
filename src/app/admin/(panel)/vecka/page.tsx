@@ -15,6 +15,7 @@ import {
 import { formatDate, formatDuration } from "@/lib/format";
 import EmployeeAvatar from "@/components/ui/EmployeeAvatar";
 import {
+  ButtonLink,
   Card,
   CardHeader,
   EmptyState,
@@ -100,6 +101,9 @@ export default async function WeekPage({
       {week.rows.length === 0 ? (
         <EmptyState
           title="Inga anställda upplagda"
+          action={
+            <ButtonLink href="/admin/anstallda">Lägg upp anställda</ButtonLink>
+          }
         />
       ) : (
         <Card>

@@ -234,22 +234,25 @@ export default async function EntriesPage({
   // En BEFINTLIG post behåller däremot sitt eget moment i listan, även
   // avaktiverat. Det avgörs i rutan, se moment-options.ts.
 
+  // Två ställen, men bara rubrikens öppnas av genvägen, som på Ordrar.
+  const newEntry = (openOnMount: boolean) => (
+    <NewEntryDialog
+      employees={employeeOptions}
+      orders={orderOptions}
+      moments={pickableMoments}
+      indirectMoments={indirectMoments
+        .filter((moment) => moment.active)
+        .map((moment) => ({ id: moment.id, label: moment.name }))}
+      openOnMount={openOnMount}
+    />
+  );
+
   return (
     <>
       <PageHeader
         title="Stämplingar"
         help="andra-stampling"
-        action={
-          <NewEntryDialog
-            employees={employeeOptions}
-            orders={orderOptions}
-            moments={pickableMoments}
-            indirectMoments={indirectMoments
-              .filter((moment) => moment.active)
-              .map((moment) => ({ id: moment.id, label: moment.name }))}
-            openOnMount={params.ny === "1"}
-          />
-        }
+        action={newEntry(params.ny === "1")}
       />
 
       <FilterBar
@@ -301,9 +304,7 @@ export default async function EntriesPage({
       </FilterBar>
 
       {total === 0 ? (
-        <EmptyState
-          title="Inga stämplingar"
-        />
+        <EmptyState title="Inga stämplingar" action={newEntry(false)} />
       ) : (
         <EntryEditor
           orders={orderOptions}

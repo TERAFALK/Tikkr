@@ -37,7 +37,10 @@ export default async function ProductsPage() {
       />
 
       {products.length === 0 ? (
-        <EmptyState title="Inga produkter" />
+        <EmptyState
+          title="Inga produkter"
+          action={<ButtonLink href="/plattform/produkter/ny">Ny produkt</ButtonLink>}
+        />
       ) : (
         <Card>
           <Table>

@@ -82,11 +82,13 @@ export const GUIDES = [
       },
       {
         title: "Koppla en stämplingsskärm",
-        body: "Tryck Skapa skärm och följ guiden för att koppla skärmen.",
+        body: "Tryck Ny skärm och följ guiden för att koppla skärmen.",
       },
     ],
     notes: [
-      "Under Därefter på samma sida står det som gör underlagen kompletta: kundregister, timkostnader och improduktiv tid.",
+      "Ett klart steg fälls ihop. Under Lägg till fler står formuläret kvar.",
+      "Under Därefter står det som gör underlagen kompletta: kunder, timkostnad, improduktiv tid, kollegor och företagsuppgifterna.",
+      "Med Löneunderlag eller Planering står deras uppsättning under egna rubriker: arbetstider, röda dagar, rasttyper, arbetstidsförkortning och stationer.",
     ],
     related: ["koppla-skarm", "anstallda", "ordrar"],
   },
