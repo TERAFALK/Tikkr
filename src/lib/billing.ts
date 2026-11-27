@@ -49,6 +49,60 @@ export class BillingChangeError extends Error {
 }
 
 /**
+ * Momssatsen som läggs på varje rad, som en lista eftersom Stripe tar en.
+ *
+ * Priserna hos Stripe är exklusive moms, och Tikkr säljer bara till svenska
+ * företag: 25 % på allt. Satsen skapas en gång hos Stripe och dess id står i
+ * STRIPE_TAX_RATE_ID. En fast sats och inte Stripe Tax, som räknar per land
+ * och kostar per transaktion för en uträkning som här alltid ger samma svar.
+ *
+ * SAKNAS DEN SÄLJER VI INTE. En prenumeration utan moms ger en faktura som är
+ * fel mot kunden och mot Skatteverket, och den går inte att rätta i efterhand
+ * utan att kreditera. Kassan startar inte, ett tillval får ett kort besked,
+ * och felet står i loggen.
+ */
+export function vatTaxRateIds(
+  configured: string | undefined = process.env.STRIPE_TAX_RATE_ID
+): string[] {
+  const id = configured?.trim();
+
+  if (!id) {
+    console.error(
+      "[moms] STRIPE_TAX_RATE_ID saknas. Kassan och tillvalen stoppas tills momssatsen är satt."
+    );
+    throw new BillingChangeError(
+      "Betalningen går inte att starta just nu. Kontakta support@tikkr.se."
+    );
+  }
+
+  return [id];
+}
+
+/** Kassans rader: licenserna och tillvalen, alla med momssatsen. */
+export function checkoutLineItems(params: {
+  screenPrice: string;
+  screens: number;
+  modulePrices: string[];
+  taxRates: string[];
+}): Stripe.Checkout.SessionCreateParams.LineItem[] {
+  return [
+    {
+      price: params.screenPrice,
+      quantity: params.screens,
+      // Kunden kan justera antalet i kassan också. Den som ändrar sig i
+      // sista stund ska inte behöva backa ut och börja om.
+      adjustable_quantity: { enabled: true, minimum: 1, maximum: 100 },
+      tax_rates: params.taxRates,
+    },
+    ...params.modulePrices.map((price) => ({
+      price,
+      quantity: 1,
+      tax_rates: params.taxRates,
+    })),
+  ];
+}
+
+/**
  * Startar kassan där kunden fyller i sitt kort.
  *
  * Vi skapar aldrig prenumerationen själva. Stripe gör det när betalningen
@@ -103,23 +157,20 @@ export async function createCheckoutSession(params: {
     );
   }
 
-  const moduleLines = modules
+  const modulePrices = modules
     .map((key) => modulePriceId(book, key, params.interval))
-    .filter((price): price is string => Boolean(price))
-    .map((price) => ({ price, quantity: 1 }));
+    .filter((price): price is string => Boolean(price));
+
+  const taxRates = vatTaxRateIds();
 
   const session = await stripe().checkout.sessions.create({
     mode: "subscription",
-    line_items: [
-      {
-        price: screenPriceId(book, params.interval),
-        quantity: screens,
-        // Kunden kan justera antalet i kassan också. Den som ändrar sig i
-        // sista stund ska inte behöva backa ut och börja om.
-        adjustable_quantity: { enabled: true, minimum: 1, maximum: 100 },
-      },
-      ...moduleLines,
-    ],
+    line_items: checkoutLineItems({
+      screenPrice: screenPriceId(book, params.interval),
+      screens,
+      modulePrices,
+      taxRates,
+    }),
 
     // Finns kunden redan hos Stripe återanvänder vi den, så att en kund som
     // avslutat och kommer tillbaka inte blir två kunder med varsin historik.
@@ -132,6 +183,9 @@ export async function createCheckoutSession(params: {
     client_reference_id: params.companyId,
     subscription_data: {
       metadata: { companyId: params.companyId },
+      // Gäller rader som läggs till senare utan egen sats. Varje rad Tikkr
+      // lägger till bär ändå satsen själv, se moduleAddition.
+      default_tax_rates: taxRates,
     },
     metadata: { companyId: params.companyId },
 
@@ -774,6 +828,18 @@ interface ItemChange {
   price?: string;
   quantity?: number;
   deleted?: boolean;
+  tax_rates?: string[];
+}
+
+/**
+ * Raden för ett tillval som läggs till på en befintlig prenumeration.
+ *
+ * Bär momssatsen själv i stället för att lita på prenumerationens förval:
+ * en prenumeration från före momsen har inget förval, och utan satsen på
+ * raden hade tillvalet fakturerats utan moms.
+ */
+export function moduleAddition(price: string, taxRates: string[]): ItemChange {
+  return { price, quantity: 1, tax_rates: taxRates };
 }
 
 function changedItems(
@@ -809,7 +875,7 @@ function changedItems(
     );
   }
 
-  return [{ price, quantity: 1 }];
+  return [moduleAddition(price, vatTaxRateIds())];
 }
 
 /** Prenumerationen och vilket intervall kunden betalar i. */
