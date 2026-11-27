@@ -117,7 +117,7 @@ export default async function OnboardingPage() {
         }
       />
 
-      <Card className="max-w-3xl">
+      <Card>
         <div className="border-b border-neutral-200 px-6 py-4">
           <div className="mb-2 flex items-baseline justify-between gap-4 text-[13px]">
             <span className="whitespace-nowrap font-medium tabular-nums text-neutral-900">
