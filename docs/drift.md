@@ -73,10 +73,11 @@ sudo install -o "$USER" -g "$USER" -m 644 /dev/null /var/log/tikkr-autoclose.log
 crontab -e
 ```
 
-Lägg till raden (byt sökväg om projektet ligger någon annanstans):
+Lägg till raden. Produktionen ligger i `/opt/tikkr` och labbet i
+`/home/administrator/Tikkr`; byt sökväg på labbet:
 
 ```
-*/15 * * * * /home/administrator/Tikkr/scripts/auto-close.sh >> /var/log/tikkr-autoclose.log 2>&1
+*/15 * * * * /opt/tikkr/scripts/auto-close.sh >> /var/log/tikkr-autoclose.log 2>&1
 ```
 
 Prova direkt utan att vänta:
@@ -164,10 +165,11 @@ crontab -e
 Tre gånger per dygn: natten, lunch och strax efter arbetsdagens slut. Med en
 enda nattlig kopia kunde en hel arbetsdags stämplingar gå förlorade; nu som
 mest en halv. Databasen är liten, och kopiorna kostar i praktiken ingenting.
+Byt sökväg på labbet, som för utstämplingen.
 
 ```
-0 3,12 * * * /home/administrator/Tikkr/ops/backup.sh >> /var/log/tikkr-backup.log 2>&1
-30 16 * * * /home/administrator/Tikkr/ops/backup.sh >> /var/log/tikkr-backup.log 2>&1
+0 3,12 * * * /opt/tikkr/ops/backup.sh >> /var/log/tikkr-backup.log 2>&1
+30 16 * * * /opt/tikkr/ops/backup.sh >> /var/log/tikkr-backup.log 2>&1
 ```
 
 Före en driftsättning tas dessutom en kopia av `release.sh`.
@@ -322,7 +324,7 @@ SPF, DKIM och DMARC måste vara satta för `tikkr.se`, annars hamnar
 Produktionen kör Caddy framför appen, på en egen Glesys-VPS. Hela
 konfigurationen ligger i `deploy/Caddyfile` och `docker-compose.prod.yml`.
 
-**Storlek:** 2 vCPU, 4 GB RAM, 50 GB disk, Ubuntu 24.04 LTS. Bygget sker på
+**Storlek:** 2 vCPU, 4 GB RAM, 50 GB disk, Ubuntu 26.04 LTS. Bygget sker på
 servern och tar ungefär 2 GB minne medan den gamla versionen kör vidare;
 resten är Postgres, appen och marginal. Glesys låter servern växa senare.
 
@@ -348,20 +350,28 @@ resten är Postgres, appen och marginal. Glesys låter servern växa senare.
 ### Uppsättning
 
 1. Peka DNS för `www.tikkr.se`, `tikkr.se` och `portal.tikkr.se` mot servern
-2. Installera Docker och klona repot. Docker Compose behöver vara 2.24 eller
-   nyare (`docker compose version`) för `!override` i produktionsfilen
-3. Skapa nätet appen och Caddy delar:
+2. Installera Docker ur Dockers eget paketförråd, och lägg ditt konto i
+   gruppen `docker`. Docker Compose behöver vara 2.24 eller nyare
+   (`docker compose version`) för `!override` i produktionsfilen
+3. Klona repot till `/opt/tikkr`, ägt av ditt konto. Mappen hör till servern
+   och inte till en person, och skripten har inga fasta sökvägar:
+
+```bash
+sudo install -d -o "$USER" -g "$USER" /opt/tikkr && git clone https://github.com/TERAFALK/tikkr.git /opt/tikkr
+```
+
+4. Skapa nätet appen och Caddy delar:
 
 ```bash
 docker network create npm_proxy
 ```
 
-4. Fyll i `.env` utifrån `.env.example`. Utöver labbets värden krävs
+5. Fyll i `.env` utifrån `.env.example`. Utöver labbets värden krävs
    `TIKKR_ENV=production`,
    `COMPOSE_FILE=docker-compose.yml:docker-compose.prod.yml`, `ACME_EMAIL`,
    `APP_URL=https://portal.tikkr.se`, `MARKETING_HOST=www.tikkr.se,tikkr.se`
    och `PORTAL_HOST=portal.tikkr.se`
-5. Driftsätt den första versionen, se [release.md](release.md):
+6. Driftsätt den första versionen, se [release.md](release.md):
 
 ```bash
 ./ops/release.sh v1.0.0

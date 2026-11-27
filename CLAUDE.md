@@ -2757,8 +2757,8 @@ varje skärm kopplas om med en ny kod.
 
 | Sak | Status |
 |---|---|
-| GitHub-repo | ⚠ `TERAFALK/Tikkr` finns men är **publikt**. Ska bli privat; gratisplanen kan då inte skydda `prod` |
-| Produktionsserver | ⏸ Glesys-VPS, senare. Föreslaget: 2 vCPU, 4 GB RAM, 50 GB, Ubuntu 24.04 |
+| GitHub-repo | ⚠ `TERAFALK/tikkr` (hette `Tikkr` till 2026-11-27) finns men är **publikt**. Ska bli privat; gratisplanen kan då inte skydda `prod` |
+| Produktionsserver | ⏸ Glesys-VPS, senare. 2 vCPU, 4 GB RAM, 50 GB, Ubuntu 26.04 LTS, projektet i `/opt/tikkr` (beslutat 2026-11-27) |
 | Offsite-backup (rclone-mål) | ⏸ Glesys Object Storage, köps till. `BACKUP_REMOTE` sätts före lansering |
 | Uptime-övervakning | ⏸ sätts upp mot produktionens adress |
 
