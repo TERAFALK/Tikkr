@@ -106,7 +106,7 @@ export const GUIDES = [
       },
       {
         title: "Öppna adressen på skärmen",
-        body: "Rutan i panelen visar adressen. Öppna den i webbläsaren på enheten som ska sitta i verkstaden.",
+        body: "Öppna tikkr.se/kiosk i webbläsaren på enheten som ska sitta i verkstaden. Adressen står också i rutan med koden.",
       },
       {
         title: "Knappa in koden och tryck Koppla skärmen",
