@@ -1760,7 +1760,14 @@ kundens arbetsorder, det allt annat i Tikkr hänger på. I koden heter det
    `auth-callbacks.ts`. Konsekvensen är att alla loggar in en gång till efter
    versionen, och därefter var sjunde dag oavsett hur ofta panelen används. **E-postadressen bekräftas** med en länk vid
    registreringen; det spärrar ingenting, men panelen visar en remsa tills
-   det är gjort, och en obekräftad adress går att rätta själv. Registreringen
+   det är gjort, och en obekräftad adress går att rätta själv.
+
+   **Länken bekräftar med en knapp, inte när sidan visas** (ändrat
+   2026-11-27, v1.0.2). Microsofts Safe Links öppnar varje länk i ett
+   inkommande mejl, och förbrukade länken 14 sekunder efter utskicket. Den
+   som sedan klickade fick "Länken fungerar inte", fast adressen var
+   bekräftad. Sidan säger nu "bekräftad" för en bekräftad adress, vem som än
+   löste in länken. Se `linkState` i `email-verification.ts`. Registreringen
    tar högst fem nya arbetsytor per kvart och IP-adress. Se `account.ts` och
    `email-verification.ts`.
    **DET EGNA KONTOT LIGGER FÖR SIG** (ändrat 2026-10-08). Namn,
