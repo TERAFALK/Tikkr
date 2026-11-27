@@ -203,9 +203,11 @@ en lista man bara läser har ingen. Regeln står i `TONE-OF-VOICE.md` och
 `tests/empty-states.test.ts` fäller ett tomt läge utan knapp som inte står
 bland undantagen med sitt skäl.
 
-**Kom igång följer tillvalen** (ändrat 2026-11-27). De fyra stegen som krävs
-fälls ihop när de är klara, med formuläret under Lägg till fler. De
-rekommenderade stegen står under Därefter, Löneunderlag och Planering, och bara
+**Kom igång är ett kort och en väg** (ändrat 2026-11-27, produktägarens val).
+De fyra stegen som krävs står i rad med en linje mellan, som tidslinjen under
+Nyheter. Bara steget man står på är öppet; ett klart steg visar det upplagda
+och formuläret under Lägg till fler. De rekommenderade stegen står längst ned i
+samma kort, under För kompletta underlag, Löneunderlag och Planering, och bara
 för den som har tillvalet. De räknas bara när guiden visas (`extras: true` i
 `onboarding.ts`), eftersom panelens layout hämtar stegen vid varje sidladdning.
 
