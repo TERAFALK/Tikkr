@@ -1763,6 +1763,13 @@ kundens arbetsorder, det allt annat i Tikkr hänger på. I koden heter det
    det är gjort, och en obekräftad adress går att rätta själv. Registreringen
    tar högst fem nya arbetsytor per kvart och IP-adress. Se `account.ts` och
    `email-verification.ts`.
+
+   **Länken bekräftar med en knapp, inte när sidan visas** (ändrat
+   2026-11-27, v1.0.2). Microsofts Safe Links öppnar varje länk i ett
+   inkommande mejl, och förbrukade länken 14 sekunder efter utskicket. Den
+   som sedan klickade fick "Länken fungerar inte", fast adressen var
+   bekräftad. Sidan säger nu "bekräftad" för en bekräftad adress, vem som än
+   löste in länken. Se `linkState` i `email-verification.ts`.
    **DET EGNA KONTOT LIGGER FÖR SIG** (ändrat 2026-10-08). Namn,
    telefonnummer, e-postadress och lösenord ligger på `/admin/konto`, som nås
    från adressen längst ner i menyn. De låg under Inställningar, Användare,
