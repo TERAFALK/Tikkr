@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState, useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { useFormStatus } from "react-dom";
 import type { PairingFormState } from "@/app/admin/(panel)/installningar/skarmar/actions";
 import { Alert, Button } from "@/components/ui";
@@ -28,6 +29,15 @@ import { Alert, Button } from "@/components/ui";
  * är avsiktligt: raden i listan har en egen knapp för en ny kod, så ingen
  * tvingas skapa om själva skärmen, och en färsk kod med känd livslängd är
  * ärligare än en gammal vars återstående tid ingen längre ser.
+ *
+ * LISTAN HÄMTAS OM FÖRST NÄR RUTAN STÄNGS (ändrat 2026-11-27). Åtgärden
+ * hämtade om sidan direkt, och den första skärmen skapas från knappen i den
+ * tomma listan. Den tomma listan byttes då mot tabellen, rutan försvann med
+ * den, och koden syntes aldrig. Från den andra skärmen stod knappen i
+ * rubriken och fanns kvar.
+ *
+ * ADRESSEN STÅR SOM ETT EGET STEG, lika stort som koden. Den stod i en
+ * liten rad under rubriken, och det var inte självklart vart skärmen skulle.
  */
 export default function PairingCodeDialog({
   trigger,
@@ -37,8 +47,11 @@ export default function PairingCodeDialog({
   action,
   submitLabel,
   disabled,
+  address,
   children,
 }: {
+  /** Adressen skärmen öppnar, utan https://, till exempel tikkr.se/kiosk. */
+  address: string;
   trigger: string;
   triggerTone?: "primary" | "secondary" | "ghost";
   title: string;
@@ -53,6 +66,7 @@ export default function PairingCodeDialog({
   children?: React.ReactNode;
 }) {
   const dialog = useRef<HTMLDialogElement>(null);
+  const router = useRouter();
 
   // Räknas upp vid varje öppning. Används som key på innehållet nedan, vilket
   // bygger om det från grunden — inklusive formulärets tillstånd.
@@ -74,6 +88,7 @@ export default function PairingCodeDialog({
 
       <dialog
         ref={dialog}
+        onClose={() => router.refresh()}
         className="w-[min(42rem,calc(100vw-2rem))] rounded-xl border border-neutral-200 bg-white p-0 shadow-xl backdrop:bg-neutral-900/40"
       >
         <Body
@@ -82,6 +97,7 @@ export default function PairingCodeDialog({
           description={description}
           action={action}
           submitLabel={submitLabel}
+          address={address}
           onClose={() => dialog.current?.close()}
         >
           {children}
@@ -96,9 +112,11 @@ function Body({
   description,
   action,
   submitLabel,
+  address,
   onClose,
   children,
 }: {
+  address: string;
   title: string;
   description?: string;
   action: (
@@ -118,15 +136,26 @@ function Body({
           <h2 className="text-sm font-semibold text-neutral-900">
             Kod för {state.deviceName}
           </h2>
-          <p className="mt-0.5 text-[13px] leading-relaxed text-neutral-500">
-            Öppna portal.tikkr.se/kiosk på skärmen och knappa in koden.
-          </p>
         </div>
 
-        <div className="space-y-4 px-5 py-6 text-center">
-          <p className="font-mono text-5xl font-semibold tracking-[0.2em] text-neutral-900">
-            {state.code.slice(0, 3)} {state.code.slice(3)}
-          </p>
+        <div className="space-y-6 px-5 py-6 text-center">
+          <div>
+            <p className="text-[13px] font-medium text-neutral-600">
+              1. Öppna adressen i webbläsaren på skärmen
+            </p>
+            <p className="mt-1 select-all font-mono text-2xl font-semibold text-neutral-900">
+              {address}
+            </p>
+          </div>
+
+          <div>
+            <p className="text-[13px] font-medium text-neutral-600">
+              2. Knappa in koden
+            </p>
+            <p className="mt-1 font-mono text-5xl font-semibold tracking-[0.2em] text-neutral-900">
+              {state.code.slice(0, 3)} {state.code.slice(3)}
+            </p>
+          </div>
 
           <Countdown expiresAt={state.expiresAt!} />
 

@@ -49,7 +49,9 @@ export async function addDevice(
 
   const pairing = await startPairing(device.id);
 
-  revalidatePath(PATH);
+  // Ingen revalidatePath: rutan hämtar om listan när den stängs. Hämtades
+  // sidan om här försvann rutan med den tomma listan, och koden för den
+  // första skärmen syntes aldrig. Se PairingCodeDialog.
 
   return {
     code: pairing.code,
