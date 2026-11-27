@@ -6,6 +6,11 @@
 #   test   typkontroll och alla tester, mot en riktig Postgres
 #   image  bygger samma Docker-image som servern bygger
 #
+# IMAGEN BYGGS BARA MOT PROD (ändrat 2026-11-27). En PR mot dev kör bara
+# test, ungefär två minuter. Bygget tog lika lång tid till och fångar sällan
+# något i en vanlig ändring; det körs på PR:en dev → prod och på prod, alltså
+# före varje tagg, och release.sh vägrar en tagg utan grön CI.
+#
 # Ett rött kryss på en PR betyder att den inte ska slås ihop. Det här
 # arbetsflödet driftsätter ingenting — produktionen uppdateras bara när någon
 # kör release-rutinen på servern.
@@ -105,6 +110,7 @@ jobs:
         run: npx vitest run
 
   image:
+    if: github.ref == 'refs/heads/prod' || github.base_ref == 'prod'
     runs-on: ubuntu-latest
     timeout-minutes: 20
 
