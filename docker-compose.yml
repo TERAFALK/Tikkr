@@ -122,6 +122,9 @@ services:
       STRIPE_PRICE_ID_PAYROLL: ${STRIPE_PRICE_ID_PAYROLL:-}
       STRIPE_PRICE_ID_PAYROLL_YEARLY: ${STRIPE_PRICE_ID_PAYROLL_YEARLY:-}
       STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-}
+      # Momssatsen, 25 % exklusive, som läggs på varje rad. Utan den startar
+      # ingen betalning. Se vatTaxRateIds i src/lib/billing.ts.
+      STRIPE_TAX_RATE_ID: ${STRIPE_TAX_RATE_ID:-}
     ports:
       # Vänsterledet är porten på servern och går att ändra i .env om något
       # annat redan använder 3000.
