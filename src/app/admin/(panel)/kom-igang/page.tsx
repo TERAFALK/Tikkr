@@ -9,7 +9,6 @@ import {
   type OnboardingStep,
 } from "@/lib/onboarding";
 import {
-  Button,
   ButtonLink,
   Card,
   Field,
@@ -21,6 +20,7 @@ import SearchSelect from "@/components/admin/SearchSelect";
 import { customerOptions } from "@/lib/customers";
 import { checkoutHrefFor } from "@/lib/shop/cart";
 import { addEmployees, addMoments, addOrder } from "./actions";
+import AddButton from "./AddButton";
 
 export const metadata = { title: "Kom igång · Tikkr" };
 
@@ -159,7 +159,7 @@ export default async function OnboardingPage() {
                   placeholder={"Anna Andersson\nBjörn Bergqvist\nCarina Cederlund"}
                 />
               </Field>
-              <Button type="submit">Lägg till</Button>
+              <AddButton />
             </form>
           </Step>
 
@@ -207,7 +207,7 @@ export default async function OnboardingPage() {
                 />
               </Field>
 
-              <Button type="submit">Lägg till</Button>
+              <AddButton />
             </form>
           </Step>
 
@@ -253,7 +253,7 @@ export default async function OnboardingPage() {
                   placeholder="Sök kund…"
                 />
               </div>
-              <Button type="submit">Lägg till</Button>
+              <AddButton />
             </form>
           </Step>
 

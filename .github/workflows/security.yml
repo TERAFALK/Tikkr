@@ -120,8 +120,10 @@ jobs:
           --severity ERROR
           --error
 
+  # Bara mot prod och varje måndag, som bygget i ci.yml (ändrat 2026-11-27).
   image:
     name: Docker-imagen (trivy)
+    if: github.event_name == 'schedule' || github.ref == 'refs/heads/prod' || github.base_ref == 'prod'
     runs-on: ubuntu-latest
     timeout-minutes: 25
 
