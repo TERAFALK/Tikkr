@@ -2136,6 +2136,14 @@ får inga egna commits utom en akut rättelse, som sedan slås ihop tillbaka i
 `dev`. Då har `prod` exakt det innehåll labbet provat, och taggen sätts utan
 en ny omgång i labbet.
 
+**Första produktionsversionen plockades ur `dev`** (beslutat 2026-11-27,
+produktägarens val). Integrationerna (§ 3.5) låg redan i `dev` men var inte
+klara, och pilotkunden började 2026-12-01. PR 125, 127 och 128 plockades över
+till `prod` med cherry-pick och provades i labbet på `prod`, samma väg som en
+akut rättelse. Taggen `v1.0.0`, satt 2026-10-31 men aldrig driftsatt, flyttades
+till den versionen. Ett engångsfall: nästa version går `dev` till `prod` som
+vanligt, och integrationerna följer då med.
+
 - **CI** (`.github/workflows/ci.yml`) kör typkontroll, alla tester mot en egen
   Postgres, ett bygge av Docker-imagen och en kontroll av compose-filerna på
   varje PR och push till `dev` och `prod`. Den driftsätter ingenting.
