@@ -2675,6 +2675,21 @@ aldrig låst, se § 4 punkt 5.
 Stripe sköter prenumerationen och styr åtkomst automatiskt. Fortnox används
 parallellt för bokföring och momsredovisning.
 
+**Momsen är en fast sats på 25 %, inte Stripe Tax** (beslutat 2026-11-27).
+Priserna hos Stripe är exklusive moms, och Tikkr säljer bara till svenska
+företag. Kassan lägger satsen ur `STRIPE_TAX_RATE_ID` på varje rad och som
+prenumerationens förval, och ett tillval som läggs till senare bär den själv.
+Saknas satsen startar ingen betalning: en faktura utan moms är fel mot kunden
+och Skatteverket. Till v1.0.1 lades ingen moms på alls. Stripe Tax valdes
+bort eftersom det räknar per land och kostar per transaktion, för en uträkning
+som här alltid ger samma svar. Se `vatTaxRateIds` i `billing.ts`, och
+`tests/vat.test.ts`.
+
+**Tikkr har ett eget Stripe-konto** (beslutat 2026-11-27), i organisationen
+TERAFALK AB, med Tikkrs varumärke. Terafalk är säljaren på fakturan. Nyckeln
+är begränsad till det koden använder: Checkout Sessions, Customer Portal,
+Customers, Invoices och Subscriptions skriva, Prices och Products läsa.
+
 ## 9. Miljöstatus (uppdatera vid ändring)
 
 ### Arbetssätt
