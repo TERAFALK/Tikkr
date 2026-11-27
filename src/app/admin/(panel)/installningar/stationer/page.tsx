@@ -117,7 +117,7 @@ export default async function StationsPage() {
             description="En station kör ett arbetsmoment. Lägg upp momenten först."
             action={
               <ButtonLink href="/admin/installningar/arbetsmoment">
-                Till arbetsmoment
+                Lägg upp arbetsmoment
               </ButtonLink>
             }
           />

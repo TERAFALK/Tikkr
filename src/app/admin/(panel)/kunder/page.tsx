@@ -59,25 +59,21 @@ export default async function CustomersPage({
   const active = customers.filter((customer) => customer.active).length;
   const page = listPaging(customers.length, params);
 
+  const newCustomer = (
+    <CustomerDialog
+      trigger="Ny kund"
+      title="Lägg till kund"
+      action={createCustomer}
+      submitLabel="Lägg till"
+    />
+  );
+
   return (
     <>
-      <PageHeader
-        title="Kunder"
-        help="kunder"
-        action={
-          <CustomerDialog
-            trigger="Ny kund"
-            title="Lägg till kund"
-            action={createCustomer}
-            submitLabel="Lägg till"
-          />
-        }
-      />
+      <PageHeader title="Kunder" help="kunder" action={newCustomer} />
 
       {customers.length === 0 && !query ? (
-        <EmptyState
-          title="Inga kunder upplagda"
-        />
+        <EmptyState title="Inga kunder upplagda" action={newCustomer} />
       ) : (
         <Card>
           <CardHeader

@@ -32,22 +32,40 @@ import type { CompanyDb } from "./tenant";
  * Gränsen är avsiktlig. Blandades de ihop skulle `ready` betyda "har fyllt i
  * allt", och den dag en kund inte vill ha ett kundregister vore guiden aldrig
  * klar. `ready` betyder en sak: skärmen går att använda.
+ *
+ * DE REKOMMENDERADE STEGEN FÖLJER TILLVALEN (ändrat 2026-11-27). Guiden
+ * visade bara arbetstidsschemat för löneunderlaget, under ett namn sidan inte
+ * längre har, och ingenting alls för planeringen. Nu står varje tillval under
+ * sin egen rubrik, och bara för den som har det.
  */
+
+/**
+ * Var ett rekommenderat steg hör hemma: hos alla, eller med ett tillval. Guiden
+ * visar varje grupp under sin egen rubrik, så att den som har löneunderlaget
+ * ser vad som hör till det, och den som inte har det aldrig ser stegen.
+ */
+export type OnboardingGroup = "base" | "payroll" | "planning";
 
 export interface OnboardingStep {
   key: string;
   title: string;
+  /** Står under rubriken i guiden. Ett ställe, inte två. */
   description: string;
   href: string;
   done: boolean;
   /** Texten på knappen som leder vidare. Bara för de rekommenderade stegen. */
   action?: string;
+  /** Bara för de rekommenderade stegen. */
+  group?: OnboardingGroup;
 }
 
 export interface OnboardingState {
   /** Stegen som krävs för att kunna stämpla. */
   steps: OnboardingStep[];
-  /** Stegen som gör underlagen kompletta. Påverkar inte `ready`. */
+  /**
+   * Stegen som gör underlagen kompletta. Påverkar inte `ready`. Tom utan
+   * `extras: true`, se nedan.
+   */
   extras: OnboardingStep[];
   completed: number;
   total: number;
@@ -55,42 +73,35 @@ export interface OnboardingState {
   ready: boolean;
 }
 
+export interface OnboardingOptions {
+  /**
+   * true räknar också de rekommenderade stegen. Bara guiden visar dem.
+   * Panelens layout och översikten behöver fyra siffror och `ready`, vid
+   * varje sidladdning, och där ska inte ett tiotal frågor till köras för en
+   * lista ingen ser.
+   */
+  extras?: boolean;
+  /**
+   * Tillvalen och planeringsläget. Skickas in i stället för att slås upp
+   * här: anroparen vet redan om modulen är på, och en funktion i lib/ ska
+   * inte behöva känna till grinden. Se lib/company-modules.ts.
+   */
+  payroll?: boolean;
+  planning?: boolean;
+  planningMode?: "PRODUCTION" | "SERVICE";
+  /** Företagets avtal för arbetstidsförkortning, eller null. */
+  atfAgreement?: string | null;
+}
+
 export async function getOnboardingState(
   db: CompanyDb,
-  options: {
-    /**
-     * true när företaget har löneunderlaget. Styr om arbetstidsschemat
-     * räknas som ett steg alls.
-     *
-     * Skickas in i stället för att slås upp här. Anroparen vet redan om
-     * modulen är på, och en funktion i lib/ ska inte behöva känna till
-     * grinden för att kunna räkna fyra siffror. Se lib/company-modules.ts.
-     */
-    payroll?: boolean;
-  } = {}
+  options: OnboardingOptions = {}
 ): Promise<OnboardingState> {
-  const [
-    employees,
-    moments,
-    orders,
-    devices,
-    customers,
-    momentsWithRate,
-    indirect,
-    scheduleDays,
-  ] = await Promise.all([
+  const [employees, moments, orders, devices] = await Promise.all([
     db.employee.count(),
     db.workMoment.count(),
     db.order.count(),
     db.kioskDevice.count(),
-    db.customer.count(),
-    db.workMoment.count({ where: { costRateOre: { not: null } } }),
-    db.indirectMoment.count(),
-    // Bara företagets standardschema. Ett personligt schema hör till en
-    // enskild anställd och säger ingenting om att uppsättningen är gjord.
-    options.payroll
-      ? db.scheduleDay.count({ where: { schedule: { isDefault: true } } })
-      : Promise.resolve(0),
   ]);
 
   // Ordningen speglar beroendena: utan anställda finns ingen att stämpla,
@@ -100,7 +111,7 @@ export async function getOnboardingState(
     {
       key: "employees",
       title: "Lägg upp anställda",
-      description: "Visas som knappar på stämplingsskärmen.",
+      description: "Varje anställd blir en knapp på stämplingsskärmen.",
       href: "/admin/kom-igang",
       done: employees > 0,
     },
@@ -108,44 +119,116 @@ export async function getOnboardingState(
       key: "moments",
       title: "Lägg upp arbetsmoment",
       description:
-        "Den typ av arbete tiden avser, t.ex. svetsning eller montering.",
+        "Det arbete tiden avser, till exempel svetsning eller montering.",
       href: "/admin/kom-igang",
       done: moments > 0,
     },
     {
       key: "orders",
       title: "Lägg upp minst en order",
-      description: "All registrerad tid hör till en kundorder.",
+      description: "All ordertid stämplas på en order.",
       href: "/admin/kom-igang",
       done: orders > 0,
     },
     {
       key: "device",
       title: "Koppla en stämplingsskärm",
-      description: "Lägg upp skärmen och knappa in koden på enheten.",
+      description: "Lägg upp skärmen här och knappa in koden på skärmen.",
       href: "/admin/installningar/skarmar",
       done: devices > 0,
     },
   ];
+
+  const completed = steps.filter((step) => step.done).length;
+
+  return {
+    steps,
+    extras: options.extras ? await extrasFor(db, options) : [],
+    completed,
+    total: steps.length,
+    ready: completed === steps.length,
+  };
+}
+
+/**
+ * Det som gör underlagen kompletta, för alla och per tillval.
+ *
+ * Arbetstiderna hör till arbetsytan sedan 2026-10-17 och visas med
+ * löneunderlaget ELLER planeringen, som båda läser dem (WORK_HOURS_MODULES).
+ * De står under det första tillvalet kunden har, så att de inte syns två
+ * gånger.
+ */
+async function extrasFor(
+  db: CompanyDb,
+  options: OnboardingOptions
+): Promise<OnboardingStep[]> {
+  const workHours = Boolean(options.payroll || options.planning);
+  const stations = Boolean(
+    options.planning && options.planningMode !== "SERVICE"
+  );
+
+  const [
+    customers,
+    employeeRates,
+    momentRates,
+    indirect,
+    admins,
+    profile,
+    scheduleDays,
+    holidays,
+    breakTypes,
+    stationCount,
+  ] = await Promise.all([
+    db.customer.count(),
+    db.employee.count({ where: { costRateOre: { not: null } } }),
+    db.workMoment.count({ where: { costRateOre: { not: null } } }),
+    db.indirectMoment.count(),
+    db.adminUser.count(),
+    db.companyProfile.count({ where: { orgNumber: { not: null } } }),
+    // Bara företagets tider. En anställds egna tider säger ingenting om att
+    // uppsättningen är gjord.
+    workHours
+      ? db.scheduleDay.count({ where: { schedule: { isDefault: true } } })
+      : Promise.resolve(0),
+    options.payroll ? db.holiday.count() : Promise.resolve(0),
+    options.payroll ? db.breakType.count() : Promise.resolve(0),
+    stations ? db.station.count() : Promise.resolve(0),
+  ]);
+
+  const workHoursStep: OnboardingStep = {
+    key: "work-hours",
+    title: "Lägg upp arbetstiderna",
+    description: options.payroll
+      ? "Den planerade tiden flexen mäts mot. Utan arbetstider blir all arbetad tid flex."
+      : "Visar på tavlan när personalen arbetar.",
+    href: "/admin/installningar/arbetstider",
+    action: "Till arbetstider",
+    done: scheduleDays > 0,
+  };
 
   const extras: OnboardingStep[] = [
     {
       key: "customers",
       title: "Lägg upp kunder",
       description:
-        "Ordern kopplas till en kund. Kunden bär påslag, rabatt och adressen på underlaget.",
+        "Ordern kopplas till en kund, som bär påslag, rabatt och adressen på underlaget.",
       href: "/admin/kunder",
       action: "Till kunder",
       done: customers > 0,
+      group: "base",
     },
     {
+      // Självkostnaden är personens sats plus momentets (CLAUDE.md § 3
+      // regel 4). Steget är klart när någon av dem finns, eftersom en sats
+      // ensam räcker för att efterkalkylen ska ha ett belopp.
       key: "rates",
-      title: "Sätt timkostnad på arbetsmomenten",
+      title: "Sätt timkostnad",
       description:
-        "Utan den saknar efterkalkylen underlag och tiden redovisas utan belopp.",
+        "På den anställde och på arbetsmomentet. Efterkalkylen lägger ihop dem, och utan någon av dem står tiden utan belopp.",
       href: "/admin/installningar/arbetsmoment",
       action: "Till arbetsmoment",
-      done: momentsWithRate > 0,
+      done: employeeRates + momentRates > 0,
+      group: "base",
     },
     {
       key: "indirect",
@@ -155,30 +238,80 @@ export async function getOnboardingState(
       href: "/admin/installningar/improduktivt",
       action: "Till improduktiv tid",
       done: indirect > 0,
+      group: "base",
+    },
+    {
+      key: "users",
+      title: "Bjud in kollegor",
+      description: "Var och en loggar in med eget konto.",
+      href: "/admin/installningar/anvandare",
+      action: "Till användare",
+      done: admins > 1,
+      group: "base",
+    },
+    {
+      key: "company",
+      title: "Fyll i företagsuppgifterna",
+      description:
+        "Organisationsnummer och adresser, till beställningar och fakturor.",
+      href: "/admin/installningar",
+      action: "Till företaget",
+      done: profile > 0,
+      group: "base",
     },
   ];
 
   if (options.payroll) {
-    extras.push({
-      key: "schedule",
-      title: "Lägg upp arbetstidsschemat",
-      description:
-        "Ger den planerade tiden som flexsaldot mäts mot. Utan schema blir all arbetad tid flex.",
-      href: "/admin/installningar/arbetstider",
-      action: "Till arbetstider",
-      done: scheduleDays > 0,
-    });
+    extras.push(
+      { ...workHoursStep, group: "payroll" },
+      {
+        key: "holidays",
+        title: "Lägg in röda dagar",
+        description:
+          "Dagar utan planerad tid för någon. Listan fylls i för varje år.",
+        href: "/admin/installningar/roda-dagar",
+        action: "Till röda dagar",
+        done: holidays > 0,
+        group: "payroll",
+      },
+      {
+        key: "breaks",
+        title: "Lägg upp rasttyper",
+        description: "Rasterna stämplas på skärmen och dras från närvarotiden.",
+        href: "/admin/installningar/schema",
+        action: "Till rasttyper",
+        done: breakTypes > 0,
+        group: "payroll",
+      },
+      {
+        key: "atf",
+        title: "Välj avtal för arbetstidsförkortning",
+        description: "Bara om ert kollektivavtal ger arbetstidsförkortning.",
+        href: "/admin/installningar/atf",
+        action: "Till arbetstidsförkortning",
+        done: Boolean(options.atfAgreement),
+        group: "payroll",
+      }
+    );
   }
 
-  const completed = steps.filter((step) => step.done).length;
+  if (options.planning) {
+    if (!options.payroll) extras.push({ ...workHoursStep, group: "planning" });
 
-  return {
-    steps,
-    extras,
-    completed,
-    total: steps.length,
-    ready: completed === steps.length,
-  };
+    if (stations) {
+      extras.push({
+        key: "stations",
+        title: "Lägg upp stationer",
+        description: "En maskin eller arbetsplats som kör ett arbetsmoment.",
+        href: "/admin/installningar/stationer",
+        action: "Till stationer",
+        done: stationCount > 0,
+        group: "planning",
+      });
+    }
+  }
+
+  return extras;
 }
 
 /**

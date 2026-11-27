@@ -195,6 +195,20 @@ Stämplingar, Anställda och Kunder visar varje rad som ett kort under `sm`, med
 `Table cards` och en `label` på cellerna. Det är samma celler som på skrivbordet,
 ritade om i `globals.css`, så att telefonen aldrig kan visa något annat.
 
+**En tom lista visar vägen vidare, likadant överallt** (beslutat 2026-11-27,
+produktägarens krav). Kunder saknade knappen som Anställda hade mitt i den
+tomma listan. Kan man lägga upp något på sidan står samma knapp som i
+sidhuvudet; beror sidan på ett annat register står en knapp dit, med Lägg upp;
+en lista man bara läser har ingen. Regeln står i `TONE-OF-VOICE.md` och
+`tests/empty-states.test.ts` fäller ett tomt läge utan knapp som inte står
+bland undantagen med sitt skäl.
+
+**Kom igång följer tillvalen** (ändrat 2026-11-27). De fyra stegen som krävs
+fälls ihop när de är klara, med formuläret under Lägg till fler. De
+rekommenderade stegen står under Därefter, Löneunderlag och Planering, och bara
+för den som har tillvalet. De räknas bara när guiden visas (`extras: true` i
+`onboarding.ts`), eftersom panelens layout hämtar stegen vid varje sidladdning.
+
 **Osparade ändringar frågar innan de försvinner** (beslutat 2026-10-30,
 UX-granskningen). `UnsavedGuard` står i `SaveForm`, i Arbetstider och i rutorna
 för anställd, kund och order: en länk i panelen och webbläsarens omladdning

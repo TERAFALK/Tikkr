@@ -158,6 +158,17 @@ En rubrik som substantiv. Beskrivning bara om den säger vad man gör nu.
 
 Inte "Du har ännu inte registrerat några arbetstimmar för den här perioden."
 
+Under rubriken står vägen vidare, och den är densamma överallt:
+
+- **Kan man lägga upp något på sidan** står samma knapp som i sidhuvudet, med
+  samma text och samma ruta: Ny anställd, Ny kund, Ny order.
+- **Beror sidan på ett annat register** står en knapp dit, med verbet Lägg
+  upp: Lägg upp anställda, Lägg upp arbetsmoment.
+- **En lista man bara läser, eller ett filter utan träff,** har ingen knapp.
+
+`tests/empty-states.test.ts` fäller ett tomt tillstånd utan knapp som inte
+står bland undantagen med sitt skäl.
+
 ### Bekräftelser före något oåterkalleligt
 En fråga, sedan konsekvensen. Verbet i knappen säger vad som händer.
 
