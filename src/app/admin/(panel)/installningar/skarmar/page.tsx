@@ -20,6 +20,7 @@ import { formatDateTime } from "@/lib/format";
 import { checkoutHrefFor } from "@/lib/shop/cart";
 import { getLicenseState } from "@/lib/licenses";
 import { deviceState } from "@/lib/kiosk-auth";
+import { appUrl } from "@/lib/app-url";
 import {
   addDevice,
   deleteDevice,
@@ -32,7 +33,21 @@ export const metadata = { title: "Stämplingsskärmar · Tikkr" };
 
 export const dynamic = "force-dynamic";
 
+/**
+ * Adressen skärmen öppnar, så kort som möjligt: tikkr.se/kiosk i produktionen,
+ * som skickas vidare till portalen, och labbets egen adress där.
+ */
+function kioskAddress(): string {
+  const marketing = (process.env.MARKETING_HOST ?? "").split(",")[0]?.trim();
+  const host = marketing
+    ? marketing.replace(/^www\./, "")
+    : new URL(appUrl()).host;
+  return `${host}/kiosk`;
+}
+
 export default async function DevicesPage() {
+  const address = kioskAddress();
+
   const { db, companyId } = await requireAdmin();
   const licenses = await getLicenseState(companyId);
 
@@ -64,6 +79,8 @@ export default async function DevicesPage() {
       action={addDevice}
       submitLabel="Skapa kod"
       disabled={licenses.available <= 0}
+      description={`Skärmen kopplas på ${address}.`}
+      address={address}
     >
       <Field
         label="Namn"
@@ -212,6 +229,7 @@ export default async function DevicesPage() {
                           }
                           action={repairDevice}
                           submitLabel="Skapa kod"
+                          address={address}
                         >
                           <input type="hidden" name="id" value={device.id} />
                           <p className="text-[13px] leading-relaxed text-neutral-600">

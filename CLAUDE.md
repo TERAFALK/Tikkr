@@ -2170,6 +2170,10 @@ vanligt, och integrationerna följer då med.
 - **CI** (`.github/workflows/ci.yml`) kör typkontroll, alla tester mot en egen
   Postgres, ett bygge av Docker-imagen och en kontroll av compose-filerna på
   varje PR och push till `dev` och `prod`. Den driftsätter ingenting.
+  **Imagen byggs och skannas bara mot `prod`** (ändrat 2026-11-27,
+  produktägarens val): en PR mot `dev` kör typkontroll och tester, och den
+  fulla kontrollen körs före taggen. `release.sh` vägrar en tagg vars commit
+  inte har grön CI.
 - **Säkerhetskontrollerna** (`.github/workflows/security.yml`, infört
   2026-10-18) körs på samma händelser och dessutom varje måndag:
   `npm audit` (produktionens beroenden fäller vid hög, alla vid kritisk),
