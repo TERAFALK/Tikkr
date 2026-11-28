@@ -20,7 +20,7 @@ import SearchSelect from "@/components/admin/SearchSelect";
 import { customerOptions } from "@/lib/customers";
 import { checkoutHrefFor } from "@/lib/shop/cart";
 import { addEmployees, addMoments, addOrder } from "./actions";
-import AddButton from "./AddButton";
+import AddForm from "./AddForm";
 
 export const metadata = { title: "Kom igång · Tikkr" };
 
@@ -151,7 +151,7 @@ export default async function OnboardingPage() {
               />
             }
           >
-            <form action={addEmployees} className="space-y-3">
+            <AddForm action={addEmployees} className="space-y-3">
               <Field label="Namn" hint="Ett namn per rad">
                 <Textarea
                   name="names"
@@ -159,8 +159,7 @@ export default async function OnboardingPage() {
                   placeholder={"Anna Andersson\nBjörn Bergqvist\nCarina Cederlund"}
                 />
               </Field>
-              <AddButton />
-            </form>
+            </AddForm>
           </Step>
 
           <Step
@@ -174,7 +173,7 @@ export default async function OnboardingPage() {
               />
             }
           >
-            <form action={addMoments} className="space-y-4">
+            <AddForm action={addMoments} className="space-y-4">
               {suggestions.length > 0 && (
                 <fieldset>
                   <legend className="mb-2 text-[13px] font-medium text-neutral-700">
@@ -206,9 +205,7 @@ export default async function OnboardingPage() {
                   placeholder={"Kantpressning\nBlästring"}
                 />
               </Field>
-
-              <AddButton />
-            </form>
+            </AddForm>
           </Step>
 
           <Step
@@ -230,7 +227,7 @@ export default async function OnboardingPage() {
                 som hjälptext under sig och ordernumret ingen, och då hamnade
                 etiketterna på olika höjd. Nu står valfritt i etiketten, och
                 fälten och knappen ligger på samma linje. */}
-            <form
+            <AddForm
               action={addOrder}
               className="grid gap-3 sm:grid-cols-[9rem_minmax(0,1fr)_auto] sm:items-end"
             >
@@ -253,8 +250,7 @@ export default async function OnboardingPage() {
                   placeholder="Sök kund…"
                 />
               </div>
-              <AddButton />
-            </form>
+            </AddForm>
           </Step>
 
           <Step
